@@ -29,6 +29,8 @@ local ctx_candidatePriority: { [number]: number } = table.create(16)
 local ctx_candidateIndex: { [number]: number } = table.create(16)
 local ctx_candidateList: { [number]: number } = table.create(16)
 
+local SAFETY_MODE = true
+
 local MOVE_THRESHOLD = 0.1
 local MOVE_THRESHOLD_SQ = MOVE_THRESHOLD * MOVE_THRESHOLD
 
@@ -42,8 +44,14 @@ local function fireCallback(callbacks, item, zone, customData)
 		return
 	end
 
-	for _, cb in callbacks do
-		task.spawn(cb, item, zone, customData)
+	if SAFETY_MODE then
+		for _, cb in callbacks do
+			task.spawn(cb, item, zone, customData)
+		end
+	else
+		for _, cb in callbacks do
+			cb(item, zone, customData)
+		end
 	end
 end
 
@@ -297,5 +305,9 @@ return {
 
 	SetFrameBudget = function(n: number)
 		State.frameBudget = n
+	end,
+
+	DisableSafetyMode = function()
+		SAFETY_MODE = false
 	end,
 }
