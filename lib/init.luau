@@ -4,7 +4,7 @@
 local RunService = game:GetService('RunService')
 
 local Geometry = require(script.Geometry)
-local SpatialIndex = require(script.SpatialIndex)
+local LinearBVH = require(script.LinearBVH)
 local Types = require(script.Types)
 local State = require(script.State)
 local Zone = require(script.Zone)
@@ -13,7 +13,7 @@ local Strategy = require(script.Strategy)
 
 local items = State.items
 local objects = State.objects
-local zoneWatchingGroups = State.zoneWatchingGroups
+local zoneBoundGroups = State.zoneBoundGroups
 local groupPriorityMap = State.groupPriorityMap
 local itemCustomData = State.itemCustomData
 local groupEnteredCallbacks = State.groupEnteredCallbacks
@@ -48,14 +48,14 @@ local function fireCallback(callbacks, item, zone, customData)
 end
 
 local function queryCallback(zoneId: number)
-	local groups = zoneWatchingGroups[zoneId]
+	local groups = zoneBoundGroups[zoneId]
 	if not groups then
 		return
 	end
 
 	local memberOfGroups = ctx_data.memberOfGroups
 
-	-- If the item isn't a member of any group this zone watches, skip the geometry entirely.
+	-- If the item isn't a member of any group this zone is bound to, skip the geometry entirely.
 	local isMemberOfAny = false
 	for _, gUID in groups do
 		if memberOfGroups[gUID] then
@@ -95,7 +95,7 @@ end
 RunService.Heartbeat:Connect(function()
 	if State.pendingRebuild then
 		debug.profilebegin('QuickBounds_Build')
-		State.rootNode = SpatialIndex.Build(objects)
+		State.rootNode = LinearBVH.Build(objects)
 		State.pendingRebuild = false
 		debug.profileend()
 		State.isDirty = true
@@ -147,7 +147,7 @@ RunService.Heartbeat:Connect(function()
 		ctx_cCount = 0
 		ctx_highestWin = -math.huge
 
-		SpatialIndex.QueryPoint(State.rootNode, pos, queryCallback)
+		LinearBVH.QueryPoint(State.rootNode, pos, queryCallback)
 
 		local current = data.activeGroupMemberships
 
@@ -278,9 +278,9 @@ return {
 		local results = {}
 		local foundUIDs = {}
 		if State.rootNode then
-			SpatialIndex.QueryPoint(State.rootNode, position, function(zoneId)
+			LinearBVH.QueryPoint(State.rootNode, position, function(zoneId)
 				if Geometry.IsPointInShape(position, objects[zoneId]) then
-					local groups = State.zoneWatchingGroups[zoneId]
+					local groups = State.zoneBoundGroups[zoneId]
 					if groups then
 						for _, uid in groups do
 							if not foundUIDs[uid] then

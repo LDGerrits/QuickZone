@@ -9,8 +9,8 @@ type ListItem = {
 	mortonCode: number,
 }
 
-local SpatialIndex = {}
-SpatialIndex.__index = SpatialIndex
+local LinearBVH = {}
+LinearBVH.__index = LinearBVH
 
 local listCache = table.create(2000)
 local traversalStack = table.create(64)
@@ -75,7 +75,7 @@ end
 local HUGE_VECTOR = Vector3.one * math.huge
 local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
-function SpatialIndex.Build(objects: { Geometry.BoundingVolume }): Types.Node?
+function LinearBVH.Build(objects: { Geometry.BoundingVolume }): Types.Node?
 	table.clear(traversalStack)
 
 	local min = HUGE_VECTOR
@@ -119,7 +119,7 @@ function SpatialIndex.Build(objects: { Geometry.BoundingVolume }): Types.Node?
 	return nil
 end
 
-function SpatialIndex.QueryPoint(root: Types.Node?, point: Vector3, callback: (id: number) -> ())
+function LinearBVH.QueryPoint(root: Types.Node?, point: Vector3, callback: (id: number) -> ())
 	if not root then
 		return
 	end
@@ -152,4 +152,4 @@ function SpatialIndex.QueryPoint(root: Types.Node?, point: Vector3, callback: (i
 	end
 end
 
-return SpatialIndex
+return LinearBVH

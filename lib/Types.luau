@@ -8,14 +8,13 @@ export type BoundingVolume = {
 	HalfSize: Vector3,
 	Shape: ShapeType,
 
-	-- sphere specific
-	radius: number?,
+	-- sphere and cylinder specific
+	radiusSquared: number?,
 
 	-- cylinder specific
 	start: Vector3?,
 	axis: Vector3?,
 	axisLength: number?,
-	radiusSquared: number?,
 }
 
 export type Node = {

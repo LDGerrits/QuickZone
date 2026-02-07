@@ -16,7 +16,7 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	}
 
 	if shape == 'Ball' then
-		object.radius = halfSize.X
+		object.radiusSquared = halfSize.X * halfSize.X
 	elseif shape == 'Cylinder' then
 		local halfHeight = halfSize.X
 		object.start = object.Position - object.CFrame.RightVector * halfHeight
@@ -34,7 +34,7 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	State.zoneIndexToZoneObj[index] = (self :: any) :: Types.Zone
 
 	task.delay(5, function()
-		if State.zoneIndexToZoneObj[index] and not State.zoneWatchingGroups[index] then
+		if State.zoneIndexToZoneObj[index] and not State.zoneBoundGroups[index] then
 			warn(
 				string.format(
 					'[BitZone] Warning: Zone (Index %d) has been active for 5s without being bound to a Group. '
@@ -49,11 +49,11 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 end
 
 function Zone:BindToGroups(...): Types.Zone
-	local watching = State.zoneWatchingGroups[self.Index] or {}
-	State.zoneWatchingGroups[self.Index] = watching
+	local bound = State.zoneBoundGroups[self.Index] or {}
+	State.zoneBoundGroups[self.Index] = bound
 	for _, g in { ... } do
-		if not table.find(watching, g.UID) then
-			table.insert(watching, g.UID)
+		if not table.find(bound, g.UID) then
+			table.insert(bound, g.UID)
 		end
 	end
 	State.isDirty = true
@@ -61,20 +61,20 @@ function Zone:BindToGroups(...): Types.Zone
 end
 
 function Zone:UnbindFromGroups(...): Types.Zone
-	local watching = State.zoneWatchingGroups[self.Index]
-	if not watching then
+	local bound = State.zoneBoundGroups[self.Index]
+	if not bound then
 		return self
 	end
 
 	for _, g in { ... } do
-		local idx = table.find(watching, g.UID)
+		local idx = table.find(bound, g.UID)
 		while idx do
-			table.remove(watching, idx)
-			idx = table.find(watching, g.UID)
+			table.remove(bound, idx)
+			idx = table.find(bound, g.UID)
 		end
 	end
-	if #watching == 0 then
-		State.zoneWatchingGroups[self.Index] = nil
+	if #bound == 0 then
+		State.zoneBoundGroups[self.Index] = nil
 	end
 	State.isDirty = true
 
@@ -82,13 +82,13 @@ function Zone:UnbindFromGroups(...): Types.Zone
 end
 
 function Zone:GetGroups(): { Types.Group }
-	local watching = State.zoneWatchingGroups[self.Index]
-	if not watching then
+	local bound = State.zoneBoundGroups[self.Index]
+	if not bound then
 		return {}
 	end
 
 	local result = {}
-	for _, uid in watching do
+	for _, uid in bound do
 		local group = State.groupUIDToGroupObj[uid]
 		if group then
 			table.insert(result, group)
@@ -98,7 +98,7 @@ function Zone:GetGroups(): { Types.Group }
 end
 
 function Zone:Destroy()
-	State.zoneWatchingGroups[self.Index] = nil
+	State.zoneBoundGroups[self.Index] = nil
 	State.zoneIndexToZoneObj[self.Index] = nil
 	State.objects[self.Index] = nil
 	State.pendingRebuild = true

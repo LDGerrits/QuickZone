@@ -3,7 +3,7 @@ local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
 local Geometry = require(script.Parent.Geometry)
-local SpatialIndex = require(script.Parent.SpatialIndex)
+local LinearBVH = require(script.Parent.LinearBVH)
 local State = require(script.Parent.State)
 local Strategy = require(script.Parent.Strategy)
 local Types = require(script.Parent.Types)
@@ -276,8 +276,8 @@ end
 
 function Group:GetZones(): { Types.Zone }
 	local results = {}
-	for zoneIdx, watchingList in pairs(State.zoneWatchingGroups) do
-		if table.find(watchingList, self.UID) then
+	for zoneIdx, boundList in pairs(State.zoneBoundGroups) do
+		if table.find(boundList, self.UID) then
 			local zone = State.zoneIndexToZoneObj[zoneIdx]
 			if zone then
 				table.insert(results, zone)
@@ -293,11 +293,11 @@ function Group:IsPointInside(position: Vector3): boolean
 	end
 	local isInside = false
 
-	SpatialIndex.QueryPoint(State.rootNode, position, function(zoneId)
+	LinearBVH.QueryPoint(State.rootNode, position, function(zoneId)
 		if isInside then
 			return
 		end
-		local groups = State.zoneWatchingGroups[zoneId]
+		local groups = State.zoneBoundGroups[zoneId]
 		if groups and table.find(groups, self.UID) then
 			if Geometry.IsPointInShape(position, State.objects[zoneId]) then
 				isInside = true
@@ -332,11 +332,11 @@ function Group:Destroy(): ()
 
 	self:_cleanupPlayerConnections()
 
-	for _, watchingList in pairs(State.zoneWatchingGroups) do
-		local idx = table.find(watchingList, uid)
+	for _, boundList in pairs(State.zoneBoundGroups) do
+		local idx = table.find(boundList, uid)
 		while idx do
-			table.remove(watchingList, idx)
-			idx = table.find(watchingList, uid)
+			table.remove(boundList, idx)
+			idx = table.find(boundList, uid)
 		end
 	end
 

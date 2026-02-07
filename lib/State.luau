@@ -25,7 +25,7 @@ State.groupPriorityMap = {} :: { [number]: number }
 State.groupEnteredCallbacks = {} :: { [number]: { Types.Callback } }
 State.groupExitedCallbacks = {} :: { [number]: { Types.Callback } }
 
-State.zoneWatchingGroups = {} :: { [number]: { number } }
+State.zoneBoundGroups = {} :: { [number]: { number } }
 State.zoneIndexToZoneObj = {} :: { [number]: Types.Zone }
 State.groupUIDToGroupObj = {} :: { [number]: Types.Group }
 

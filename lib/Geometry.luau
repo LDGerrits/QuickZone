@@ -63,8 +63,7 @@ function Geometry.IsPointInShape(point: Vector3, object: Types.BoundingVolume): 
 		local localPoint = vector.abs(object.CFrame:PointToObjectSpace(point))
 		return vector.min(localPoint, object.HalfSize) == localPoint
 	elseif object.Shape == 'Ball' then
-		local radius = object.radius :: number
-		return vector.dot(object.Position - point, object.Position - point) <= (radius * radius)
+		return vector.dot(object.Position - point, object.Position - point) <= object.radiusSquared
 	elseif object.Shape == 'Cylinder' then
 		local toPoint = point - object.start :: Vector3
 		local projection = vector.dot(toPoint, object.axis :: Vector3)
