@@ -20,6 +20,8 @@ local groupExitedCallbacks = State.groupExitedCallbacks
 local zoneIndexToZoneObj = State.zoneIndexToZoneObj
 
 local ctx_pos: Vector3
+local ctx_itemSize: Vector3
+local ctx_itemCF: CFrame
 local ctx_data: Types.ItemData
 local ctx_cCount: number = 0
 local ctx_highestWin: number
@@ -95,6 +97,48 @@ local function queryCallback(zoneId: number)
 	end
 end
 
+local function volumeQueryCallback(zoneId: number)
+	if not Geometry.IsBoxInShape(ctx_itemCF, ctx_itemSize, objects[zoneId]) then
+		return
+	end
+
+	local groups = zoneBoundGroups[zoneId]
+	if not groups then
+		return
+	end
+
+	local memberOfGroups = ctx_data.memberOfGroups
+
+	local isMemberOfAny = false
+	for _, gUID in groups do
+		if memberOfGroups[gUID] then
+			if not ctx_candidatePriority[gUID] then
+				isMemberOfAny = true
+				break
+			end
+		end
+	end
+
+	if not isMemberOfAny then
+		return
+	end
+
+	for _, gUID in groups do
+		if memberOfGroups[gUID] then
+			local pri = groupPriorityMap[gUID] or 0
+
+			ctx_cCount += 1
+			ctx_candidateList[ctx_cCount] = gUID
+			ctx_candidateIndex[gUID] = zoneId
+			ctx_candidatePriority[gUID] = pri
+
+			if pri > ctx_highestWin then
+				ctx_highestWin = pri
+			end
+		end
+	end
+end
+
 RunService.Heartbeat:Connect(function()
 	if State.pendingRebuild then
 		debug.profilebegin('QuickBounds_Build')
@@ -149,7 +193,19 @@ RunService.Heartbeat:Connect(function()
 		ctx_cCount = 0
 		ctx_highestWin = -math.huge
 
-		LinearBVH.QueryPoint(State.rootNode, pos, queryCallback)
+		if data.useVolume then
+			local part = item :: BasePart
+			ctx_itemSize = part.Size -- TODO could be optimized?
+			ctx_itemCF = part.CFrame -- TODO could be optimized?
+
+			local halfSize = ctx_itemSize * 0.5
+			local min = pos - halfSize
+			local max = pos + halfSize
+
+			LinearBVH.QueryBox(State.rootNode, min, max, volumeQueryCallback)
+		else
+			LinearBVH.QueryPoint(State.rootNode, pos, queryCallback)
+		end
 
 		local current = data.activeGroupMemberships
 

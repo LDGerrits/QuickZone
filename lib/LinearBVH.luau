@@ -152,4 +152,42 @@ function LinearBVH.QueryPoint(root: Types.Node?, point: Vector3, callback: (id: 
 	end
 end
 
+function LinearBVH.QueryBox(root: Node?, boxMin: Vector3, boxMax: Vector3, callback: (id: number) -> ())
+	if not root then
+		return
+	end
+
+	local stackPtr = 1
+	traversalStack[1] = root
+
+	while stackPtr > 0 do
+		local node = traversalStack[stackPtr]
+		stackPtr -= 1
+
+		local nMin, nMax = node.min, node.max
+		if
+			boxMax.X >= nMin.X
+			and boxMin.X <= nMax.X
+			and boxMax.Y >= nMin.Y
+			and boxMin.Y <= nMax.Y
+			and boxMax.Z >= nMin.Z
+			and boxMin.Z <= nMax.Z
+		then
+			if node.id > 0 then
+				callback(node.id)
+			else
+				local left = node.left
+				local right = node.right
+
+				if left and right then
+					stackPtr += 1
+					traversalStack[stackPtr] = left
+					stackPtr += 1
+					traversalStack[stackPtr] = right
+				end
+			end
+		end
+	end
+end
+
 return LinearBVH

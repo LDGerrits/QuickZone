@@ -20,27 +20,9 @@ local STRAT_PIVOT = Strategy.PIVOT
 local Group = {}
 Group.__index = Group
 
-function Group.new(priority: number?): Types.Group
-	local group = (
-		setmetatable({
-			UID = State.nextGroupId,
-			_mainConnections = {},
-			_playerTrackers = {},
-		}, Group) :: any
-	) :: Types.Group
-
-	State.groupPriorityMap[group.UID] = priority or 0
-	State.groupEnteredCallbacks[group.UID] = {}
-	State.groupExitedCallbacks[group.UID] = {}
-	State.groupTrackingItems[group.UID] = setmetatable({}, { __mode = 'k' }) :: any
-	State.groupUIDToGroupObj[group.UID] = group
-
-	State.nextGroupId += 1
-	return group
-end
-
-function Group:TrackItem(item: Types.Item, customData: any?): Types.Group
+local function registerItem(group: Types.Group, item: Types.Item, customData: any?, useVolume: boolean)
 	local data = State.items[item]
+
 	if not data then
 		local strat
 		if typeof(item) == 'Instance' then
@@ -68,12 +50,29 @@ function Group:TrackItem(item: Types.Item, customData: any?): Types.Group
 		if not strat then
 			error(
 				string.format(
-					'[BitZone] TrackItem Failed: The provided item (%s) is not a supported type. '
-						.. 'Ensure it is a BasePart, Model, Attachment, Bone, Camera, or a table with a Position/CFrame.',
+					'[BitZone] TrackItem Failed: Item (%s) is not supported. '
+						.. 'Must be BasePart, Model, Attachment, Bone, Camera, or table with Position/CFrame.',
 					tostring(item)
 				),
 				2
 			)
+		end
+
+		if useVolume then
+			-- We restrict Volume tracking to BaseParts for now because they have a defined Size.
+			-- (Models would need GetBoundingBox which is slow, or a manual size passed in)
+			if not (typeof(item) == 'Instance' and item:IsA('BasePart')) then
+				warn(
+					string.format(
+						"[BitZone] Volume tracking requires a BasePart. Defaulting '%s' to point tracking.",
+						tostring(item)
+					)
+				)
+				useVolume = false
+			elseif strat == STRAT_POS then
+				-- If we are tracking volume, we need Rotation (CFrame), not just Position
+				strat = STRAT_CFRAME
+			end
 		end
 
 		data = {
@@ -81,21 +80,60 @@ function Group:TrackItem(item: Types.Item, customData: any?): Types.Group
 			memberOfGroups = {},
 			lastPosition = Vector3.zero,
 			strategy = strat,
+			useVolume = useVolume,
 			isDirty = true,
 		}
 		State.items[item] = data
+	else
+		-- 2. Update existing item mode if upgraded to Volume
+		if useVolume and not data.useVolume then
+			if typeof(item) == 'Instance' and item:IsA('BasePart') then
+				data.useVolume = true
+				-- Upgrade strategy to CFrame if it was just Position, so we get rotation for OBB checks
+				if data.strategy == STRAT_POS then
+					data.strategy = STRAT_CFRAME
+				end
+			end
+		end
 	end
 
 	if customData ~= nil then
 		if not State.itemCustomData[item] then
 			State.itemCustomData[item] = {}
 		end
-		State.itemCustomData[item][self.UID] = customData
+		State.itemCustomData[item][group.UID] = customData
 	end
 
-	data.memberOfGroups[self.UID] = true
+	data.memberOfGroups[group.UID] = true
 	data.isDirty = true
+end
 
+function Group.new(priority: number?): Types.Group
+	local group = (
+		setmetatable({
+			UID = State.nextGroupId,
+			_mainConnections = {},
+			_playerTrackers = {},
+		}, Group) :: any
+	) :: Types.Group
+
+	State.groupPriorityMap[group.UID] = priority or 0
+	State.groupEnteredCallbacks[group.UID] = {}
+	State.groupExitedCallbacks[group.UID] = {}
+	State.groupTrackingItems[group.UID] = setmetatable({}, { __mode = 'k' }) :: any
+	State.groupUIDToGroupObj[group.UID] = group
+
+	State.nextGroupId += 1
+	return group
+end
+
+function Group:TrackItem(item: Types.Item, customData: any?): Types.Group
+	registerItem(self, item, customData, false)
+	return self
+end
+
+function Group:TrackVolume(part: BasePart, customData: any?): Types.Group
+	registerItem(self, part, customData, true)
 	return self
 end
 

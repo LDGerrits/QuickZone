@@ -1,6 +1,6 @@
 --!strict
 
-export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge'
+export type ShapeType = 'Block' | 'Ball' | 'Cylinder'
 
 export type BoundingVolume = {
 	Position: Vector3,
@@ -9,6 +9,7 @@ export type BoundingVolume = {
 	Shape: ShapeType,
 
 	-- Sphere / cylinder specific
+	radius: number?,
 	radiusSquared: number?,
 
 	-- Cylinder specific
@@ -42,6 +43,7 @@ export type ItemData = {
 	memberOfGroups: { [UID]: boolean },
 	lastPosition: Vector3,
 	strategy: number,
+	useVolume: boolean,
 	isDirty: boolean,
 }
 
@@ -73,6 +75,7 @@ export type Callback = (Item, Zone, any?) -> ()
 export type Group = {
 	SetPriority: (self: Group, priority: number) -> Group,
 	TrackItem: (self: Group, item: Item, customData: any?) -> Group,
+	TrackVolume: (self: BasePart, item: Item, customData: any?) -> Group,
 	UntrackItem: (self: Group, item: Item) -> Group,
 	TrackLocalPlayer: (self: Group) -> Group,
 	TrackPlayers: (self: Group) -> Group,

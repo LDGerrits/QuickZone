@@ -1,6 +1,7 @@
 --!native
 --!strict
 
+local BoxIntersection = require(script.Parent.BoxIntersection)
 local Types = require(script.Parent.Types)
 
 local MORTON_SHIFT16_MASK = 0xFF0000FF
@@ -74,14 +75,25 @@ function Geometry.IsPointInShape(point: Vector3, object: Types.BoundingVolume): 
 			return distanceSq <= object.radiusSquared :: number
 		end
 		return false
-	elseif object.Shape == 'Wedge' then
-		local localPoint = object.CFrame:PointToObjectSpace(point)
-		local absolutePoint = vector.abs(localPoint)
-		if vector.min(absolutePoint, object.HalfSize) == absolutePoint then
-			local size = object.HalfSize * 2
-			return (localPoint.Y / size.Y - localPoint.Z / size.Z) <= 0
-		end
-		return false
+	end
+
+	return false
+end
+
+function Geometry.IsBoxInShape(partCF: CFrame, partSize: Vector3, vol: Types.BoundingVolume): boolean
+	if vol.Shape == 'Block' then
+		return BoxIntersection.BoxInBox(partCF, partSize, vol.CFrame, vol.HalfSize * 2)
+	elseif vol.Shape == 'Ball' then
+		return BoxIntersection.BoxInSphere(partCF, partSize, vol.Position, vol.radius :: number)
+	elseif vol.Shape == 'Cylinder' then
+		return BoxIntersection.BoxInCylinder(
+			partCF,
+			partSize,
+			vol.Position,
+			vol.CFrame.RightVector,
+			vol.axisLength :: number,
+			vol.radius :: number
+		)
 	end
 
 	return false

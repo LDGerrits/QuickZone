@@ -17,6 +17,7 @@ export type BitZone = Types.BitZone
 export type Zone = Types.Zone
 export type Group = Types.Group
 export type Item = Types.Item
+export type Shape = Types.ShapeType
 
 local BitZone = {}
 

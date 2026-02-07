@@ -16,12 +16,14 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	}
 
 	if shape == 'Ball' then
+		object.radius = halfSize.X
 		object.radiusSquared = halfSize.X * halfSize.X
 	elseif shape == 'Cylinder' then
 		local halfHeight = halfSize.X
 		object.start = object.Position - object.CFrame.RightVector * halfHeight
 		object.axis = object.CFrame.RightVector
 		object.axisLength = halfHeight * 2
+		object.radius = halfSize.Y
 		object.radiusSquared = halfSize.Y * halfSize.Y
 	end
 
