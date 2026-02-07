@@ -15,5 +15,6 @@ registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
 [dependencies]
-Observers = "sleitnick/observers@^0.4.0"
+Observers = "ldgerrits/bitzone@^0.1.0"
 ```
+
