@@ -1,0 +1,13 @@
+[package]
+name = "ldgerrits/bitzone"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+license = "MIT"
+exclude = ["**"]
+include = [
+	"lib", 
+	"lib/**/*.luau",
+	"wally.toml",
+	"default.project.json",
+]
