@@ -15,7 +15,7 @@ State.isDirty = false
 State.items = {} :: { [Types.Item]: Types.ItemData }
 State.itemList = {} :: { Types.Item }
 State.itemIndices = {} :: { [Types.Item]: number }
-State.itemCustomData = {}
+State.itemCustomData = {} :: { [Types.Item]: { [number]: any } }
 
 State.groupTrackingItems = {} :: { [number]: { [Types.Item]: boolean } }
 State.groupPriorityMap = {} :: { [number]: number }

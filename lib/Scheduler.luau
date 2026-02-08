@@ -7,7 +7,7 @@ local Geometry = require(script.Parent.Geometry)
 local LinearBVH = require(script.Parent.LinearBVH)
 local Types = require(script.Parent.Types)
 local State = require(script.Parent.State)
-local Strategy = require(script.Parent.Strategy)
+local Config = require(script.Parent.Config)
 
 local itemList = State.itemList
 local items = State.items
@@ -29,22 +29,23 @@ local ctx_candidatePriority: { [number]: number } = table.create(16)
 local ctx_candidateIndex: { [number]: number } = table.create(16)
 local ctx_candidateList: { [number]: number } = table.create(16)
 
-local SAFETY_MODE = true
-local FRAME_BUDGET = 1 / 1000
-local PRECISION = 0.1
-local PRECISION_SQ = PRECISION * PRECISION
+local safetyMode = Config.Scheduler.SafetyMode
+local frameBudget = Config.Scheduler.FrameBudget
+local updateRate = Config.Scheduler.UpdateRate
+local precision = Config.Scheduler.Precision
+local precisionSq = precision * precision
 
-local STRAT_POS = Strategy.POS
-local STRAT_PRIM = Strategy.PRIM
-local STRAT_WORLD = Strategy.WORLD
-local STRAT_CFRAME = Strategy.CFRAME
+local STRAT_POS = Config.Strategy.POS
+local STRAT_PRIM = Config.Strategy.PRIM
+local STRAT_WORLD = Config.Strategy.WORLD
+local STRAT_CFRAME = Config.Strategy.CFRAME
 
 local function fireCallback(callbacks, item, zone, customData)
 	if not callbacks then
 		return
 	end
 
-	if SAFETY_MODE then
+	if safetyMode then
 		for _, cb in callbacks do
 			task.spawn(cb, item, zone, customData)
 		end
@@ -97,7 +98,7 @@ local function queryCallback(zoneId: number)
 	end
 end
 
-RunService.Heartbeat:Connect(function()
+RunService.Heartbeat:Connect(function(dt: number)
 	if State.pendingRebuild then
 		debug.profilebegin('QuickBounds_Build')
 		State.rootNode = LinearBVH.Build(objects)
@@ -121,11 +122,19 @@ RunService.Heartbeat:Connect(function()
 		return
 	end
 
+	local workQuota = math.ceil(totalItems * updateRate * dt)
+	if workQuota < 1 then
+		workQuota = 1
+	end
+	if workQuota > totalItems then
+		workQuota = totalItems
+	end
+
 	if lastProcessedIndex > totalItems then
 		lastProcessedIndex = 1
 	end
 
-	while processed < totalItems do
+	while processed < workQuota do
 		local item = itemList[lastProcessedIndex]
 		local data = items[item]
 
@@ -151,7 +160,7 @@ RunService.Heartbeat:Connect(function()
 			local dy = pos.Y - lastPos.Y
 			local dz = pos.Z - lastPos.Z
 			local d2 = (dx * dx) + (dy * dy) + (dz * dz)
-			if d2 >= PRECISION_SQ then
+			if d2 >= precisionSq then
 				shouldCheck = true
 			end
 		end
@@ -215,7 +224,7 @@ RunService.Heartbeat:Connect(function()
 
 		processed += 1
 
-		if processed % 32 == 0 and (os.clock() - start) > FRAME_BUDGET then
+		if processed % 32 == 0 and (os.clock() - start) > frameBudget then
 			break
 		end
 	end
@@ -224,17 +233,20 @@ end)
 
 local Scheduler = {}
 
+function Scheduler.SetUpdateRate(n: number)
+	updateRate = n
+end
+
 function Scheduler.SetFrameBudget(n: number)
-	FRAME_BUDGET = n
+	frameBudget = n
 end
 
 function Scheduler.SetPrecision(n: number)
-	PRECISION = n
-	PRECISION_SQ = PRECISION * PRECISION
+	precisionSq = n * n
 end
 
 function Scheduler.DisableSafetyMode()
-	SAFETY_MODE = false
+	safetyMode = false
 end
 
 return Scheduler

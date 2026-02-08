@@ -6,16 +6,16 @@ local RunService = game:GetService('RunService')
 local Geometry = require(script.Parent.Geometry)
 local LinearBVH = require(script.Parent.LinearBVH)
 local State = require(script.Parent.State)
-local Strategy = require(script.Parent.Strategy)
+local Config = require(script.Parent.Config)
 local Types = require(script.Parent.Types)
 
 local IS_CLIENT = RunService:IsClient()
 
-local STRAT_POS = Strategy.POS
-local STRAT_PRIM = Strategy.PRIM
-local STRAT_WORLD = Strategy.WORLD
-local STRAT_CFRAME = Strategy.CFRAME
-local STRAT_PIVOT = Strategy.PIVOT
+local STRAT_POS = Config.Strategy.POS
+local STRAT_PRIM = Config.Strategy.PRIM
+local STRAT_WORLD = Config.Strategy.WORLD
+local STRAT_CFRAME = Config.Strategy.CFRAME
+local STRAT_PIVOT = Config.Strategy.PIVOT
 
 local Group = {}
 Group.__index = Group
