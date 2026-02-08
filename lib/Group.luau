@@ -32,7 +32,7 @@ function Group.new(priority: number?): Types.Group
 	State.groupPriorityMap[group.UID] = priority or 0
 	State.groupEnteredCallbacks[group.UID] = {}
 	State.groupExitedCallbacks[group.UID] = {}
-	State.groupTrackingItems[group.UID] = setmetatable({}, { __mode = 'k' }) :: any
+	State.groupTrackingItems[group.UID] = {}
 	State.groupUIDToGroupObj[group.UID] = group
 
 	State.nextGroupId += 1
@@ -83,7 +83,12 @@ function Group:TrackItem(item: Types.Item, customData: any?): Types.Group
 			strategy = strat,
 			isDirty = true,
 		}
+
 		State.items[item] = data
+
+		local idx = #State.itemList + 1
+		State.itemList[idx] = item
+		State.itemIndices[item] = idx
 	end
 
 	if customData ~= nil then
@@ -134,6 +139,22 @@ function Group:UntrackItem(item: Types.Item): Types.Group
 
 	if next(data.memberOfGroups) == nil then
 		State.items[item] = nil
+
+		local indexToRemove = State.itemIndices[item]
+		local lastIndex = #State.itemList
+		local lastItem = State.itemList[lastIndex]
+
+		-- Swap-Remove from dense array
+		if indexToRemove == lastIndex then
+			State.itemList[lastIndex] = nil
+			State.itemIndices[item] = nil
+		else
+			State.itemList[indexToRemove] = lastItem
+			State.itemIndices[lastItem] = indexToRemove
+
+			State.itemList[lastIndex] = nil
+			State.itemIndices[item] = nil
+		end
 	end
 
 	return self

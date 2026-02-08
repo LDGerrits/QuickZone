@@ -9,6 +9,7 @@ local Types = require(script.Parent.Types)
 local State = require(script.Parent.State)
 local Strategy = require(script.Parent.Strategy)
 
+local itemList = State.itemList
 local items = State.items
 local objects = State.objects
 local zoneBoundGroups = State.zoneBoundGroups
@@ -19,6 +20,7 @@ local groupTrackingItems = State.groupTrackingItems
 local groupExitedCallbacks = State.groupExitedCallbacks
 local zoneIndexToZoneObj = State.zoneIndexToZoneObj
 
+local lastProcessedIndex = 1
 local ctx_pos: Vector3
 local ctx_data: Types.ItemData
 local ctx_cCount: number = 0
@@ -114,9 +116,22 @@ RunService.Heartbeat:Connect(function()
 	local forceRefresh = State.isDirty
 	State.isDirty = false
 
-	for item, data in items do
+	local totalItems = #itemList
+	if totalItems == 0 then
+		return
+	end
+
+	if lastProcessedIndex > totalItems then
+		lastProcessedIndex = 1
+	end
+
+	while processed < totalItems do
+		local item = itemList[lastProcessedIndex]
+		local data = items[item]
+
 		local pos
 		local strategy = data.strategy
+
 		if strategy == STRAT_POS then
 			pos = (item :: any).Position
 		elseif strategy == STRAT_WORLD then
@@ -129,53 +144,54 @@ RunService.Heartbeat:Connect(function()
 			pos = (item :: any):GetPivot().Position
 		end
 
-		if not forceRefresh and not data.isDirty then
+		local shouldCheck = forceRefresh or data.isDirty
+		if not shouldCheck then
 			local lastPos = data.lastPosition
 			local dx = pos.X - lastPos.X
 			local dy = pos.Y - lastPos.Y
 			local dz = pos.Z - lastPos.Z
 			local d2 = (dx * dx) + (dy * dy) + (dz * dz)
-			if d2 < PRECISION_SQ then
-				continue
+			if d2 >= PRECISION_SQ then
+				shouldCheck = true
 			end
 		end
 
-		data.lastPosition = pos
-		data.isDirty = false
+		if shouldCheck then
+			data.lastPosition = pos
+			data.isDirty = false
 
-		-- Query spatial map
-		ctx_pos = pos
-		ctx_data = data
-		ctx_cCount = 0
-		ctx_highestWin = -math.huge
+			-- Query spatial map
+			ctx_pos = pos
+			ctx_data = data
+			ctx_cCount = 0
+			ctx_highestWin = -math.huge
 
-		LinearBVH.QueryPoint(State.rootNode, pos, queryCallback)
+			LinearBVH.QueryPoint(State.rootNode, pos, queryCallback)
 
-		local current = data.activeGroupMemberships
+			local current = data.activeGroupMemberships
 
-		-- Check exits
-		for gUID, oldZoneIdx in current do
-			local newPri = ctx_candidatePriority[gUID]
-			if not newPri or newPri < ctx_highestWin then
-				current[gUID] = nil
+			-- Check exits
+			for gUID, oldZoneIdx in current do
+				local newPri = ctx_candidatePriority[gUID]
+				if not newPri or newPri < ctx_highestWin then
+					current[gUID] = nil
 
-				if groupTrackingItems[gUID] then
-					groupTrackingItems[gUID][item] = nil
+					if groupTrackingItems[gUID] then
+						groupTrackingItems[gUID][item] = nil
+					end
+
+					local zone = zoneIndexToZoneObj[oldZoneIdx]
+					local cd = itemCustomData[item] and itemCustomData[item][gUID]
+					fireCallback(groupExitedCallbacks[gUID], item, zone, cd)
 				end
-
-				local zone = zoneIndexToZoneObj[oldZoneIdx]
-				local cd = itemCustomData[item] and itemCustomData[item][gUID]
-				fireCallback(groupExitedCallbacks[gUID], item, zone, cd)
 			end
-		end
 
-		-- Check entries
-		for i = 1, ctx_cCount do
-			local gUID = ctx_candidateList[i]
-			local pri = ctx_candidatePriority[gUID]
+			-- Check entries
+			for i = 1, ctx_cCount do
+				local gUID = ctx_candidateList[i]
+				local pri = ctx_candidatePriority[gUID]
 
-			if pri >= ctx_highestWin then
-				if not current[gUID] then
+				if pri >= ctx_highestWin and not current[gUID] then
 					local newZoneIdx = ctx_candidateIndex[gUID]
 					current[gUID] = newZoneIdx
 
@@ -185,14 +201,20 @@ RunService.Heartbeat:Connect(function()
 					local cd = itemCustomData[item] and itemCustomData[item][gUID]
 					fireCallback(groupEnteredCallbacks[gUID], item, zone, cd)
 				end
-			end
 
-			ctx_candidatePriority[gUID] = nil
-			ctx_candidateIndex[gUID] = nil
-			ctx_candidateList[i] = nil
+				ctx_candidatePriority[gUID] = nil
+				ctx_candidateIndex[gUID] = nil
+				ctx_candidateList[i] = nil
+			end
+		end
+
+		lastProcessedIndex += 1
+		if lastProcessedIndex > totalItems then
+			lastProcessedIndex = 1
 		end
 
 		processed += 1
+
 		if processed % 32 == 0 and (os.clock() - start) > FRAME_BUDGET then
 			break
 		end
