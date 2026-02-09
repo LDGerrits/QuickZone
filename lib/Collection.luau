@@ -23,8 +23,8 @@ function Collection.new(config: {
 	local n = config and config.Precision
 	assert(not n or n >= 0, '[BitZone] Precision must be non-negative')
 
-	local id = State.nextCollectionId
-	State.nextCollectionId += 1
+	local id = State.NextCollectionId
+	State.NextCollectionId += 1
 
 	local updateRate = hz or Config.Scheduler.UpdateRate
 	local precision = n or Config.Scheduler.Precision
@@ -35,21 +35,21 @@ function Collection.new(config: {
 
 	local self = (
 		setmetatable({
-			ID = id,
-			Items = {},
-			ItemIndices = {},
-			ItemData = {},
-			Config = {
+			Id = id,
+			_items = {},
+			_itemIndices = {},
+			_itemData = {},
+			_config = {
 				UpdateRate = updateRate,
 				PrecisionSq = precision ^ 2,
 				SafetyMode = safetyMode,
 			},
-			LastProcessedIndex = 1,
+			_lastProcessedIndex = 1,
 		}, Collection) :: any
 	) :: Types.Collection
 
-	State.collections[id] = self
-	State.collectionToGroups[id] = {}
+	State.Collections[id] = self
+	State.CollectionToGroups[id] = {}
 
 	return self
 end
@@ -66,20 +66,20 @@ function Collection:SetConfig(config: {
 	assert(not n or n >= 0, '[BitZone] Precision must be non-negative')
 
 	if hz then
-		self.Config.UpdateRate = hz
+		self._config.UpdateRate = hz
 	end
 	if n then
-		self.Config.Precision = n
+		self._config.Precision = n
 	end
 	if config.SafetyMode ~= nil then
-		self.Config.SafetyMode = config.SafetyMode
+		self._config.SafetyMode = config.SafetyMode
 	end
 end
 
 function Collection:SetUpdateRate(hz: number): Types.Collection
 	assert(hz > 0, '[BitZone] UpdateRate must be greater than 0')
 
-	self.Config.UpdateRate = hz
+	self._config.UpdateRate = hz
 
 	return self
 end
@@ -87,22 +87,22 @@ end
 function Collection:SetPrecision(n: number): Types.Collection
 	assert(n >= 0, '[BitZone] Precision must be non-negative')
 
-	self.Config.PrecisionSq = n ^ 2
+	self._config.PrecisionSq = n ^ 2
 	return self
 end
 
 function Collection:SetSafetyMode(enabled: boolean): Types.Collection
-	self.Config.SafetyMode = enabled
+	self.Con_configfig.SafetyMode = enabled
 	return self
 end
 
 function Collection:Add(item: Types.Item, customData: any?): Types.Collection
-	local oldColID = State.itemToCollection[item]
-	if oldColID then
-		if oldColID == self.ID then
+	local oldColId = State.ItemToCollection[item]
+	if oldColId then
+		if oldColId == self.Id then
 			return self
 		end
-		local oldCol = State.collections[oldColID]
+		local oldCol = State.Collections[oldColId]
 		if oldCol then
 			oldCol:Remove(item)
 		end
@@ -144,46 +144,46 @@ function Collection:Add(item: Types.Item, customData: any?): Types.Collection
 
 	local data = {
 		lastPosition = Vector3.zero,
-		strategy = strat,
-		isDirty = true,
-		activeGroupMemberships = {}, -- [GroupUID] = ZoneIndex
+		Strategy = strat,
+		IsDirty = true,
+		ActiveGroupMemberships = {},
 	}
 
-	local idx = #self.Items + 1
-	self.Items[idx] = item
-	self.ItemIndices[item] = idx
-	self.ItemData[item] = data
+	local idx = #self._items + 1
+	self._items[idx] = item
+	self._itemIndices[item] = idx
+	self._itemData[item] = data
 
-	State.itemToCollection[item] = self.ID
+	State.ItemToCollection[item] = self.Id
 
 	if customData then
-		if not State.itemCustomData[item] then
-			State.itemCustomData[item] = {}
+		if not State.ItemCustomData[item] then
+			State.ItemCustomData[item] = {}
 		end
-		State.itemCustomData[item] = customData
+		State.ItemCustomData[item] = customData
 	end
 
 	return self
 end
 
 function Collection:Remove(item: Types.Item): Types.Collection
-	if State.itemToCollection[item] ~= self.ID then
+	if State.ItemToCollection[item] ~= self.Id then
 		return self
 	end
 
-	local data = self.ItemData[item]
+	local data = self._itemData[item]
 
 	-- Trigger exit
-	local safetyMode = self.Config.SafetyMode
-	for gUID, oldZoneIdx in pairs(data.activeGroupMemberships) do
-		if State.groupTrackingItems[gUID] then
-			State.groupTrackingItems[gUID][item] = nil
+	local safetyMode = self._config.SafetyMode
+	for gId, oldZoneIdx in pairs(data.ActiveGroupMemberships) do
+		if State.GroupTrackingItems[gId] then
+			State.GroupTrackingItems[gId][item] = nil
 		end
 
-		local cbs = State.groupExitedCallbacks[gUID]
+		local cbs = State.GroupExitedCallbacks[gId]
 		if cbs then
-			local z = State.zoneIndexToZoneObj[oldZoneIdx]
-			local cd = State.itemCustomData[item] and State.itemCustomData[item][gUID]
+			local z = State.ZoneIdToZoneObj[oldZoneIdx]
+			local cd = State.ItemCustomData[item] and State.ItemCustomData[item][gId]
 			for _, fn in cbs do
 				if safetyMode then
 					task.spawn(fn, item, z, cd)
@@ -195,40 +195,40 @@ function Collection:Remove(item: Types.Item): Types.Collection
 	end
 
 	-- Swap-remove from Array
-	local idx = self.ItemIndices[item]
-	local lastIdx = #self.Items
-	local lastItem = self.Items[lastIdx]
+	local idx = self._itemIndices[item]
+	local lastIdx = #self._items
+	local lastItem = self._items[lastIdx]
 
 	if idx == lastIdx then
-		self.Items[lastIdx] = nil
-		self.ItemIndices[item] = nil
+		self._items[lastIdx] = nil
+		self._itemIndices[item] = nil
 	else
-		self.Items[idx] = lastItem
-		self.ItemIndices[lastItem] = idx
-		self.Items[lastIdx] = nil
-		self.ItemIndices[item] = nil
+		self._items[idx] = lastItem
+		self._itemIndices[lastItem] = idx
+		self._items[lastIdx] = nil
+		self._itemIndices[item] = nil
 	end
 
-	self.ItemData[item] = nil
-	State.itemToCollection[item] = nil
-	State.itemCustomData[item] = nil
+	self._itemData[item] = nil
+	State.ItemToCollection[item] = nil
+	State.ItemCustomData[item] = nil
 
 	return self
 end
 
 function Collection:GetItems(): { Types.Item }
-	local result = table.create(#self.Items)
-	table.move(self.Items, 1, #self.Items, 1, result)
+	local result = table.create(#self._items)
+	table.move(self._items, 1, #self._items, 1, result)
 	return result
 end
 
 function Collection:GetGroups(): { Types.Group }
 	local result = {}
-	local groupsMap = State.collectionToGroups[self.ID]
+	local groupsMap = State.CollectionToGroups[self.Id]
 
 	if groupsMap then
-		for groupUID, _ in pairs(groupsMap) do
-			local group = State.groupUIDToGroupObj[groupUID]
+		for groupId, _ in pairs(groupsMap) do
+			local group = State.GroupIdToGroupObj[groupId]
 			if group then
 				table.insert(result, group)
 			end
@@ -243,7 +243,7 @@ function Collection:GetConfig(): {
 	Precision: number,
 	SafetyMode: boolean,
 }
-	local config = self.Config
+	local config = self._config
 	return {
 		UpdateRate = config.UpdateRate,
 		Precision = math.sqrt(config.PrecisionSq),
@@ -252,12 +252,12 @@ function Collection:GetConfig(): {
 end
 
 function Collection:Destroy(): ()
-	for i = #self.Items, 1, -1 do
-		self:Remove(self.Items[i])
+	for i = #self._items, 1, -1 do
+		self:Remove(self._items[i])
 	end
 
-	State.collectionToGroups[self.ID] = nil
-	State.collections[self.ID] = nil
+	State.CollectionToGroups[self.Id] = nil
+	State.Collections[self.Id] = nil
 	setmetatable(self :: any, nil)
 end
 

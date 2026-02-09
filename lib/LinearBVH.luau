@@ -56,19 +56,19 @@ local function createSubTree(
 ): Types.Node
 	if beginIndex == endIndex then
 		local id = list[beginIndex].id
-		return { min = boundsMin[id], max = boundsMax[id], id = id }
+		return { Min = boundsMin[id], Max = boundsMax[id], Id = id }
 	else
 		local mid = getSplitPos(list, beginIndex, endIndex)
 		if mid == nil then
 			local id = list[beginIndex].id
-			return { min = boundsMin[id], max = boundsMax[id], id = id }
+			return { Min = boundsMin[id], Max = boundsMax[id], Id = id }
 		end
 
 		local left = createSubTree(list, boundsMin, boundsMax, beginIndex, mid - 1)
 		local right = createSubTree(list, boundsMin, boundsMax, mid, endIndex)
-		local min, max = Geometry.UnionBounds(left.min, left.max, right.min, right.max)
+		local min, max = Geometry.UnionBounds(left.Min, left.Max, right.Min, right.Max)
 
-		return { min = min, max = max, id = -1, left = left, right = right }
+		return { Min = min, Max = max, Id = -1, Left = left, Right = right }
 	end
 end
 
@@ -131,7 +131,7 @@ function LinearBVH.QueryPoint(root: Types.Node?, point: Vector3, callback: (id: 
 		local node = traversalStack[stackPtr]
 		stackPtr -= 1
 
-		local min, max = node.min, node.max
+		local min, max = node.Min, node.Max
 		if
 			point.X >= min.X
 			and point.X <= max.X
@@ -140,13 +140,13 @@ function LinearBVH.QueryPoint(root: Types.Node?, point: Vector3, callback: (id: 
 			and point.Z >= min.Z
 			and point.Z <= max.Z
 		then
-			if node.id > 0 then
-				callback(node.id)
+			if node.Id > 0 then
+				callback(node.Id)
 			else
 				stackPtr += 1
-				traversalStack[stackPtr] = node.left :: Types.Node
+				traversalStack[stackPtr] = node.Left :: Types.Node
 				stackPtr += 1
-				traversalStack[stackPtr] = node.right :: Types.Node
+				traversalStack[stackPtr] = node.Right :: Types.Node
 			end
 		end
 	end

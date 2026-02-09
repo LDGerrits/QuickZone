@@ -63,15 +63,15 @@ function Geometry.IsPointInShape(point: Vector3, object: Types.BoundingVolume): 
 		local localPoint = vector.abs(object.CFrame:PointToObjectSpace(point))
 		return vector.min(localPoint, object.HalfSize) == localPoint
 	elseif object.Shape == 'Ball' then
-		return vector.dot(object.Position - point, object.Position - point) <= object.radiusSquared
+		return vector.dot(object.Position - point, object.Position - point) <= object.RadiusSq
 	elseif object.Shape == 'Cylinder' then
-		local toPoint = point - object.start :: Vector3
-		local projection = vector.dot(toPoint, object.axis :: Vector3)
+		local toPoint = point - object.Start :: Vector3
+		local projection = vector.dot(toPoint, object.Axis :: Vector3)
 
-		if projection >= 0 and projection <= object.axisLength :: number then
-			local closestPointOnAxis = object.start :: Vector3 + object.axis :: Vector3 * projection
+		if projection >= 0 and projection <= object.AxisLength :: number then
+			local closestPointOnAxis = object.Start :: Vector3 + object.Axis :: Vector3 * projection
 			local distanceSq = vector.dot(point - closestPointOnAxis, point - closestPointOnAxis)
-			return distanceSq <= object.radiusSquared :: number
+			return distanceSq <= object.RadiusSq :: number
 		end
 		return false
 	elseif object.Shape == 'Wedge' then

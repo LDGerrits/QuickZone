@@ -4,27 +4,27 @@ local Types = require(script.Parent.Types)
 
 local State = {}
 
-State.nextZoneId = 1
-State.nextGroupId = 1
-State.nextCollectionId = 1
+State.NextZoneId = 1
+State.NextGroupId = 1
+State.NextCollectionId = 1
 
-State.collections = {} :: { [number]: Types.Collection }
-State.itemToCollection = {} :: { [Types.Item]: number }
-State.collectionToGroups = {} :: { [number]: { [number]: boolean } }
+State.Collections = {} :: { [number]: Types.Collection }
+State.ItemToCollection = {} :: { [Types.Item]: number }
+State.CollectionToGroups = {} :: { [number]: { [number]: boolean } }
 
-State.objects = {} :: { Types.BoundingVolume }
-State.rootNode = nil :: Types.Node?
-State.pendingRebuild = false
-State.isDirty = false
+State.Objects = {} :: { Types.BoundingVolume }
+State.RootNode = nil :: Types.Node?
+State.PendingRebuild = false
+State.IsDirty = false
 
-State.groupTrackingItems = {} :: { [number]: { [Types.Item]: boolean } }
-State.groupPriorityMap = {} :: { [number]: number }
-State.itemCustomData = {} :: { [Types.Item]: { [number]: any } }
-State.groupEnteredCallbacks = {} :: { [number]: { Types.Callback } }
-State.groupExitedCallbacks = {} :: { [number]: { Types.Callback } }
+State.GroupTrackingItems = {} :: { [number]: { [Types.Item]: boolean } }
+State.GroupPriorityMap = {} :: { [number]: number }
+State.ItemCustomData = {} :: { [Types.Item]: { [number]: any } }
+State.GroupEnteredCallbacks = {} :: { [number]: { Types.Callback } }
+State.GroupExitedCallbacks = {} :: { [number]: { Types.Callback } }
 
-State.zoneBoundGroups = {} :: { [number]: { number } }
-State.zoneIndexToZoneObj = {} :: { [number]: Types.Zone }
-State.groupUIDToGroupObj = {} :: { [number]: Types.Group }
+State.ZoneBoundGroups = {} :: { [number]: { number } }
+State.ZoneIdToZoneObj = {} :: { [number]: Types.Zone }
+State.GroupIdToGroupObj = {} :: { [number]: Types.Group }
 
 return State

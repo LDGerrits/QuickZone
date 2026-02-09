@@ -16,68 +16,68 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	}
 
 	if shape == 'Ball' then
-		object.radiusSquared = halfSize.X * halfSize.X
+		object.RadiusSq = halfSize.X * halfSize.X
 	elseif shape == 'Cylinder' then
 		local halfHeight = halfSize.X
-		object.start = object.Position - object.CFrame.RightVector * halfHeight
-		object.axis = object.CFrame.RightVector
-		object.axisLength = halfHeight * 2
-		object.radiusSquared = halfSize.Y * halfSize.Y
+		object.Start = object.Position - object.CFrame.RightVector * halfHeight
+		object.Axis = object.CFrame.RightVector
+		object.AxisLength = halfHeight * 2
+		object.RadiusSq = halfSize.Y * halfSize.Y
 	end
 
-	local index = State.nextZoneId
-	State.nextZoneId += 1
-	State.objects[index] = object
-	State.pendingRebuild = true
+	local id = State.NextZoneId
+	State.NextZoneId += 1
+	State.Objects[id] = object
+	State.PendingRebuild = true
 
-	local self = (setmetatable({ Index = index, Part = associatedPart }, Zone) :: any) :: Types.Zone
-	State.zoneIndexToZoneObj[index] = self
+	local self = (setmetatable({ Id = id, Part = associatedPart }, Zone) :: any) :: Types.Zone
+	State.ZoneIdToZoneObj[id] = self
 
 	return self
 end
 
 function Zone:BindToGroups(...): Types.Zone
-	local bound = State.zoneBoundGroups[self.Index] or {}
-	State.zoneBoundGroups[self.Index] = bound
+	local bound = State.ZoneBoundGroups[self.Id] or {}
+	State.ZoneBoundGroups[self.Id] = bound
 	for _, group in { ... } do
-		if not table.find(bound, group.UID) then
-			table.insert(bound, group.UID)
+		if not table.find(bound, group.Id) then
+			table.insert(bound, group.Id)
 		end
 	end
-	State.isDirty = true
+	State.IsDirty = true
 	return self
 end
 
 function Zone:UnbindFromGroups(...): Types.Zone
-	local bound = State.zoneBoundGroups[self.Index]
+	local bound = State.ZoneBoundGroups[self.Id]
 	if not bound then
 		return self
 	end
 
 	for _, group in { ... } do
-		local idx = table.find(bound, group.UID)
+		local idx = table.find(bound, group.Id)
 		while idx do
 			table.remove(bound, idx)
-			idx = table.find(bound, group.UID)
+			idx = table.find(bound, group.Id)
 		end
 	end
 	if #bound == 0 then
-		State.zoneBoundGroups[self.Index] = nil
+		State.ZoneBoundGroups[self.Id] = nil
 	end
-	State.isDirty = true
+	State.IsDirty = true
 
 	return self
 end
 
 function Zone:GetGroups(): { Types.Group }
-	local bound = State.zoneBoundGroups[self.Index]
+	local bound = State.ZoneBoundGroups[self.Id]
 	if not bound then
 		return {}
 	end
 
 	local result = {}
-	for _, uid in bound do
-		local group = State.groupUIDToGroupObj[uid]
+	for _, id in bound do
+		local group = State.GroupIdToGroupObj[id]
 		if group then
 			table.insert(result, group)
 		end
@@ -86,10 +86,10 @@ function Zone:GetGroups(): { Types.Group }
 end
 
 function Zone:Destroy()
-	State.zoneBoundGroups[self.Index] = nil
-	State.zoneIndexToZoneObj[self.Index] = nil
-	State.objects[self.Index] = nil
-	State.pendingRebuild = true
+	State.ZoneBoundGroups[self.Id] = nil
+	State.ZoneIdToZoneObj[self.Id] = nil
+	State.Objects[self.Id] = nil
+	State.PendingRebuild = true
 
 	setmetatable(self :: any, nil)
 end

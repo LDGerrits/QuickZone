@@ -9,20 +9,20 @@ export type BoundingVolume = {
 	Shape: ShapeType,
 
 	-- Sphere / cylinder specific
-	radiusSquared: number?,
+	RadiusSq: number?,
 
 	-- Cylinder specific
-	start: Vector3?,
-	axis: Vector3?,
-	axisLength: number?,
+	Start: Vector3?,
+	Axis: Vector3?,
+	AxisLength: number?,
 }
 
 export type Node = {
-	left: Node?,
-	right: Node?,
-	min: Vector3,
-	max: Vector3,
-	id: number, -- -1 for internal nodes
+	Left: Node?,
+	Right: Node?,
+	Min: Vector3,
+	Max: Vector3,
+	Id: number, -- -1 for internal nodes
 }
 
 export type BitZone = {
@@ -80,7 +80,7 @@ export type Zone = {
 	GetGroups: (zone: Zone) -> { Group },
 
 	-- Props
-	Index: number,
+	Id: number,
 	Part: BasePart?,
 }
 
@@ -118,7 +118,7 @@ export type Group = {
 	OnPlayerExited: (self: Group, callback: (Player, Zone) -> ()) -> () -> (),
 
 	-- Props
-	UID: number,
+	Id: number,
 }
 
 export type Collection = {
@@ -152,16 +152,16 @@ export type Collection = {
 	},
 
 	-- Props
-	ID: number,
-	Items: { Item },
-	ItemIndices: { [Item]: number },
-	ItemData: { [Item]: ItemData },
-	Config: {
+	Id: number,
+	_items: { Item },
+	_itemIndices: { [Item]: number },
+	_itemData: { [Item]: ItemData },
+	_config: {
 		UpdateRate: number,
 		PrecisionSq: number,
 		SafetyMode: boolean,
 	},
-	LastProcessedIndex: number,
+	_lastProcessedIndex: number,
 }
 
 export type ItemTable = {
@@ -175,10 +175,10 @@ export type ItemTable = {
 export type Item = BasePart | Model | Camera | Attachment | Bone | ItemTable
 
 export type ItemData = {
-	activeGroupMemberships: { [number]: number },
+	ActiveGroupMemberships: { [number]: number },
 	lastPosition: Vector3,
-	strategy: number,
-	isDirty: boolean,
+	Strategy: number,
+	IsDirty: boolean,
 }
 
 return nil

@@ -9,17 +9,17 @@ local State = require(script.Parent.State)
 local Config = require(script.Parent.Config)
 local Types = require(script.Parent.Types)
 
-local objects = State.objects
-local zoneBoundGroups = State.zoneBoundGroups
-local groupPriorityMap = State.groupPriorityMap
-local itemCustomData = State.itemCustomData
-local groupEnteredCallbacks = State.groupEnteredCallbacks
-local groupTrackingItems = State.groupTrackingItems
-local groupExitedCallbacks = State.groupExitedCallbacks
-local zoneIndexToZoneObj = State.zoneIndexToZoneObj
+local objects = State.Objects
+local zoneBoundGroups = State.ZoneBoundGroups
+local groupPriorityMap = State.GroupPriorityMap
+local itemCustomData = State.ItemCustomData
+local groupEnteredCallbacks = State.GroupEnteredCallbacks
+local groupTrackingItems = State.GroupTrackingItems
+local groupExitedCallbacks = State.GroupExitedCallbacks
+local zoneIdToZoneObj = State.ZoneIdToZoneObj
 
 local ctx_pos: Vector3
-local ctx_collectionID: number
+local ctx_collectionId: number
 local ctx_cCount: number = 0
 local ctx_highestWin: number
 local ctx_candidatePriority: { [number]: number } = table.create(16)
@@ -59,17 +59,17 @@ local function queryCallback(zoneId: number)
 		return
 	end
 
-	local linkedGroups = State.collectionToGroups[ctx_collectionID]
+	local linkedGroups = State.CollectionToGroups[ctx_collectionId]
 	if not linkedGroups then
 		return
 	end
 
 	local isRelevant = false
-	for _, gUID in groups do
+	for _, gId in groups do
 		-- Is this group even interested in this collection?
-		if linkedGroups[gUID] then
+		if linkedGroups[gId] then
 			-- Do we already have a better candidate?
-			if not ctx_candidatePriority[gUID] then
+			if not ctx_candidatePriority[gId] then
 				isRelevant = true
 				break
 			end
@@ -79,13 +79,13 @@ local function queryCallback(zoneId: number)
 		return
 	end
 
-	for _, gUID in groups do
-		if linkedGroups[gUID] then
-			local pri = groupPriorityMap[gUID] or 0
+	for _, gId in groups do
+		if linkedGroups[gId] then
+			local pri = groupPriorityMap[gId] or 0
 			ctx_cCount += 1
-			ctx_candidateList[ctx_cCount] = gUID
-			ctx_candidateIndex[gUID] = zoneId
-			ctx_candidatePriority[gUID] = pri
+			ctx_candidateList[ctx_cCount] = gId
+			ctx_candidateIndex[gId] = zoneId
+			ctx_candidatePriority[gId] = pri
 			if pri > ctx_highestWin then
 				ctx_highestWin = pri
 			end
@@ -94,32 +94,32 @@ local function queryCallback(zoneId: number)
 end
 
 RunService.Heartbeat:Connect(function(dt: number)
-	if State.pendingRebuild then
+	if State.PendingRebuild then
 		debug.profilebegin('QuickBounds_Build')
-		State.rootNode = LinearBVH.Build(objects)
-		State.pendingRebuild = false
+		State.RootNode = LinearBVH.Build(objects)
+		State.PendingRebuild = false
 		debug.profileend()
-		State.isDirty = true
+		State.IsDirty = true
 	end
 
-	if not State.rootNode then
+	if not State.RootNode then
 		return
 	end
 
 	debug.profilebegin('QuickBounds_Step')
 	local start = os.clock()
-	local forceRefresh = State.isDirty
-	State.isDirty = false
+	local forceRefresh = State.IsDirty
+	State.IsDirty = false
 
 	-- Each collection is processed one-by-one
-	for _, col in pairs(State.collections) do
-		local list = col.Items
+	for _, col in pairs(State.Collections) do
+		local list = col._items
 		local totalItems = #list
 		if totalItems == 0 then
 			continue
 		end
 
-		local config = col.Config
+		local config = col._config
 		local rate = config.UpdateRate or 20
 		local precSq = config.PrecisionSq or 0.01
 		local safeMode = config.SafetyMode
@@ -133,16 +133,16 @@ RunService.Heartbeat:Connect(function(dt: number)
 		end
 
 		local processed = 0
-		local idx = col.LastProcessedIndex
+		local idx = col._lastProcessedIndex
 		if idx > totalItems then
 			idx = 1
 		end
 
-		ctx_collectionID = col.ID
+		ctx_collectionId = col.Id
 
 		while processed < workQuota do
 			local item = list[idx]
-			local d = col.ItemData[item] :: Types.ItemData?
+			local d = col._itemData[item] :: Types._itemData?
 
 			-- Race condition guard
 			if not d then
@@ -164,13 +164,13 @@ RunService.Heartbeat:Connect(function(dt: number)
 			elseif strategy == STRAT_CFRAME then
 				pos = (item :: BasePart).CFrame.Position
 			elseif strategy == STRAT_PRIM and (item :: Model).PrimaryPart then
-				pos = (item.PrimaryPart :: BasePart).Position
+				pos = ((item :: Model).PrimaryPart :: BasePart).Position
 			else
 				pos = (item :: any):GetPivot().Position
 			end
 
 			-- Threshold
-			local shouldCheck = forceRefresh or d.isDirty
+			local shouldCheck = forceRefresh or d.IsDirty
 			if not shouldCheck then
 				local lp = d.lastPosition
 				local dx, dy, dz = pos.X - lp.X, pos.Y - lp.Y, pos.Z - lp.Z
@@ -181,29 +181,29 @@ RunService.Heartbeat:Connect(function(dt: number)
 
 			if shouldCheck then
 				d.lastPosition = pos
-				d.isDirty = false
+				d.IsDirty = false
 
 				ctx_pos = pos
 				ctx_cCount = 0
 				ctx_highestWin = -math.huge
 
-				LinearBVH.QueryPoint(State.rootNode, pos, queryCallback)
+				LinearBVH.QueryPoint(State.RootNode, pos, queryCallback)
 
-				local current = d.activeGroupMemberships
+				local current = d.ActiveGroupMemberships
 
 				-- Exits
-				for gUID, oldZoneIdx in pairs(current) do
-					local newPri = ctx_candidatePriority[gUID]
+				for gId, oldZoneIdx in pairs(current) do
+					local newPri = ctx_candidatePriority[gId]
 					if not newPri or newPri < ctx_highestWin then
-						current[gUID] = nil
-						if groupTrackingItems[gUID] then
-							groupTrackingItems[gUID][item] = nil
+						current[gId] = nil
+						if groupTrackingItems[gId] then
+							groupTrackingItems[gId][item] = nil
 						end
 
-						local cbs = groupExitedCallbacks[gUID]
+						local cbs = groupExitedCallbacks[gId]
 						if cbs then
-							local z = zoneIndexToZoneObj[oldZoneIdx]
-							local cd = itemCustomData[item] and itemCustomData[item][gUID]
+							local z = zoneIdToZoneObj[oldZoneIdx]
+							local cd = itemCustomData[item] and itemCustomData[item][gId]
 							fireCallback(cbs, item, z, cd, safeMode)
 						end
 					end
@@ -211,21 +211,21 @@ RunService.Heartbeat:Connect(function(dt: number)
 
 				-- Entries
 				for i = 1, ctx_cCount do
-					local gUID = ctx_candidateList[i]
-					local pri = ctx_candidatePriority[gUID]
-					if pri >= ctx_highestWin and not current[gUID] then
-						local newZoneIdx = ctx_candidateIndex[gUID]
-						current[gUID] = newZoneIdx
-						groupTrackingItems[gUID][item] = true
-						local cbs = groupEnteredCallbacks[gUID]
+					local gId = ctx_candidateList[i]
+					local pri = ctx_candidatePriority[gId]
+					if pri >= ctx_highestWin and not current[gId] then
+						local newZoneIdx = ctx_candidateIndex[gId]
+						current[gId] = newZoneIdx
+						groupTrackingItems[gId][item] = true
+						local cbs = groupEnteredCallbacks[gId]
 						if cbs then
-							local z = zoneIndexToZoneObj[newZoneIdx]
-							local cd = itemCustomData[item] and itemCustomData[item][gUID]
+							local z = zoneIdToZoneObj[newZoneIdx]
+							local cd = itemCustomData[item] and itemCustomData[item][gId]
 							fireCallback(cbs, item, z, cd, safeMode)
 						end
 					end
-					ctx_candidatePriority[gUID] = nil
-					ctx_candidateIndex[gUID] = nil
+					ctx_candidatePriority[gId] = nil
+					ctx_candidateIndex[gId] = nil
 					ctx_candidateList[i] = nil
 				end
 			end
@@ -242,7 +242,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 			end
 		end
 
-		col.LastProcessedIndex = idx
+		col._lastProcessedIndex = idx
 
 		if (os.clock() - start) > frameBudget then
 			break

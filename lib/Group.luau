@@ -16,55 +16,55 @@ Group.__index = Group
 function Group.new(priority: number?): Types.Group
 	local group = (
 		setmetatable({
-			UID = State.nextGroupId,
+			Id = State.NextGroupId,
 			_mainConnections = {},
 			_playerTrackers = {},
 		}, Group) :: any
 	) :: Types.Group
 
-	State.groupPriorityMap[group.UID] = priority or 0
-	State.groupEnteredCallbacks[group.UID] = {}
-	State.groupExitedCallbacks[group.UID] = {}
-	State.groupTrackingItems[group.UID] = {}
-	State.groupUIDToGroupObj[group.UID] = group
+	State.GroupPriorityMap[group.Id] = priority or 0
+	State.GroupEnteredCallbacks[group.Id] = {}
+	State.GroupExitedCallbacks[group.Id] = {}
+	State.GroupTrackingItems[group.Id] = {}
+	State.GroupIdToGroupObj[group.Id] = group
 
-	State.nextGroupId += 1
+	State.NextGroupId += 1
 	return group
 end
 
 function Group:SetPriority(p: number): Types.Group
-	State.groupPriorityMap[self.UID] = p
-	State.isDirty = true
+	State.GroupPriorityMap[self.Id] = p
+	State.IsDirty = true
 	return self
 end
 
 function Group:TrackCollection(collection: Types.Collection): Types.Group
-	local colID = collection.ID
-	if not State.collectionToGroups[colID] then
-		State.collectionToGroups[colID] = {}
+	local colId = collection.Id
+	if not State.CollectionToGroups[colId] then
+		State.CollectionToGroups[colId] = {}
 	end
-	State.collectionToGroups[colID][self.UID] = true
+	State.CollectionToGroups[colId][self.Id] = true
 	return self
 end
 
 function Group:UntrackCollection(collection: Types.Collection): Types.Group
-	local colID = collection.ID
-	if State.collectionToGroups[colID] then
-		State.collectionToGroups[colID][self.UID] = nil
+	local colId = collection.Id
+	if State.CollectionToGroups[colId] then
+		State.CollectionToGroups[colId][self.Id] = nil
 	end
 
-	local safetyMode = collection.Config.SafetyMode
-	for _, item in collection.Items do
-		local data = collection.ItemData[item]
-		local oldZoneIdx = data and data.activeGroupMemberships[self.UID]
+	local safetyMode = collection._config.SafetyMode
+	for _, item in collection._items do
+		local data = collection._itemData[item]
+		local oldZoneIdx = data and data.ActiveGroupMemberships[self.Id]
 		if oldZoneIdx then
-			data.activeGroupMemberships[self.UID] = nil
-			State.groupTrackingItems[self.UID][item] = nil
+			data.ActiveGroupMemberships[self.Id] = nil
+			State.GroupTrackingItems[self.Id][item] = nil
 
-			local z = State.zoneIndexToZoneObj[oldZoneIdx]
-			local cbs = State.groupExitedCallbacks[self.UID]
+			local z = State.ZoneIdToZoneObj[oldZoneIdx]
+			local cbs = State.GroupExitedCallbacks[self.Id]
 			if cbs then
-				local cd = State.itemCustomData[item] and State.itemCustomData[item][self.UID]
+				local cd = State.ItemCustomData[item] and State.ItemCustomData[item][self.Id]
 				for _, fn in cbs do
 					if safetyMode then
 						task.spawn(fn, item, z, cd)
@@ -102,33 +102,33 @@ function Group:IsLocalPlayerInside(): boolean
 end
 
 function Group:IsItemInside(item: Types.Item): boolean
-	local colID = State.itemToCollection[item]
-	if not colID then
+	local colId = State.ItemToCollection[item]
+	if not colId then
 		return false
 	end
 
-	local collection = State.collections[colID]
-	local data = collection.ItemData[item]
+	local collection = State.Collections[colId]
+	local data = collection._itemData[item]
 	if not data then
 		return false
 	end
 
-	return data.activeGroupMemberships[self.UID] ~= nil
+	return data.ActiveGroupMemberships[self.Id] ~= nil
 end
 
 function Group:IsPointInside(position: Vector3): boolean
-	if not State.rootNode then
+	if not State.RootNode then
 		return false
 	end
 
 	local isInside = false
-	LinearBVH.QueryPoint(State.rootNode, position, function(zoneId)
+	LinearBVH.QueryPoint(State.RootNode, position, function(zoneId)
 		if isInside then
 			return
 		end
-		local groups = State.zoneBoundGroups[zoneId]
-		if groups and table.find(groups, self.UID) then
-			if Geometry.IsPointInShape(position, State.objects[zoneId]) then
+		local groups = State.ZoneBoundGroups[zoneId]
+		if groups and table.find(groups, self.Id) then
+			if Geometry.IsPointInShape(position, State.Objects[zoneId]) then
 				isInside = true
 			end
 		end
@@ -138,7 +138,7 @@ function Group:IsPointInside(position: Vector3): boolean
 end
 
 function Group:GetItemsInside(): { Types.Item }
-	local items = State.groupTrackingItems[self.UID]
+	local items = State.GroupTrackingItems[self.Id]
 	if not items then
 		return {}
 	end
@@ -151,10 +151,10 @@ end
 
 function Group:GetItems(): { Types.Item }
 	local results = {}
-	for colID, groups in pairs(State.collectionToGroups) do
-		if groups[self.UID] then
-			local collection = State.collections[colID]
-			for _, item in ipairs(collection.Items) do
+	for colId, groups in pairs(State.CollectionToGroups) do
+		if groups[self.Id] then
+			local collection = State.Collections[colId]
+			for _, item in ipairs(collection._items) do
 				table.insert(results, item)
 			end
 		end
@@ -164,9 +164,9 @@ end
 
 function Group:GetZones(): { Types.Zone }
 	local results = {}
-	for zoneIdx, boundList in pairs(State.zoneBoundGroups) do
-		if table.find(boundList, self.UID) then
-			local zone = State.zoneIndexToZoneObj[zoneIdx]
+	for zoneIdx, boundList in pairs(State.ZoneBoundGroups) do
+		if table.find(boundList, self.Id) then
+			local zone = State.ZoneIdToZoneObj[zoneIdx]
 			if zone then
 				table.insert(results, zone)
 			end
@@ -178,9 +178,9 @@ end
 function Group:GetCollections(): { Types.Collection }
 	local result = {}
 
-	for colID, groupsMap in pairs(State.collectionToGroups) do
-		if groupsMap[self.UID] then
-			local collection = State.collections[colID]
+	for colId, groupsMap in pairs(State.CollectionToGroups) do
+		if groupsMap[self.Id] then
+			local collection = State.Collections[colId]
 			if collection then
 				table.insert(result, collection)
 			end
@@ -191,21 +191,21 @@ function Group:GetCollections(): { Types.Collection }
 end
 
 function Group:OnEntered(callback): () -> ()
-	table.insert(State.groupEnteredCallbacks[self.UID], callback)
+	table.insert(State.GroupEnteredCallbacks[self.Id], callback)
 	return function()
-		local i = table.find(State.groupEnteredCallbacks[self.UID], callback)
+		local i = table.find(State.GroupEnteredCallbacks[self.Id], callback)
 		if i then
-			table.remove(State.groupEnteredCallbacks[self.UID], i)
+			table.remove(State.GroupEnteredCallbacks[self.Id], i)
 		end
 	end
 end
 
 function Group:OnExited(callback): () -> ()
-	table.insert(State.groupExitedCallbacks[self.UID], callback)
+	table.insert(State.GroupExitedCallbacks[self.Id], callback)
 	return function()
-		local i = table.find(State.groupExitedCallbacks[self.UID], callback)
+		local i = table.find(State.GroupExitedCallbacks[self.Id], callback)
 		if i then
-			table.remove(State.groupExitedCallbacks[self.UID], i)
+			table.remove(State.GroupExitedCallbacks[self.Id], i)
 		end
 	end
 end
@@ -245,25 +245,25 @@ function Group:OnLocalPlayerExited(callback: (Types.Zone) -> ()): () -> ()
 end
 
 function Group:Destroy(): ()
-	local uid = self.UID
-	for _, groups in pairs(State.collectionToGroups) do
-		groups[uid] = nil
+	local id = self.Id
+	for _, groups in pairs(State.CollectionToGroups) do
+		groups[id] = nil
 	end
 
-	for _, boundList in pairs(State.zoneBoundGroups) do
-		local idx = table.find(boundList, uid)
+	for _, boundList in pairs(State.ZoneBoundGroups) do
+		local idx = table.find(boundList, id)
 		while idx do
 			table.remove(boundList, idx)
-			idx = table.find(boundList, uid)
+			idx = table.find(boundList, id)
 		end
 	end
 
-	State.groupPriorityMap[uid] = nil
-	State.groupEnteredCallbacks[uid] = nil
-	State.groupExitedCallbacks[uid] = nil
-	State.groupTrackingItems[uid] = nil
-	State.groupUIDToGroupObj[uid] = nil
-	State.isDirty = true
+	State.GroupPriorityMap[id] = nil
+	State.GroupEnteredCallbacks[id] = nil
+	State.GroupExitedCallbacks[id] = nil
+	State.GroupTrackingItems[id] = nil
+	State.GroupIdToGroupObj[id] = nil
+	State.IsDirty = true
 	setmetatable(self :: any, nil)
 end
 

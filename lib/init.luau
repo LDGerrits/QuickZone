@@ -11,9 +11,9 @@ local Zone = require(script.Zone)
 local Group = require(script.Group)
 local Scheduler = require(script.Scheduler)
 
-local objects = State.objects
-local zoneBoundGroups = State.zoneBoundGroups
-local groupUIDToGroupObj = State.groupUIDToGroupObj
+local objects = State.Objects
+local zoneBoundGroups = State.ZoneBoundGroups
+local groupIdToGroupObj = State.GroupIdToGroupObj
 
 local IS_CLIENT = RunService:IsClient()
 
@@ -80,17 +80,17 @@ end
 
 function BitZone:GetGroupsAtPoint(position: Vector3): { Group }
 	local results = {}
-	local foundUIDs = {}
+	local foundIds = {}
 
-	if State.rootNode then
-		LinearBVH.QueryPoint(State.rootNode, position, function(zoneId)
+	if State.RootNode then
+		LinearBVH.QueryPoint(State.RootNode, position, function(zoneId)
 			if Geometry.IsPointInShape(position, objects[zoneId]) then
 				local groups = zoneBoundGroups[zoneId]
 				if groups then
-					for _, uid in groups do
-						if not foundUIDs[uid] then
-							foundUIDs[uid] = true
-							local group = groupUIDToGroupObj[uid]
+					for _, id in groups do
+						if not foundIds[id] then
+							foundIds[id] = true
+							local group = groupIdToGroupObj[id]
 							if group then
 								table.insert(results, group)
 							end
@@ -104,16 +104,16 @@ function BitZone:GetGroupsAtPoint(position: Vector3): { Group }
 end
 
 function BitZone:GetCollectionOfItem(item: Types.Item): Types.Collection?
-	local colID = State.itemToCollection[item]
-	if colID then
-		return State.collections[colID]
+	local colId = State.ItemToCollection[item]
+	if colId then
+		return State.Collections[colId]
 	end
 	return nil
 end
 
 function BitZone:GetZones(): { Types.Zone }
 	local result = {}
-	for _, zone in pairs(State.zoneIndexToZoneObj) do
+	for _, zone in pairs(State.ZoneIdToZoneObj) do
 		table.insert(result, zone)
 	end
 	return result
@@ -121,7 +121,7 @@ end
 
 function BitZone:GetGroups(): { Types.Group }
 	local result = {}
-	for _, group in pairs(State.groupUIDToGroupObj) do
+	for _, group in pairs(State.GroupIdToGroupObj) do
 		table.insert(result, group)
 	end
 	return result
@@ -129,7 +129,7 @@ end
 
 function BitZone:GetCollections(): { Types.Collection }
 	local result = {}
-	for _, collection in pairs(State.collections) do
+	for _, collection in pairs(State.Collections) do
 		table.insert(result, collection)
 	end
 	return result
@@ -137,11 +137,11 @@ end
 
 function BitZone:GetItems(): { Types.Item }
 	local result = {}
-	for _, collection in pairs(State.collections) do
-		local count = #collection.Items
+	for _, collection in pairs(State.Collections) do
+		local count = #collection._items
 		if count > 0 then
 			local currentSize = #result
-			table.move(collection.Items, 1, count, currentSize + 1, result)
+			table.move(collection._items, 1, count, currentSize + 1, result)
 		end
 	end
 	return result
@@ -167,7 +167,7 @@ function BitZone:IsItemValidType(item: any): boolean
 end
 
 function BitZone:IsItemInAnyCollection(item: Item): boolean
-	return State.itemToCollection[item] ~= nil
+	return State.ItemToCollection[item] ~= nil
 end
 
 return BitZone

@@ -22,7 +22,7 @@ Config.Scheduler = {
 	UpdateRate = 30,
 
 	-- Minimum positional change (in studs) required to trigger a spatial query
-	-- Items moving less than this distance are considered stationary
+	-- _items moving less than this distance are considered stationary
 	Precision = 0.1,
 
 	-- If true, callbacks are fired via task.spawn (safe but slower)
