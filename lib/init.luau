@@ -22,7 +22,6 @@ export type Zone = Types.Zone
 export type Group = Types.Group
 export type Collection = Types.Collection
 export type Item = Types.Item
-export type CollectionConfig = Types.CollectionConfig
 
 local BitZone = {}
 
@@ -44,17 +43,29 @@ function BitZone.newGroup(priority: number?): Group
 	return Group.new(priority)
 end
 
-function BitZone.newCollection(config: CollectionConfig?)
+function BitZone.newCollection(config: {
+	UpdateRate: number?,
+	Precision: number?,
+	SafetyMode: boolean?,
+}?)
 	return Collection.new(config)
 end
 
 -- TODO
-function BitZone.playersCollection(config: CollectionConfig?): Collection
+function BitZone.playersCollection(config: {
+	UpdateRate: number?,
+	Precision: number?,
+	SafetyMode: boolean?,
+}?): Collection
 	return
 end
 
 -- TODO
-function BitZone.localPlayerCollection(config: CollectionConfig?): Collection
+function BitZone.localPlayerCollection(config: {
+	UpdateRate: number?,
+	Precision: number?,
+	SafetyMode: boolean?,
+}?): Collection
 	assert(IS_CLIENT, '[BitZone] TrackLocalPlayer can only be called on the Client.')
 
 	return
@@ -92,6 +103,7 @@ function BitZone:GetGroupsAtPoint(position: Vector3): { Group }
 	return results
 end
 
+-- TODO
 function BitZone:GetCollectionOfItem(item: Item): Collection?
 	return State.itemToCollection[item]
 end

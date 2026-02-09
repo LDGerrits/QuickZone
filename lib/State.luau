@@ -8,10 +8,9 @@ State.nextZoneId = 1
 State.nextGroupId = 1
 State.nextCollectionId = 1
 
--- TODO add types
-State.collections = {}
-State.itemToCollection = {}
-State.collectionToGroups = {}
+State.collections = {} :: { [number]: Types.Collection }
+State.itemToCollection = {} :: { [Types.Item]: number }
+State.collectionToGroups = {} :: { [number]: { [number]: boolean } }
 
 State.objects = {} :: { Types.BoundingVolume }
 State.rootNode = nil :: Types.Node?

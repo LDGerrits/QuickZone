@@ -27,7 +27,6 @@ export type Node = {
 
 export type ItemData = {
 	activeGroupMemberships: { [number]: number },
-	memberOfGroups: { [number]: boolean },
 	lastPosition: Vector3,
 	strategy: number,
 	isDirty: boolean,
@@ -38,9 +37,27 @@ export type BitZone = {
 	newZone: (cframe: CFrame, size: Vector3, shape: ShapeType, associatedPart: BasePart?) -> Zone,
 	newZoneFromPart: (part: BasePart) -> Zone,
 	newGroup: (priority: number?) -> Group,
-	newCollection: (CollectionConfig?) -> Collection,
-	playersCollection: (CollectionConfig?) -> Collection,
-	localPlayerCollection: (CollectionConfig?) -> Collection,
+	newCollection: (
+		{
+			UpdateRate: number?,
+			Precision: number?,
+			SafetyMode: boolean?,
+		}?
+	) -> Collection,
+	playersCollection: (
+		{
+			UpdateRate: number?,
+			Precision: number?,
+			SafetyMode: boolean?,
+		}?
+	) -> Collection,
+	localPlayerCollection: (
+		{
+			UpdateRate: number?,
+			Precision: number?,
+			SafetyMode: boolean?,
+		}?
+	) -> Collection,
 
 	-- Global settings
 	SetFrameBudget: (self: BitZone, n: number) -> BitZone,
@@ -111,12 +128,6 @@ export type Group = {
 	UID: number,
 }
 
-export type CollectionConfig = {
-	UpdateRate: number?,
-	Precision: number?,
-	SafetyMode: boolean?,
-}
-
 export type Collection = {
 	-- Lifecycle
 	Destroy: (self: Collection) -> (),
@@ -137,7 +148,14 @@ export type Collection = {
 	-- Props
 	ID: number,
 	Items: { Item },
+	ItemIndices: { [Item]: number },
 	ItemData: { [Item]: ItemData },
+	Settings: {
+		UpdateRate: number,
+		PrecisionSq: number,
+		SafetyMode: boolean,
+	},
+	LastProcessedIndex: number,
 }
 
 export type ItemTable = {

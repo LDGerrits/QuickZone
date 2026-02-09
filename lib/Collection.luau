@@ -12,28 +12,40 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 local Collection = {}
 Collection.__index = Collection
 
-function Collection.new(config: Types.CollectionConfig?): Types.Collection
+function Collection.new(config: {
+	UpdateRate: number?,
+	Precision: number?,
+	SafetyMode: boolean?,
+}?): Types.Collection
 	local id = State.nextCollectionId
 	State.nextCollectionId += 1
 
-	-- TODO need to add these props to Types
-	local self = setmetatable({
-		ID = id,
-		Items = {}, -- Dense Array [1]=Item
-		ItemIndices = {}, -- Lookup [Item]=1
-		ItemData = {}, -- Data [Item]={lastPos...}
-		Settings = {
-			UpdateRate = config and config.UpdateRate or Config.Scheduler.UpdateRate,
-			PrecisionSq = (config and config.Precision or Config.Scheduler.Precision) ^ 2,
-			SafetyMode = config and config.SafetyMode or Config.Scheduler.SafetyMode,
-		},
-		LastProcessedIndex = 1,
-	}, Collection)
+	local updateRate = if config and config.UpdateRate then config.UpdateRate else Config.Scheduler.UpdateRate
+	local precision = if config and config.Precision then config.Precision else Config.Scheduler.Precision
+	local safetyMode = Config.Scheduler.SafetyMode
+	if config and config.SafetyMode ~= nil then
+		safetyMode = config.SafetyMode
+	end
+
+	local self = (
+		setmetatable({
+			ID = id,
+			Items = {},
+			ItemIndices = {},
+			ItemData = {},
+			Settings = {
+				UpdateRate = updateRate,
+				PrecisionSq = precision ^ 2,
+				SafetyMode = safetyMode,
+			},
+			LastProcessedIndex = 1,
+		}, Collection) :: any
+	) :: Types.Collection
 
 	State.collections[id] = self
 	State.collectionToGroups[id] = {}
 
-	return (self :: any) :: Types.Collection
+	return self
 end
 
 function Collection:SetUpdateRate(hz: number): Types.Collection
