@@ -32,13 +32,13 @@ function Observer.new(priority: number?): Types.Observer
 	return observer
 end
 
-function Observer:SetPriority(p: number): Types.Observer
+function Observer:setPriority(p: number): Types.Observer
 	State.ObserverPriorityMap[self.Id] = p
 	State.IsDirty = true
 	return self
 end
 
-function Observer:Track(group: Types.Group): Types.Observer
+function Observer:track(group: Types.Group): Types.Observer
 	local groupId = group.Id
 	if not State.GroupToObservers[groupId] then
 		State.GroupToObservers[groupId] = {}
@@ -47,7 +47,7 @@ function Observer:Track(group: Types.Group): Types.Observer
 	return self
 end
 
-function Observer:Untrack(group: Types.Group): Types.Observer
+function Observer:untrack(group: Types.Group): Types.Observer
 	local groupId = group.Id
 	if State.GroupToObservers[groupId] then
 		State.GroupToObservers[groupId][self.Id] = nil
@@ -79,7 +79,7 @@ function Observer:Untrack(group: Types.Group): Types.Observer
 	return self
 end
 
-function Observer:IsPlayerInside(player: Player): boolean
+function Observer:isPlayerInside(player: Player): boolean
 	local character = player.Character
 	if not character then
 		return false
@@ -90,18 +90,18 @@ function Observer:IsPlayerInside(player: Player): boolean
 		return false
 	end
 
-	return self:IsEntityInside(hrp)
+	return self:isEntityInside(hrp)
 end
 
-function Observer:IsLocalPlayerInside(): boolean
+function Observer:isLocalPlayerInside(): boolean
 	if not IS_CLIENT then
-		error('[BitZone] IsLocalPlayerInside can only be called on the Client.', 2)
+		error('[BitZone] isLocalPlayerInside can only be called on the Client.', 2)
 	end
 
-	return self:IsPlayerInside(Players.LocalPlayer)
+	return self:isPlayerInside(Players.LocalPlayer)
 end
 
-function Observer:IsEntityInside(entity: Types.Entity): boolean
+function Observer:isEntityInside(entity: Types.Entity): boolean
 	local groupId = State.EntityToGroup[entity]
 	if not groupId then
 		return false
@@ -116,7 +116,7 @@ function Observer:IsEntityInside(entity: Types.Entity): boolean
 	return data.ActiveObserverMemberships[self.Id] ~= nil
 end
 
-function Observer:IsPointInside(position: Vector3): boolean
+function Observer:isPointInside(position: Vector3): boolean
 	if not State.RootNode then
 		return false
 	end
@@ -137,7 +137,7 @@ function Observer:IsPointInside(position: Vector3): boolean
 	return isInside
 end
 
-function Observer:GetEntitiesInside(): { Types.Entity }
+function Observer:getEntitiesInside(): { Types.Entity }
 	local entities = State.ObserverTrackingEntities[self.Id]
 	if not entities then
 		return {}
@@ -149,7 +149,7 @@ function Observer:GetEntitiesInside(): { Types.Entity }
 	return results
 end
 
-function Observer:GetEntities(): { Types.Entity }
+function Observer:getEntities(): { Types.Entity }
 	local results = {}
 	for groupId, observers in pairs(State.GroupToObservers) do
 		if observers[self.Id] then
@@ -162,7 +162,7 @@ function Observer:GetEntities(): { Types.Entity }
 	return results
 end
 
-function Observer:GetZones(): { Types.Zone }
+function Observer:getZones(): { Types.Zone }
 	local results = {}
 	for zoneId, boundList in pairs(State.ZoneBoundObservers) do
 		if table.find(boundList, self.Id) then
@@ -175,7 +175,7 @@ function Observer:GetZones(): { Types.Zone }
 	return results
 end
 
-function Observer:GetGroups(): { Types.Group }
+function Observer:getGroups(): { Types.Group }
 	local result = {}
 
 	for groupId, observersMap in pairs(State.GroupToObservers) do
@@ -190,7 +190,7 @@ function Observer:GetGroups(): { Types.Group }
 	return result
 end
 
-function Observer:OnEntered(callback): () -> ()
+function Observer:onEntered(callback): () -> ()
 	table.insert(State.ObserverEnteredCallbacks[self.Id], callback)
 	return function()
 		local i = table.find(State.ObserverEnteredCallbacks[self.Id], callback)
@@ -200,7 +200,7 @@ function Observer:OnEntered(callback): () -> ()
 	end
 end
 
-function Observer:OnExited(callback): () -> ()
+function Observer:onExited(callback): () -> ()
 	table.insert(State.ObserverExitedCallbacks[self.Id], callback)
 	return function()
 		local i = table.find(State.ObserverExitedCallbacks[self.Id], callback)
@@ -210,41 +210,41 @@ function Observer:OnExited(callback): () -> ()
 	end
 end
 
-function Observer:OnPlayerEntered(callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:OnEntered(function(_entity, zone, data: { Player: Player }?)
+function Observer:onPlayerEntered(callback: (Player, Types.Zone) -> ()): () -> ()
+	return self:onEntered(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player then
 			callback(data.Player, zone)
 		end
 	end)
 end
 
-function Observer:OnPlayerExited(callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:OnExited(function(_entity, zone, data: { Player: Player }?)
+function Observer:onPlayerExited(callback: (Player, Types.Zone) -> ()): () -> ()
+	return self:onExited(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player then
 			callback(data.Player, zone)
 		end
 	end)
 end
 
-function Observer:OnLocalPlayerEntered(callback: (Types.Zone) -> ()): () -> ()
-	assert(IS_CLIENT, '[BitZone] OnLocalPlayerEntered can only be called on the Client.')
-	return self:OnEntered(function(_entity, zone, data: { Player: Player }?)
+function Observer:onLocalPlayerEntered(callback: (Types.Zone) -> ()): () -> ()
+	assert(IS_CLIENT, '[BitZone] onLocalPlayerEntered can only be called on the Client.')
+	return self:onEntered(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player == Players.LocalPlayer then
 			callback(zone)
 		end
 	end)
 end
 
-function Observer:OnLocalPlayerExited(callback: (Types.Zone) -> ()): () -> ()
-	assert(IS_CLIENT, '[BitZone] OnLocalPlayerExited can only be called on the Client.')
-	return self:OnExited(function(_entity, zone, data: { Player: Player }?)
+function Observer:onLocalPlayerExited(callback: (Types.Zone) -> ()): () -> ()
+	assert(IS_CLIENT, '[BitZone] onLocalPlayerExited can only be called on the Client.')
+	return self:onExited(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player == Players.LocalPlayer then
 			callback(zone)
 		end
 	end)
 end
 
-function Observer:Destroy(): ()
+function Observer:destroy(): ()
 	local id = self.Id
 	for _, observers in pairs(State.GroupToObservers) do
 		observers[id] = nil

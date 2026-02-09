@@ -54,7 +54,7 @@ function Group.new(config: {
 	return self
 end
 
-function Group:SetConfig(config: {
+function Group:setConfig(config: {
 	UpdateRate: number?,
 	Precision: number?,
 	SafetyMode: boolean?,
@@ -76,7 +76,7 @@ function Group:SetConfig(config: {
 	end
 end
 
-function Group:SetUpdateRate(hz: number): Types.Group
+function Group:setUpdateRate(hz: number): Types.Group
 	assert(hz > 0, '[BitZone] UpdateRate must be greater than 0')
 
 	self._config.UpdateRate = hz
@@ -84,19 +84,19 @@ function Group:SetUpdateRate(hz: number): Types.Group
 	return self
 end
 
-function Group:SetPrecision(n: number): Types.Group
+function Group:setPrecision(n: number): Types.Group
 	assert(n >= 0, '[BitZone] Precision must be non-negative')
 
 	self._config.PrecisionSq = n ^ 2
 	return self
 end
 
-function Group:SetSafetyMode(enabled: boolean): Types.Group
+function Group:setSafetyMode(enabled: boolean): Types.Group
 	self.Con_configfig.SafetyMode = enabled
 	return self
 end
 
-function Group:Add(entity: Types.Entity, customData: any?): Types.Group
+function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	local oldGroupId = State.EntityToGroup[entity]
 	if oldGroupId then
 		if oldGroupId == self.Id then
@@ -104,7 +104,7 @@ function Group:Add(entity: Types.Entity, customData: any?): Types.Group
 		end
 		local oldGroup = State.Groups[oldGroupId]
 		if oldGroup then
-			oldGroup:Remove(entity)
+			oldGroup:remove(entity)
 		end
 	end
 
@@ -134,7 +134,7 @@ function Group:Add(entity: Types.Entity, customData: any?): Types.Group
 	if not strat then
 		error(
 			string.format(
-				'[BitZone] Add Failed: The provided entity (%s) is not a supported type. '
+				'[BitZone] add Failed: The provided entity (%s) is not a supported type. '
 					.. 'Ensure it is a BasePart, Model, Attachment, Bone, Camera, or a table with a Position/CFrame.',
 				tostring(entity)
 			),
@@ -166,7 +166,7 @@ function Group:Add(entity: Types.Entity, customData: any?): Types.Group
 	return self
 end
 
-function Group:Remove(entity: Types.Entity): Types.Group
+function Group:remove(entity: Types.Entity): Types.Group
 	if State.EntityToGroup[entity] ~= self.Id then
 		return self
 	end
@@ -175,14 +175,14 @@ function Group:Remove(entity: Types.Entity): Types.Group
 
 	-- Trigger exit
 	local safetyMode = self._config.SafetyMode
-	for gId, oldZoneIdx in pairs(data.ActiveObserverMemberships) do
+	for gId, oldZoneId in pairs(data.ActiveObserverMemberships) do
 		if State.ObserverTrackingEntities[gId] then
 			State.ObserverTrackingEntities[gId][entity] = nil
 		end
 
 		local cbs = State.ObserverExitedCallbacks[gId]
 		if cbs then
-			local z = State.ZoneIdToZoneObj[oldZoneIdx]
+			local z = State.ZoneIdToZoneObj[oldZoneId]
 			local cd = State.EntityCustomData[entity] and State.EntityCustomData[entity][gId]
 			for _, fn in cbs do
 				if safetyMode then
@@ -216,13 +216,13 @@ function Group:Remove(entity: Types.Entity): Types.Group
 	return self
 end
 
-function Group:GetEntities(): { Types.Entity }
+function Group:getEntities(): { Types.Entity }
 	local result = table.create(#self._entities)
 	table.move(self._entities, 1, #self._entities, 1, result)
 	return result
 end
 
-function Group:GetObservers(): { Types.Observer }
+function Group:getObservers(): { Types.Observer }
 	local result = {}
 	local observersMap = State.GroupToObservers[self.Id]
 
@@ -238,7 +238,7 @@ function Group:GetObservers(): { Types.Observer }
 	return result
 end
 
-function Group:GetConfig(): {
+function Group:getConfig(): {
 	UpdateRate: number,
 	Precision: number,
 	SafetyMode: boolean,
@@ -251,9 +251,9 @@ function Group:GetConfig(): {
 	}
 end
 
-function Group:Destroy(): ()
+function Group:destroy(): ()
 	for i = #self._entities, 1, -1 do
-		self:Remove(self._entities[i])
+		self:remove(self._entities[i])
 	end
 
 	State.GroupToObservers[self.Id] = nil

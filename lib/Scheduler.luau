@@ -190,7 +190,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 				local current = d.ActiveObserverMemberships
 
 				-- Exits
-				for gId, oldZoneIdx in pairs(current) do
+				for gId, oldZoneId in pairs(current) do
 					local newPri = ctx_candidatePriority[gId]
 					if not newPri or newPri < ctx_highestWin then
 						current[gId] = nil
@@ -200,7 +200,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 
 						local cbs = observerExitedCallbacks[gId]
 						if cbs then
-							local z = zoneIdToZoneObj[oldZoneIdx]
+							local z = zoneIdToZoneObj[oldZoneId]
 							local cd = entityCustomData[entity] and entityCustomData[entity][gId]
 							fireCallback(cbs, entity, z, cd, safeMode)
 						end
@@ -212,12 +212,12 @@ RunService.Heartbeat:Connect(function(dt: number)
 					local gId = ctx_candidateList[i]
 					local pri = ctx_candidatePriority[gId]
 					if pri >= ctx_highestWin and not current[gId] then
-						local newZoneIdx = ctx_candidateIndex[gId]
-						current[gId] = newZoneIdx
+						local ZoneIdx = ctx_candidateIndex[gId]
+						current[gId] = ZoneIdx
 						observerTrackingEntities[gId][entity] = true
 						local cbs = observerEnteredCallbacks[gId]
 						if cbs then
-							local z = zoneIdToZoneObj[newZoneIdx]
+							local z = zoneIdToZoneObj[ZoneIdx]
 							local cd = entityCustomData[entity] and entityCustomData[entity][gId]
 							fireCallback(cbs, entity, z, cd, safeMode)
 						end
@@ -252,7 +252,7 @@ end)
 
 local Scheduler = {}
 
-function Scheduler.SetFrameBudget(n: number)
+function Scheduler.setFrameBudget(n: number)
 	frameBudget = n
 end
 

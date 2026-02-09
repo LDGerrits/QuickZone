@@ -27,51 +27,51 @@ export type Node = {
 
 export type BitZone = {
 	-- Factories
-	newZone: (cframe: CFrame, size: Vector3, shape: ShapeType, associatedPart: BasePart?) -> Zone,
-	newZoneFromPart: (part: BasePart) -> Zone,
-	newObserver: (priority: number?) -> Observer,
-	newGroup: ({
+	Zone: (cframe: CFrame, size: Vector3, shape: ShapeType, associatedPart: BasePart?) -> Zone,
+	ZoneFromPart: (part: BasePart) -> Zone,
+	Observer: (priority: number?) -> Observer,
+	Group: ({
 		UpdateRate: number?,
 		Precision: number?,
 		SafetyMode: boolean?,
 	}?) -> Group,
-	playersGroup: ({
+	GroupPlayers: ({
 		UpdateRate: number?,
 		Precision: number?,
 		SafetyMode: boolean?,
 	}?) -> Group,
-	localPlayerGroup: ({
+	GroupLocalPlayer: ({
 		UpdateRate: number?,
 		Precision: number?,
 		SafetyMode: boolean?,
 	}?) -> Group,
 
 	-- Global config
-	SetFrameBudget: (self: BitZone, n: number) -> BitZone,
+	setFrameBudget: (self: BitZone, n: number) -> BitZone,
 
 	-- Getters
-	GetObserversAtPoint: (self: BitZone, position: Vector3) -> { Observer },
-	GetGroupOfEntity: (self: BitZone, entity: Entity) -> Group?,
-	GetZones: (self: BitZone) -> { Zone },
-	GetObservers: (self: BitZone) -> { Observer },
-	GetGroups: (self: BitZone) -> { Group },
-	GetEntities: (self: BitZone) -> { Entity },
+	getObserversAtPoint: (self: BitZone, position: Vector3) -> { Observer },
+	getGroupOfEntity: (self: BitZone, entity: Entity) -> Group?,
+	getZones: (self: BitZone) -> { Zone },
+	getObservers: (self: BitZone) -> { Observer },
+	getGroups: (self: BitZone) -> { Group },
+	getEntities: (self: BitZone) -> { Entity },
 
 	-- Queries
-	IsEntityValidType: (self: BitZone, entity: any) -> boolean,
-	IsEntityInAnyGroup: (self: BitZone, entity: Entity) -> boolean,
+	isEntityValidType: (self: BitZone, entity: any) -> boolean,
+	isEntityInAnyGroup: (self: BitZone, entity: Entity) -> boolean,
 }
 
 export type Zone = {
 	-- Lifecycle
-	Destroy: (zone: Zone) -> (),
+	destroy: (zone: Zone) -> (),
 
 	-- State
-	BindToObservers: (zone: Zone, ...Observer) -> Zone,
-	UnbindFromObservers: (zone: Zone, ...Observer) -> Zone,
+	bindToObservers: (zone: Zone, ...Observer) -> Zone,
+	unbindFromObservers: (zone: Zone, ...Observer) -> Zone,
 
 	-- Utility
-	GetObservers: (zone: Zone) -> { Observer },
+	getObservers: (zone: Zone) -> { Observer },
 
 	-- Props
 	Id: number,
@@ -82,34 +82,34 @@ export type Callback = (Entity, Zone, any?) -> ()
 
 export type Observer = {
 	-- Lifecycle
-	Destroy: (self: Observer) -> (),
+	destroy: (self: Observer) -> (),
 
 	-- Config
-	SetPriority: (self: Observer, n: number) -> Observer,
+	setPriority: (self: Observer, n: number) -> Observer,
 
 	-- State
-	Track: (self: Observer, Group) -> Observer,
-	Untrack: (self: Observer, Group) -> Observer,
+	track: (self: Observer, Group) -> Observer,
+	untrack: (self: Observer, Group) -> Observer,
 
 	-- Queries
-	IsPlayerInside: (self: Observer, player: Player) -> boolean,
-	IsLocalPlayerInside: (self: Observer) -> boolean,
-	IsEntityInside: (self: Observer, entity: Entity) -> boolean,
-	IsPointInside: (self: Observer, position: Vector3) -> boolean,
+	isPlayerInside: (self: Observer, player: Player) -> boolean,
+	isLocalPlayerInside: (self: Observer) -> boolean,
+	isEntityInside: (self: Observer, entity: Entity) -> boolean,
+	isPointInside: (self: Observer, position: Vector3) -> boolean,
 
 	-- Getters
-	GetEntitiesInside: (self: Observer) -> { Entity },
-	GetEntities: (self: Observer) -> { Entity },
-	GetZones: (self: Observer) -> { Zone },
-	GetGroups: (self: Observer) -> { Group },
+	getEntitiesInside: (self: Observer) -> { Entity },
+	getEntities: (self: Observer) -> { Entity },
+	getZones: (self: Observer) -> { Zone },
+	getGroups: (self: Observer) -> { Group },
 
 	-- Events
-	OnEntered: (self: Observer, callback: Callback) -> () -> (),
-	OnExited: (self: Observer, callback: Callback) -> () -> (),
-	OnLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
-	OnLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
-	OnPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
-	OnPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
+	onEntered: (self: Observer, callback: Callback) -> () -> (),
+	onExited: (self: Observer, callback: Callback) -> () -> (),
+	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
+	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
+	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
+	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 
 	-- Props
 	Id: number,
@@ -117,13 +117,13 @@ export type Observer = {
 
 export type Group = {
 	-- Lifecycle
-	Destroy: (self: Group) -> (),
+	destroy: (self: Group) -> (),
 
 	-- Config
-	SetUpdateRate: (self: Group, hz: number) -> Group,
-	SetPrecision: (self: Group, n: number) -> Group,
-	SetSafetyMode: (self: Group, enabled: boolean) -> Group,
-	SetConfig: (
+	setUpdateRate: (self: Group, hz: number) -> Group,
+	setPrecision: (self: Group, n: number) -> Group,
+	setSafetyMode: (self: Group, enabled: boolean) -> Group,
+	setConfig: (
 		self: Group,
 		{
 			UpdateRate: number?,
@@ -133,13 +133,13 @@ export type Group = {
 	) -> Group,
 
 	-- State
-	Add: (self: Group, entity: Entity, customData: any?) -> Group,
-	Remove: (self: Group, entity: Entity) -> Group,
+	add: (self: Group, entity: Entity, customData: any?) -> Group,
+	remove: (self: Group, entity: Entity) -> Group,
 
 	-- Getters
-	GetEntities: (self: Group) -> { Entity },
-	GetObservers: (self: Group) -> { Observer },
-	GetConfig: (self: Group) -> {
+	getEntities: (self: Group) -> { Entity },
+	getObservers: (self: Group) -> { Observer },
+	getConfig: (self: Group) -> {
 		UpdateRate: number,
 		Precision: number,
 		SafetyMode: boolean,

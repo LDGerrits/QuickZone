@@ -25,11 +25,11 @@ export type Entity = Types.Entity
 
 local BitZone = {}
 
-function BitZone.newZone(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associatedPart: BasePart?): Zone
+function BitZone.Zone(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associatedPart: BasePart?): Zone
 	return Zone.new(cframe, size, shape, associatedPart)
 end
 
-function BitZone.newZoneFromPart(part: BasePart): Zone
+function BitZone.ZoneFromPart(part: BasePart): Zone
 	local shape: Types.ShapeType = 'Block'
 	if (part :: any).Shape == Enum.PartType.Ball then
 		shape = 'Ball'
@@ -39,11 +39,11 @@ function BitZone.newZoneFromPart(part: BasePart): Zone
 	return Zone.new(part.CFrame, part.Size, shape, part)
 end
 
-function BitZone.newObserver(priority: number?): Observer
+function BitZone.Observer(priority: number?): Observer
 	return Observer.new(priority)
 end
 
-function BitZone.newGroup(config: {
+function BitZone.Group(config: {
 	UpdateRate: number?,
 	Precision: number?,
 	SafetyMode: boolean?,
@@ -52,7 +52,7 @@ function BitZone.newGroup(config: {
 end
 
 -- TODO
-function BitZone.playersGroup(config: {
+function BitZone.GroupPlayers(config: {
 	UpdateRate: number?,
 	Precision: number?,
 	SafetyMode: boolean?,
@@ -61,7 +61,7 @@ function BitZone.playersGroup(config: {
 end
 
 -- TODO
-function BitZone.localPlayerGroup(config: {
+function BitZone.GroupLocalPlayer(config: {
 	UpdateRate: number?,
 	Precision: number?,
 	SafetyMode: boolean?,
@@ -71,14 +71,14 @@ function BitZone.localPlayerGroup(config: {
 	return
 end
 
-function BitZone:SetFrameBudget(n: number): BitZone
+function BitZone:setFrameBudget(n: number): BitZone
 	assert(n > 0, '[BitZone] FrameBudget must be greater than 0')
 
-	Scheduler.SetFrameBudget(n)
+	Scheduler.setFrameBudget(n)
 	return BitZone
 end
 
-function BitZone:GetObserversAtPoint(position: Vector3): { Observer }
+function BitZone:getObserversAtPoint(position: Vector3): { Observer }
 	local results = {}
 	local foundIds = {}
 
@@ -103,7 +103,7 @@ function BitZone:GetObserversAtPoint(position: Vector3): { Observer }
 	return results
 end
 
-function BitZone:GetGroupOfEntity(entity: Types.Entity): Types.Group?
+function BitZone:getGroupOfEntity(entity: Types.Entity): Types.Group?
 	local groupId = State.EntityToGroup[entity]
 	if groupId then
 		return State.Groups[groupId]
@@ -111,7 +111,7 @@ function BitZone:GetGroupOfEntity(entity: Types.Entity): Types.Group?
 	return nil
 end
 
-function BitZone:GetZones(): { Types.Zone }
+function BitZone:getZones(): { Types.Zone }
 	local result = {}
 	for _, zone in pairs(State.ZoneIdToZoneObj) do
 		table.insert(result, zone)
@@ -119,7 +119,7 @@ function BitZone:GetZones(): { Types.Zone }
 	return result
 end
 
-function BitZone:GetObservers(): { Types.Observer }
+function BitZone:getObservers(): { Types.Observer }
 	local result = {}
 	for _, observer in pairs(State.ObserverIdToObserverObj) do
 		table.insert(result, observer)
@@ -127,7 +127,7 @@ function BitZone:GetObservers(): { Types.Observer }
 	return result
 end
 
-function BitZone:GetGroups(): { Types.Group }
+function BitZone:getGroups(): { Types.Group }
 	local result = {}
 	for _, group in pairs(State.Groups) do
 		table.insert(result, group)
@@ -135,7 +135,7 @@ function BitZone:GetGroups(): { Types.Group }
 	return result
 end
 
-function BitZone:GetEntities(): { Types.Entity }
+function BitZone:getEntities(): { Types.Entity }
 	local result = {}
 	for _, group in pairs(State.Groups) do
 		local count = #group._entities
@@ -147,7 +147,7 @@ function BitZone:GetEntities(): { Types.Entity }
 	return result
 end
 
-function BitZone:IsEntityValidType(entity: any): boolean
+function BitZone:isEntityValidType(entity: any): boolean
 	if typeof(entity) == 'Instance' then
 		if
 			entity:IsA('BasePart')
@@ -166,7 +166,7 @@ function BitZone:IsEntityValidType(entity: any): boolean
 	return false
 end
 
-function BitZone:IsEntityInAnyGroup(entity: Entity): boolean
+function BitZone:isEntityInAnyGroup(entity: Entity): boolean
 	return State.EntityToGroup[entity] ~= nil
 end
 

@@ -36,7 +36,7 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	return self
 end
 
-function Zone:BindToObservers(...): Types.Zone
+function Zone:bindToObservers(...): Types.Zone
 	local bound = State.ZoneBoundObservers[self.Id] or {}
 	State.ZoneBoundObservers[self.Id] = bound
 	for _, observer in { ... } do
@@ -48,7 +48,7 @@ function Zone:BindToObservers(...): Types.Zone
 	return self
 end
 
-function Zone:UnbindFromObservers(...): Types.Zone
+function Zone:unbindFromObservers(...): Types.Zone
 	local bound = State.ZoneBoundObservers[self.Id]
 	if not bound then
 		return self
@@ -69,7 +69,7 @@ function Zone:UnbindFromObservers(...): Types.Zone
 	return self
 end
 
-function Zone:GetObservers(): { Types.Observer }
+function Zone:getObservers(): { Types.Observer }
 	local bound = State.ZoneBoundObservers[self.Id]
 	if not bound then
 		return {}
@@ -85,7 +85,7 @@ function Zone:GetObservers(): { Types.Observer }
 	return result
 end
 
-function Zone:Destroy()
+function Zone:destroy()
 	State.ZoneBoundObservers[self.Id] = nil
 	State.ZoneIdToZoneObj[self.Id] = nil
 	State.Objects[self.Id] = nil
