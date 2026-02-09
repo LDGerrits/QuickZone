@@ -10,7 +10,7 @@ local Config = require(script.Parent.Config)
 local Types = require(script.Parent.Types)
 
 local objects = State.objects
-local zoneBoundObservers = State.zoneBoundObservers
+local zoneAttachedObservers = State.zoneAttachedObservers
 local observerPriorityMap = State.ObserverPriorityMap
 local entityCustomData = State.entityCustomData
 local observerEnteredCallbacks = State.observerEnteredCallbacks
@@ -54,7 +54,7 @@ local function queryCallback(zoneId: number)
 		return
 	end
 
-	local observers = zoneBoundObservers[zoneId]
+	local observers = zoneAttachedObservers[zoneId]
 	if not observers then
 		return
 	end
@@ -93,7 +93,7 @@ end
 
 RunService.Heartbeat:Connect(function(dt: number)
 	if State.pendingRebuild then
-		debug.profilebegin('QuickBounds_Build')
+		debug.profilebegin('BitZone_Build')
 		State.rootNode = LinearBVH.build(objects)
 		State.pendingRebuild = false
 		debug.profileend()
@@ -104,7 +104,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 		return
 	end
 
-	debug.profilebegin('QuickBounds_Step')
+	debug.profilebegin('BitZone_Step')
 	local start = os.clock()
 	local forceRefresh = State.isDirty
 	State.isDirty = false

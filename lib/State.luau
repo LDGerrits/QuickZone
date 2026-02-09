@@ -23,7 +23,7 @@ State.entityCustomData = {} :: { [Types.Entity]: { [number]: any } }
 State.observerEnteredCallbacks = {} :: { [number]: { Types.Callback } }
 State.observerExitedCallbacks = {} :: { [number]: { Types.Callback } }
 
-State.zoneBoundObservers = {} :: { [number]: { number } }
+State.zoneAttachedObservers = {} :: { [number]: { number } }
 State.zoneIdToZoneObj = {} :: { [number]: Types.Zone }
 State.observerIdToObserverObj = {} :: { [number]: Types.Observer }
 

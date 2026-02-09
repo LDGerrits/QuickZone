@@ -12,7 +12,7 @@ local Observer = require(script.Observer)
 local Scheduler = require(script.Scheduler)
 
 local objects = State.objects
-local zoneBoundObservers = State.zoneBoundObservers
+local zoneAttachedObservers = State.zoneAttachedObservers
 local observerIdToObserverObj = State.observerIdToObserverObj
 
 local IS_CLIENT = RunService:IsClient()
@@ -85,7 +85,7 @@ function BitZone:getObserversAtPoint(position: Vector3): { Observer }
 	if State.rootNode then
 		LinearBVH.queryPoint(State.rootNode, position, function(zoneId)
 			if Geometry.isPointInShape(position, objects[zoneId]) then
-				local observers = zoneBoundObservers[zoneId]
+				local observers = zoneAttachedObservers[zoneId]
 				if observers then
 					for _, id in observers do
 						if not foundIds[id] then

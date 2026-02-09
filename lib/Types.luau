@@ -67,8 +67,8 @@ export type Zone = {
 	destroy: (zone: Zone) -> (),
 
 	-- State
-	bindToObservers: (zone: Zone, ...Observer) -> Zone,
-	unbindFromObservers: (zone: Zone, ...Observer) -> Zone,
+	attach: (zone: Zone, ...Observer) -> Zone,
+	detach: (zone: Zone, ...Observer) -> Zone,
 
 	-- Utility
 	getObservers: (zone: Zone) -> { Observer },
@@ -88,8 +88,8 @@ export type Observer = {
 	setPriority: (self: Observer, n: number) -> Observer,
 
 	-- State
-	track: (self: Observer, Group) -> Observer,
-	untrack: (self: Observer, Group) -> Observer,
+	subscribe: (self: Observer, ...Group) -> Observer,
+	unsubscribe: (self: Observer, ...Group) -> Observer,
 
 	-- Queries
 	isPlayerInside: (self: Observer, player: Player) -> boolean,
@@ -134,7 +134,7 @@ export type Group = {
 
 	-- State
 	add: (self: Group, entity: Entity, customData: any?) -> Group,
-	remove: (self: Group, entity: Entity) -> Group,
+	remove: (self: Group, ...Entity) -> Group,
 
 	-- Getters
 	getEntities: (self: Group) -> { Entity },

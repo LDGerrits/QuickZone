@@ -166,52 +166,54 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	return self
 end
 
-function Group:remove(entity: Types.Entity): Types.Group
-	if State.entityToGroup[entity] ~= self.id then
-		return self
-	end
-
-	local data = self._entityData[entity]
-
-	-- Trigger exit
-	local safety = self._config.safety
-	for gId, oldZoneId in pairs(data.activeObserverMemberships) do
-		if State.observerTrackingEntities[gId] then
-			State.observerTrackingEntities[gId][entity] = nil
+function Group:remove(...: Types.Entity): Types.Group
+	for _, entity in { ... } do
+		if State.entityToGroup[entity] ~= self.id then
+			continue
 		end
 
-		local cbs = State.observerExitedCallbacks[gId]
-		if cbs then
-			local z = State.zoneIdToZoneObj[oldZoneId]
-			local cd = State.entityCustomData[entity] and State.entityCustomData[entity][gId]
-			for _, fn in cbs do
-				if safety then
-					task.spawn(fn, entity, z, cd)
-				else
-					fn(entity, z, cd)
+		local data = self._entityData[entity]
+
+		-- Trigger exit
+		local safety = self._config.safety
+		for gId, oldZoneId in pairs(data.activeObserverMemberships) do
+			if State.observerTrackingEntities[gId] then
+				State.observerTrackingEntities[gId][entity] = nil
+			end
+
+			local cbs = State.observerExitedCallbacks[gId]
+			if cbs then
+				local z = State.zoneIdToZoneObj[oldZoneId]
+				local cd = State.entityCustomData[entity] and State.entityCustomData[entity][gId]
+				for _, fn in cbs do
+					if safety then
+						task.spawn(fn, entity, z, cd)
+					else
+						fn(entity, z, cd)
+					end
 				end
 			end
 		end
+
+		-- Swap-remove from Array
+		local idx = self._entityIndices[entity]
+		local lastIdx = #self._entities
+		local lastEntity = self._entities[lastIdx]
+
+		if idx == lastIdx then
+			self._entities[lastIdx] = nil
+			self._entityIndices[entity] = nil
+		else
+			self._entities[idx] = lastEntity
+			self._entityIndices[lastEntity] = idx
+			self._entities[lastIdx] = nil
+			self._entityIndices[entity] = nil
+		end
+
+		self._entityData[entity] = nil
+		State.entityToGroup[entity] = nil
+		State.entityCustomData[entity] = nil
 	end
-
-	-- Swap-remove from Array
-	local idx = self._entityIndices[entity]
-	local lastIdx = #self._entities
-	local lastEntity = self._entities[lastIdx]
-
-	if idx == lastIdx then
-		self._entities[lastIdx] = nil
-		self._entityIndices[entity] = nil
-	else
-		self._entities[idx] = lastEntity
-		self._entityIndices[lastEntity] = idx
-		self._entities[lastIdx] = nil
-		self._entityIndices[entity] = nil
-	end
-
-	self._entityData[entity] = nil
-	State.entityToGroup[entity] = nil
-	State.entityCustomData[entity] = nil
 
 	return self
 end

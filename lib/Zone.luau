@@ -36,33 +36,33 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	return self
 end
 
-function Zone:bindToObservers(...): Types.Zone
-	local bound = State.zoneBoundObservers[self.id] or {}
-	State.zoneBoundObservers[self.id] = bound
+function Zone:attach(...: Types.Group): Types.Zone
+	local attached = State.zoneAttachedObservers[self.id] or {}
+	State.zoneAttachedObservers[self.id] = attached
 	for _, observer in { ... } do
-		if not table.find(bound, observer.id) then
-			table.insert(bound, observer.id)
+		if not table.find(attached, observer.id) then
+			table.insert(attached, observer.id)
 		end
 	end
 	State.isDirty = true
 	return self
 end
 
-function Zone:unbindFromObservers(...): Types.Zone
-	local bound = State.zoneBoundObservers[self.id]
-	if not bound then
+function Zone:detach(...: Types.Group): Types.Zone
+	local attached = State.zoneAttachedObservers[self.id]
+	if not attached then
 		return self
 	end
 
 	for _, observer in { ... } do
-		local idx = table.find(bound, observer.id)
+		local idx = table.find(attached, observer.id)
 		while idx do
-			table.remove(bound, idx)
-			idx = table.find(bound, observer.id)
+			table.remove(attached, idx)
+			idx = table.find(attached, observer.id)
 		end
 	end
-	if #bound == 0 then
-		State.zoneBoundObservers[self.id] = nil
+	if #attached == 0 then
+		State.zoneAttachedObservers[self.id] = nil
 	end
 	State.isDirty = true
 
@@ -70,13 +70,13 @@ function Zone:unbindFromObservers(...): Types.Zone
 end
 
 function Zone:getObservers(): { Types.Observer }
-	local bound = State.zoneBoundObservers[self.id]
-	if not bound then
+	local attached = State.zoneAttachedObservers[self.id]
+	if not attached then
 		return {}
 	end
 
 	local result = {}
-	for _, id in bound do
+	for _, id in attached do
 		local observer = State.observerIdToObserverObj[id]
 		if observer then
 			table.insert(result, observer)
@@ -86,7 +86,7 @@ function Zone:getObservers(): { Types.Observer }
 end
 
 function Zone:destroy()
-	State.zoneBoundObservers[self.id] = nil
+	State.zoneAttachedObservers[self.id] = nil
 	State.zoneIdToZoneObj[self.id] = nil
 	State.objects[self.id] = nil
 	State.pendingRebuild = true

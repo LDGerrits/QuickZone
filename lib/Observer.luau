@@ -38,38 +38,47 @@ function Observer:setPriority(p: number): Types.Observer
 	return self
 end
 
-function Observer:track(group: Types.Group): Types.Observer
-	local groupId = group.id
-	if not State.groupToObservers[groupId] then
-		State.groupToObservers[groupId] = {}
+function Observer:subscribe(...: Types.Group): Types.Observer
+	for _, group in { ... } do
+		local groupId = group.id
+
+		if not State.groupToObservers[groupId] then
+			State.groupToObservers[groupId] = {}
+		end
+
+		State.groupToObservers[groupId][self.id] = true
 	end
-	State.groupToObservers[groupId][self.id] = true
+
 	return self
 end
 
-function Observer:untrack(group: Types.Group): Types.Observer
-	local groupId = group.id
-	if State.groupToObservers[groupId] then
-		State.groupToObservers[groupId][self.id] = nil
-	end
+function Observer:unsubscribe(...: Types.Group): Types.Observer
+	for _, group in { ... } do
+		local groupId = group.id
+		if State.groupToObservers[groupId] then
+			State.groupToObservers[groupId][self.id] = nil
+		end
 
-	local safety = group._config.safety
-	for _, entity in group._entities do
-		local data = group._entityData[entity]
-		local oldZoneId = data and data.activeObserverMemberships[self.id]
-		if oldZoneId then
-			data.activeObserverMemberships[self.id] = nil
-			State.observerTrackingEntities[self.id][entity] = nil
+		local safety = group._config.safety
+		for _, entity in group._entities do
+			local data = group._entityData[entity]
+			local oldZoneId = data and data.activeObserverMemberships[self.id]
+			if oldZoneId then
+				data.activeObserverMemberships[self.id] = nil
+				if State.observerTrackingEntities[self.id] then
+					State.observerTrackingEntities[self.id][entity] = nil
+				end
 
-			local z = State.zoneIdToZoneObj[oldZoneId]
-			local cbs = State.observerExitedCallbacks[self.id]
-			if cbs then
-				local cd = State.entityCustomData[entity] and State.entityCustomData[entity][self.id]
-				for _, fn in cbs do
-					if safety then
-						task.spawn(fn, entity, z, cd)
-					else
-						fn(entity, z, cd)
+				local cbs = State.observerExitedCallbacks[self.id]
+				if cbs then
+					local z = State.zoneIdToZoneObj[oldZoneId]
+					local cd = State.entityCustomData[entity] and State.entityCustomData[entity][self.id]
+					for _, fn in cbs do
+						if safety then
+							task.spawn(fn, entity, z, cd)
+						else
+							fn(entity, z, cd)
+						end
 					end
 				end
 			end
@@ -126,7 +135,7 @@ function Observer:isPointInside(position: Vector3): boolean
 		if isInside then
 			return
 		end
-		local observers = State.zoneBoundObservers[zoneId]
+		local observers = State.zoneAttachedObservers[zoneId]
 		if observers and table.find(observers, self.id) then
 			if Geometry.isPointInShape(position, State.objects[zoneId]) then
 				isInside = true
@@ -164,8 +173,8 @@ end
 
 function Observer:getZones(): { Types.Zone }
 	local results = {}
-	for zoneId, boundList in pairs(State.zoneBoundObservers) do
-		if table.find(boundList, self.id) then
+	for zoneId, attachedList in pairs(State.zoneAttachedObservers) do
+		if table.find(attachedList, self.id) then
 			local zone = State.zoneIdToZoneObj[zoneId]
 			if zone then
 				table.insert(results, zone)
@@ -250,11 +259,11 @@ function Observer:destroy(): ()
 		observers[id] = nil
 	end
 
-	for _, boundList in pairs(State.zoneBoundObservers) do
-		local idx = table.find(boundList, id)
+	for _, attachedList in pairs(State.zoneAttachedObservers) do
+		local idx = table.find(attachedList, id)
 		while idx do
-			table.remove(boundList, idx)
-			idx = table.find(boundList, id)
+			table.remove(attachedList, idx)
+			idx = table.find(attachedList, id)
 		end
 	end
 
