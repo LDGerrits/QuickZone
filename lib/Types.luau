@@ -3,26 +3,26 @@
 export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge'
 
 export type BoundingVolume = {
-	Position: Vector3,
-	CFrame: CFrame,
-	HalfSize: Vector3,
-	Shape: ShapeType,
+	position: Vector3,
+	cframe: CFrame,
+	halfSize: Vector3,
+	shape: ShapeType,
 
 	-- Sphere / cylinder specific
-	RadiusSq: number?,
+	radiusSq: number?,
 
 	-- Cylinder specific
-	Start: Vector3?,
-	Axis: Vector3?,
-	AxisLength: number?,
+	start: Vector3?,
+	axis: Vector3?,
+	axisLength: number?,
 }
 
 export type Node = {
-	Left: Node?,
-	Right: Node?,
-	Min: Vector3,
-	Max: Vector3,
-	Id: number, -- -1 for internal nodes
+	left: Node?,
+	right: Node?,
+	min: Vector3,
+	max: Vector3,
+	id: number, -- -1 for internal nodes
 }
 
 export type BitZone = {
@@ -31,19 +31,19 @@ export type BitZone = {
 	ZoneFromPart: (part: BasePart) -> Zone,
 	Observer: (priority: number?) -> Observer,
 	Group: ({
-		UpdateRate: number?,
-		Precision: number?,
-		SafetyMode: boolean?,
+		updateRate: number?,
+		precision: number?,
+		safety: boolean?,
 	}?) -> Group,
 	GroupPlayers: ({
-		UpdateRate: number?,
-		Precision: number?,
-		SafetyMode: boolean?,
+		updateRate: number?,
+		precision: number?,
+		safety: boolean?,
 	}?) -> Group,
 	GroupLocalPlayer: ({
-		UpdateRate: number?,
-		Precision: number?,
-		SafetyMode: boolean?,
+		updateRate: number?,
+		precision: number?,
+		safety: boolean?,
 	}?) -> Group,
 
 	-- Global config
@@ -74,8 +74,8 @@ export type Zone = {
 	getObservers: (zone: Zone) -> { Observer },
 
 	-- Props
-	Id: number,
-	Part: BasePart?,
+	id: number,
+	part: BasePart?,
 }
 
 export type Callback = (Entity, Zone, any?) -> ()
@@ -112,7 +112,7 @@ export type Observer = {
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 
 	-- Props
-	Id: number,
+	id: number,
 }
 
 export type Group = {
@@ -126,9 +126,9 @@ export type Group = {
 	setConfig: (
 		self: Group,
 		{
-			UpdateRate: number?,
-			Precision: number?,
-			SafetyMode: boolean?,
+			updateRate: number?,
+			precision: number?,
+			safety: boolean?,
 		}?
 	) -> Group,
 
@@ -140,20 +140,20 @@ export type Group = {
 	getEntities: (self: Group) -> { Entity },
 	getObservers: (self: Group) -> { Observer },
 	getConfig: (self: Group) -> {
-		UpdateRate: number,
-		Precision: number,
-		SafetyMode: boolean,
+		updateRate: number,
+		precision: number,
+		safety: boolean,
 	},
 
 	-- Props
-	Id: number,
+	id: number,
 	_entities: { Entity },
 	_entityIndices: { [Entity]: number },
 	_entityData: { [Entity]: EntityData },
 	_config: {
-		UpdateRate: number,
+		updateRate: number,
 		PrecisionSq: number,
-		SafetyMode: boolean,
+		safety: boolean,
 	},
 	_lastProcessedIndex: number,
 }
@@ -169,10 +169,10 @@ export type EntityTable = {
 export type Entity = BasePart | Model | Camera | Attachment | Bone | EntityTable
 
 export type EntityData = {
-	ActiveObserverMemberships: { [number]: number },
-	LastPosition: Vector3,
-	Strategy: number,
-	IsDirty: boolean,
+	activeObserverMemberships: { [number]: number },
+	lastPosition: Vector3,
+	strategy: number,
+	isDirty: boolean,
 }
 
 return nil

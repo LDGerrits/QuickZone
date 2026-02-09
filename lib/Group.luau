@@ -13,36 +13,36 @@ local Group = {}
 Group.__index = Group
 
 function Group.new(config: {
-	UpdateRate: number?,
-	Precision: number?,
-	SafetyMode: boolean?,
+	updateRate: number?,
+	precision: number?,
+	safety: boolean?,
 }?): Types.Group
-	local hz = config and config.UpdateRate
-	assert(not hz or hz > 0, '[BitZone] UpdateRate must be greater than 0')
+	local hz = config and config.updateRate
+	assert(not hz or hz > 0, '[BitZone] updateRate must be greater than 0')
 
-	local n = config and config.Precision
-	assert(not n or n >= 0, '[BitZone] Precision must be non-negative')
+	local n = config and config.precision
+	assert(not n or n >= 0, '[BitZone] precision must be non-negative')
 
 	local id = State.nextGroupId
 	State.nextGroupId += 1
 
-	local updateRate = hz or Config.Scheduler.UpdateRate
-	local precision = n or Config.Scheduler.Precision
-	local safetyMode = Config.Scheduler.SafetyMode
-	if config and config.SafetyMode ~= nil then
-		safetyMode = config.SafetyMode
+	local updateRate = hz or Config.Scheduler.updateRate
+	local precision = n or Config.Scheduler.precision
+	local safety = Config.Scheduler.safety
+	if config and config.safety ~= nil then
+		safety = config.safety
 	end
 
 	local self = (
 		setmetatable({
-			Id = id,
+			id = id,
 			_entities = {},
 			_entityIndices = {},
 			_entityData = {},
 			_config = {
-				UpdateRate = updateRate,
+				updateRate = updateRate,
 				PrecisionSq = precision ^ 2,
-				SafetyMode = safetyMode,
+				safety = safety,
 			},
 			_lastProcessedIndex = 1,
 		}, Group) :: any
@@ -55,51 +55,51 @@ function Group.new(config: {
 end
 
 function Group:setConfig(config: {
-	UpdateRate: number?,
-	Precision: number?,
-	SafetyMode: boolean?,
+	updateRate: number?,
+	precision: number?,
+	safety: boolean?,
 })
-	local hz = config.UpdateRate
-	assert(not hz or hz > 0, '[BitZone] UpdateRate must be greater than 0')
+	local hz = config.updateRate
+	assert(not hz or hz > 0, '[BitZone] updateRate must be greater than 0')
 
-	local n = config.Precision
-	assert(not n or n >= 0, '[BitZone] Precision must be non-negative')
+	local n = config.precision
+	assert(not n or n >= 0, '[BitZone] precision must be non-negative')
 
 	if hz then
-		self._config.UpdateRate = hz
+		self._config.updateRate = hz
 	end
 	if n then
-		self._config.Precision = n
+		self._config.precision = n
 	end
-	if config.SafetyMode ~= nil then
-		self._config.SafetyMode = config.SafetyMode
+	if config.safety ~= nil then
+		self._config.safety = config.safety
 	end
 end
 
 function Group:setUpdateRate(hz: number): Types.Group
-	assert(hz > 0, '[BitZone] UpdateRate must be greater than 0')
+	assert(hz > 0, '[BitZone] updateRate must be greater than 0')
 
-	self._config.UpdateRate = hz
+	self._config.updateRate = hz
 
 	return self
 end
 
 function Group:setPrecision(n: number): Types.Group
-	assert(n >= 0, '[BitZone] Precision must be non-negative')
+	assert(n >= 0, '[BitZone] precision must be non-negative')
 
 	self._config.PrecisionSq = n ^ 2
 	return self
 end
 
-function Group:setSafetyMode(enabled: boolean): Types.Group
-	self.Con_configfig.SafetyMode = enabled
+function Group:setSafety(enabled: boolean): Types.Group
+	self.Con_configfig.safety = enabled
 	return self
 end
 
 function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	local oldGroupId = State.entityToGroup[entity]
 	if oldGroupId then
-		if oldGroupId == self.Id then
+		if oldGroupId == self.id then
 			return self
 		end
 		local oldGroup = State.groups[oldGroupId]
@@ -143,10 +143,10 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	end
 
 	local data = {
-		LastPosition = Vector3.zero,
-		Strategy = strat,
-		IsDirty = true,
-		ActiveObserverMemberships = {},
+		lastPosition = Vector3.zero,
+		strategy = strat,
+		isDirty = true,
+		activeObserverMemberships = {},
 	}
 
 	local idx = #self._entities + 1
@@ -154,7 +154,7 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	self._entityIndices[entity] = idx
 	self._entityData[entity] = data
 
-	State.entityToGroup[entity] = self.Id
+	State.entityToGroup[entity] = self.id
 
 	if customData then
 		if not State.entityCustomData[entity] then
@@ -167,15 +167,15 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 end
 
 function Group:remove(entity: Types.Entity): Types.Group
-	if State.entityToGroup[entity] ~= self.Id then
+	if State.entityToGroup[entity] ~= self.id then
 		return self
 	end
 
 	local data = self._entityData[entity]
 
 	-- Trigger exit
-	local safetyMode = self._config.SafetyMode
-	for gId, oldZoneId in pairs(data.ActiveObserverMemberships) do
+	local safety = self._config.safety
+	for gId, oldZoneId in pairs(data.activeObserverMemberships) do
 		if State.observerTrackingEntities[gId] then
 			State.observerTrackingEntities[gId][entity] = nil
 		end
@@ -185,7 +185,7 @@ function Group:remove(entity: Types.Entity): Types.Group
 			local z = State.zoneIdToZoneObj[oldZoneId]
 			local cd = State.entityCustomData[entity] and State.entityCustomData[entity][gId]
 			for _, fn in cbs do
-				if safetyMode then
+				if safety then
 					task.spawn(fn, entity, z, cd)
 				else
 					fn(entity, z, cd)
@@ -224,7 +224,7 @@ end
 
 function Group:getObservers(): { Types.Observer }
 	local result = {}
-	local observersMap = State.groupToObservers[self.Id]
+	local observersMap = State.groupToObservers[self.id]
 
 	if observersMap then
 		for observerId, _ in pairs(observersMap) do
@@ -239,15 +239,15 @@ function Group:getObservers(): { Types.Observer }
 end
 
 function Group:getConfig(): {
-	UpdateRate: number,
-	Precision: number,
-	SafetyMode: boolean,
+	updateRate: number,
+	precision: number,
+	safety: boolean,
 }
 	local config = self._config
 	return {
-		UpdateRate = config.UpdateRate,
-		Precision = math.sqrt(config.PrecisionSq),
-		SafetyMode = config.SafetyMode,
+		updateRate = config.updateRate,
+		precision = math.sqrt(config.PrecisionSq),
+		safety = config.safety,
 	}
 end
 
@@ -256,8 +256,8 @@ function Group:destroy(): ()
 		self:remove(self._entities[i])
 	end
 
-	State.groupToObservers[self.Id] = nil
-	State.groups[self.Id] = nil
+	State.groupToObservers[self.id] = nil
+	State.groups[self.id] = nil
 	setmetatable(self :: any, nil)
 end
 

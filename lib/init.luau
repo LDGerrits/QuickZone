@@ -44,27 +44,27 @@ function BitZone.Observer(priority: number?): Observer
 end
 
 function BitZone.Group(config: {
-	UpdateRate: number?,
-	Precision: number?,
-	SafetyMode: boolean?,
+	updateRate: number?,
+	precision: number?,
+	safety: boolean?,
 }?)
 	return Group.new(config)
 end
 
 -- TODO
 function BitZone.GroupPlayers(config: {
-	UpdateRate: number?,
-	Precision: number?,
-	SafetyMode: boolean?,
+	updateRate: number?,
+	precision: number?,
+	safety: boolean?,
 }?): Group
 	return
 end
 
 -- TODO
 function BitZone.GroupLocalPlayer(config: {
-	UpdateRate: number?,
-	Precision: number?,
-	SafetyMode: boolean?,
+	updateRate: number?,
+	precision: number?,
+	safety: boolean?,
 }?): Group
 	assert(IS_CLIENT, '[BitZone] TrackLocalPlayer can only be called on the Client.')
 

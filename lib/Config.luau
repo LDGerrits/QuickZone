@@ -17,17 +17,17 @@ Config.Scheduler = {
 	-- 0.001 = 1ms (approx 6% of a frame at 60 FPS)
 	FrameBudget = 1 / 1000,
 
-	-- Target update frequency (Hz).
+	-- Update frequency (Hz).
 	-- 30 means every entity is checked ~30 times per second
-	UpdateRate = 30,
+	updateRate = 30,
 
 	-- Minimum positional change (in studs) required to trigger a spatial query
 	-- Entities moving less than this distance are considered stationary
-	Precision = 0.1,
+	precision = 0.1,
 
 	-- If true, callbacks are fired via task.spawn (safe but slower)
 	-- If false, callbacks fire immediately (risky if not handled appropriately)
-	SafetyMode = true,
+	safety = true,
 }
 
 return Config

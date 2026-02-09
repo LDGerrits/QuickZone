@@ -56,19 +56,19 @@ local function createSubTree(
 ): Types.Node
 	if beginIndex == endIndex then
 		local id = list[beginIndex].id
-		return { Min = boundsMin[id], Max = boundsMax[id], Id = id }
+		return { min = boundsMin[id], max = boundsMax[id], id = id }
 	else
 		local mid = getSplitPos(list, beginIndex, endIndex)
 		if mid == nil then
 			local id = list[beginIndex].id
-			return { Min = boundsMin[id], Max = boundsMax[id], Id = id }
+			return { min = boundsMin[id], max = boundsMax[id], id = id }
 		end
 
 		local left = createSubTree(list, boundsMin, boundsMax, beginIndex, mid - 1)
 		local right = createSubTree(list, boundsMin, boundsMax, mid, endIndex)
-		local min, max = Geometry.unionBounds(left.Min, left.Max, right.Min, right.Max)
+		local min, max = Geometry.unionBounds(left.min, left.max, right.min, right.max)
 
-		return { Min = min, Max = max, Id = -1, Left = left, Right = right }
+		return { min = min, max = max, id = -1, left = left, right = right }
 	end
 end
 
@@ -104,7 +104,7 @@ function LinearBVH.build(objects: { Types.BoundingVolume }): Types.Node?
 		count += 1
 		listCache[count] = {
 			id = id,
-			mortonCode = Geometry.positionToMortonCode(object.Position, sceneMin, sceneMax),
+			mortonCode = Geometry.positionToMortonCode(object.position, sceneMin, sceneMax),
 		}
 	end
 
@@ -131,7 +131,7 @@ function LinearBVH.queryPoint(root: Types.Node?, point: Vector3, callback: (id: 
 		local node = traversalStack[stackPtr]
 		stackPtr -= 1
 
-		local min, max = node.Min, node.Max
+		local min, max = node.min, node.max
 		if
 			point.X >= min.X
 			and point.X <= max.X
@@ -140,13 +140,13 @@ function LinearBVH.queryPoint(root: Types.Node?, point: Vector3, callback: (id: 
 			and point.Z >= min.Z
 			and point.Z <= max.Z
 		then
-			if node.Id > 0 then
-				callback(node.Id)
+			if node.id > 0 then
+				callback(node.id)
 			else
 				stackPtr += 1
-				traversalStack[stackPtr] = node.Left :: Types.Node
+				traversalStack[stackPtr] = node.left :: Types.Node
 				stackPtr += 1
-				traversalStack[stackPtr] = node.Right :: Types.Node
+				traversalStack[stackPtr] = node.right :: Types.Node
 			end
 		end
 	end

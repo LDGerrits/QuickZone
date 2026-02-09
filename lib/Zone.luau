@@ -9,20 +9,20 @@ Zone.__index = Zone
 function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associatedPart: BasePart?): Types.Zone
 	local halfSize = size / 2
 	local object: Types.BoundingVolume = {
-		Position = cframe.Position,
-		CFrame = cframe,
-		HalfSize = halfSize,
-		Shape = shape,
+		position = cframe.Position,
+		cframe = cframe,
+		halfSize = halfSize,
+		shape = shape,
 	}
 
 	if shape == 'Ball' then
-		object.RadiusSq = halfSize.X * halfSize.X
+		object.radiusSq = halfSize.X * halfSize.X
 	elseif shape == 'Cylinder' then
 		local halfHeight = halfSize.X
-		object.Start = object.Position - object.CFrame.RightVector * halfHeight
-		object.Axis = object.CFrame.RightVector
-		object.AxisLength = halfHeight * 2
-		object.RadiusSq = halfSize.Y * halfSize.Y
+		object.start = object.position - object.cframe.RightVector * halfHeight
+		object.axis = object.cframe.RightVector
+		object.axisLength = halfHeight * 2
+		object.radiusSq = halfSize.Y * halfSize.Y
 	end
 
 	local id = State.nextZoneId
@@ -30,18 +30,18 @@ function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associa
 	State.objects[id] = object
 	State.pendingRebuild = true
 
-	local self = (setmetatable({ Id = id, Part = associatedPart }, Zone) :: any) :: Types.Zone
+	local self = (setmetatable({ id = id, part = associatedPart }, Zone) :: any) :: Types.Zone
 	State.zoneIdToZoneObj[id] = self
 
 	return self
 end
 
 function Zone:bindToObservers(...): Types.Zone
-	local bound = State.zoneBoundObservers[self.Id] or {}
-	State.zoneBoundObservers[self.Id] = bound
+	local bound = State.zoneBoundObservers[self.id] or {}
+	State.zoneBoundObservers[self.id] = bound
 	for _, observer in { ... } do
-		if not table.find(bound, observer.Id) then
-			table.insert(bound, observer.Id)
+		if not table.find(bound, observer.id) then
+			table.insert(bound, observer.id)
 		end
 	end
 	State.isDirty = true
@@ -49,20 +49,20 @@ function Zone:bindToObservers(...): Types.Zone
 end
 
 function Zone:unbindFromObservers(...): Types.Zone
-	local bound = State.zoneBoundObservers[self.Id]
+	local bound = State.zoneBoundObservers[self.id]
 	if not bound then
 		return self
 	end
 
 	for _, observer in { ... } do
-		local idx = table.find(bound, observer.Id)
+		local idx = table.find(bound, observer.id)
 		while idx do
 			table.remove(bound, idx)
-			idx = table.find(bound, observer.Id)
+			idx = table.find(bound, observer.id)
 		end
 	end
 	if #bound == 0 then
-		State.zoneBoundObservers[self.Id] = nil
+		State.zoneBoundObservers[self.id] = nil
 	end
 	State.isDirty = true
 
@@ -70,7 +70,7 @@ function Zone:unbindFromObservers(...): Types.Zone
 end
 
 function Zone:getObservers(): { Types.Observer }
-	local bound = State.zoneBoundObservers[self.Id]
+	local bound = State.zoneBoundObservers[self.id]
 	if not bound then
 		return {}
 	end
@@ -86,9 +86,9 @@ function Zone:getObservers(): { Types.Observer }
 end
 
 function Zone:destroy()
-	State.zoneBoundObservers[self.Id] = nil
-	State.zoneIdToZoneObj[self.Id] = nil
-	State.objects[self.Id] = nil
+	State.zoneBoundObservers[self.id] = nil
+	State.zoneIdToZoneObj[self.id] = nil
+	State.objects[self.id] = nil
 	State.pendingRebuild = true
 
 	setmetatable(self :: any, nil)

@@ -118,9 +118,9 @@ RunService.Heartbeat:Connect(function(dt: number)
 		end
 
 		local config = group._config
-		local rate = config.UpdateRate or 20
+		local rate = config.updateRate or 20
 		local precSq = config.PrecisionSq or 0.01
-		local safeMode = config.SafetyMode
+		local safeMode = config.safety
 
 		local workQuota = math.ceil(totalEntities * rate * dt)
 		if workQuota < 1 then
@@ -136,7 +136,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 			idx = 1
 		end
 
-		ctx_groupId = group.Id
+		ctx_groupId = group.id
 
 		while processed < workQuota do
 			local entity = list[idx]
@@ -154,7 +154,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 
 			-- Strategy
 			local pos
-			local strategy = d.Strategy
+			local strategy = d.strategy
 			if strategy == STRAT_POS then
 				pos = (entity :: BasePart).Position
 			elseif strategy == STRAT_WORLD then
@@ -170,7 +170,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 			-- Threshold
 			local shouldCheck = forceRefresh or d.isDirty
 			if not shouldCheck then
-				local lp = d.LastPosition
+				local lp = d.lastPosition
 				local dx, dy, dz = pos.X - lp.X, pos.Y - lp.Y, pos.Z - lp.Z
 				if (dx * dx + dy * dy + dz * dz) >= precSq then
 					shouldCheck = true
@@ -178,7 +178,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 			end
 
 			if shouldCheck then
-				d.LastPosition = pos
+				d.lastPosition = pos
 				d.isDirty = false
 
 				ctx_pos = pos
@@ -187,7 +187,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 
 				LinearBVH.queryPoint(State.rootNode, pos, queryCallback)
 
-				local current = d.ActiveObserverMemberships
+				local current = d.activeObserverMemberships
 
 				-- Exits
 				for gId, oldZoneId in pairs(current) do
