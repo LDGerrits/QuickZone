@@ -72,9 +72,11 @@ export type Zone = {
 	-- State
 	attach: (zone: Zone, ...Observer) -> Zone,
 	detach: (zone: Zone, ...Observer) -> Zone,
+	update: (newCFrame: CFrame?, newSize: Vector3?) -> Zone,
 
 	-- Utility
 	getObservers: (zone: Zone) -> { Observer },
+	isPointInside: (point: Vector3) -> boolean,
 
 	-- Props
 	id: number,

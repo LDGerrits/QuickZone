@@ -1,5 +1,6 @@
 --!strict
 
+local Geometry = require(script.Parent.Parent.Core.Geometry)
 local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
@@ -69,6 +70,43 @@ function Zone:detach(...: Types.Group): Types.Zone
 	return self
 end
 
+function Zone:update(newCFrame: CFrame?, newSize: Vector3?): Types.Zone
+	local shape = State.shapes[self.id]
+
+	-- If no arguments, use reference part if possible
+	if not newCFrame and self.part then
+		newCFrame = self.part.CFrame
+		newSize = self.part.Size
+	end
+
+	if not newCFrame or not newSize then
+		warn('[QuickZone] Zone:update() failed. No Part given and no CFrame provided.')
+		return self
+	end
+
+	local shapeType = shape.type
+	local halfSize = newSize / 2
+
+	-- Update the internal data struct
+	shape.cframe = newCFrame
+	shape.position = newCFrame.Position
+	shape.halfSize = halfSize
+
+	if shapeType == 'Ball' then
+		shape.radiusSq = halfSize.X * halfSize.X
+	elseif shapeType == 'Cylinder' then
+		local halfHeight = halfSize.X
+		shape.start = shape.position - shape.cframe.RightVector * halfHeight
+		shape.axis = shape.cframe.RightVector
+		shape.axisLength = halfHeight * 2
+		shape.radiusSq = halfSize.Y * halfSize.Y
+	end
+
+	State.pendingRebuild = true
+
+	return self
+end
+
 function Zone:getObservers(): { Types.Observer }
 	local attached = State.zoneAttachedObservers[self.id]
 	if not attached then
@@ -83,6 +121,15 @@ function Zone:getObservers(): { Types.Observer }
 		end
 	end
 	return result
+end
+
+function Zone:isPointInside(point: Vector3): boolean
+	local shape = State.shapes[self.id]
+	if not shape then
+		return false
+	end
+
+	return Geometry.isPointInShape(point, shape)
 end
 
 function Zone:destroy()

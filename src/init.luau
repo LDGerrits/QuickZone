@@ -36,6 +36,8 @@ function QuickZone.ZoneFromPart(part: BasePart): Zone
 		shape = 'Ball'
 	elseif (part :: any).Shape == Enum.PartType.Cylinder then
 		shape = 'Cylinder'
+	elseif part:IsA('WedgePart') then
+		shape = 'Wedge'
 	end
 	return Zone.new(part.CFrame, part.Size, shape, part)
 end
