@@ -12,7 +12,7 @@ State.groups = {} :: { [number]: Types.Group }
 State.entityToGroup = {} :: { [Types.Entity]: number }
 State.groupToObservers = {} :: { [number]: { [number]: boolean } }
 
-State.zones = {} :: { Types.BoundingVolume }
+State.shapes = {} :: { Types.BoundingVolume }
 State.rootNode = nil :: Types.Node?
 State.pendingRebuild = false
 State.isDirty = false

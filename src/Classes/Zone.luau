@@ -6,28 +6,28 @@ local Types = require(script.Parent.Parent.Types)
 local Zone = {}
 Zone.__index = Zone
 
-function Zone.new(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associatedPart: BasePart?): Types.Zone
+function Zone.new(cframe: CFrame, size: Vector3, shapeType: Types.ShapeType, associatedPart: BasePart?): Types.Zone
 	local halfSize = size / 2
-	local zone: Types.BoundingVolume = {
+	local shape: Types.BoundingVolume = {
 		position = cframe.Position,
 		cframe = cframe,
 		halfSize = halfSize,
-		shape = shape,
+		type = shapeType,
 	}
 
-	if shape == 'Ball' then
-		zone.radiusSq = halfSize.X * halfSize.X
-	elseif shape == 'Cylinder' then
+	if shapeType == 'Ball' then
+		shape.radiusSq = halfSize.X * halfSize.X
+	elseif shapeType == 'Cylinder' then
 		local halfHeight = halfSize.X
-		zone.start = zone.position - zone.cframe.RightVector * halfHeight
-		zone.axis = zone.cframe.RightVector
-		zone.axisLength = halfHeight * 2
-		zone.radiusSq = halfSize.Y * halfSize.Y
+		shape.start = shape.position - shape.cframe.RightVector * halfHeight
+		shape.axis = shape.cframe.RightVector
+		shape.axisLength = halfHeight * 2
+		shape.radiusSq = halfSize.Y * halfSize.Y
 	end
 
 	local id = State.nextZoneId
 	State.nextZoneId += 1
-	State.zones[id] = zone
+	State.shapes[id] = shape
 	State.pendingRebuild = true
 
 	local self = (setmetatable({ id = id, part = associatedPart }, Zone) :: any) :: Types.Zone
@@ -88,7 +88,7 @@ end
 function Zone:destroy()
 	State.zoneAttachedObservers[self.id] = nil
 	State.zoneIdToZoneObj[self.id] = nil
-	State.zones[self.id] = nil
+	State.shapes[self.id] = nil
 	State.pendingRebuild = true
 
 	setmetatable(self :: any, nil)

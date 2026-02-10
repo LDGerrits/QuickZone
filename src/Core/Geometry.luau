@@ -32,10 +32,10 @@ function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB:
 	return vector.min(minA, minB), vector.max(maxA, maxB)
 end
 
-function Geometry.getObjectBounds(object: Types.BoundingVolume): (Vector3, Vector3)
-	local halfSize = object.halfSize
-	local cframe = object.cframe
-	local center = object.position
+function Geometry.getObjectBounds(shape: Types.BoundingVolume): (Vector3, Vector3)
+	local halfSize = shape.halfSize
+	local cframe = shape.cframe
+	local center = shape.position
 
 	local halfExtent = vector.abs(cframe.RightVector) * halfSize.X
 		+ vector.abs(cframe.UpVector) * halfSize.Y
@@ -58,27 +58,27 @@ function Geometry.positionToMortonCode(position: Vector3, sceneMin: Vector3, sce
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end
 
-function Geometry.isPointInShape(point: Vector3, object: Types.BoundingVolume): boolean
-	if object.shape == 'Block' then
-		local localPoint = vector.abs(object.cframe:PointToObjectSpace(point))
-		return vector.min(localPoint, object.halfSize) == localPoint
-	elseif object.shape == 'Ball' then
-		return vector.dot(object.position - point, object.position - point) <= object.radiusSq
-	elseif object.shape == 'Cylinder' then
-		local toPoint = point - object.start :: Vector3
-		local projection = vector.dot(toPoint, object.axis :: Vector3)
+function Geometry.isPointInShape(point: Vector3, shape: Types.BoundingVolume): boolean
+	if shape.type == 'Block' then
+		local localPoint = vector.abs(shape.cframe:PointToObjectSpace(point))
+		return vector.min(localPoint, shape.halfSize) == localPoint
+	elseif shape.type == 'Ball' then
+		return vector.dot(shape.position - point, shape.position - point) <= shape.radiusSq
+	elseif shape.type == 'Cylinder' then
+		local toPoint = point - shape.start :: Vector3
+		local projection = vector.dot(toPoint, shape.axis :: Vector3)
 
-		if projection >= 0 and projection <= object.axisLength :: number then
-			local closestPointOnAxis = object.start :: Vector3 + object.axis :: Vector3 * projection
+		if projection >= 0 and projection <= shape.axisLength :: number then
+			local closestPointOnAxis = shape.start :: Vector3 + shape.axis :: Vector3 * projection
 			local distanceSq = vector.dot(point - closestPointOnAxis, point - closestPointOnAxis)
-			return distanceSq <= object.radiusSq :: number
+			return distanceSq <= shape.radiusSq :: number
 		end
 		return false
-	elseif object.shape == 'Wedge' then
-		local localPoint = object.cframe:PointToObjectSpace(point)
+	elseif shape.type == 'Wedge' then
+		local localPoint = shape.cframe:PointToObjectSpace(point)
 		local absolutePoint = vector.abs(localPoint)
-		if vector.min(absolutePoint, object.halfSize) == absolutePoint then
-			local size = object.halfSize * 2
+		if vector.min(absolutePoint, shape.halfSize) == absolutePoint then
+			local size = shape.halfSize * 2
 			return (localPoint.Y / size.Y - localPoint.Z / size.Z) <= 0
 		end
 		return false

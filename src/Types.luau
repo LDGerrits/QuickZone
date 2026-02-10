@@ -6,7 +6,7 @@ export type BoundingVolume = {
 	position: Vector3,
 	cframe: CFrame,
 	halfSize: Vector3,
-	shape: ShapeType,
+	type: ShapeType,
 
 	-- Sphere / cylinder specific
 	radiusSq: number?,

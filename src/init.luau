@@ -1,6 +1,5 @@
 --!strict
 
-local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
 local Group = require(script.Classes.Group)
@@ -12,7 +11,7 @@ local Zone = require(script.Classes.Zone)
 local Observer = require(script.Classes.Observer)
 local Scheduler = require(script.Core.Scheduler)
 
-local zones = State.zones
+local shapes = State.shapes
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerIdToObserverObj = State.observerIdToObserverObj
 
@@ -84,7 +83,7 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 
 	if State.rootNode then
 		LinearBVH.queryPoint(State.rootNode, position, function(zoneId)
-			if Geometry.isPointInShape(position, zones[zoneId]) then
+			if Geometry.isPointInShape(position, shapes[zoneId]) then
 				local observers = zoneAttachedObservers[zoneId]
 				if observers then
 					for _, id in observers do
@@ -184,10 +183,10 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	folder.Name = DEBUG_FOLDER_NAME
 	folder.Parent = workspace
 
-	for id, obj in State.zones do
+	for id, shape in State.shapes do
 		local box = Instance.new('BoxHandleAdornment')
-		box.Size = obj.halfSize * 2
-		box.CFrame = obj.cframe
+		box.Size = shape.halfSize * 2
+		box.CFrame = shape.cframe
 		box.Adornee = workspace.Terrain
 		box.Transparency = 0.6
 		box.AlwaysOnTop = true
