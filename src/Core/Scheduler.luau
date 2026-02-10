@@ -93,7 +93,7 @@ end
 
 RunService.Heartbeat:Connect(function(dt: number)
 	if State.pendingRebuild then
-		debug.profilebegin('BitZone_Build')
+		debug.profilebegin('QuickZone_Build')
 		State.rootNode = LinearBVH.build(objects)
 		State.pendingRebuild = false
 		debug.profileend()
@@ -104,7 +104,7 @@ RunService.Heartbeat:Connect(function(dt: number)
 		return
 	end
 
-	debug.profilebegin('BitZone_Step')
+	debug.profilebegin('QuickZone_Step')
 	local start = os.clock()
 	local forceRefresh = State.isDirty
 	State.isDirty = false

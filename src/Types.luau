@@ -25,7 +25,7 @@ export type Node = {
 	id: number, -- -1 for internal nodes
 }
 
-export type BitZone = {
+export type QuickZone = {
 	-- Factories
 	Zone: (cframe: CFrame, size: Vector3, shape: ShapeType, associatedPart: BasePart?) -> Zone,
 	ZoneFromPart: (part: BasePart) -> Zone,
@@ -47,19 +47,19 @@ export type BitZone = {
 	}?) -> Group,
 
 	-- Global config
-	setFrameBudget: (self: BitZone, n: number) -> BitZone,
+	setFrameBudget: (self: QuickZone, n: number) -> QuickZone,
 
 	-- Getters
-	getObserversAtPoint: (self: BitZone, position: Vector3) -> { Observer },
-	getGroupOfEntity: (self: BitZone, entity: Entity) -> Group?,
-	getZones: (self: BitZone) -> { Zone },
-	getObservers: (self: BitZone) -> { Observer },
-	getGroups: (self: BitZone) -> { Group },
-	getEntities: (self: BitZone) -> { Entity },
+	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
+	getGroupOfEntity: (self: QuickZone, entity: Entity) -> Group?,
+	getZones: (self: QuickZone) -> { Zone },
+	getObservers: (self: QuickZone) -> { Observer },
+	getGroups: (self: QuickZone) -> { Group },
+	getEntities: (self: QuickZone) -> { Entity },
 
 	-- Queries
-	isEntityValidType: (self: BitZone, entity: any) -> boolean,
-	isEntityInAnyGroup: (self: BitZone, entity: Entity) -> boolean,
+	isEntityValidType: (self: QuickZone, entity: any) -> boolean,
+	isEntityInAnyGroup: (self: QuickZone, entity: Entity) -> boolean,
 }
 
 export type Zone = {

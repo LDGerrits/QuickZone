@@ -18,19 +18,19 @@ local observerIdToObserverObj = State.observerIdToObserverObj
 
 local IS_CLIENT = RunService:IsClient()
 
-export type BitZone = Types.BitZone
+export type QuickZone = Types.QuickZone
 export type Zone = Types.Zone
 export type Observer = Types.Observer
 export type Group = Types.Group
 export type Entity = Types.Entity
 
-local BitZone = {}
+local QuickZone = {}
 
-function BitZone.Zone(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associatedPart: BasePart?): Zone
+function QuickZone.Zone(cframe: CFrame, size: Vector3, shape: Types.ShapeType, associatedPart: BasePart?): Zone
 	return Zone.new(cframe, size, shape, associatedPart)
 end
 
-function BitZone.ZoneFromPart(part: BasePart): Zone
+function QuickZone.ZoneFromPart(part: BasePart): Zone
 	local shape: Types.ShapeType = 'Block'
 	if (part :: any).Shape == Enum.PartType.Ball then
 		shape = 'Ball'
@@ -40,11 +40,11 @@ function BitZone.ZoneFromPart(part: BasePart): Zone
 	return Zone.new(part.CFrame, part.Size, shape, part)
 end
 
-function BitZone.Observer(priority: number?): Observer
+function QuickZone.Observer(priority: number?): Observer
 	return Observer.new(priority)
 end
 
-function BitZone.Group(config: {
+function QuickZone.Group(config: {
 	updateRate: number?,
 	precision: number?,
 	safety: boolean?,
@@ -53,7 +53,7 @@ function BitZone.Group(config: {
 end
 
 -- TODO
-function BitZone.PlayerGroup(config: {
+function QuickZone.PlayerGroup(config: {
 	updateRate: number?,
 	precision: number?,
 	safety: boolean?,
@@ -62,24 +62,24 @@ function BitZone.PlayerGroup(config: {
 end
 
 -- TODO
-function BitZone.LocalPlayerGroup(config: {
+function QuickZone.LocalPlayerGroup(config: {
 	updateRate: number?,
 	precision: number?,
 	safety: boolean?,
 }?): Group
-	assert(IS_CLIENT, '[BitZone] TrackLocalPlayer can only be called on the Client.')
+	assert(IS_CLIENT, '[QuickZone] TrackLocalPlayer can only be called on the Client.')
 
 	return
 end
 
-function BitZone:setFrameBudget(n: number): BitZone
-	assert(n > 0, '[BitZone] FrameBudget must be greater than 0')
+function QuickZone:setFrameBudget(n: number): QuickZone
+	assert(n > 0, '[QuickZone] FrameBudget must be greater than 0')
 
 	Scheduler.setFrameBudget(n)
-	return BitZone
+	return QuickZone
 end
 
-function BitZone:getObserversAtPoint(position: Vector3): { Observer }
+function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 	local results = {}
 	local foundIds = {}
 
@@ -104,7 +104,7 @@ function BitZone:getObserversAtPoint(position: Vector3): { Observer }
 	return results
 end
 
-function BitZone:getGroupOfEntity(entity: Types.Entity): Types.Group?
+function QuickZone:getGroupOfEntity(entity: Types.Entity): Types.Group?
 	local groupId = State.entityToGroup[entity]
 	if groupId then
 		return State.groups[groupId]
@@ -112,7 +112,7 @@ function BitZone:getGroupOfEntity(entity: Types.Entity): Types.Group?
 	return nil
 end
 
-function BitZone:getZones(): { Types.Zone }
+function QuickZone:getZones(): { Types.Zone }
 	local result = {}
 	for _, zone in pairs(State.zoneIdToZoneObj) do
 		table.insert(result, zone)
@@ -120,7 +120,7 @@ function BitZone:getZones(): { Types.Zone }
 	return result
 end
 
-function BitZone:getObservers(): { Types.Observer }
+function QuickZone:getObservers(): { Types.Observer }
 	local result = {}
 	for _, observer in pairs(State.observerIdToObserverObj) do
 		table.insert(result, observer)
@@ -128,7 +128,7 @@ function BitZone:getObservers(): { Types.Observer }
 	return result
 end
 
-function BitZone:getGroups(): { Types.Group }
+function QuickZone:getGroups(): { Types.Group }
 	local result = {}
 	for _, group in pairs(State.groups) do
 		table.insert(result, group)
@@ -136,7 +136,7 @@ function BitZone:getGroups(): { Types.Group }
 	return result
 end
 
-function BitZone:getEntities(): { Types.Entity }
+function QuickZone:getEntities(): { Types.Entity }
 	local result = {}
 	for _, group in pairs(State.groups) do
 		local count = #group._entities
@@ -148,7 +148,7 @@ function BitZone:getEntities(): { Types.Entity }
 	return result
 end
 
-function BitZone:isEntityValidType(entity: any): boolean
+function QuickZone:isEntityValidType(entity: any): boolean
 	if typeof(entity) == 'Instance' then
 		if
 			entity:IsA('BasePart')
@@ -167,8 +167,8 @@ function BitZone:isEntityValidType(entity: any): boolean
 	return false
 end
 
-function BitZone:isEntityInAnyGroup(entity: Entity): boolean
+function QuickZone:isEntityInAnyGroup(entity: Entity): boolean
 	return State.entityToGroup[entity] ~= nil
 end
 
-return BitZone
+return QuickZone

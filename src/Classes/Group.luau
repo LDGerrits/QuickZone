@@ -19,10 +19,10 @@ function Group.new(config: {
 	safety: boolean?,
 }?): Types.Group
 	local hz = config and config.updateRate
-	assert(not hz or hz > 0, '[BitZone] updateRate must be greater than 0')
+	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
 
 	local n = config and config.precision
-	assert(not n or n >= 0, '[BitZone] precision must be non-negative')
+	assert(not n or n >= 0, '[QuickZone] precision must be non-negative')
 
 	local id = State.nextGroupId
 	State.nextGroupId += 1
@@ -61,10 +61,10 @@ function Group:setConfig(config: {
 	safety: boolean?,
 })
 	local hz = config.updateRate
-	assert(not hz or hz > 0, '[BitZone] updateRate must be greater than 0')
+	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
 
 	local n = config.precision
-	assert(not n or n >= 0, '[BitZone] precision must be non-negative')
+	assert(not n or n >= 0, '[QuickZone] precision must be non-negative')
 
 	if hz then
 		self._config.updateRate = hz
@@ -78,7 +78,7 @@ function Group:setConfig(config: {
 end
 
 function Group:setUpdateRate(hz: number): Types.Group
-	assert(hz > 0, '[BitZone] updateRate must be greater than 0')
+	assert(hz > 0, '[QuickZone] updateRate must be greater than 0')
 
 	self._config.updateRate = hz
 
@@ -86,7 +86,7 @@ function Group:setUpdateRate(hz: number): Types.Group
 end
 
 function Group:setPrecision(n: number): Types.Group
-	assert(n >= 0, '[BitZone] precision must be non-negative')
+	assert(n >= 0, '[QuickZone] precision must be non-negative')
 
 	self._config.PrecisionSq = n ^ 2
 	return self
@@ -135,7 +135,7 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	if not strat then
 		error(
 			string.format(
-				'[BitZone] add Failed: The provided entity (%s) is not a supported type. '
+				'[QuickZone] add Failed: The provided entity (%s) is not a supported type. '
 					.. 'Ensure it is a BasePart, Model, Attachment, Bone, Camera, or a table with a Position/CFrame.',
 				tostring(entity)
 			),
