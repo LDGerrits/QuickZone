@@ -4,6 +4,9 @@
 local Geometry = require(script.Parent.Geometry)
 local Types = require(script.Parent.Parent.Types)
 
+local HUGE_VECTOR = Vector3.one * math.huge
+local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
+
 type ListEntity = {
 	id: number,
 	mortonCode: number,
@@ -13,6 +16,8 @@ local LinearBVH = {}
 LinearBVH.__index = LinearBVH
 
 local listCache = table.create(2000)
+local objMinCache = table.create(2000)
+local objMaxCache = table.create(2000)
 local traversalStack = table.create(64)
 
 local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: number): number?
@@ -72,11 +77,10 @@ local function createSubTree(
 	end
 end
 
-local HUGE_VECTOR = Vector3.one * math.huge
-local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
-
 function LinearBVH.build(shapes: { Types.BoundingVolume }): Types.Node?
 	table.clear(traversalStack)
+	table.clear(objMinCache)
+	table.clear(objMaxCache)
 
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
@@ -94,7 +98,7 @@ function LinearBVH.build(shapes: { Types.BoundingVolume }): Types.Node?
 	local sceneMin, sceneMax = min - padding, max + padding
 
 	table.clear(listCache)
-	local objMin, objMax = {}, {}
+	local objMin, objMax = objMinCache, objMaxCache
 
 	local count = 0
 	for id, shape in shapes do
