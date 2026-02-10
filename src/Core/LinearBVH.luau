@@ -2,7 +2,7 @@
 --!strict
 
 local Geometry = require(script.Parent.Geometry)
-local Types = require(script.Parent.Types)
+local Types = require(script.Parent.Parent.Types)
 
 type ListEntity = {
 	id: number,

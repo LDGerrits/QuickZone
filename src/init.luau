@@ -1,15 +1,16 @@
 --!strict
+
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
-local Group = require(script.Group)
-local Geometry = require(script.Geometry)
-local LinearBVH = require(script.LinearBVH)
+local Group = require(script.Classes.Group)
+local Geometry = require(script.Core.Geometry)
+local LinearBVH = require(script.Core.LinearBVH)
 local Types = require(script.Types)
 local State = require(script.State)
-local Zone = require(script.Zone)
-local Observer = require(script.Observer)
-local Scheduler = require(script.Scheduler)
+local Zone = require(script.Classes.Zone)
+local Observer = require(script.Classes.Observer)
+local Scheduler = require(script.Core.Scheduler)
 
 local objects = State.objects
 local zoneAttachedObservers = State.zoneAttachedObservers

@@ -1,7 +1,8 @@
 --!strict
-local State = require(script.Parent.State)
-local Types = require(script.Parent.Types)
-local Config = require(script.Parent.Config)
+
+local State = require(script.Parent.Parent.State)
+local Types = require(script.Parent.Parent.Types)
+local Config = require(script.Parent.Parent.Config)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM

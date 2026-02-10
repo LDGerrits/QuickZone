@@ -5,9 +5,9 @@ local RunService = game:GetService('RunService')
 
 local Geometry = require(script.Parent.Geometry)
 local LinearBVH = require(script.Parent.LinearBVH)
-local State = require(script.Parent.State)
-local Config = require(script.Parent.Config)
-local Types = require(script.Parent.Types)
+local State = require(script.Parent.Parent.State)
+local Config = require(script.Parent.Parent.Config)
+local Types = require(script.Parent.Parent.Types)
 
 local objects = State.objects
 local zoneAttachedObservers = State.zoneAttachedObservers

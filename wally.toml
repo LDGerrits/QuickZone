@@ -7,8 +7,8 @@ realm = "shared"
 license = "MIT"
 exclude = ["**"]
 include = [
-	"lib", 
-	"lib/**/*.luau",
+	"src", 
+	"src/**/*.luau",
 	"wally.toml",
 	"default.project.json",
 	"LICENSE.md"

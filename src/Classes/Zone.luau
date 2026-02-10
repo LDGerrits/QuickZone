@@ -1,7 +1,7 @@
 --!strict
 
-local State = require(script.Parent.State)
-local Types = require(script.Parent.Types)
+local State = require(script.Parent.Parent.State)
+local Types = require(script.Parent.Parent.Types)
 
 local Zone = {}
 Zone.__index = Zone

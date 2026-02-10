@@ -1,7 +1,7 @@
 --!native
 --!strict
 
-local Types = require(script.Parent.Types)
+local Types = require(script.Parent.Parent.Types)
 
 local MORTON_SHIFT16_MASK = 0xFF0000FF
 local MORTON_SHIFT8_MASK = 0xF00F00F

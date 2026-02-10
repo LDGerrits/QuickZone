@@ -3,10 +3,10 @@
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
-local Geometry = require(script.Parent.Geometry)
-local LinearBVH = require(script.Parent.LinearBVH)
-local State = require(script.Parent.State)
-local Types = require(script.Parent.Types)
+local Geometry = require(script.Parent.Parent.Core.Geometry)
+local LinearBVH = require(script.Parent.Parent.Core.LinearBVH)
+local State = require(script.Parent.Parent.State)
+local Types = require(script.Parent.Parent.Types)
 
 local IS_CLIENT = RunService:IsClient()
 
