@@ -18,6 +18,7 @@ local observerEnteredCallbacks = State.observerEnteredCallbacks
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
 local zoneIdToZoneObj = State.zoneIdToZoneObj
+local groupList = State.groupList
 
 local ctx_pos: Vector3
 local ctx_groupId: number
@@ -28,6 +29,7 @@ local ctx_candidateIndex: { [number]: number } = table.create(16)
 local ctx_candidateList: { [number]: number } = table.create(16)
 
 local frameBudget = Config.Scheduler.frameBudget
+local nextGroupIndex = 1 -- Round-robin pointer
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -85,12 +87,12 @@ local function queryCallbackDynamic(zoneId: number)
 	end
 end
 
-local function fireCallback(callbacks, entity, zone, customData, safeMode)
+local function fireCallback(callbacks, entity, zone, customData, safety)
 	if not callbacks then
 		return
 	end
 
-	if safeMode then
+	if safety then
 		for _, cb in callbacks do
 			task.spawn(cb, entity, zone, customData)
 		end
@@ -114,30 +116,44 @@ RunService.PostSimulation:Connect(function(dt: number)
 		State.isDirty = true
 	end
 
-	if not State.staticRootNode and not State.dynamicRootNode then
+	local staticRoot = State.staticRootNode
+	local dynamicRoot = State.dynamicRootNode
+
+	if not staticRoot and not dynamicRoot then
 		return
 	end
 
+	local numGroups = #groupList
+	if numGroups == 0 then
+		return
+	end
+
+	-- Pointer may have gotten out of bounds
+	if nextGroupIndex > numGroups then
+		nextGroupIndex = 1
+	end
+
 	debug.profilebegin('QuickZone_Step')
+
 	local start = os.clock()
 	local forceRefresh = State.isDirty
 	State.isDirty = false
 
-	local staticRoot = State.staticRootNode
-	local dynamicRoot = State.dynamicRootNode
+	-- Round-robin scheduling to prevent starvation
+	for _ = 1, numGroups do
+		local group = groupList[nextGroupIndex]
+		nextGroupIndex = (nextGroupIndex % numGroups) + 1
 
-	-- Process each group
-	for _, group in State.groups do
 		local list = group._entities
 		local totalEntities = #list
 		if totalEntities == 0 then
 			continue
 		end
 
-		local config = group._config
-		local rate = config.updateRate or 20
-		local precSq = config.PrecisionSq or 0.01
-		local safeMode = config.safety
+		local groupConfig = group._config
+		local rate = groupConfig.updateRate
+		local precisionSq = groupConfig.precisionSq
+		local safety = groupConfig.safety
 
 		local workQuota = math.ceil(totalEntities * rate * dt)
 		if workQuota < 1 then
@@ -189,7 +205,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 			if not shouldCheck then
 				local lp = d.lastPosition
 				local dx, dy, dz = pos.X - lp.X, pos.Y - lp.Y, pos.Z - lp.Z
-				if (dx * dx + dy * dy + dz * dz) >= precSq then
+				if (dx * dx + dy * dy + dz * dz) >= precisionSq then
 					shouldCheck = true
 				end
 			end
@@ -225,7 +241,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						if cbs then
 							local z = zoneIdToZoneObj[oldZoneId]
 							local cd = entityCustomData[entity] and entityCustomData[entity][gId]
-							fireCallback(cbs, entity, z, cd, safeMode)
+							fireCallback(cbs, entity, z, cd, safety)
 						end
 					end
 				end
@@ -242,7 +258,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						if cbs then
 							local z = zoneIdToZoneObj[ZoneIdx]
 							local cd = entityCustomData[entity] and entityCustomData[entity][gId]
-							fireCallback(cbs, entity, z, cd, safeMode)
+							fireCallback(cbs, entity, z, cd, safety)
 						end
 					end
 					ctx_candidatePriority[gId] = nil

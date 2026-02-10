@@ -42,7 +42,7 @@ function Group.new(config: {
 			_entityData = {},
 			_config = {
 				updateRate = updateRate,
-				PrecisionSq = precision ^ 2,
+				precisionSq = precision ^ 2,
 				safety = safety,
 			},
 			_lastProcessedIndex = 1,
@@ -51,6 +51,7 @@ function Group.new(config: {
 
 	State.groups[id] = self
 	State.groupToObservers[id] = {}
+	table.insert(State.groupList, self)
 
 	return self
 end
@@ -81,14 +82,13 @@ function Group:setUpdateRate(hz: number): Types.Group
 	assert(hz > 0, '[QuickZone] updateRate must be greater than 0')
 
 	self._config.updateRate = hz
-
 	return self
 end
 
 function Group:setPrecision(n: number): Types.Group
 	assert(n >= 0, '[QuickZone] precision must be non-negative')
 
-	self._config.PrecisionSq = n ^ 2
+	self._config.precisionSq = n ^ 2
 	return self
 end
 
@@ -177,7 +177,7 @@ function Group:remove(...: Types.Entity): Types.Group
 
 		-- Trigger exit
 		local safety = self._config.safety
-		for gId, oldZoneId in pairs(data.activeObserverMemberships) do
+		for gId, oldZoneId in data.activeObserverMemberships do
 			if State.observerTrackingEntities[gId] then
 				State.observerTrackingEntities[gId][entity] = nil
 			end
@@ -230,7 +230,7 @@ function Group:getObservers(): { Types.Observer }
 	local observersMap = State.groupToObservers[self.id]
 
 	if observersMap then
-		for observerId, _ in pairs(observersMap) do
+		for observerId, _ in observersMap do
 			local observer = State.observerIdToObserverObj[observerId]
 			if observer then
 				table.insert(result, observer)
@@ -249,7 +249,7 @@ function Group:getConfig(): {
 	local config = self._config
 	return {
 		updateRate = config.updateRate,
-		precision = math.sqrt(config.PrecisionSq),
+		precision = math.sqrt(config.precisionSq),
 		safety = config.safety,
 	}
 end
@@ -262,6 +262,12 @@ function Group:destroy(): ()
 
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
+
+	local listIdx = table.find(State.groupList, self)
+	if listIdx then
+		table.remove(State.groupList, listIdx)
+	end
+
 	setmetatable(self :: any, nil)
 end
 
