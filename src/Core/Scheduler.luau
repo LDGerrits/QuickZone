@@ -9,7 +9,7 @@ local State = require(script.Parent.Parent.State)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 
-local objects = State.objects
+local zones = State.zones
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerPriorityMap = State.ObserverPriorityMap
 local entityCustomData = State.entityCustomData
@@ -50,7 +50,7 @@ local function fireCallback(callbacks, entity, zone, customData, safeMode)
 end
 
 local function queryCallback(zoneId: number)
-	if not Geometry.isPointInShape(ctx_pos, objects[zoneId]) then
+	if not Geometry.isPointInShape(ctx_pos, zones[zoneId]) then
 		return
 	end
 
@@ -94,7 +94,7 @@ end
 RunService.Heartbeat:Connect(function(dt: number)
 	if State.pendingRebuild then
 		debug.profilebegin('QuickZone_Build')
-		State.rootNode = LinearBVH.build(objects)
+		State.rootNode = LinearBVH.build(zones)
 		State.pendingRebuild = false
 		debug.profileend()
 		State.isDirty = true
@@ -253,6 +253,8 @@ end)
 local Scheduler = {}
 
 function Scheduler.setFrameBudget(n: number)
+	assert(n > 0, '[QuickZone] FrameBudget must be greater than 0')
+
 	frameBudget = n
 end
 

@@ -75,13 +75,13 @@ end
 local HUGE_VECTOR = Vector3.one * math.huge
 local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
-function LinearBVH.build(objects: { Types.BoundingVolume }): Types.Node?
+function LinearBVH.build(zones: { Types.BoundingVolume }): Types.Node?
 	table.clear(traversalStack)
 
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
-	for _, object in objects do
-		local bMin, bMax = Geometry.getObjectBounds(object)
+	for _, zone in zones do
+		local bMin, bMax = Geometry.getObjectBounds(zone)
 		min = vector.min(min, bMin)
 		max = vector.max(max, bMax)
 	end
@@ -97,14 +97,14 @@ function LinearBVH.build(objects: { Types.BoundingVolume }): Types.Node?
 	local objMin, objMax = {}, {}
 
 	local count = 0
-	for id, object in objects do
-		local bMin, bMax = Geometry.getObjectBounds(object)
+	for id, zone in zones do
+		local bMin, bMax = Geometry.getObjectBounds(zone)
 		objMin[id], objMax[id] = bMin, bMax
 
 		count += 1
 		listCache[count] = {
 			id = id,
-			mortonCode = Geometry.positionToMortonCode(object.position, sceneMin, sceneMax),
+			mortonCode = Geometry.positionToMortonCode(zone.position, sceneMin, sceneMax),
 		}
 	end
 

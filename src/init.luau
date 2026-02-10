@@ -12,7 +12,7 @@ local Zone = require(script.Classes.Zone)
 local Observer = require(script.Classes.Observer)
 local Scheduler = require(script.Core.Scheduler)
 
-local objects = State.objects
+local zones = State.zones
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerIdToObserverObj = State.observerIdToObserverObj
 
@@ -73,8 +73,6 @@ function QuickZone.LocalPlayerGroup(config: {
 end
 
 function QuickZone:setFrameBudget(n: number): QuickZone
-	assert(n > 0, '[QuickZone] FrameBudget must be greater than 0')
-
 	Scheduler.setFrameBudget(n)
 	return QuickZone
 end
@@ -85,7 +83,7 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 
 	if State.rootNode then
 		LinearBVH.queryPoint(State.rootNode, position, function(zoneId)
-			if Geometry.isPointInShape(position, objects[zoneId]) then
+			if Geometry.isPointInShape(position, zones[zoneId]) then
 				local observers = zoneAttachedObservers[zoneId]
 				if observers then
 					for _, id in observers do

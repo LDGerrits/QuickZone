@@ -137,7 +137,7 @@ function Observer:isPointInside(position: Vector3): boolean
 		end
 		local observers = State.zoneAttachedObservers[zoneId]
 		if observers and table.find(observers, self.id) then
-			if Geometry.isPointInShape(position, State.objects[zoneId]) then
+			if Geometry.isPointInShape(position, State.zones[zoneId]) then
 				isInside = true
 			end
 		end
