@@ -22,6 +22,7 @@ local foundIdsCache = {}
 
 local sharedPlayerGroup: Types.Group?
 local sharedLocalPlayerGroup: Types.Group?
+local bridgeRefreshPlayerGroup: ((Player) -> ())?
 
 local debugConnection: RBXScriptConnection?
 local debugFolder: Folder?
@@ -58,7 +59,7 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 		cleanCharacter()
 
 		task.spawn(function()
-			-- Give LocalPlayerGroup priority over PlayerGroup for LocalPlayer
+			-- To prioritize LocalPlayerGroup, do early return if it is local player and LocalPlayerGroup exists
 			if
 				IS_CLIENT
 				and group == sharedPlayerGroup
@@ -169,6 +170,11 @@ function QuickZone.PlayerGroup(config: {
 	local trackerStore = {} :: { [Player]: () -> () }
 	local mainConnections = {} :: { RBXScriptConnection }
 
+	bridgeRefreshPlayerGroup = function(player: Player)
+		untrackPlayer(player, trackerStore)
+		trackPlayer(group, player, trackerStore)
+	end
+
 	table.insert(
 		mainConnections,
 		Players.PlayerAdded:Connect(function(player)
@@ -195,9 +201,13 @@ function QuickZone.PlayerGroup(config: {
 		for _, cleanup in trackerStore do
 			cleanup()
 		end
+
 		table.clear(mainConnections)
 		table.clear(trackerStore)
+
+		bridgeRefreshPlayerGroup = nil
 		sharedPlayerGroup = nil
+
 		originalDestroyHook(self)
 	end
 
@@ -230,6 +240,12 @@ function QuickZone.LocalPlayerGroup(config: {
 	group.destroy = function(self)
 		untrackPlayer(lp, trackers)
 		sharedLocalPlayerGroup = nil
+
+		-- The player should immediately be handed over to PlayerGroup
+		if bridgeRefreshPlayerGroup then
+			bridgeRefreshPlayerGroup(Players.LocalPlayer)
+		end
+
 		originalDestroyHook(self)
 	end
 
@@ -259,10 +275,9 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 			if foundIdsCache[id] then
 				continue
 			end
-
 			foundIdsCache[id] = true
-			local observer = observerIdToObserverObj[id]
 
+			local observer = observerIdToObserverObj[id]
 			if observer then
 				table.insert(results, observer)
 			end
@@ -350,7 +365,6 @@ function QuickZone:visualize(enable: boolean): QuickZone
 		debugConnection:Disconnect()
 		debugConnection = nil
 	end
-
 	if debugFolder then
 		debugFolder:Destroy()
 		debugFolder = nil
