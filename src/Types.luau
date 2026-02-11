@@ -108,9 +108,9 @@ export type Observer = {
 	isPointInside: (self: Observer, position: Vector3) -> boolean,
 
 	-- Getters
+	getId: (self: Observer) -> number,
 	getPriority: (self: Observer) -> number,
 	getEntitiesInside: (self: Observer) -> { Entity },
-	getEntities: (self: Observer) -> { Entity },
 	getZones: (self: Observer) -> { Zone },
 	getGroups: (self: Observer) -> { Group },
 

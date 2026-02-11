@@ -202,6 +202,10 @@ function Observer:isPointInside(position: Vector3): boolean
 	return isInside
 end
 
+function Observer:getId(): number
+	return self.id
+end
+
 function Observer:getPriority(): number
 	return State.observerPriorityMap[self.id] or 0
 end
@@ -214,19 +218,6 @@ function Observer:getEntitiesInside(): { Types.Entity }
 	local results = {}
 	for entity, _ in entities do
 		table.insert(results, entity)
-	end
-	return results
-end
-
-function Observer:getEntities(): { Types.Entity }
-	local results = {}
-	for groupId, observers in State.groupToObservers do
-		if observers[self.id] then
-			local group = State.groups[groupId]
-			for _, entity in group._entities do
-				table.insert(results, entity)
-			end
-		end
 	end
 	return results
 end
