@@ -14,13 +14,9 @@ local Observer = {}
 Observer.__index = Observer
 
 function Observer.new(priority: number?): Types.Observer
-	local observer = (
-		setmetatable({
-			id = State.nextObserverId,
-			_mainConnections = {},
-			_playerTrackers = {},
-		}, Observer) :: any
-	) :: Types.Observer
+	local observer = (setmetatable({
+		id = State.nextObserverId,
+	}, Observer) :: any) :: Types.Observer
 
 	State.ObserverPriorityMap[observer.id] = priority or 0
 	State.observerEnteredCallbacks[observer.id] = {}
