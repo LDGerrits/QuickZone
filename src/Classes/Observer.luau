@@ -10,6 +10,37 @@ local Types = require(script.Parent.Parent.Types)
 
 local IS_CLIENT = RunService:IsClient()
 
+local function disconnectObserverFromGroup(observerId: number, group: Types.Group)
+	local safety = group._config.safety
+
+	for _, entity in group._entities do
+		local data = group._entityData[entity]
+
+		local oldZoneId = data.activeObserverMemberships[observerId]
+		if not oldZoneId then
+			continue
+		end
+
+		data.activeObserverMemberships[observerId] = nil
+		if State.observerTrackingEntities[observerId] then
+			State.observerTrackingEntities[observerId][entity] = nil
+		end
+
+		local cbs = State.observerExitedCallbacks[observerId]
+		if cbs then
+			local z = State.zoneIdToZoneObj[oldZoneId]
+			local cd = State.entityCustomData[entity] and State.entityCustomData[entity][observerId]
+			for _, fn in cbs do
+				if safety then
+					task.spawn(fn, entity, z, cd)
+				else
+					fn(entity, z, cd)
+				end
+			end
+		end
+	end
+end
+
 local Observer = {}
 Observer.__index = Observer
 
@@ -23,9 +54,41 @@ function Observer.new(priority: number?): Types.Observer
 	State.observerExitedCallbacks[observer.id] = {}
 	State.observerTrackingEntities[observer.id] = {}
 	State.observerIdToObserverObj[observer.id] = observer
+	State.observerEnabled[observer.id] = true
 
 	State.nextObserverId += 1
 	return observer
+end
+
+-- TODO
+function Observer:setEnabled(enabled: boolean): Types.Group
+	local wasEnabled = self:isEnabled()
+
+	if wasEnabled == enabled then
+		return self
+	end
+
+	State.observerEnabled[self.id] = enabled
+	State.isDirty = true
+
+	if enabled then
+		return self
+	end
+
+	for groupId, observersMap in State.groupToObservers do
+		if not observersMap[self.id] then
+			continue
+		end
+
+		local group = State.groups[groupId]
+		if not group then
+			continue
+		end
+
+		disconnectObserverFromGroup(self.id, group)
+	end
+
+	return self
 end
 
 function Observer:setPriority(p: number): Types.Observer
@@ -50,42 +113,19 @@ end
 
 function Observer:unsubscribe(...: Types.Group): Types.Observer
 	for _, group in { ... } do
+		disconnectObserverFromGroup(self.id, group)
+
 		local groupId = group.id
 		if State.groupToObservers[groupId] then
 			State.groupToObservers[groupId][self.id] = nil
 		end
-
-		local safety = group._config.safety
-		for _, entity in group._entities do
-			local data = group._entityData[entity]
-			local oldZoneId = data and data.activeObserverMemberships[self.id]
-			if not oldZoneId then
-				continue
-			end
-
-			data.activeObserverMemberships[self.id] = nil
-			if State.observerTrackingEntities[self.id] then
-				State.observerTrackingEntities[self.id][entity] = nil
-			end
-
-			local cbs = State.observerExitedCallbacks[self.id]
-			if not cbs then
-				continue
-			end
-
-			local z = State.zoneIdToZoneObj[oldZoneId]
-			local cd = State.entityCustomData[entity] and State.entityCustomData[entity][self.id]
-			for _, fn in cbs do
-				if safety then
-					task.spawn(fn, entity, z, cd)
-				else
-					fn(entity, z, cd)
-				end
-			end
-		end
 	end
 
 	return self
+end
+
+function Observer:isEnabled(): boolean
+	return State.observerEnabled[self.id] ~= false
 end
 
 function Observer:isPlayerInside(player: Player): boolean
@@ -275,6 +315,8 @@ function Observer:onLocalPlayerExited(callback: (Types.Zone) -> ()): () -> ()
 end
 
 function Observer:destroy(): ()
+	self:setEnabled(false)
+
 	local id = self.id
 	for _, observers in State.groupToObservers do
 		observers[id] = nil
@@ -293,6 +335,8 @@ function Observer:destroy(): ()
 	State.observerExitedCallbacks[id] = nil
 	State.observerTrackingEntities[id] = nil
 	State.observerIdToObserverObj[id] = nil
+	State.observerEnabled[id] = nil
+
 	State.isDirty = true
 	setmetatable(self :: any, nil)
 end

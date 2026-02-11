@@ -96,8 +96,10 @@ export type Observer = {
 	-- State
 	subscribe: (self: Observer, ...Group) -> Observer,
 	unsubscribe: (self: Observer, ...Group) -> Observer,
+	setEnabled: (self: Observer, enabled: boolean) -> Observer,
 
 	-- Queries
+	isEnabled: (self: Observer) -> boolean,
 	isPlayerInside: (self: Observer, player: Player) -> boolean,
 	isLocalPlayerInside: (self: Observer) -> boolean,
 	isEntityInside: (self: Observer, entity: Entity) -> boolean,
@@ -128,7 +130,7 @@ export type Group = {
 	-- Config
 	setUpdateRate: (self: Group, hz: number) -> Group,
 	setPrecision: (self: Group, n: number) -> Group,
-	setSafetyMode: (self: Group, enabled: boolean) -> Group,
+	setSafety: (self: Group, enabled: boolean) -> Group,
 	setConfig: (
 		self: Group,
 		{

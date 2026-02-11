@@ -17,6 +17,7 @@ local entityCustomData = State.entityCustomData
 local observerEnteredCallbacks = State.observerEnteredCallbacks
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
+local observerEnabled = State.observerEnabled
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local groupList = State.groupList
 
@@ -48,9 +49,9 @@ local function processZoneHit(zoneId: number)
 	end
 
 	local isRelevant = false
-	for _, gId in observers do
-		if linkedObservers[gId] then
-			if not ctx_candidatePriority[gId] then
+	for _, observerId in observers do
+		if linkedObservers[observerId] and observerEnabled[observerId] ~= false then
+			if not ctx_candidatePriority[observerId] then
 				isRelevant = true
 				break
 			end
@@ -61,13 +62,13 @@ local function processZoneHit(zoneId: number)
 		return
 	end
 
-	for _, gId in observers do
-		if linkedObservers[gId] then
-			local pri = observerPriorityMap[gId] or 0
+	for _, observerId in observers do
+		if linkedObservers[observerId] and observerEnabled[observerId] ~= false then
+			local pri = observerPriorityMap[observerId] or 0
 			ctx_cCount += 1
-			ctx_candidateList[ctx_cCount] = gId
-			ctx_candidateIndex[gId] = zoneId
-			ctx_candidatePriority[gId] = pri
+			ctx_candidateList[ctx_cCount] = observerId
+			ctx_candidateIndex[observerId] = zoneId
+			ctx_candidatePriority[observerId] = pri
 			if pri > ctx_highestWin then
 				ctx_highestWin = pri
 			end
@@ -236,18 +237,18 @@ RunService.PostSimulation:Connect(function(dt: number)
 				local current = d.activeObserverMemberships
 
 				-- Exits
-				for gId, oldZoneId in current do
-					local newPri = ctx_candidatePriority[gId]
+				for observerId, oldZoneId in current do
+					local newPri = ctx_candidatePriority[observerId]
 					if not newPri or newPri < ctx_highestWin then
-						current[gId] = nil
-						if observerTrackingEntities[gId] then
-							observerTrackingEntities[gId][entity] = nil
+						current[observerId] = nil
+						if observerTrackingEntities[observerId] then
+							observerTrackingEntities[observerId][entity] = nil
 						end
 
-						local cbs = observerExitedCallbacks[gId]
+						local cbs = observerExitedCallbacks[observerId]
 						if cbs then
 							local z = zoneIdToZoneObj[oldZoneId]
-							local cd = entityCustomData[entity] and entityCustomData[entity][gId]
+							local cd = entityCustomData[entity] and entityCustomData[entity][observerId]
 							fireCallback(cbs, entity, z, cd, safety)
 						end
 					end
@@ -255,21 +256,21 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 				-- Entries
 				for i = 1, ctx_cCount do
-					local gId = ctx_candidateList[i]
-					local pri = ctx_candidatePriority[gId]
-					if pri >= ctx_highestWin and not current[gId] then
-						local ZoneIdx = ctx_candidateIndex[gId]
-						current[gId] = ZoneIdx
-						observerTrackingEntities[gId][entity] = true
-						local cbs = observerEnteredCallbacks[gId]
+					local observerId = ctx_candidateList[i]
+					local pri = ctx_candidatePriority[observerId]
+					if pri >= ctx_highestWin and not current[observerId] then
+						local zoneIdx = ctx_candidateIndex[observerId]
+						current[observerId] = zoneIdx
+						observerTrackingEntities[observerId][entity] = true
+						local cbs = observerEnteredCallbacks[observerId]
 						if cbs then
-							local z = zoneIdToZoneObj[ZoneIdx]
-							local cd = entityCustomData[entity] and entityCustomData[entity][gId]
+							local z = zoneIdToZoneObj[zoneIdx]
+							local cd = entityCustomData[entity] and entityCustomData[entity][observerId]
 							fireCallback(cbs, entity, z, cd, safety)
 						end
 					end
-					ctx_candidatePriority[gId] = nil
-					ctx_candidateIndex[gId] = nil
+					ctx_candidatePriority[observerId] = nil
+					ctx_candidateIndex[observerId] = nil
 					ctx_candidateList[i] = nil
 				end
 			end
