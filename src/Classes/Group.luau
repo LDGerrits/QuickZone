@@ -45,7 +45,6 @@ function Group.new(config: {
 				precisionSq = precision ^ 2,
 				safety = safety,
 			},
-			lastProcessedIndex = 1,
 		}, Group) :: any
 	) :: Types.Group
 

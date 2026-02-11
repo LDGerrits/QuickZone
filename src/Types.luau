@@ -168,7 +168,6 @@ export type Group = {
 		precisionSq: number,
 		safety: boolean,
 	},
-	lastProcessedIndex: number,
 }
 
 export type EntityTable = {

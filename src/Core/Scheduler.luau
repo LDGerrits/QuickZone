@@ -31,6 +31,7 @@ local ctx_candidateList: { [number]: number } = table.create(16)
 
 local frameBudget = Config.Scheduler.frameBudget
 local nextGroupIndex = 1 -- Round-robin pointer
+local groupLastProcessedIndex = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Types.Group]: number }
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -172,7 +173,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 		end
 
 		local processed = 0
-		local idx = group.lastProcessedIndex
+		local idx = groupLastProcessedIndex[group] or 1
 		if idx > totalEntities then
 			idx = 1
 		end
@@ -287,7 +288,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 			end
 		end
 
-		group.lastProcessedIndex = idx
+		groupLastProcessedIndex[group] = idx
 
 		if (os.clock() - start) > frameBudget then
 			break
