@@ -44,14 +44,14 @@ function Zone.new(
 	end
 
 	local self = (
-		setmetatable({ id = id, part = associatedPart, isDynamic = isDynamic or false }, Zone) :: any
+		setmetatable({ id = id, part = associatedPart, dynamic = isDynamic or false }, Zone) :: any
 	) :: Types.Zone
 	State.zoneIdToZoneObj[id] = self
 
 	return self
 end
 
-function Zone:attach(...: Types.Group): Types.Zone
+function Zone:attach(...: Types.Observer): Types.Zone
 	local attached = State.zoneAttachedObservers[self.id] or {}
 	State.zoneAttachedObservers[self.id] = attached
 	for _, observer in { ... } do
@@ -63,7 +63,7 @@ function Zone:attach(...: Types.Group): Types.Zone
 	return self
 end
 
-function Zone:detach(...: Types.Group): Types.Zone
+function Zone:detach(...: Types.Observer): Types.Zone
 	local attached = State.zoneAttachedObservers[self.id]
 	if not attached then
 		return self
@@ -85,7 +85,7 @@ function Zone:detach(...: Types.Group): Types.Zone
 end
 
 function Zone:update(newCFrame: CFrame?, newSize: Vector3?): Types.Zone
-	local shape = self.isDynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
+	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
 
 	-- If no arguments, use reference part if possible
 	if not newCFrame and self.part then
@@ -116,13 +116,26 @@ function Zone:update(newCFrame: CFrame?, newSize: Vector3?): Types.Zone
 		shape.radiusSq = halfSize.Y * halfSize.Y
 	end
 
-	if self.isDynamic then
+	if self.dynamic then
 		State.pendingDynamicRebuild = true
 	else
 		State.pendingStaticRebuild = true
 	end
 
 	return self
+end
+
+function Zone:getId(): number
+	return self.id
+end
+
+function Zone:getPart(): BasePart?
+	return self.part
+end
+
+function Zone:getShapeType(): Types.ShapeType
+	local shape = State.dynamicShapes[self.id] or State.staticShapes[self.id]
+	return shape.type
 end
 
 function Zone:getObservers(): { Types.Observer }
@@ -142,15 +155,19 @@ function Zone:getObservers(): { Types.Observer }
 end
 
 function Zone:isPointInside(point: Vector3): boolean
-	local shape = self.isDynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
+	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
 	return Geometry.isPointInShape(point, shape)
+end
+
+function Zone:isDynamic(): boolean
+	return self.dynamic
 end
 
 function Zone:destroy(): ()
 	State.zoneAttachedObservers[self.id] = nil
 	State.zoneIdToZoneObj[self.id] = nil
 
-	if self.isDynamic then
+	if self.dynamic then
 		State.dynamicShapes[self.id] = nil
 		State.pendingDynamicRebuild = true
 	else

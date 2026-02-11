@@ -67,21 +67,27 @@ export type QuickZone = {
 
 export type Zone = {
 	-- Lifecycle
-	destroy: (zone: Zone) -> (),
+	destroy: (self: Zone) -> (),
 
 	-- State
-	attach: (zone: Zone, ...Observer) -> Zone,
-	detach: (zone: Zone, ...Observer) -> Zone,
-	update: (newCFrame: CFrame?, newSize: Vector3?) -> Zone,
+	attach: (self: Zone, ...Observer) -> Zone,
+	detach: (self: Zone, ...Observer) -> Zone,
+	update: (self: Zone, newCFrame: CFrame?, newSize: Vector3?) -> Zone,
+
+	-- Getters
+	getId: (self: Zone) -> number,
+	getPart: (self: Zone) -> BasePart?,
+	getShapeType: (self: Zone) -> ShapeType,
+	getObservers: (self: Zone) -> { Observer },
+	isDynamic: (self: Zone) -> boolean,
 
 	-- Utility
-	getObservers: (zone: Zone) -> { Observer },
-	isPointInside: (point: Vector3) -> boolean,
+	isPointInside: (self: Zone, point: Vector3) -> boolean,
 
 	-- Props
 	id: number,
 	part: BasePart?,
-	isDynamic: boolean,
+	dynamic: boolean,
 }
 
 export type Callback = (Entity, Zone, any?) -> ()
