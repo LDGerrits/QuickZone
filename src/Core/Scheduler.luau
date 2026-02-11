@@ -104,6 +104,9 @@ local function fireCallback(callbacks, entity, zone, customData, safety)
 end
 
 RunService.PostSimulation:Connect(function(dt: number)
+	debug.profilebegin('QuickZone_Scheduler')
+	local start = os.clock()
+
 	if State.pendingDynamicRebuild then
 		State.dynamicRootNode = LinearBVH.build(dynamicShapes)
 		State.pendingDynamicRebuild = false
@@ -116,15 +119,22 @@ RunService.PostSimulation:Connect(function(dt: number)
 		State.isDirty = true
 	end
 
+	if (os.clock() - start) > frameBudget then
+		debug.profileend()
+		return
+	end
+
 	local staticRoot = State.staticRootNode
 	local dynamicRoot = State.dynamicRootNode
 
 	if not staticRoot and not dynamicRoot then
+		debug.profileend()
 		return
 	end
 
 	local numGroups = #groupList
 	if numGroups == 0 then
+		debug.profileend()
 		return
 	end
 
@@ -133,9 +143,6 @@ RunService.PostSimulation:Connect(function(dt: number)
 		nextGroupIndex = 1
 	end
 
-	debug.profilebegin('QuickZone_Step')
-
-	local start = os.clock()
 	local forceRefresh = State.isDirty
 	State.isDirty = false
 
