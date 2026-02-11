@@ -80,25 +80,6 @@ function Group:setConfig(config: {
 	return self
 end
 
-function Group:setUpdateRate(hz: number): Types.Group
-	assert(hz > 0, '[QuickZone] updateRate must be greater than 0')
-
-	self._config.updateRate = hz
-	return self
-end
-
-function Group:setPrecision(n: number): Types.Group
-	assert(n >= 0, '[QuickZone] precision must be non-negative')
-
-	self._config.precisionSq = n ^ 2
-	return self
-end
-
-function Group:setSafety(enabled: boolean): Types.Group
-	self.Con_configfig.safety = enabled
-	return self
-end
-
 function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	local oldGroupId = State.entityToGroup[entity]
 	if oldGroupId then
@@ -223,6 +204,10 @@ function Group:remove(...: Types.Entity): Types.Group
 	return self
 end
 
+function Group:getId(): number
+	return self.id
+end
+
 function Group:getEntities(): { Types.Entity }
 	local result = table.create(#self._entities)
 	table.move(self._entities, 1, #self._entities, 1, result)
@@ -258,6 +243,11 @@ function Group:getConfig(): {
 		precision = math.sqrt(config.precisionSq),
 		safety = config.safety,
 	}
+end
+
+function Group:contains(entity: Types.Entity): boolean
+	local groupId = State.entityToGroup[entity]
+	return groupId and groupId == self.id
 end
 
 function Group:destroy(): ()

@@ -135,9 +135,6 @@ export type Group = {
 	destroy: (self: Group) -> (),
 
 	-- Config
-	setUpdateRate: (self: Group, hz: number) -> Group,
-	setPrecision: (self: Group, n: number) -> Group,
-	setSafety: (self: Group, enabled: boolean) -> Group,
 	setConfig: (
 		self: Group,
 		{
@@ -152,6 +149,7 @@ export type Group = {
 	remove: (self: Group, ...Entity) -> Group,
 
 	-- Getters
+	getId: (self: Group) -> number,
 	getEntities: (self: Group) -> { Entity },
 	getObservers: (self: Group) -> { Observer },
 	getConfig: (self: Group) -> {
@@ -159,6 +157,9 @@ export type Group = {
 		precision: number,
 		safety: boolean,
 	},
+
+	-- Helpers
+	contains: (self: Group, entity: Entity) -> boolean,
 
 	-- Props
 	id: number,
