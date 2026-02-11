@@ -80,8 +80,9 @@ export type Zone = {
 
 	-- Utility
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
+}
 
-	-- Props
+export type InternalZone = Zone & {
 	id: number,
 	part: BasePart?,
 	dynamic: boolean,
@@ -122,8 +123,9 @@ export type Observer = {
 	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
+}
 
-	-- Props
+export type InternalObserver = Observer & {
 	id: number,
 }
 
@@ -157,8 +159,9 @@ export type Group = {
 
 	-- Helpers
 	contains: (self: Group, entity: Entity) -> boolean,
+}
 
-	-- Props
+export type InternalGroup = Group & {
 	id: number,
 	entities: { Entity },
 	entityIndices: { [Entity]: number },

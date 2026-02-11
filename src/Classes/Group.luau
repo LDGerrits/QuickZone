@@ -34,19 +34,17 @@ function Group.new(config: {
 		safety = config.safety
 	end
 
-	local self = (
-		setmetatable({
-			id = id,
-			entities = {},
-			entityIndices = {},
-			entityData = {},
-			config = {
-				updateRate = updateRate,
-				precisionSq = precision ^ 2,
-				safety = safety,
-			},
-		}, Group) :: any
-	) :: Types.Group
+	local self: Types.InternalGroup = setmetatable({
+		id = id,
+		entities = {},
+		entityIndices = {},
+		entityData = {},
+		config = {
+			updateRate = updateRate,
+			precisionSq = precision ^ 2,
+			safety = safety,
+		},
+	}, Group) :: any
 
 	State.groups[id] = self
 	State.groupToObservers[id] = {}
@@ -55,11 +53,14 @@ function Group.new(config: {
 	return self
 end
 
-function Group:setConfig(config: {
-	updateRate: number?,
-	precision: number?,
-	safety: boolean?,
-}): Types.Group
+function Group.setConfig(
+	self: Types.InternalGroup,
+	config: {
+		updateRate: number?,
+		precision: number?,
+		safety: boolean?,
+	}
+): Types.Group
 	local hz = config.updateRate
 	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
 
@@ -79,7 +80,7 @@ function Group:setConfig(config: {
 	return self
 end
 
-function Group:add(entity: Types.Entity, customData: any?): Types.Group
+function Group.add(self: Types.InternalGroup, entity: Types.Entity, customData: any?): Types.Group
 	local oldGroupId = State.entityToGroup[entity]
 	if oldGroupId then
 		if oldGroupId == self.id then
@@ -148,7 +149,7 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	return self
 end
 
-function Group:remove(...: Types.Entity): Types.Group
+function Group.remove(self: Types.InternalGroup, ...: Types.Entity): Types.Group
 	for _, entity in { ... } do
 		if State.entityToGroup[entity] ~= self.id then
 			continue
@@ -202,17 +203,17 @@ function Group:remove(...: Types.Entity): Types.Group
 	return self
 end
 
-function Group:getId(): number
+function Group.getId(self: Types.InternalGroup): number
 	return self.id
 end
 
-function Group:getEntities(): { Types.Entity }
+function Group.getEntities(self: Types.InternalGroup): { Types.Entity }
 	local result = table.create(#self.entities)
 	table.move(self.entities, 1, #self.entities, 1, result)
 	return result
 end
 
-function Group:getObservers(): { Types.Observer }
+function Group.getObservers(self: Types.InternalGroup): { Types.Observer }
 	local result = {}
 	local observersMap = State.groupToObservers[self.id]
 
@@ -230,7 +231,7 @@ function Group:getObservers(): { Types.Observer }
 	return result
 end
 
-function Group:getConfig(): {
+function Group.getConfig(self: Types.InternalGroup): {
 	updateRate: number,
 	precision: number,
 	safety: boolean,
@@ -243,12 +244,12 @@ function Group:getConfig(): {
 	}
 end
 
-function Group:contains(entity: Types.Entity): boolean
+function Group.contains(self: Types.InternalGroup, entity: Types.Entity): boolean
 	local groupId = State.entityToGroup[entity]
 	return groupId and groupId == self.id
 end
 
-function Group:destroy(): ()
+function Group.destroy(self: Types.InternalGroup): ()
 	-- Must iterate backwards because remove() modifies array length
 	for i = #self.entities, 1, -1 do
 		self:remove(self.entities[i])

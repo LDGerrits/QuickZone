@@ -150,7 +150,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 	-- Round-robin scheduling to prevent starvation
 	for _ = 1, numGroups do
-		local group = groupList[nextGroupIndex]
+		local group = groupList[nextGroupIndex] :: Types.InternalGroup
 		nextGroupIndex = (nextGroupIndex % numGroups) + 1
 
 		local list = group.entities

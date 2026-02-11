@@ -43,15 +43,14 @@ function Zone.new(
 		State.pendingStaticRebuild = true
 	end
 
-	local self = (
+	local self: Types.InternalZone =
 		setmetatable({ id = id, part = associatedPart, dynamic = isDynamic or false }, Zone) :: any
-	) :: Types.Zone
 	State.zoneIdToZoneObj[id] = self
 
 	return self
 end
 
-function Zone:attach(...: Types.Observer): Types.Zone
+function Zone.attach(self: Types.InternalZone, ...: Types.InternalObserver): Types.Zone
 	local attached = State.zoneAttachedObservers[self.id] or {}
 	State.zoneAttachedObservers[self.id] = attached
 	for _, observer in { ... } do
@@ -63,7 +62,7 @@ function Zone:attach(...: Types.Observer): Types.Zone
 	return self
 end
 
-function Zone:detach(...: Types.Observer): Types.Zone
+function Zone.detach(self: Types.InternalZone, ...: Types.InternalObserver): Types.Zone
 	local attached = State.zoneAttachedObservers[self.id]
 	if not attached then
 		return self
@@ -84,7 +83,7 @@ function Zone:detach(...: Types.Observer): Types.Zone
 	return self
 end
 
-function Zone:update(newCFrame: CFrame?, newSize: Vector3?): Types.Zone
+function Zone.update(self: Types.InternalZone, newCFrame: CFrame?, newSize: Vector3?): Types.Zone
 	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
 
 	-- If no arguments, use reference part if possible
@@ -125,20 +124,20 @@ function Zone:update(newCFrame: CFrame?, newSize: Vector3?): Types.Zone
 	return self
 end
 
-function Zone:getId(): number
+function Zone.getId(self: Types.InternalZone): number
 	return self.id
 end
 
-function Zone:getPart(): BasePart?
+function Zone.getPart(self: Types.InternalZone): BasePart?
 	return self.part
 end
 
-function Zone:getShapeType(): Types.ShapeType
+function Zone.getShapeType(self: Types.InternalZone): Types.ShapeType
 	local shape = State.dynamicShapes[self.id] or State.staticShapes[self.id]
 	return shape.type
 end
 
-function Zone:getObservers(): { Types.Observer }
+function Zone.getObservers(self: Types.InternalZone): { Types.Observer }
 	local attached = State.zoneAttachedObservers[self.id]
 	if not attached then
 		return {}
@@ -154,16 +153,16 @@ function Zone:getObservers(): { Types.Observer }
 	return result
 end
 
-function Zone:isPointInside(point: Vector3): boolean
+function Zone.isPointInside(self: Types.InternalZone, point: Vector3): boolean
 	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
 	return Geometry.isPointInShape(point, shape)
 end
 
-function Zone:isDynamic(): boolean
+function Zone.isDynamic(self: Types.InternalZone): boolean
 	return self.dynamic
 end
 
-function Zone:destroy(): ()
+function Zone.destroy(self: Types.InternalZone): ()
 	State.zoneAttachedObservers[self.id] = nil
 	State.zoneIdToZoneObj[self.id] = nil
 

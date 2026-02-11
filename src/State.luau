@@ -16,9 +16,9 @@ State.pendingStaticRebuild = false
 State.pendingDynamicRebuild = false
 State.isDirty = false -- Forces spatial query for every entity
 
-State.groups = {} :: { [number]: Types.Group }
+State.groups = {} :: { [number]: Types.InternalGroup }
 State.groupToObservers = {} :: { [number]: { [number]: boolean } }
-State.groupList = {} :: { Types.Group }
+State.groupList = {} :: { Types.InternalGroup }
 State.entityToGroup = {} :: { [Types.Entity]: number }
 State.entityCustomData = {} :: { [Types.Entity]: { [number]: any } }
 
@@ -29,7 +29,7 @@ State.observerExitedCallbacks = {} :: { [number]: { Types.Callback } }
 State.observerEnabled = {} :: { [number]: boolean }
 
 State.zoneAttachedObservers = {} :: { [number]: { number } }
-State.zoneIdToZoneObj = {} :: { [number]: Types.Zone }
-State.observerIdToObserverObj = {} :: { [number]: Types.Observer }
+State.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }
+State.observerIdToObserverObj = {} :: { [number]: Types.InternalObserver }
 
 return State
