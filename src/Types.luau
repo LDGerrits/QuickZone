@@ -135,7 +135,7 @@ export type Group = {
 			updateRate: number?,
 			precision: number?,
 			safety: boolean?,
-		}?
+		}
 	) -> Group,
 
 	-- State
