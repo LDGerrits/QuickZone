@@ -116,14 +116,13 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 	end
 
 	if not strat then
-		error(
+		warn(
 			string.format(
-				'[QuickZone] add Failed: The provided entity (%s) is not a supported type. '
-					.. 'Ensure it is a BasePart, Model, Attachment, Bone, Camera, or a table with a Position/CFrame.',
+				'[QuickZone] Group:add skipped invalid entity (%s). Expected BasePart, Model, etc.',
 				tostring(entity)
-			),
-			2
+			)
 		)
+		return self
 	end
 
 	local data = {

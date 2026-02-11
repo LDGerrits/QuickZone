@@ -143,7 +143,7 @@ end
 
 function Observer:isLocalPlayerInside(): boolean
 	if not IS_CLIENT then
-		error('[QuickZone] isLocalPlayerInside can only be called on the Client.', 2)
+		error('[QuickZone] Observer:isLocalPlayerInside can only be called on the Client.', 2)
 	end
 
 	return self:isPlayerInside(Players.LocalPlayer)
@@ -291,7 +291,7 @@ function Observer:onPlayerExited(callback: (Player, Types.Zone) -> ()): () -> ()
 end
 
 function Observer:onLocalPlayerEntered(callback: (Types.Zone) -> ()): () -> ()
-	assert(IS_CLIENT, '[QuickZone] onLocalPlayerEntered can only be called on the Client.')
+	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerEntered can only be called on the Client.')
 	return self:onEntered(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player == Players.LocalPlayer then
 			callback(zone)
@@ -300,7 +300,7 @@ function Observer:onLocalPlayerEntered(callback: (Types.Zone) -> ()): () -> ()
 end
 
 function Observer:onLocalPlayerExited(callback: (Types.Zone) -> ()): () -> ()
-	assert(IS_CLIENT, '[QuickZone] onLocalPlayerExited can only be called on the Client.')
+	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerExited can only be called on the Client.')
 	return self:onExited(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player == Players.LocalPlayer then
 			callback(zone)

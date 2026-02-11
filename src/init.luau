@@ -219,7 +219,7 @@ function QuickZone.LocalPlayerGroup(config: {
 	precision: number?,
 	safety: boolean?,
 }?): Group
-	assert(IS_CLIENT, '[QuickZone] LocalPlayerGroup can only be called on the Client.')
+	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
 
 	if sharedLocalPlayerGroup then
 		if config then

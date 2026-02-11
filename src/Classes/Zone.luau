@@ -94,7 +94,7 @@ function Zone:update(newCFrame: CFrame?, newSize: Vector3?): Types.Zone
 	end
 
 	if not newCFrame or not newSize then
-		warn('[QuickZone] Zone:update() failed. No Part given and no CFrame provided.')
+		warn('[QuickZone] Zone:update failed. No Part given and no CFrame provided.')
 		return self
 	end
 

@@ -300,7 +300,7 @@ end)
 local Scheduler = {}
 
 function Scheduler.setFrameBudget(n: number)
-	assert(n > 0, '[QuickZone] FrameBudget must be greater than 0')
+	assert(n > 0, '[QuickZone] frameBudget must be greater than 0')
 
 	frameBudget = n
 end
