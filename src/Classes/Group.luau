@@ -37,15 +37,15 @@ function Group.new(config: {
 	local self = (
 		setmetatable({
 			id = id,
-			_entities = {},
-			_entityIndices = {},
-			_entityData = {},
-			_config = {
+			entities = {},
+			entityIndices = {},
+			entityData = {},
+			config = {
 				updateRate = updateRate,
 				precisionSq = precision ^ 2,
 				safety = safety,
 			},
-			_lastProcessedIndex = 1,
+			lastProcessedIndex = 1,
 		}, Group) :: any
 	) :: Types.Group
 
@@ -68,13 +68,13 @@ function Group:setConfig(config: {
 	assert(not n or n >= 0, '[QuickZone] precision must be non-negative')
 
 	if hz then
-		self._config.updateRate = hz
+		self.config.updateRate = hz
 	end
 	if n then
-		self._config.precisionSq = n ^ 2
+		self.config.precisionSq = n ^ 2
 	end
 	if config.safety ~= nil then
-		self._config.safety = config.safety
+		self.config.safety = config.safety
 	end
 
 	return self
@@ -132,10 +132,10 @@ function Group:add(entity: Types.Entity, customData: any?): Types.Group
 		activeObserverMemberships = {},
 	}
 
-	local idx = #self._entities + 1
-	self._entities[idx] = entity
-	self._entityIndices[entity] = idx
-	self._entityData[entity] = data
+	local idx = #self.entities + 1
+	self.entities[idx] = entity
+	self.entityIndices[entity] = idx
+	self.entityData[entity] = data
 
 	State.entityToGroup[entity] = self.id
 
@@ -155,10 +155,10 @@ function Group:remove(...: Types.Entity): Types.Group
 			continue
 		end
 
-		local data = self._entityData[entity]
+		local data = self.entityData[entity]
 
 		-- Trigger exit
-		local safety = self._config.safety
+		local safety = self.config.safety
 		for observerId, oldZoneId in data.activeObserverMemberships do
 			if State.observerTrackingEntities[observerId] then
 				State.observerTrackingEntities[observerId][entity] = nil
@@ -181,21 +181,21 @@ function Group:remove(...: Types.Entity): Types.Group
 		end
 
 		-- Swap-remove from Array
-		local idx = self._entityIndices[entity]
-		local lastIdx = #self._entities
-		local lastEntity = self._entities[lastIdx]
+		local idx = self.entityIndices[entity]
+		local lastIdx = #self.entities
+		local lastEntity = self.entities[lastIdx]
 
 		if idx == lastIdx then
-			self._entities[lastIdx] = nil
-			self._entityIndices[entity] = nil
+			self.entities[lastIdx] = nil
+			self.entityIndices[entity] = nil
 		else
-			self._entities[idx] = lastEntity
-			self._entityIndices[lastEntity] = idx
-			self._entities[lastIdx] = nil
-			self._entityIndices[entity] = nil
+			self.entities[idx] = lastEntity
+			self.entityIndices[lastEntity] = idx
+			self.entities[lastIdx] = nil
+			self.entityIndices[entity] = nil
 		end
 
-		self._entityData[entity] = nil
+		self.entityData[entity] = nil
 		State.entityToGroup[entity] = nil
 		State.entityCustomData[entity] = nil
 	end
@@ -208,8 +208,8 @@ function Group:getId(): number
 end
 
 function Group:getEntities(): { Types.Entity }
-	local result = table.create(#self._entities)
-	table.move(self._entities, 1, #self._entities, 1, result)
+	local result = table.create(#self.entities)
+	table.move(self.entities, 1, #self.entities, 1, result)
 	return result
 end
 
@@ -236,7 +236,7 @@ function Group:getConfig(): {
 	precision: number,
 	safety: boolean,
 }
-	local config = self._config
+	local config = self.config
 	return {
 		updateRate = config.updateRate,
 		precision = math.sqrt(config.precisionSq),
@@ -251,8 +251,8 @@ end
 
 function Group:destroy(): ()
 	-- Must iterate backwards because remove() modifies array length
-	for i = #self._entities, 1, -1 do
-		self:remove(self._entities[i])
+	for i = #self.entities, 1, -1 do
+		self:remove(self.entities[i])
 	end
 
 	State.groupToObservers[self.id] = nil

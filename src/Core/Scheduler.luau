@@ -152,13 +152,13 @@ RunService.PostSimulation:Connect(function(dt: number)
 		local group = groupList[nextGroupIndex]
 		nextGroupIndex = (nextGroupIndex % numGroups) + 1
 
-		local list = group._entities
+		local list = group.entities
 		local totalEntities = #list
 		if totalEntities == 0 then
 			continue
 		end
 
-		local groupConfig = group._config
+		local groupConfig = group.config
 		local rate = groupConfig.updateRate
 		local precisionSq = groupConfig.precisionSq
 		local safety = groupConfig.safety
@@ -172,7 +172,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 		end
 
 		local processed = 0
-		local idx = group._lastProcessedIndex
+		local idx = group.lastProcessedIndex
 		if idx > totalEntities then
 			idx = 1
 		end
@@ -181,7 +181,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 		while processed < workQuota do
 			local entity = list[idx]
-			local d = group._entityData[entity] :: Types.EntityData?
+			local d = group.entityData[entity] :: Types.EntityData?
 
 			-- Race condition guard
 			if not d then
@@ -287,7 +287,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 			end
 		end
 
-		group._lastProcessedIndex = idx
+		group.lastProcessedIndex = idx
 
 		if (os.clock() - start) > frameBudget then
 			break

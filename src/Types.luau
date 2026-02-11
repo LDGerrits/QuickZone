@@ -160,15 +160,15 @@ export type Group = {
 
 	-- Props
 	id: number,
-	_entities: { Entity },
-	_entityIndices: { [Entity]: number },
-	_entityData: { [Entity]: EntityData },
-	_config: {
+	entities: { Entity },
+	entityIndices: { [Entity]: number },
+	entityData: { [Entity]: EntityData },
+	config: {
 		updateRate: number,
 		precisionSq: number,
 		safety: boolean,
 	},
-	_lastProcessedIndex: number,
+	lastProcessedIndex: number,
 }
 
 export type EntityTable = {

@@ -11,10 +11,10 @@ local Types = require(script.Parent.Parent.Types)
 local IS_CLIENT = RunService:IsClient()
 
 local function disconnectObserverFromGroup(observerId: number, group: Types.Group)
-	local safety = group._config.safety
+	local safety = group.config.safety
 
-	for _, entity in group._entities do
-		local data = group._entityData[entity]
+	for _, entity in group.entities do
+		local data = group.entityData[entity]
 
 		local oldZoneId = data.activeObserverMemberships[observerId]
 		if not oldZoneId then
@@ -156,7 +156,7 @@ function Observer:isEntityInside(entity: Types.Entity): boolean
 	end
 
 	local group = State.groups[groupId]
-	local data = group._entityData[entity]
+	local data = group.entityData[entity]
 	if not data then
 		return false
 	end

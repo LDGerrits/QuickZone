@@ -361,10 +361,10 @@ end
 function QuickZone:getEntities(): { Types.Entity }
 	local result = {}
 	for _, group in State.groups do
-		local count = #group._entities
+		local count = #group.entities
 		if count > 0 then
 			local currentSize = #result
-			table.move(group._entities, 1, count, currentSize + 1, result)
+			table.move(group.entities, 1, count, currentSize + 1, result)
 		end
 	end
 	return result
