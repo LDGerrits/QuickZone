@@ -343,23 +343,6 @@ function QuickZone:getEntities(): { Types.Entity }
 	return result
 end
 
-function QuickZone:isEntityValidType(entity: any): boolean
-	if typeof(entity) == 'Instance' then
-		return entity:IsA('BasePart')
-			or entity:IsA('Attachment')
-			or entity:IsA('Bone')
-			or entity:IsA('Camera')
-			or entity:IsA('Model')
-	elseif typeof(entity) == 'table' then
-		return entity.Position or entity.CFrame or entity.WorldPosition or entity.GetPivot
-	end
-	return false
-end
-
-function QuickZone:isEntityInAnyGroup(entity: Entity): boolean
-	return State.entityToGroup[entity] ~= nil
-end
-
 function QuickZone:visualize(enabled: boolean): QuickZone
 	if debugConnection then
 		debugConnection:Disconnect()

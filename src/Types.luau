@@ -57,10 +57,6 @@ export type QuickZone = {
 	getGroups: (self: QuickZone) -> { Group },
 	getEntities: (self: QuickZone) -> { Entity },
 
-	-- Queries
-	isEntityValidType: (self: QuickZone, entity: any) -> boolean,
-	isEntityInAnyGroup: (self: QuickZone, entity: Entity) -> boolean,
-
 	-- Helpers
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,
 }
