@@ -14,8 +14,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Rojo
-        uses: rojo-rbx/setup-rojo-action@v1
+      - name: Install Aftman
+        uses: ok-nick/setup-aftman@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build quickzone.rbxm
         run: rojo build -o quickzone.rbxm
