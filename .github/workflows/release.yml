@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rojo
-        uses: rojo-rbx/setup-rojo@v2.0.1
+        uses: rojo-rbx/setup-rojo-action@v1
 
       - name: Build quickzone.rbxm
         run: rojo build -o quickzone.rbxm
