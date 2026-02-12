@@ -29,4 +29,4 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: quickzone.rbxm
-          generate_release_notes: true
+          generate_release_notes: false
