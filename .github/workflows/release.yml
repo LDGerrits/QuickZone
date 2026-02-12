@@ -25,13 +25,6 @@ jobs:
       - name: Build Model
         run: rojo build -o quickzone.rbxm
 
-      - name: Upload to Roblox
-        run: |
-          rbxcloud assets upload \
-            --asset-id 96553484189609 \
-            --filepath quickzone.rbxm \
-            --api-key ${{ secrets.ROBLOX_API_KEY }}
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
