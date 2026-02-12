@@ -22,9 +22,6 @@ jobs:
       - name: Install Rokit Tools
         run: rokit install --no-trust-check
 
-      - name: Install Dependencies
-        run: wally install
-
       - name: Build Model
         run: rojo build -o quickzone.rbxm
 
