@@ -4,68 +4,117 @@ sidebar_position: 3
 
 # Why use QuickZone?
 
-Before integrating a new library, you might need some convincing of why you shouldn't just use Roblox's built-in `.Touched` event or `workspace:GetPartsInPart`. That's totally fair! The following text explains the engineering challenges of spatial queries in Roblox and how QuickZone solves them through advanced algorithms and low-level optimizations.
+Traditional zone libraries like ZonePlus and SimpleZone act as wrappers for Roblox's internal physics queries. Such libraries may use basic Bounding Volume Hierarchy (BVHs), but ultimately rely on the physics engine (e.g., `GetBoundsInBox`, `GetPartsInPart` or `.Touched`), resulting in expensive collision geometry calculations and synchronization overhead.
 
-## The Problem with Physics
+## The QuickZone Approach
 
-Traditionally, developers rely on the Roblox Physics engine to detect when a player enters a zone.
+QuickZone bypasses the physics engine in favor of geometric math and data-oriented design. It implements a Linear BVH that resolves spatial queries using math compiled to machine code to bypass interpreter overhead.
 
-### The `.Touched` Event
-The `.Touched` event is the oldest method. It relies on physical collisions.
-- **Tunneling:** Fast-moving objects (like cars or falling players) can skip over a zone entirely between physics steps, never firing the event.
-- **Performance:** It requires parts to be physically present in the workspace. If you have 1,000 zones, you have 1,000 extra parts adding to the physics simulation overhead, even if they are `CanCollide = false`.
-- **Reliability:** It doesn't fire if the part is not moving relative to the zone.
+### 1. The Entity-Centric Model
 
-### Spatial Queries (`GetPartsInPart`)
-The modern alternative is `workspace:GetPartsInPart`. While accurate, it is effectively a 'Brute Force' physics check.
-- **Cost:** It has to calculate precise collision geometry (OOB/Convex Decomposition). Doing this for 50 zones every frame is incredibly expensive.
-- **Garbage:** It allocates a new table and new instances every time you call it, causing frequent Garbage Collection (GC) spikes.
+Traditional libraries are Zone-Centric. They iterate through every Zone instance and query the physics engine for overlapping parts (i.e. entities in QuickZone-terms).
 
-## The QuickZone Solution
+- **The Scaling Problem**: Performance worsens as you add more zones (*O(Z)*), even if the number of entities remains static.
 
-QuickZone was built with one goal: **Maximum Performance with Minimal Footprint.** It bypasses the physics engine entirely in favor of pure geometric math and data-oriented design.
+QuickZone, on the other hand, is Entity-Centric. It keeps a list of entities and queries them against an LBVH (*O(N log Z)*). 
 
-### 1. Bounding Volume Hierarchy (BVH)
+- **The Benefit**: This means that you can have hundreds, even thousands, of zones with very low runtime cost. The cost effectively becomes a factor of the number of entities that are being tracked.
 
-If you have 100 players and 100 zones, a naive script would perform 10,000 checks per frame ($O(N \times M)$). As your game grows, this logic causes lag.
+### 2. Data-Oriented Design
 
-QuickZone implements a **Linear Bounding Volume Hierarchy**.
-A BVH organizes your zones into a tree structure. When checking if a player is in a zone, we first check the 'root' of the tree. If the player isn't in the root, we instantly know they aren't in *any* of the 1,000 zones inside it.
+QuickZone is built on Data-Oriented principles, shifting the focus from 'objects' to how data is laid out in memory.
 
-This turns an $O(N)$ search into an $O(\log N)$ search. In practice, this means QuickZone can query thousands of zones in microseconds.
+- **Contiguous Arrays**: Unlike standard OOP where data is scattered across the heap in different objects, QuickZone stores entity data in pre-allocated, contiguous arrays. This maximizes CPU cache locality, improving processing speed.
 
-### 2. Data-Oriented Design (DOD)
+- **Stable Memory**: By using flat arrays and object pooling, QuickZone generates almost no garbage during runtime. This prevents lag spikes caused by the GC.
 
-Most Lua libraries heavily use Object-Oriented Programming (OOP), creating a new table/class for every single bullet or entity.
-- **The Problem:** Lua tables are expensive memory allocations. Creating wrapper objects (`Entity.new(part)`) for 1,000 projectiles creates massive GC pressure (lag spikes).
-- **The Solution:** QuickZone uses a Data-Oriented approach. We don't wrap your parts in objects. We track them in flat arrays and use the Instances themselves as keys.
+### 3. Architecture
 
-This results in **Zero-Allocation Hot Loops**. Once the system is running, the scheduler generates almost no garbage, keeping your memory usage flat and your GC pauses non-existent.
+QuickZone moves away from binding logic to specific Instances. Instead, it uses a topology of Groups and Observers which separates what is being tracked from where it is being tracked and how to react to that.
 
-### 3. The Frame Budget (Fixing Starvation)
+#### Groups
+A Group is a collection of entities that share performance characteristics and logical categorization.
 
-A common issue with loop-based checks is 'Starvation.'
-If you have 5,000 zombies to check, the loop might take 8ms. If your game is already running heavy logic, that 8ms push might drop you below 60 FPS.
+Performance can be configured per Group, allowing for granular optimization like this:
 
-QuickZone includes a **Frame Budget Scheduler**.
-1. You set a budget (e.g., 2ms).
-2. The scheduler processes as many entities as it can within that 2ms.
-3. If it runs out of time, it **pauses** and resumes exactly where it left off on the next frame.
+- `CameraGroup`: Real-time frequency (60Hz), zero tolerance.
 
-This guarantees that **QuickZone will never be the cause of your frame drops**, no matter how many entities you throw at it. It favors 'Eventual Consistency' over 'Lag.'
+- `PlayerGroup`: High frequency (30Hz), high precision.
 
-## Implementation Detail
+- `NPCGroup`: Low frequency (2Hz), low precision.
 
-Let's look at a comparison.
+This prevents 'wasting' CPU cycles checking a slow-moving NPC, for example.
 
-**The Naive Way (Laggy):**
+#### Observers
+An Observer is a system that bridges Groups and Zones.
+
+- Observers subscribe to specific Groups.
+
+- Zones (the 'where') attach to specific Observers.
+
+This creates a Many-to-Many relationship that allows for fast and decoupled logic.
+
 ```lua
-RunService.Heartbeat:Connect(function()
-    for _, zone in zones do
-        -- Allocates a new table every single frame for every single zone
-        local parts = workspace:GetPartsInPart(zone.Part) 
-        for _, part in parts do
-            -- heavy logic...
-        end
-    end
+-- Create an Observer and subscribe to a group
+local safeObserver = QuickZone.Observer()
+safeObserver:subscribe(QuickZone.LocalPlayerGroup())
+
+-- Logic is defined once, not per zone
+safeObserver:onEntered(function(player, zone)
+    print('Entered Safe Zone:', zone:getId())
 end)
+
+-- Create Zones from parts and attach them to the observer
+for _, part in workspace.SafeZones:GetChildren() do
+    if part:IsA('BasePart') then
+        local zone = QuickZone.ZoneFromPart(part)
+        zone:attach(safeObserver)
+    end
+end
+```
+
+### 4. The Budgeted Scheduler
+A common issue with spatial libraries is stutter due to it processing too many things in one frame. QuickZone fixes this via its smart Scheduler.
+
+#### Frame Budgeting
+You can set a hard time limit (e.g., 1ms). The Scheduler monitors os.clock() in real-time. If the budget is met, the system pauses immediately and resumes in the next frame. This guarantees that QuickZone will never be the cause of a frame drop.
+
+#### Workload Smearing
+The scheduler smears updates across frames. This means that, if you have a Group of 600 entities updating at 10Hz, QuickZone will process exactly 100 entities per frame at 60 fps. This ensures that we have flat, predictable performance profile with no peaks or valleys.
+
+#### No starvation
+The Scheduler uses a Round-Robin strategy for Group processing. Instead of processing groups in order, QuickZone cycles through them fairly. This prevents the issue where a heavy group keeps consuming the entire frame budget and 'starving' the subsequent groups.
+
+### 5. Flexibility
+
+Because QuickZone relies on pure math rather than the Physics engine, it is not limited to BaseParts. It also supports duck typing for entities.
+
+- **BaseParts**: Uses `.Position`.
+
+- **Models**: Uses `.PrimaryPart.Position` or `:GetPivot()` (if `.PrimaryPart` does not exist).
+
+- **Attachments/Bones**: Uses `.WorldPosition`.
+
+- **Cameras**: Uses `.CFrame.Position`.
+
+- **Tables**: Uses any custom `.Position`, `.WorldPosition` and `.CFrame` field, or `:GetPivot()`.
+
+This allows you to track real-time simulations (e.g. a spell cast or an RC car) without the overhead of creating physical Instances.
+
+### 6. Performance Benchmarks
+
+In a scenario with 2,000 moving entities and 100 zones, recorded over 30-seconds, I obtained the following benchmarks:
+
+| Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
+| --- | --- | --- | --- | --- | --- |
+| FPS | 42.37 | 37.23 | 29.88 | 41.31 | 42.73 |
+| Events/s | 2271 | 2482 | 2518 | 566 | 0 |
+| Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
+
+_Note: For the QuickZone benchmark, we used a frame budget of 1ms, the entities' update rate was set to 60Hz, and the precision was 0.0._
+
+The benchmarks show that QuickZone's negative impact on FPS was quite negligible compared to the empty script baseline. In comparison, ZonePlus drops the game to ~29 FPS under the same load, introducing significant stutter, while SimpleZone drops frames by ~13%. QuickZone proves that you can run complex spatial logic without taxing the render loop.
+
+Furthermore, QuickZone only used 2.13 MB of memory. In comparison, ZonePlus bloats to 159 MB. QuickZone's use of flat arrays and object pooling keeps the memory footprint ~98% smaller.
+
+While QuickBounds has similar, if not slightly worse, FPS and memory usage, QuickZone handles 4x the event volume (2271 vs 566 events/s). This validates the shift to the Linear BVH, contiguous arrays, caching, and starvation prevention techniques, allowing the system to process thousands of spatial queries per second without bottlenecking the CPU.

@@ -5,19 +5,48 @@ sidebar_position: 1
 # Introduction
 
 ## Overview
-**QuickZone** is a high-performance, low-footprint spatial query library for Roblox. It allows you to efficiently track when parts, models, or players enter defined zones.
+QuickZone is a high-performance, spatial partitioning library for Roblox. 
 
-Under the hood, it uses a **Bounding Volume Hierarchy (BVH)** and a **Frame Budget Scheduler** to ensure your game stays at 60 FPS, even with hundreds of zones and thousands of tracked entities.
+QuickZone makes it possible to track thousands of entities across hundreds of zones with almost no impact on your frame rate. It bypasses Roblox's physics engine in favor of geometric math while providing a predictable, budgeted, and flexible solution for zone detection.
+
+:::info Point-Based Detection
+QuickZone uses point-based detection. It checks if a specific point (e.g., the center of a Part, the position of an Attachment, or the Pivot of a Model) is inside a zone's boundary.
+
+Because it calculates if it is inside or not using geometric math instead of physics-based volume intersections, it is significantly faster than other zone detection libraries.
+:::
+
+## Core Features
+
+**Best-In-Class Performance**: Process thousands of spatial queries per second with negligible FPS impact.
+
+**Smart Scheduler**: Autmomatically divides workload equally across frames for a flat, predictable performance profile. Set a hard time limit (e.g., 1ms) to ensure that QuickZone never causes frame drops.
+
+**Entity-Centric**: Costs are based on the number of tracked entities and not the number of zones.
+
+**Group-Observer Topology**: Decouple your game logic from spatial instances. You are able to bind behaviors to categories of entities instead of individual parts.
+
+**Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even Lua tables.
+
+## Benchmarks
+
+In a scenario with 2,000 moving entities and 100 zones recorded over 30-seconds, the obtained benchmarks were as follows:
+
+| Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
+| --- | --- | --- | --- | --- | --- |
+| FPS | 42.37 | 37.23 | 29.88 | 41.31 | 42.73 |
+| Events/s | 2271 | 2482 | 2518 | 566 | 0 |
+| Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
 ## Installation
 
-For wally, the package name + version is
+### Wally
+The package name + version is
 
 ```
 ldgerrits/quickzone@^0.2.2
 ```
 
-## Manual
+### Manual
 Download the latest .rbxm model file from the [Releases](https://github.com/LDGerrits/QuickZone/releases) tab and drag it into ReplicatedStorage.
 
 ## Quick Start
@@ -27,13 +56,12 @@ local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local QuickZone = require(ReplicatedStorage.QuickZone)
 
--- 1. Create a Group
--- LocalPlayerGroup automatically tracks the client's character (including respawns)
+-- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
 local myPlayer = QuickZone.LocalPlayerGroup()
 
--- 2. Create an Observer
--- The Observer holds the behavior. We subscribe it to our player group.
-local swimObserver = QuickZone.Observer()
+-- Create an Observer that holds the behavior with a priority of 42.
+-- If this player is inside multiple zones, the higher priority observer will 'win'.
+local swimObserver = QuickZone.Observer(42)
 swimObserver:subscribe(myPlayer)
 
 -- Connect the events (Note: Events return cleanup functions)
@@ -54,11 +82,9 @@ swimObserver:onLocalPlayerExited(function(zone)
     end
 end)
 
--- 3. Create a Zone
 -- Create a static zone from a Part in workspace
-local poolZone = QuickZone.fromPart(workspace.PoolWater)
+local poolZone = QuickZone.ZoneFromPart(workspace.PoolWater)
 
--- 4. Connect them
 -- Attach the logic (Observer) to the location (Zone)
 poolZone:attach(swimObserver)
 ```

@@ -4,54 +4,59 @@ sidebar_position: 2
 
 # Usage
 
-## Zones ('Where')
+## Zones
 
-Zones represent physical areas in your world. They can be created from existing parts or defined manually with a CFrame and Size.
+Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
 
-### From a Part
+### Creation
 The easiest way to create a zone.
 
 ```lua
--- Static Zone (e.g. a pool of water)
-local zone = QuickZone.fromPart(workspace.Pool)
+-- Static Zone (Fastest)
+-- Ideal for shops, biomes, or permanent regions.
+local staticZone = QuickZone.ZoneFromPart(workspace.SafeZone)
 
--- Dynamic Zone (e.g. a moving train carriage)
--- Pass 'true' as the second argument
-local trainZone = QuickZone.fromPart(workspace.TrainCar, true)
+-- Dynamic Zone
+-- Passing 'true' makes the zone follow the part's CFrame on :update()
+local trainZone = QuickZone.ZoneFromPart(workspace.TrainCarriage, true)
 ```
 
 ### Manual Creation
-Useful for procedural generation or abstract areas.
+Useful for procedural generation or areas without physical parts.
 
 ```lua
 local zone = QuickZone.Zone(
-    CFrame.new(0, 10, 0),       -- Position/Rotation
+    CFrame.new(0, 10, 0),       -- Position and rotation
     Vector3.new(20, 20, 20),    -- Size
     'Block',                    -- Shape: 'Block', 'Ball', 'Cylinder', or 'Wedge'
     nil,                        -- No associated part
-    false                       -- Static (false) or Dynamic (true)
+    false                       -- Static (false) or dynamic (true)
 )
 ```
 
-### Lifecycle
-When you are done with a zone, destroy it to clean up memory.
+### Updating Zones
+If you create a zone manually or want to sync a dynamic zone to a new reference, use `:update()`.
 
 ```lua
-zone:destroy()
+-- Manually move a zone
+zone:update(CFrame.new(0, 50, 0), Vector3.new(10, 10, 10))
+
+-- Sync a dynamic zone to its associated part
+dynamicZone:update()
 ```
 
-## Groups ('Who')
+## Groups
 
-Groups are collections of entities (Parts, Models, Players, etc.) that you want to track.
+Groups are collections of entities (Parts, Models, Players, etc.) that you want to track. They allow you to categorize entities and set unique performance costs for each category.
 
-### Player Groups
+### Specialized Groups
 QuickZone provides specialized groups that automatically handle player joining, leaving, and respawning.
 
 ```lua
--- Tracks ALL players in the server
+-- Tracks all players in the server
 local allPlayers = QuickZone.PlayerGroup()
 
--- Tracks ONLY the local player (Client-side only)
+-- Tracks only the local player (client-side only)
 local myPlayer = QuickZone.LocalPlayerGroup()
 ```
 
@@ -59,23 +64,32 @@ local myPlayer = QuickZone.LocalPlayerGroup()
 For NPCs, projectiles, or vehicles, create a standard Group.
 
 ```lua
--- Create a group with custom config
-local enemies = QuickZone.Group({
-    updateRate = 10,  -- Check 10 times per second (defaults to 30)
-    safety = true     -- Use task.spawn for callbacks (safer but slightly slower)
+local projectiles = QuickZone.Group({
+    updateRate = 60,   -- Check every frame for high-speed objects
+    precision = 0,     -- Query every time it moves
+    safety = false     -- Fire callbacks immediately (faster but risky if you yield)
+})
+
+local idleNPCs = QuickZone.Group({
+    updateRate = 5,    -- Check only 5 times a second
+    precision = 2.0    -- Only query if the NPC moves more than 2 studs
 })
 ```
 
 ### Adding Entities
-You can add BaseParts, Models, Attachments, Bones, or even raw tables with a Position.
+You can add BaseParts, Models, Attachments, Bones, or even tables with a Position.
 
 ```lua
--- Add a Model (Tracks the PrimaryPart or Pivot)
+-- Add a Model (tracks the PrimaryPart or Pivot)
 enemies:add(npcModel, { Team = 'Red' })
 
--- Add a specific Attachment (Tracks the exact point)
--- This is great for precise hitboxes (e.g. sword tip)
-enemies:add(character.HeadAttachment, { IsHeadshot = true })
+-- Add a specific Attachment (tracks the exact point)
+-- This is great for offsets if you do not want to track the middle of a part (e.g. sword tip)
+enemies:add(sword.TipAttachment, { Damage = 75 })
+
+-- Add a table
+local spell = { Position = Vector3.new(10, 5, 0) }
+enemies:add(spell)
 
 -- Remove when done
 enemies:remove(npcModel)
@@ -83,52 +97,49 @@ enemies:remove(npcModel)
 
 _Note: The second argument (`customData`) is optional and will be passed to your event callbacks._
 
-## Observers ('Logic')
+## Observers
 
-Observers are the 'brain' of QuickZone. They connect **Groups** to **Zones**.
+Observers are the 'brain' of QuickZone. They connect Groups to Zones.
 
 ### Setup
-1. **Create** an Observer.
-2. **Subscribe** to a Group (tell it _who_ to watch).
-3. **Attach** to a Zone (tell it _where_ to watch).
+An Observer listens to its subscribed Groups and checks if they overlap with its attached Zones.
 
 ```lua
 local observer = QuickZone.Observer()
 
--- Watch the 'enemies' group
-observer:subscribe(enemies)
-
--- Listen for events in the 'lava' zone
-lavaZone:attach(observer)
+observer:subscribe(allPlayers) -- Who to watch
+healingZone:attach(observer)   -- Where to watch
 ```
 
 ### Events
-Events are defined on the **Observer**, not the Zone or Group.
+Events are defined on the Observer, not the Zone or Group. Events return a cleanup function. Calling this function is equivalent to 'disconnecting' the listener.
 
 ```lua
--- Generic Entity Event
-observer:onEntered(function(entity, zone, customData)
-    print(entity.Name, 'entered zone', zone:getId())
-    if customData then
-        print('Team:', customData.Team)
-    end
+-- Fires when an entity enters a zone for this observer
+local disconnect = observer:onEntered(function(entity, zone, customData)
+    print(entity.Name .. " entered " .. zone:getId())
 end)
 
--- Convenience wrapper for Players
-observer:onPlayerEntered(function(player, zone)
-    print(player.Name, 'stepped in!')
-end)
-
--- Clean up events
-local connection = observer:onExited(function(entity, zone)
-    print('Entity left')
-end)
-
-connection() -- Disconnects this specific listener
+-- Convenience Player wrappers
+observer:onPlayerEntered(function(player, zone) ... end)
+observer:onLocalPlayerEntered(function(zone) ... end)
+observer:onPlayerExited(function(player, zone) ... end)
 ```
 
-### Priority & State
-You can disable an observer temporarily (e.g., during a cutscene). This will force an `onExited` event for all currently tracked entities, ensuring logic stops cleanly.
+### Priority & Resolution
+Observers use a priority system to handle overlapping zones. An entity 'belongs' to only one zone state per observer at a time when using priorities.
+
+```lua
+local lowPriority = QuickZone.Observer(0)
+local highPriority = QuickZone.Observer(10)
+
+-- If a player is inside Zone A (Low) and Zone B (High) simultaneously:
+-- 1. highPriority:onEntered() fires for Zone B.
+-- 2. lowPriority:onEntered() fires for Zone A.
+```
+
+### Handling State
+You can toggle an observer's activity state. This is useful for disabling triggers during cutscenes or rounds.
 
 ```lua
 observer:setEnabled(false) -- Fires 'onExited' for everyone inside
@@ -142,19 +153,12 @@ observer:setEnabled(true)  -- Fires 'onEntered' if they are still there
 QuickZone uses a scheduler to prevent lag. You can adjust how much time (in seconds) it is allowed to use per frame.
 
 ```lua
--- Allow 2 milliseconds per frame (default is 1ms)
-QuickZone:setFrameBudget(0.002)
-```
-
-### Visualizer
-Debug your zones by seeing exactly what the library sees.
-
-```lua
-QuickZone:visualize(true)
+-- Allow 0.5 milliseconds per frame (default is 1ms)
+QuickZone:setFrameBudget(0.5/1000)
 ```
 
 ### Spatial Queries
-You can check 'What is here?' without setting up an observer.
+Perform instant checks without using the Observer/Group pattern.
 
 ```lua
 -- Get all zones at a specific vector
@@ -164,8 +168,15 @@ local zones = QuickZone:getZonesAtPoint(Vector3.new(10, 5, 0))
 local group = QuickZone:getGroupOfEntity(workspace.Part)
 ```
 
+### Debugging
+Enable the visualizer to see zone boundaries and whether they are used or not.
+
+```lua
+QuickZone:visualize(true)
+```
+
 ## Considerations
 
-- **Point-Based Tracking:** QuickZone tracks **points** (the center of a Part, the Attachment's position, etc.), not the volume of the part itself per default.
-- **Attachments:** For precise hitboxes (e.g., a sword tip entering a shield zone), use `Attachment` instances.
-- **Eventual Consistency:** Because of the frame budget, an entity entering a zone might be detected a few frames later if thousands of calculations are queued. This ensures minimal negative impact on FPS but means detection is not strictly instantaneous.
+- **Point-Based Tracking:** QuickZone tracks points (the center of a Part, the Attachment's position, etc.), not the volume of the part itself.
+- **Attachments:** If you need to track a specific part of a character, add an `Attachment` to that part and track the Attachment.
+- **Scheduling:** To maintain high FPS, QuickZone uses `workload smearing` and a frame budget. As a consequence, an entity entering a zone might be detected a few frames later if thousands of calculations are queued.
