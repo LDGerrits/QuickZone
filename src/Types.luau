@@ -65,7 +65,7 @@ export type QuickZone = {
 		precision: number?,
 		safety: boolean?,
 	}?) -> Group,
-	setFrameBudget: (self: QuickZone, n: number) -> QuickZone,
+	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
 	getGroupOfEntity: (self: QuickZone, entity: Entity) -> Group?,

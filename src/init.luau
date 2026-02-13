@@ -350,21 +350,26 @@ function QuickZone.LocalPlayerGroup(config: {
 end
 
 --[=[ 
-	Sets the global time budget (in milliseconds) for the Scheduler per frame.
-	Defaults to 1ms. Use this to prevent frame drops in heavy games.
+	Sets the global execution budget for the Scheduler per frame.
+	
+	The Scheduler will 'dispatch' entity updates until this threshold is reached, 
+	at which point it yields until the next frame to prevent render stutter.
+	
+	Defaults to 1ms.
 
 	```lua
-	-- Allow QuickZone to use up to 5ms of frame time
-	QuickZone:setFrameBudget(5)
+	-- Allow QuickZone to use up to 0.5ms of frame time
+	QuickZone:setFrameBudget(0.5)
 	```
 
 	@method setFrameBudget
 	@within QuickZone
-	@param n number -- Time in milliseconds.
+	@param ms number -- Time in milliseconds
 	@return QuickZone
 ]=]
-function QuickZone:setFrameBudget(n: number): QuickZone
-	Scheduler.setFrameBudget(n)
+function QuickZone:setFrameBudget(ms: number): QuickZone
+	local s = ms / 1000
+	Scheduler.setFrameBudget(s)
 	return QuickZone
 end
 
