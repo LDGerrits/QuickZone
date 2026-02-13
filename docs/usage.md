@@ -4,7 +4,9 @@ sidebar_position: 2
 
 # Usage
 
-QuickZone is designed around a three-tier architecture: Zones (the space), Groups (the entities), and Observers (the logic bridge).
+QuickZone is designed around a three-tier architecture: Zones (where), Groups (who), and Observers (the logic bridge).
+
+![Priority](topology_quickzone.png)
 
 ## Zones
 
@@ -167,7 +169,7 @@ To maintain a high framerate in complex scenes, you can constrain the total CPU 
 
 ```lua
 -- Allow 0.5 milliseconds per frame (default is 1ms)
-QuickZone:setFrameBudget(0.5/1000)
+QuickZone:setFrameBudget(0.5)
 ```
 
 ### Immediate Spatial Queries

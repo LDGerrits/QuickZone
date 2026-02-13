@@ -18,17 +18,19 @@ Traditional libraries are Zone-Centric. They iterate through every Zone instance
 
 QuickZone, on the other hand, is Entity-Centric. It keeps a list of entities and queries them against an LBVH (*O(N log Z)*). 
 
-- **The Benefit**: This means that you can have hundreds, even thousands, of zones with very low runtime cost. The cost effectively becomes a factor of the number of entities that are being tracked.
+- **The Benefit**: This means that you can have hundreds, even thousands, of zones with very low runtime cost. The cost effectively becomes a factor of the number of entities that are being processed.
 
 ### 2. Data-Oriented Design (DOD)
-Built on DOD principles, QuickZone focuses on how data is laid out in memory.
+QuickZone focuses on how data is laid out in memory based on DOD principles.
 
 - **Contiguous Arrays**: Unlike standard OOP where data is scattered across the heap in different objects, QuickZone stores entity data in pre-allocated, contiguous arrays to improve CPU cache locality.
 
 - **Stable Memory**: By using flat arrays and object pooling, QuickZone generates almost no garbage during runtime. This prevents lag spikes caused by the GC.
 
 ### 3. Architecture
-QuickZone separates what is being tracked from where it is being tracked through a decoupled topology.
+QuickZone moves away from monolithic, instance-bound logic in favor of a Group-Observer-Zone topology. This architecture separates what is being tracked from where the tracking occurs and how the system should respond.
+
+![Priority](topology_quickzone.png)
 
 #### Groups
 A Group is a collection of entities that share performance characteristics and logical categorization. Performance can be configured per Group.
@@ -38,12 +40,6 @@ A Group is a collection of entities that share performance characteristics and l
 local cameraGroup = QuickZone.Group({
     updateRate = 60,
     precision = 0,
-})
-
--- High frequency (30Hz), high precision.
-local playerGroup = QuickZone.PlayerGroup({
-    updateRate = 30,
-    precision = 0.5,
 })
 
 -- Low frequency (2Hz), low precision.
@@ -89,12 +85,12 @@ The scheduler smears updates across frames. This means that, if you have a Group
 #### No starvation
 The Scheduler uses a Round-Robin strategy for Group processing. Instead of processing groups in order, QuickZone cycles through them fairly. This prevents the issue where a heavy group keeps consuming the entire frame budget and 'starving' the subsequent groups.
 
-### 5. Dual-Tree & Batched Rebuilding
+### 5. Dual-LBVH and Batched Rebuilding
 To maintain high performance, QuickZone maintains two LBVHs:
 
-- **The Static Tree**: Contains all non-moving, non-resizing zones.
+- **The Static LBVH**: Contains all non-moving, non-resizing zones.
 
-- **The Dynamic Tree**: Contains zones attached to moving parts (e.g., vehicles, platforms).
+- **The Dynamic LBVH**: Contains zones attached to moving parts (e.g., vehicles, platforms).
 
 #### Optimization via Batching
 Rebuilding an LBVH is computationally expensive. QuickZone optimizes this by batching updates per frame: if multiple zones are added, removed, or moved in a single frame, QuickZone will only perform a single rebuild at the start of the Scheduler step.
@@ -125,7 +121,7 @@ In a stress test with 2,000 moving entities and 100 zones recorded over 30 secon
 
 | Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
 | --- | --- | --- | --- | --- | --- |
-| FPS | 42.37 | 37.23 | 29.88 | 41.31 | 42.73 |
+| FPS | 42.37 | 29.88 | 37.23 | 41.31 | 42.73 |
 | Events/s | 2271 | 2482 | 2518 | 566 | 0 |
 | Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
