@@ -118,7 +118,6 @@ end
 
 --[=[
 	QuickZone is a high-performance spatial partitioning library for Roblox. 
-	It allows for efficient zone detection of entities using a Linear BVH (Bounding Volume Hierarchy).
 
 	@class QuickZone
 ]=]

@@ -4,7 +4,7 @@
 	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
 	@within QuickZone
 
-	Represents the geometric volume of a Zone.
+	The geometric shape of a Zone.
 ]=]
 export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge'
 
@@ -13,11 +13,7 @@ export type BoundingVolume = {
 	cframe: CFrame,
 	halfSize: Vector3,
 	type: ShapeType,
-
-	-- Sphere / cylinder specific
 	radiusSq: number?,
-
-	-- Cylinder specific
 	start: Vector3?,
 	axis: Vector3?,
 	axisLength: number?,
@@ -37,9 +33,9 @@ export type Node = {
 	.cframe CFrame -- The center position and orientation.
 	.size Vector3 -- The full dimensions of the zone.
 	.shape ShapeType -- The geometric shape ('Block', 'Ball', 'Cylinder', etc).
-	.part BasePart? -- (Optional) A part to sync the zone with.
-	.isDynamic boolean? -- (Optional) Set to true if the zone moves/resizes.
-	.metadata any? -- (Optional) Metadata.
+	.part BasePart? -- Optional part to sync the zone with.
+	.isDynamic boolean? -- Optionally set to true if the zone moves/resizes (i.e. not static).
+	.metadata any? -- Optional metadata.
 ]=]
 export type ZoneConfig = {
 	cframe: CFrame,
@@ -51,7 +47,6 @@ export type ZoneConfig = {
 }
 
 export type QuickZone = {
-	-- Factories
 	Zone: (ZoneConfig) -> Zone,
 	ZoneFromPart: (part: BasePart, isDynamic: boolean?, metadata: any?) -> Zone,
 	Observer: (priority: number?) -> Observer,
@@ -70,11 +65,7 @@ export type QuickZone = {
 		precision: number?,
 		safety: boolean?,
 	}?) -> Group,
-
-	-- Global config
 	setFrameBudget: (self: QuickZone, n: number) -> QuickZone,
-
-	-- Getters
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
 	getGroupOfEntity: (self: QuickZone, entity: Entity) -> Group?,
@@ -82,32 +73,21 @@ export type QuickZone = {
 	getObservers: (self: QuickZone) -> { Observer },
 	getGroups: (self: QuickZone) -> { Group },
 	getEntities: (self: QuickZone) -> { Entity },
-
-	-- Helpers
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,
 }
 
 export type Zone = {
-	-- Lifecycle
 	destroy: (self: Zone) -> (),
-
-	-- State
 	attach: (self: Zone, ...Observer) -> Zone,
 	detach: (self: Zone, ...Observer) -> Zone,
 	update: (self: Zone, newCFrame: CFrame?, newSize: Vector3?) -> Zone,
-
-	-- Setters
 	setMetadata: (self: Zone, metadata: any?) -> Zone,
-
-	-- Getters
 	getMetadata: (self: Zone) -> any?,
 	getId: (self: Zone) -> number,
 	getPart: (self: Zone) -> BasePart?,
 	getShapeType: (self: Zone) -> ShapeType,
 	getObservers: (self: Zone) -> { Observer },
 	isDynamic: (self: Zone) -> boolean,
-
-	-- Utility
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
 }
 
@@ -121,32 +101,21 @@ export type InternalZone = Zone & {
 export type Callback = (Entity, Zone, any?) -> ()
 
 export type Observer = {
-	-- Lifecycle
 	destroy: (self: Observer) -> (),
-
-	-- Config
 	setPriority: (self: Observer, n: number) -> Observer,
-
-	-- State
 	subscribe: (self: Observer, ...Group) -> Observer,
 	unsubscribe: (self: Observer, ...Group) -> Observer,
 	setEnabled: (self: Observer, enabled: boolean) -> Observer,
-
-	-- Queries
 	isEnabled: (self: Observer) -> boolean,
 	isPlayerInside: (self: Observer, player: Player) -> boolean,
 	isLocalPlayerInside: (self: Observer) -> boolean,
 	isEntityInside: (self: Observer, entity: Entity) -> boolean,
 	isPointInside: (self: Observer, position: Vector3) -> boolean,
 	getEntitiesInside: (self: Observer) -> { Entity },
-
-	-- Getters
 	getId: (self: Observer) -> number,
 	getPriority: (self: Observer) -> number,
 	getZones: (self: Observer) -> { Zone },
 	getGroups: (self: Observer) -> { Group },
-
-	-- Events
 	onEntered: (self: Observer, callback: Callback) -> () -> (),
 	onExited: (self: Observer, callback: Callback) -> () -> (),
 	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
@@ -160,10 +129,7 @@ export type InternalObserver = Observer & {
 }
 
 export type Group = {
-	-- Lifecycle
 	destroy: (self: Group) -> (),
-
-	-- Config
 	setConfig: (
 		self: Group,
 		{
@@ -172,12 +138,8 @@ export type Group = {
 			safety: boolean?,
 		}
 	) -> Group,
-
-	-- State
 	add: (self: Group, entity: Entity, metadata: any?) -> Group,
 	remove: (self: Group, ...Entity) -> Group,
-
-	-- Getters
 	getId: (self: Group) -> number,
 	getEntities: (self: Group) -> { Entity },
 	getObservers: (self: Group) -> { Observer },
@@ -186,8 +148,6 @@ export type Group = {
 		precision: number,
 		safety: boolean,
 	},
-
-	-- Helpers
 	contains: (self: Group, entity: Entity) -> boolean,
 }
 
@@ -207,8 +167,8 @@ export type InternalGroup = Group & {
 	@type Entity BasePart | Model | Camera | Attachment | Bone | EntityTable
 	@within QuickZone
 
-	An Entity is any object that can be tracked within a Group. Supports native 
-	Roblox Instances and custom "duck-typed" tables.
+	An Entity is any object that can be tracked within a Group. It supports native 
+	Roblox Instances and custom duck-typed tables.
 ]=]
 export type Entity = BasePart | Model | Camera | Attachment | Bone | EntityTable
 

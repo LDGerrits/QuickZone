@@ -6,9 +6,9 @@ local Types = require(script.Parent.Parent.Types)
 
 --[=[ 
 	Zones define physical areas in world space. They can be static or dynamic 
-	and support various geometric shapes like Blocks, Balls, and Cylinders.
+	and support shapes like Blocks, Balls, and Cylinders.
 	
-	Zones themselves are 'passive'; they must be attached to an **Observer** before any entity detection occurs.
+	Zones themselves are 'passive', meaning they must be attached to an Observer before any detection occurs.
 
 	@class Zone
 ]=]
@@ -86,6 +86,7 @@ end
 
 --[=[ 
 	Detaches observers from this zone.
+
 	@method detach
 	@within Zone
 	@param ... Observer -- The observers to unlink.
@@ -178,6 +179,7 @@ end
 
 --[=[ 
 	Set the metadata of the zone.
+
 	@method setMetadata
 	@within Zone
 	@return number
@@ -189,6 +191,7 @@ end
 
 --[=[ 
 	Returns the metadata of the zone.
+	
 	@method getMetadata
 	@within Zone
 	@return number
@@ -199,16 +202,7 @@ end
 
 --[=[ 
 	Returns the unique internal ID of the zone.
-	@method getId
-	@within Zone
-	@return number
-]=]
-function Zone.getId(self: Types.InternalZone): number
-	return self.id
-end
 
---[=[ 
-	Returns the unique internal ID of the zone.
 	@method getId
 	@within Zone
 	@return number
@@ -219,6 +213,7 @@ end
 
 --[=[ 
 	Returns the BasePart associated with this zone, if any.
+
 	@method getPart
 	@within Zone
 	@return BasePart?
@@ -229,6 +224,7 @@ end
 
 --[=[ 
 	Returns the geometric shape type of the zone.
+
 	@method getShapeType
 	@within Zone
 	@return ShapeType
@@ -240,6 +236,7 @@ end
 
 --[=[ 
 	Returns a list of all Observers currently attached to this zone.
+	
 	@method getObservers
 	@within Zone
 	@return { Observer }
@@ -262,6 +259,7 @@ end
 
 --[=[ 
 	Checks if a point is inside this specific zone.
+
 	@method isPointInside
 	@within Zone
 	@param point Vector3
@@ -274,6 +272,7 @@ end
 
 --[=[ 
 	Returns whether the zone is currently registered as a dynamic object.
+	
 	@method isDynamic
 	@within Zone
 	@return boolean
@@ -283,7 +282,7 @@ function Zone.isDynamic(self: Types.InternalZone): boolean
 end
 
 --[=[ 
-	Cleans up the zone, removes it from the BVH tree, and detaches all observers.
+	Cleans up the zone, removes it from the LBVH tree, and detaches all observers.
 	
 	@tag Destructor
 	@method destroy

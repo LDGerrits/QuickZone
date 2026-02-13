@@ -14,7 +14,7 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 	Groups represent a collection of entities that should be tracked by the system.
 
 	:::info Observer
-	Every entity **must** be in a group to be observed.
+	Every entity must be in a group to be observed.
 	:::
 
 	@class Group
@@ -239,6 +239,7 @@ end
 
 --[=[ 
 	Checks if a specific entity is currently a member of this group.
+
 	@method contains
 	@within Group
 	@param entity Entity
@@ -250,7 +251,7 @@ function Group.contains(self: Types.InternalGroup, entity: Types.Entity): boolea
 end
 
 --[=[ 
-	Updates the group's configuration at runtime.
+	Updates the group's configuration. 
 
 	:::tip Precision
 	A higher `precision` value (e.g., 2.0) means entities must move further 
@@ -316,6 +317,7 @@ end
 
 --[=[ 
 	Returns the unique internal ID of this group.
+
 	@method getId
 	@within Group
 	@return number
@@ -326,6 +328,7 @@ end
 
 --[=[ 
 	Returns a list of all entities currently belonging to this group.
+
 	@method getEntities
 	@within Group
 	@return { Entity }

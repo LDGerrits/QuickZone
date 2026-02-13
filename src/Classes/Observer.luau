@@ -338,6 +338,7 @@ end
 
 --[=[ 
 	Checks if a specific entity is currently inside a zone attached to this observer.
+
 	@method isEntityInside
 	@within Observer
 	@param entity Entity
@@ -406,6 +407,7 @@ end
 
 --[=[ 
 	Returns the unique internal ID of the observer.
+
 	@method getId
 	@within Observer
 	@return number
@@ -416,6 +418,7 @@ end
 
 --[=[ 
 	Returns the current resolution priority.
+
 	@method getPriority
 	@within Observer
 	@return number
@@ -426,6 +429,7 @@ end
 
 --[=[ 
 	Returns a list of all tracked entities currently inside zones attached to this observer.
+
 	@method getEntitiesInside
 	@within Observer
 	@return { Entity }
@@ -444,6 +448,7 @@ end
 
 --[=[ 
 	Returns the list of Zones currently attached to this observer.
+
 	@method getZones
 	@within Observer
 	@return { Zone }
@@ -465,6 +470,7 @@ end
 
 --[=[ 
 	Returns the list of Groups currently monitored by this observer.
+	
 	@method getGroups
 	@within Observer
 	@return { Group }
