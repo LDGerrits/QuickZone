@@ -31,10 +31,29 @@ export type Node = {
 	id: number, -- -1 for internal nodes
 }
 
+--[=[ 
+	@interface ZoneConfig
+	@within QuickZone
+	.cframe CFrame -- The center position and orientation.
+	.size Vector3 -- The full dimensions of the zone.
+	.shape ShapeType -- The geometric shape ('Block', 'Ball', 'Cylinder', etc).
+	.part BasePart? -- (Optional) A part to sync the zone with.
+	.isDynamic boolean? -- (Optional) Set to true if the zone moves/resizes.
+	.metadata any? -- (Optional) Metadata.
+]=]
+export type ZoneConfig = {
+	cframe: CFrame,
+	size: Vector3,
+	shape: ShapeType,
+	part: BasePart?,
+	isDynamic: boolean?,
+	metadata: any?,
+}
+
 export type QuickZone = {
 	-- Factories
-	Zone: (cframe: CFrame, size: Vector3, shape: ShapeType, associatedPart: BasePart?, isDynamic: boolean?) -> Zone,
-	ZoneFromPart: (part: BasePart, isDynamic: boolean?) -> Zone,
+	Zone: (ZoneConfig) -> Zone,
+	ZoneFromPart: (part: BasePart, isDynamic: boolean?, metadata: any?) -> Zone,
 	Observer: (priority: number?) -> Observer,
 	Group: ({
 		updateRate: number?,
@@ -77,7 +96,11 @@ export type Zone = {
 	detach: (self: Zone, ...Observer) -> Zone,
 	update: (self: Zone, newCFrame: CFrame?, newSize: Vector3?) -> Zone,
 
+	-- Setters
+	setMetadata: (self: Zone, metadata: any?) -> Zone,
+
 	-- Getters
+	getMetadata: (self: Zone) -> any?,
 	getId: (self: Zone) -> number,
 	getPart: (self: Zone) -> BasePart?,
 	getShapeType: (self: Zone) -> ShapeType,
@@ -92,6 +115,7 @@ export type InternalZone = Zone & {
 	id: number,
 	part: BasePart?,
 	dynamic: boolean,
+	metadata: any?,
 }
 
 export type Callback = (Entity, Zone, any?) -> ()

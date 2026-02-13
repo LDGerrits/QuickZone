@@ -128,13 +128,12 @@ local QuickZone = {}
 	Creates a Zone object.
 
 	```lua
-	local zone = QuickZone.Zone(
-		CFrame.new(0, 10, 0), 
-		Vector3.new(10, 10, 10), 
-		'Block', 
-		nil, 
-		false -- Static
-	)
+	local zone = QuickZone.Zone({
+		cframe = CFrame.new(0, 10, 0),
+		size = Vector3.new(10, 10, 10),
+		shape = 'Block',
+		metadata = { Name = "Lobby" }
+	})
 	```
 
 	:::caution Performance
@@ -147,21 +146,18 @@ local QuickZone = {}
 	:::
 
 	@tag Constructor
-	@param cframe CFrame -- The center position and orientation of the zone.
-	@param size Vector3 -- The shape of the zone.
-	@param shape ShapeType -- The geometric shape ('Block', 'Ball', 'Cylinder', etc).
-	@param associatedPart BasePart? -- An optional part to associate with this zone.
-	@param isDynamic boolean? -- Whether the zone moves or changes size frequently.
+	@param config ZoneConfig
 	@return Zone
 ]=]
-function QuickZone.Zone(
+function QuickZone.Zone(config: {
 	cframe: CFrame,
 	size: Vector3,
 	shape: Types.ShapeType,
-	associatedPart: BasePart?,
-	isDynamic: boolean?
-): Zone
-	return Zone.new(cframe, size, shape, associatedPart, isDynamic)
+	part: BasePart?,
+	isDynamic: boolean?,
+	metadata: any?,
+}): Zone
+	return Zone.new(config.cframe, config.size, config.shape, config.part, config.isDynamic, config.metadata)
 end
 
 --[=[ 
@@ -173,7 +169,7 @@ end
 	@param isDynamic boolean? -- Whether the zone should follow the part every frame.
 	@return Zone
 ]=]
-function QuickZone.ZoneFromPart(part: BasePart, isDynamic: boolean?): Zone
+function QuickZone.ZoneFromPart(part: BasePart, isDynamic: boolean?, metadata: any?): Zone
 	local shape: Types.ShapeType = 'Block'
 	if (part :: any).Shape == Enum.PartType.Ball then
 		shape = 'Ball'
@@ -182,7 +178,7 @@ function QuickZone.ZoneFromPart(part: BasePart, isDynamic: boolean?): Zone
 	elseif part:IsA('WedgePart') then
 		shape = 'Wedge'
 	end
-	return Zone.new(part.CFrame, part.Size, shape, part, isDynamic)
+	return Zone.new(part.CFrame, part.Size, shape, part, isDynamic, metadata)
 end
 
 --[=[ 

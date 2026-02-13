@@ -20,7 +20,8 @@ function Zone.new(
 	size: Vector3,
 	shapeType: Types.ShapeType,
 	associatedPart: BasePart?,
-	isDynamic: boolean?
+	isDynamic: boolean?,
+	metadata: any?
 ): Types.Zone
 	local halfSize = size / 2
 	local shape: Types.BoundingVolume = {
@@ -52,7 +53,7 @@ function Zone.new(
 	end
 
 	local self: Types.InternalZone =
-		setmetatable({ id = id, part = associatedPart, dynamic = isDynamic or false }, Zone) :: any
+		setmetatable({ id = id, part = associatedPart, dynamic = isDynamic or false, metadata = metadata }, Zone) :: any
 	State.zoneIdToZoneObj[id] = self
 
 	return self
@@ -173,6 +174,37 @@ function Zone.update(self: Types.InternalZone, newCFrame: CFrame?, newSize: Vect
 	end
 
 	return self
+end
+
+--[=[ 
+	Set the metadata of the zone.
+	@method setMetadata
+	@within Zone
+	@return number
+]=]
+function Zone.setMetadata(self: Types.InternalZone, metadata: any?): Types.Zone
+	self.metadata = metadata
+	return self
+end
+
+--[=[ 
+	Returns the metadata of the zone.
+	@method getMetadata
+	@within Zone
+	@return number
+]=]
+function Zone.getMetadata(self: Types.InternalZone): any?
+	return self.metadata
+end
+
+--[=[ 
+	Returns the unique internal ID of the zone.
+	@method getId
+	@within Zone
+	@return number
+]=]
+function Zone.getId(self: Types.InternalZone): number
+	return self.id
 end
 
 --[=[ 
