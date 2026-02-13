@@ -18,20 +18,21 @@ local staticZone = QuickZone.ZoneFromPart(workspace.SafeZone)
 
 -- Dynamic Zone
 -- Passing 'true' makes the zone follow the part's CFrame on :update()
-local trainZone = QuickZone.ZoneFromPart(workspace.TrainCarriage, true)
+local trainZone = QuickZone.ZoneFromPart(workspace.TrainCarriage, true, { canDamage = true })
 ```
+
+_Note: The third argument (`metadata`) is optional and can be retrieved using `zone:getMetadata()`_
 
 ### Manual Creation
 Useful for procedural generation or areas without physical parts.
 
 ```lua
-local zone = QuickZone.Zone(
-    CFrame.new(0, 10, 0),       -- Position and rotation
-    Vector3.new(20, 20, 20),    -- Size
-    'Block',                    -- Shape: 'Block', 'Ball', 'Cylinder', or 'Wedge'
-    nil,                        -- No associated part
-    false                       -- Static (false) or dynamic (true)
-)
+local zone = QuickZone.Zone({
+    cframe = CFrame.new(0, 10, 0),
+    size = Vector3.new(10, 10, 10),
+    shape = 'Block',
+    metadata = { Name = "Lobby" }
+})
 ```
 
 ### Updating Zones
@@ -116,14 +117,20 @@ Events are defined on the Observer, not the Zone or Group. Events return a clean
 
 ```lua
 -- Fires when an entity enters a zone for this observer
-local disconnect = observer:onEntered(function(entity, zone, metadata)
-    print(entity.Name .. " entered " .. zone:getId())
+local enteredConn = observer:onEntered(function(entity, zone, metadata)
+    print(entity.Name .. " entered " .. zone:getId() ... " with " ... tostring(zone:getMetadata()))
+end)
+
+-- Fires when an entity enters a zone for this observer
+local exitedConn = observer:onExited(function(entity, zone, metadata)
+    print(entity.Name .. " exited " .. zone:getId() ... " with " ... tostring(zone:getMetadata()))
 end)
 
 -- Convenience Player wrappers
 observer:onPlayerEntered(function(player, zone) ... end)
-observer:onLocalPlayerEntered(function(zone) ... end)
 observer:onPlayerExited(function(player, zone) ... end)
+observer:onLocalPlayerEntered(function(zone) ... end)
+observer:onLocalPlayerExited(function(zone) ... end)
 ```
 
 ### Priority & Resolution
@@ -135,7 +142,7 @@ local highPriority = QuickZone.Observer(10)
 
 -- If a player is inside Zone A (Low) and Zone B (High) simultaneously:
 -- 1. highPriority:onEntered() fires for Zone B.
--- 2. lowPriority:onEntered() fires for Zone A.
+-- 2. lowPriority:onExited() fires for Zone A.
 ```
 
 ### Handling State
