@@ -1,20 +1,25 @@
-# QuickZone
+<div align="center">
+	<h1>QuickZone</h1>
+	<p>A lightweight spatial library for Roblox that replaces expensive physics queries with fast, math-based entity tracking at scale.</p>
+	<a href="(https://LDGerrits.github.io/QuickZone/"><strong>View docs</strong></a>
+</div>
+<!--moonwave-hide-before-this-line-->
 
-A high-performance, low-footprint, spatial query engine for Roblox
 
-## Installation
+## Why use QuickZone?
 
-### Wally
+Traditional zone libraries like ZonePlus and SimpleZone act as wrappers for Roblox's internal physics queries. Such libraries may use basic Bounding Volume Hierarchy (BVHs), but, ultimately, rely on the physics engine (e.g., `GetBoundsInBox`, `GetPartsInPart` or `.Touched`), resulting in expensive collision geometry calculations and synchronization overhead.
 
-Add `ldgerrits/quickzone` to dependencies list:
-```toml
-[package]
-name = "ldgerrits/quickzone"
-version = "0.2.2"
-registry = "https://github.com/UpliftGames/wally-index"
-realm = "shared"
+QuickZone bypasses the physics engine in favor of geometric math. Quickzone offers the following:
 
-[dependencies]
-Observers = "ldgerrits/quickzone@^0.2.2"
-```
+- **Fast Spatial Queries**: Process thousands of spatial queries per second with negligible FPS impact.
 
+- **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even pure Lua tables. If it has a position, QuickZone can track it.
+
+- **Shape Support**: Supports mathematical containment for Blocks, Balls, Cylinders, and Wedges without relying on physics collision meshes.
+
+- **Decoupled Architecture**: Separate game logic from spatial instances. Bind behaviors to categories of entities (Players, NPCs, Projectiles) for a clean, scalable architecture.
+
+- **Budgeted Scheduler**: Remove lag spikes by setting a hard frame budget (e.g., 1ms). Workload is smeared across frames to maintain a flat and predictable performance profile.
+
+- **Zero-Allocation Runtime**: By using contiguous arrays and object pooling, thereby minimizing GC pressure, QuickZone avoids memory-related stutters.
