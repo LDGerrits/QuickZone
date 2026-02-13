@@ -5,9 +5,9 @@ sidebar_position: 1
 # Introduction
 
 ## Overview
-QuickZone is a high-performance, spatial partitioning library for Roblox. 
+A lightweight spatial library for Roblox that replaces expensive physics queries with fast, math-based entity tracking at scale.
 
-QuickZone makes it possible to track thousands of entities across hundreds of zones with almost no impact on your frame rate. It bypasses Roblox's physics engine in favor of geometric math while providing a predictable, budgeted, and flexible solution for zone detection.
+QuickZone makes it possible to track thousands of entities across hundreds of zones with very little impact on your frame rate. It bypasses Roblox's physics engine in favor of geometric math while providing a predictable, budgeted, and flexible solution for zone detection.
 
 :::info Point-Based Detection
 QuickZone uses point-based detection. It checks if a specific point (e.g., the center of a Part, the position of an Attachment, or the Pivot of a Model) is inside a zone's boundary.
@@ -23,20 +23,20 @@ Because it calculates if it is inside or not using geometric math instead of phy
 
 - **Shape Support**: Supports mathematical containment for Blocks, Balls, Cylinders, and Wedges without relying on physics collision meshes.
 
-- **Decoupled Logic**: Decouple game logic from spatial instances. Bind behaviors to categories of entities (Players, NPCs, Projectiles) for a clean, scalable architecture.
+- **Decoupled Architecture**: Separate game logic from spatial instances. Bind behaviors to categories of entities (Players, NPCs, Projectiles) for a clean, scalable architecture.
 
-- **Budgeted Scheduler**: Remove lag spikes by setting a hard frame budget (e.g., 1ms). Workload is smeared across frames to ensure a flat, predictable performance profile.
+- **Budgeted Scheduler**: Remove lag spikes by setting a hard frame budget (e.g., 1ms). Workload is smeared across frames to maintain a flat and predictable performance profile.
 
-- **Zero-Allocation Runtime**: Engineered with Data-Oriented Design to minimize GC pressure. By using contiguous arrays and object pooling, QuickZone avoids memory-related stutters.
+- **Zero-Allocation Runtime**: By using contiguous arrays and object pooling, QuickZone reduces GC pressure, avoiding memory-related stutters.
 
 
 ## Benchmarks
 
-In a scenario with 2,000 moving entities and 100 zones recorded over 30-seconds, the obtained benchmarks were as follows:
+The following benchmarks were recorded over 30 seconds with 2,000 moving entities and 100 zones.
 
 | Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
 | --- | --- | --- | --- | --- | --- |
-| FPS | 42.37 | 37.23 | 29.88 | 41.31 | 42.73 |
+| FPS | 42.37 | 29.88 | 37.23 | 41.31 | 42.73 |
 | Events/s | 2271 | 2482 | 2518 | 566 | 0 |
 | Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
@@ -53,7 +53,7 @@ ldgerrits/quickzone@^0.2.2
 Download the latest .rbxm model file from the [Releases](https://github.com/LDGerrits/QuickZone/releases) tab and drag it into ReplicatedStorage.
 
 ## Quick Start
-Here is a complete example of setting up a 'Water Zone' that enables swimming logic for the LocalPlayer.
+The following example demonstrates a 'Water Zone' system. It uses an Observer to apply swimming logic to the LocalPlayerGroup only when they are inside a specific area.
 ```lua
 local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
@@ -62,14 +62,12 @@ local QuickZone = require(ReplicatedStorage.QuickZone)
 -- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
 local myPlayer = QuickZone.LocalPlayerGroup()
 
--- Create an Observer that holds the behavior with a priority of 42.
--- If this player is inside multiple zones, the higher priority observer will 'win'.
+-- Create an observer with a priority of 42. If zones overlap, higher priority observers resolve first.
 local swimObserver = QuickZone.Observer(42)
 swimObserver:subscribe(myPlayer)
 
--- Connect the events (Note: Events return cleanup functions)
+-- Define behavior
 swimObserver:onLocalPlayerEntered(function(zone)
-    print('LocalPlayer entered water!')
     local char = Players.LocalPlayer.Character
     if char then
         char.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
@@ -78,16 +76,13 @@ swimObserver:onLocalPlayerEntered(function(zone)
 end)
 
 swimObserver:onLocalPlayerExited(function(zone)
-    print('LocalPlayer left water.')
     local char = Players.LocalPlayer.Character
     if char then
         char.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
     end
 end)
 
--- Create a static zone from a Part in workspace
+-- Create zones and attach them to the observer to let the observer 'see'
 local poolZone = QuickZone.ZoneFromPart(workspace.PoolWater)
-
--- Attach the logic (Observer) to the location (Zone)
 poolZone:attach(swimObserver)
 ```

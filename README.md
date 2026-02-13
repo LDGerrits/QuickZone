@@ -22,5 +22,5 @@ QuickZone bypasses the physics engine in favor of geometric math. Quickzone offe
 
 - **Budgeted Scheduler**: Remove lag spikes by setting a hard frame budget (e.g., 1ms). Workload is smeared across frames to maintain a flat and predictable performance profile.
 
-- **Zero-Allocation Runtime**: By using contiguous arrays and object pooling, thereby minimizing GC pressure, QuickZone avoids memory-related stutters.
+- **Zero-Allocation Runtime**: By using contiguous arrays and object pooling, QuickZone reduces GC pressure, avoiding memory-related stutters.
 

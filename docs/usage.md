@@ -4,6 +4,8 @@ sidebar_position: 2
 
 # Usage
 
+QuickZone is designed around a three-tier architecture: Zones (the space), Groups (the entities), and Observers (the logic bridge).
+
 ## Zones
 
 Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
@@ -31,9 +33,14 @@ local zone = QuickZone.Zone({
     cframe = CFrame.new(0, 10, 0),
     size = Vector3.new(10, 10, 10),
     shape = 'Block',
+    isDynamic = true,
     metadata = { Name = "Lobby" }
 })
 ```
+
+:::info Performance Optimization: Static vs. Dynamic
+QuickZone batches tree rebuilds once per frame. By keeping the Dynamic Tree small, you make sure that these batched rebuilds remain super quick. For maximum perfomance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
+:::
 
 ### Updating Zones
 If you create a zone manually or want to sync a dynamic zone to a new reference, use `:update()`.
@@ -47,11 +54,10 @@ dynamicZone:update()
 ```
 
 ## Groups
-
-Groups are collections of entities (Parts, Models, Players, etc.) that you want to track. They allow you to categorize entities and set unique performance costs for each category.
+Groups are collections of entities (Parts, Models, Players, etc.). They allow you to categorize entities and set unique performance settings per category.
 
 ### Specialized Groups
-QuickZone provides specialized groups that automatically handle player joining, leaving, and respawning.
+QuickZone provides built-in abstractions that automatically handle player lifecyles.
 
 ```lua
 -- Tracks all players in the server
@@ -71,14 +77,14 @@ local projectiles = QuickZone.Group({
     safety = false     -- Fire callbacks immediately (faster but risky if you yield)
 })
 
-local idleNPCs = QuickZone.Group({
+local NPCs = QuickZone.Group({
     updateRate = 5,    -- Check only 5 times a second
     precision = 2.0    -- Only query if the NPC moves more than 2 studs
 })
 ```
 
-### Adding Entities
-You can add BaseParts, Models, Attachments, Bones, or even tables with a Position.
+### Managing Entities
+You can add BaseParts, Models, Attachments, Bones, or tables with a Position.
 
 ```lua
 -- Add a Model (tracks the PrimaryPart or Pivot)
@@ -100,7 +106,7 @@ _Note: The second argument (`metadata`) is optional and will be passed to your e
 
 ## Observers
 
-Observers are the 'brain' of QuickZone. They connect Groups to Zones.
+Observers act as the logic layer. They subscribe to Groups and attach to Zones to bridge spatial data with game behavior.
 
 ### Setup
 An Observer listens to its subscribed Groups and checks if they overlap with its attached Zones.
@@ -113,7 +119,7 @@ healingZone:attach(observer)   -- Where to watch
 ```
 
 ### Events
-Events are defined on the Observer, not the Zone or Group. Events return a cleanup function. Calling this function is equivalent to 'disconnecting' the listener.
+Events are defined on the Observer, not the Zone or Group. Events return a cleanup function.
 
 ```lua
 -- Fires when an entity enters a zone for this observer
@@ -133,7 +139,7 @@ observer:onLocalPlayerEntered(function(zone) ... end)
 observer:onLocalPlayerExited(function(zone) ... end)
 ```
 
-### Priority & Resolution
+### Priority and Resolution
 Observers use a priority system to handle overlapping zones. An entity 'belongs' to only one zone state per observer at a time when using priorities.
 
 ```lua
@@ -145,8 +151,8 @@ local highPriority = QuickZone.Observer(10)
 -- 2. lowPriority:onExited() fires for Zone A.
 ```
 
-### Handling State
-You can toggle an observer's activity state. This is useful for disabling triggers during cutscenes or rounds.
+### Observer State
+Observers can be toggled to pause logic without destroying the configuration.
 
 ```lua
 observer:setEnabled(false) -- Fires 'onExited' for everyone inside
@@ -157,14 +163,14 @@ observer:setEnabled(true)  -- Fires 'onEntered' if they are still there
 ## Utility
 
 ### Frame Budget
-QuickZone uses a scheduler to prevent lag. You can adjust how much time (in seconds) it is allowed to use per frame.
+To maintain a high framerate in complex scenes, you can constrain the total CPU time QuickZone is allowed to consume per frame.
 
 ```lua
 -- Allow 0.5 milliseconds per frame (default is 1ms)
 QuickZone:setFrameBudget(0.5/1000)
 ```
 
-### Spatial Queries
+### Immediate Spatial Queries
 Perform instant checks without using the Observer/Group pattern.
 
 ```lua
@@ -176,14 +182,15 @@ local group = QuickZone:getGroupOfEntity(workspace.Part)
 ```
 
 ### Debugging
-Enable the visualizer to see zone boundaries and whether they are used or not.
+Renders zones in the workspace to verify the setup.
 
 ```lua
 QuickZone:visualize(true)
 ```
 
 ## Considerations
+- **Point-Based Tracking:** QuickZone tracks the precise coordinate of an entity (Center, Attachment, or Pivot). It does not calculate the full volume intersection of the entity itself.
 
-- **Point-Based Tracking:** QuickZone tracks points (the center of a Part, the Attachment's position, etc.), not the volume of the part itself.
-- **Attachments:** If you need to track a specific part of a character, add an `Attachment` to that part and track the Attachment.
-- **Scheduling:** To maintain high FPS, QuickZone uses frame budget and smears workload across frames. As a consequence, an entity entering a zone might be detected a few frames later if thousands of calculations are queued.
+- **Movement Threshold (Precision)**: QuickZone only re-calculates spatial state when an entity moves beyond a certain distance. Setting a higher precision value (e.g., 2.0 studs) significantly reduces overhead for slow-moving objects.
+
+- **Budgeted Latency**: To prevent frame drops, QuickZone 'smears' workload across multiple frames. In high-load scenarios (e.g., thousands of active entities), there may be a slight delay between an entity physically entering a zone and the event firing.
