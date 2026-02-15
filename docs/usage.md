@@ -8,6 +8,8 @@ QuickZone is designed around a three-tier architecture: Zones (where), Groups (w
 
 ![Priority](topology_quickzone.png)
 
+---
+
 ## Zones
 
 Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
@@ -54,6 +56,8 @@ zone:update(CFrame.new(0, 50, 0), Vector3.new(10, 10, 10))
 -- Sync a dynamic zone to its associated part
 dynamicZone:update()
 ```
+
+---
 
 ## Groups
 Groups are collections of entities (Parts, Models, Players, etc.). They allow you to categorize entities and set unique performance settings per category.
@@ -105,6 +109,8 @@ enemies:remove(npcModel)
 ```
 
 _Note: The second argument (`metadata`) is optional and will be passed to your event callbacks._
+
+---
 
 ## Observers
 
@@ -197,6 +203,8 @@ task.wait(5)
 observer:setEnabled(true)  -- Fires 'onEntered' if they are still there
 ```
 
+---
+
 ## Utility
 
 ### Frame Budget
@@ -224,6 +232,8 @@ Renders zones in the workspace to verify the setup.
 ```lua
 QuickZone:visualize(true)
 ```
+
+---
 
 ## Considerations
 - **Point-Based Tracking:** QuickZone tracks the precise coordinate of an entity (Center, Attachment, or Pivot). It does not calculate the full volume intersection of the entity itself.

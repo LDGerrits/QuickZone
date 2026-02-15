@@ -3,9 +3,12 @@ sidebar_position: 3
 ---
 
 # Why use QuickZone?
+
 Traditional zone libraries like ZonePlus and SimpleZone act as wrappers for Roblox's physics engine (e.g., `GetBoundsInBox`, `GetPartsInPart` or `.Touched`), resulting in expensive collision geometry calculations and synchronization overhead.
 
 QuickZone bypasses the physics engine in favor of geometric math and data-oriented design. It implements a Linear BVH (LBVH) that resolves spatial queries using math compiled to machine code to prevent interpreter overhead.
+
+---
 
 ### 1. The Entity-Centric Model
 
@@ -17,12 +20,16 @@ QuickZone, on the other hand, is Entity-Centric. It keeps a list of entities and
 
 - **The Benefit**: This means that you can have hundreds, even thousands, of zones with very low runtime cost. The cost effectively becomes a factor of the number of entities that are being processed.
 
+---
+
 ### 2. Data-Oriented Design (DOD)
 QuickZone focuses on how data is laid out in memory based on DOD principles.
 
 - **Contiguous Arrays**: Unlike standard OOP where data is scattered across the heap in different objects, QuickZone stores entity data in pre-allocated, contiguous arrays to improve CPU cache locality.
 
 - **Stable Memory**: By using flat arrays and object pooling, QuickZone generates almost no garbage during runtime. This prevents lag spikes caused by the GC.
+
+---
 
 ### 3. Architecture
 QuickZone moves away from monolithic, instance-bound logic in favor of a Group-Observer-Zone topology. This architecture separates what is being tracked from where the tracking occurs and how the system should respond.
@@ -70,6 +77,8 @@ for _, part in workspace.SafeZones:GetChildren() do
 end
 ```
 
+---
+
 ### 4. The Budgeted Scheduler
 A common issue with spatial libraries is stutter due to it processing too many things in one frame. QuickZone fixes this via its smart Scheduler.
 
@@ -81,6 +90,9 @@ The scheduler smears updates across frames. This means that, if you have a Group
 
 #### No starvation
 The Scheduler uses a Round-Robin strategy for Group processing. Instead of processing groups in order, QuickZone cycles through them fairly. This prevents the issue where a heavy group keeps consuming the entire frame budget and 'starving' the subsequent groups.
+
+---
+
 
 ### 5. Dual-LBVH and Batched Rebuilding
 To maintain high performance, QuickZone maintains two LBVHs:
@@ -98,6 +110,8 @@ By separating static and dynamic zones, QuickZone minimizes the workload of the 
 Rebuilding the LBVHs is part of the frame budget. Thus, rebuilding will result in less time for processing the groups of entities.
 :::
 
+---
+
 ### 6. Flexibility
 Because QuickZone relies on pure math rather than the Physics engine, it is not limited to BaseParts. It also supports duck typing for entities.
 
@@ -113,8 +127,33 @@ Because QuickZone relies on pure math rather than the Physics engine, it is not 
 
 This allows you to track real-time simulations (e.g. a spell cast or an RC car) without the overhead of creating physical Instances.
 
+---
+
 ### 7. Performance Benchmarks
-In a stress test with 2,000 moving entities and 100 zones recorded over 30 seconds, QuickZone leads the pack:
+
+We stress-tested QuickZone against the most popular alternatives in two distinct scenarios: **Entity Stress** (lots of moving parts) and **Map Stress** (lots of zones).
+
+_Note: For the QuickZone benchmark, we used a frame budget of 1ms, the entities' update rate was set to 60Hz, and precision was 0.0._
+
+### Test 1: High Zone Count
+*Scenario: 500 moving entities, 10,000 zones, recorded over 30 seconds.*
+
+This test highlights the fundamental flaw in traditional Zone-Centric libraries. As map complexity grows, their performance degrades exponentially.
+
+| Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
+| --- | --- | --- | --- | --- | --- |
+| FPS | 59.25 | 3.84 | 5.53 | 58.95 | 59.28 |
+| Events/s | 643 | 627 | 519 | 328 | 0 |
+| Memory Usage (MB) | 18.57 | 4230 | 99.79 | 17.62 | 0.65 |
+
+**The Result:** QuickZone maintained a perfect 60 FPS.
+* ZonePlus and SimpleZone imploded, dropping to 3-5 FPS, making the game unplayable.
+* ZonePlus consumed over 4 GB of memory, which would crash most mobile devices instantly.
+* QuickZone proved it is *O(N)* relative to entities, not zones. You can add as many zones as you want without performance penalties.
+* QuickZone vs. QuickBounds: Both libraries scaled well by maintaining ~60 FPS. However, QuickZone still maintained a slight FPS lead and, more importantly, delivered double the event throughput (643 vs 328) compared to QuickBounds.
+
+### Test 2: High Entity Count
+*Scenario: 2,000 moving entities, 100 zones, recorded over 30 seconds.*
 
 | Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
 | --- | --- | --- | --- | --- | --- |
@@ -122,10 +161,7 @@ In a stress test with 2,000 moving entities and 100 zones recorded over 30 secon
 | Events/s | 2271 | 2482 | 2518 | 566 | 0 |
 | Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
-_Note: For the QuickZone benchmark, we used a frame budget of 1ms, the entities' update rate was set to 60Hz, and the precision was 0.0._
-
-- **FPS Impact**: The benchmarks show that QuickZone's had very little negative impact on FPS (-1%) compared to the empty script baseline. In comparison, ZonePlus drops the game from ~43 to ~30 FPS (-28%) under the same load, while SimpleZone drops to ~37 FPS (-13%). 
-
-- **Memory Footprint**: QuickZone's memory footprint is ~98% smaller than ZonePlus and on par with SimpleZone and QuickBounds, while keeping GC pressure low.
-
-- **Event Throughput**: QuickZone handles a similar number of events compared to ZonePlus and SimpleZone. QuickZone's slight 10% decrease can be attributed to ZonePlus and SimpleZone being volume-based instead of point-based. Moreover, QuickZone handles 4x the event volume (2271 events/s) compared to QuickBounds (566 events/s).
+**The Result:** QuickZone is the only library that maintained near-baseline FPS (-1% impact).
+* ZonePlus caused a 28% drop in framerate, rendering the game choppy.
+* QuickZone handled the load with 98% less memory than ZonePlus.
+* QuickZone vs. QuickBounds: QuickZone squeezes out more performance, averaging ~1 FPS higher than QuickBounds. More importantly, QuickZone processed 4x the volume of events (2,271 vs 566).
