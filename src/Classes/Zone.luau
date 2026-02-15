@@ -223,11 +223,11 @@ function Zone.getPart(self: Types.InternalZone): BasePart?
 end
 
 --[=[
-    Returns the current position of the zone.
+	Returns the current position of the zone.
 
-    @method getPositioin
-    @within Zone
-    @return CFrame
+	@method getPositioin
+	@within Zone
+	@return CFrame
 ]=]
 function Zone.getPosition(self: Types.InternalZone): Vector3
 	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
@@ -235,11 +235,11 @@ function Zone.getPosition(self: Types.InternalZone): Vector3
 end
 
 --[=[
-    Returns the current CFrame of the zone.
+	Returns the current CFrame of the zone.
 
-    @method getCFrame
-    @within Zone
-    @return CFrame
+	@method getCFrame
+	@within Zone
+	@return CFrame
 ]=]
 function Zone.getCFrame(self: Types.InternalZone): CFrame
 	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
@@ -247,11 +247,11 @@ function Zone.getCFrame(self: Types.InternalZone): CFrame
 end
 
 --[=[
-    Returns the full size of the zone.
+	Returns the full size of the zone.
 
-    @method getSize
-    @within Zone
-    @return Vector3
+	@method getSize
+	@within Zone
+	@return Vector3
 ]=]
 function Zone.getSize(self: Types.InternalZone): Vector3
 	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
