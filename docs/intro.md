@@ -60,7 +60,7 @@ local QuickZone = require(ReplicatedStorage.QuickZone)
 -- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
 local myPlayer = QuickZone.LocalPlayerGroup()
 
--- Create an observer with a priority of 42. If zones overlap, higher priority observers resolve first.
+-- Create an observer with a priority of 42. If zones overlap of different observers, the higher priority one will completely take over.
 local swimObserver = QuickZone.Observer(42)
 swimObserver:subscribe(myPlayer)
 

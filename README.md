@@ -8,11 +8,11 @@
 
 ## Why use QuickZone?
 
-Traditional zone libraries like ZonePlus and SimpleZone act as wrappers for Roblox's physics engine (e.g., `GetBoundsInBox`, `GetPartsInPart` or `.Touched`), resulting in expensive collision geometry calculations and synchronization overhead. QuickZone bypasses the physics engine in favor of geometric math, data-oriented design and smart processing, making it performant even in complex scenes.
+Instead of using the physics engine, QuickZone performs geometric calculations. It provides a predictable, budgeted, and flexible solution for zone detection while using Linear Bounding Volume Hierarchy (LBVH) in the backend. QuickZone makes it possible to track thousands of entities across hundreds of zones with very little impact on your frame rate and memory.
 
 ## What it offers
 
-- **Fast Spatial Queries**: Process thousands of spatial queries per second with negligible FPS impact.
+- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore.
 
 - **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even pure Lua tables. If it has a position, QuickZone can track it.
 
