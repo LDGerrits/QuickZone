@@ -116,6 +116,62 @@ function Observer.unsubscribe(self: Types.InternalObserver, ...: Types.InternalG
 end
 
 --[=[ 
+    Observes entities entering and exiting the zone. 
+    The callback executes on entry and expects a function to be returned, 
+    which is executed on exit.
+
+    ```lua
+    observer:observe(function(entity, zone)
+        print("Entered", entity)
+        local highlight = Instance.new("Highlight", entity)
+
+        -- Return cleanup function
+        return function()
+            print("Exited", entity)
+            highlight:Destroy()
+        end
+    end)
+    ```
+
+    @method observe
+    @within Observer
+    @param callback (entity: Entity, zone: Zone, metadata: any?) -> () -> ()
+    @return () -> () -- Function to stop observing entirely
+]=]
+function Observer.observe(
+	self: Types.InternalObserver,
+	callback: (Types.Entity, Types.Zone, any?) -> () -> ()
+): () -> ()
+	local cleanups = {} :: { [Types.Entity]: () -> () }
+
+	local cleanupEnter = self:onEntered(function(entity, zone, metadata)
+		local cleanup = callback(entity, zone, metadata)
+
+		if typeof(cleanup) == 'function' then
+			cleanups[entity] = cleanup
+		end
+	end)
+
+	local cleanupExit = self:onExited(function(entity, _zone, _metadata)
+		local cleanup = cleanups[entity]
+		if cleanup then
+			cleanups[entity] = nil
+			cleanup()
+		end
+	end)
+
+	return function()
+		cleanupEnter()
+		cleanupExit()
+
+		for entity, cleanup in cleanups do
+			cleanups[entity] = nil
+			task.spawn(cleanup)
+		end
+	end
+end
+
+--[=[ 
 	Fires when any entity from a subscribed group enters a zone attached to this observer.
 
 	```lua
@@ -159,8 +215,69 @@ function Observer.onExited(self: Types.InternalObserver, callback): () -> ()
 	end
 end
 
+--[=[
+    Observes players entering and exiting the zone.
+    
+    ```lua
+    observer:observePlayer(function(player, zone)
+        print(player.Name .. " entered!")
+        
+        -- Return cleanup (optional)
+        return function()
+            print(player.Name .. " left!")
+        end
+    end)
+    ```
+
+    @method observePlayer
+    @within Observer
+    @param callback (player: Player, zone: Zone) -> (() -> ())?
+    @return () -> () -- Function to stop observing entirely.
+]=]
+function Observer.observePlayer(self: Types.InternalObserver, callback: (Player, Types.Zone) -> () -> ()): () -> ()
+	local cleanups = {} :: { [Player]: () -> () }
+
+	local cleanupEnter = self:onPlayerEntered(function(player, zone)
+		local cleanup = callback(player, zone)
+
+		if typeof(cleanup) == 'function' then
+			cleanups[player] = cleanup
+		end
+	end)
+
+	local cleanupExit = self:onPlayerExited(function(player, _zone)
+		local cleanup = cleanups[player]
+		if cleanup then
+			cleanups[player] = nil
+			cleanup()
+		end
+	end)
+
+	return function()
+		cleanupEnter()
+		cleanupExit()
+
+		for player, cleanup in cleanups do
+			cleanups[player] = nil
+			task.spawn(cleanup)
+		end
+	end
+end
+
 --[=[ 
 	Specialized event for Player entities.
+
+	```lua
+	observer:onPlayerEntered(function(player, zone)
+		print(player.Name .. " entered safe zone " .. zone:getId())
+		
+		-- Play a sound
+		local sound = workspace.Sounds.SafeZoneEnter:Clone()
+		sound.Parent = player.Character.PrimaryPart
+		sound:Play()
+		game.Debris:AddItem(sound, 2)
+	end)
+	```
 
 	@tag Event
 	@method onPlayerEntered
@@ -194,8 +311,70 @@ function Observer.onPlayerExited(self: Types.InternalObserver, callback: (Player
 	end)
 end
 
+--[=[
+    Observes the LocalPlayer.
+
+	```lua
+    observer:observeLocalPlayer(function(zone)
+        local blur = Instance.new("BlurEffect", game.Lighting)
+        return function()
+            blur:Destroy()
+        end
+    end)
+    ```
+
+    @client
+    @method observeLocalPlayer
+    @within Observer
+    @param callback (zone: Zone) -> (() -> ())?
+    @return () -> () -- Function to stop observing entirely.
+]=]
+function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Types.Zone) -> () -> ()): () -> ()
+	assert(IS_CLIENT, '[QuickZone] Observer:observeLocalPlayer can only be called on the Client.')
+
+	local cleanupFn = nil :: (() -> ())?
+
+	local cleanupEnter = self:onLocalPlayerEntered(function(zone)
+		local cleanup = callback(zone)
+
+		if typeof(cleanup) == 'function' then
+			cleanupFn = cleanup
+		end
+	end)
+
+	local cleanupExit = self:onPlayerExited(function(_zone)
+		if cleanupFn then
+			local fn = cleanupFn
+			cleanupFn = nil
+			fn()
+		end
+	end)
+
+	return function()
+		cleanupEnter()
+		cleanupExit()
+
+		if cleanupFn then
+			local fn = cleanupFn
+			cleanupFn = nil
+			task.spawn(fn)
+		end
+	end
+end
+
 --[=[ 
 	Specialized event for the LocalPlayer.
+
+	```lua
+    observer:onLocalPlayerEntered(function(zone)
+        print("You entered zone " .. zone:getId())
+        
+        local char = player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = 24
+        end
+    end)
+    ```
 
 	@client
 	@tag Event

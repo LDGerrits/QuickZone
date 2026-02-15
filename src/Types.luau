@@ -116,6 +116,9 @@ export type Observer = {
 	getPriority: (self: Observer) -> number,
 	getZones: (self: Observer) -> { Zone },
 	getGroups: (self: Observer) -> { Group },
+	observe: (self: Observer, callback: (Entity, Zone, any?) -> (() -> ())?) -> () -> (),
+	observePlayer: (self: Observer, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
+	observeLocalPlayer: (self: Observer, callback: (Zone) -> (() -> ())?) -> () -> (),
 	onEntered: (self: Observer, callback: Callback) -> () -> (),
 	onExited: (self: Observer, callback: Callback) -> () -> (),
 	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
@@ -130,14 +133,11 @@ export type InternalObserver = Observer & {
 
 export type Group = {
 	destroy: (self: Group) -> (),
-	setConfig: (
-		self: Group,
-		{
-			updateRate: number?,
-			precision: number?,
-			safety: boolean?,
-		}
-	) -> Group,
+	setConfig: (self: Group, {
+		updateRate: number?,
+		precision: number?,
+		safety: boolean?,
+	}) -> Group,
 	add: (self: Group, entity: Entity, metadata: any?) -> Group,
 	remove: (self: Group, ...Entity) -> Group,
 	getId: (self: Group) -> number,
