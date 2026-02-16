@@ -1,13 +1,12 @@
 --!strict
 
 --[=[
-	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
+	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge"
 	@within QuickZone
 
 	The geometric shape of a Zone.
 ]=]
-export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge'
-
+export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge'
 export type BoundingVolume = {
 	position: Vector3,
 	cframe: CFrame,

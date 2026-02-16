@@ -605,7 +605,7 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 			end
 			local observers = State.zoneAttachedObservers[zoneId]
 			if observers and table.find(observers, self.id) then
-				if Geometry.isPointInShape(position, State.dynamicShapes[zoneId]) then
+				if Geometry.isPointInZone(position, zoneId, true) then
 					isInside = true
 				end
 			end
@@ -623,7 +623,7 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 			end
 			local observers = State.zoneAttachedObservers[zoneId]
 			if observers and table.find(observers, self.id) then
-				if Geometry.isPointInShape(position, State.staticShapes[zoneId]) then
+				if Geometry.isPointInZone(position, zoneId, false) then
 					isInside = true
 				end
 			end

@@ -9,8 +9,9 @@ local State = require(script.Parent.Parent.State)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 
-local staticShapes = State.staticShapes
-local dynamicShapes = State.dynamicShapes
+local queryPoint = LinearBVH.queryPoint
+local isPointInZone = Geometry.isPointInZone
+
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerPriorityMap = State.observerPriorityMap
 local entityMetadata = State.entityMetadata
@@ -20,14 +21,15 @@ local observerExitedCallbacks = State.observerExitedCallbacks
 local observerEnabled = State.observerEnabled
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local groupList = State.groupList
+local groupToObservers = State.groupToObservers
 
 local ctx_pos: Vector3
-local ctx_groupId: number
 local ctx_cCount: number = 0
 local ctx_highestWin: number
 local ctx_candidatePriority: { [number]: number } = table.create(16)
 local ctx_candidateIndex: { [number]: number } = table.create(16)
 local ctx_candidateList: { [number]: number } = table.create(16)
+local ctx_linkedObservers: { [number]: boolean }
 
 local frameBudget = Config.Scheduler.frameBudget
 local nextGroupIndex = 1 -- Round-robin pointer
@@ -38,38 +40,26 @@ local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 
+local BUDGET_CHECK = 32
+
 local function processZoneHit(zoneId: number)
 	local observers = zoneAttachedObservers[zoneId]
 	if not observers then
 		return
 	end
 
-	local linkedObservers = State.groupToObservers[ctx_groupId]
-	if not linkedObservers then
-		return
-	end
-
-	local isRelevant = false
 	for _, observerId in observers do
-		if linkedObservers[observerId] and observerEnabled[observerId] ~= false then
-			if not ctx_candidatePriority[observerId] then
-				isRelevant = true
-				break
-			end
-		end
-	end
-
-	if not isRelevant then
-		return
-	end
-
-	for _, observerId in observers do
-		if linkedObservers[observerId] and observerEnabled[observerId] ~= false then
+		if
+			ctx_linkedObservers[observerId]
+			and observerEnabled[observerId] ~= false
+			and not ctx_candidatePriority[observerId]
+		then
 			local pri = observerPriorityMap[observerId] or 0
 			ctx_cCount += 1
 			ctx_candidateList[ctx_cCount] = observerId
 			ctx_candidateIndex[observerId] = zoneId
 			ctx_candidatePriority[observerId] = pri
+
 			if pri > ctx_highestWin then
 				ctx_highestWin = pri
 			end
@@ -78,13 +68,13 @@ local function processZoneHit(zoneId: number)
 end
 
 local function queryCallbackStatic(zoneId: number)
-	if Geometry.isPointInShape(ctx_pos, staticShapes[zoneId]) then
+	if isPointInZone(ctx_pos, zoneId, false) then
 		processZoneHit(zoneId)
 	end
 end
 
 local function queryCallbackDynamic(zoneId: number)
-	if Geometry.isPointInShape(ctx_pos, dynamicShapes[zoneId]) then
+	if isPointInZone(ctx_pos, zoneId, true) then
 		processZoneHit(zoneId)
 	end
 end
@@ -110,13 +100,13 @@ RunService.PostSimulation:Connect(function(dt: number)
 	local start = os.clock()
 
 	if State.pendingDynamicRebuild then
-		State.dynamicRootNode = LinearBVH.build(dynamicShapes)
+		State.dynamicRootNode = LinearBVH.build(State.dynamicCFrames, State.dynamicHalfSizes)
 		State.pendingDynamicRebuild = false
 		State.isDirty = true
 	end
 
 	if State.pendingStaticRebuild then
-		State.staticRootNode = LinearBVH.build(staticShapes)
+		State.staticRootNode = LinearBVH.build(State.staticCFrames, State.staticHalfSizes)
 		State.pendingStaticRebuild = false
 		State.isDirty = true
 	end
@@ -178,11 +168,18 @@ RunService.PostSimulation:Connect(function(dt: number)
 			idx = 1
 		end
 
-		ctx_groupId = group.id
+		ctx_linkedObservers = groupToObservers[group.id]
+		if not ctx_linkedObservers then
+			continue
+		end
+
+		local entityData = group.entityData
+
+		local budgetCheckCountdown = BUDGET_CHECK
 
 		while processed < workQuota do
 			local entity = list[idx]
-			local d = group.entityData[entity] :: Types.EntityData?
+			local d = entityData[entity] :: Types.EntityData?
 
 			-- Race condition guard
 			if not d then
@@ -228,11 +225,11 @@ RunService.PostSimulation:Connect(function(dt: number)
 				ctx_highestWin = -math.huge
 
 				if dynamicRoot then
-					LinearBVH.queryPoint(dynamicRoot, pos, queryCallbackDynamic)
+					queryPoint(dynamicRoot, pos, queryCallbackDynamic)
 				end
 
 				if staticRoot then
-					LinearBVH.queryPoint(staticRoot, pos, queryCallbackStatic)
+					queryPoint(staticRoot, pos, queryCallbackStatic)
 				end
 
 				local current = d.activeObserverMemberships
@@ -283,8 +280,12 @@ RunService.PostSimulation:Connect(function(dt: number)
 			processed += 1
 
 			-- Global budget check
-			if processed % 42 == 0 and (os.clock() - start) > frameBudget then
-				break
+			budgetCheckCountdown -= 1
+			if budgetCheckCountdown == 0 then
+				budgetCheckCountdown = BUDGET_CHECK
+				if (os.clock() - start) > frameBudget then
+					break
+				end
 			end
 		end
 

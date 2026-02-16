@@ -7,6 +7,10 @@ local Types = require(script.Parent.Parent.Types)
 local HUGE_VECTOR = Vector3.one * math.huge
 local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
+local unionBounds = Geometry.unionBounds
+local getObjectBounds = Geometry.getObjectBounds
+local positionToMortonCode = Geometry.positionToMortonCode
+
 type ListEntity = {
 	id: number,
 	mortonCode: number,
@@ -71,56 +75,69 @@ local function createSubTree(
 
 		local left = createSubTree(list, boundsMin, boundsMax, beginIndex, mid - 1)
 		local right = createSubTree(list, boundsMin, boundsMax, mid, endIndex)
-		local min, max = Geometry.unionBounds(left.min, left.max, right.min, right.max)
+		local min, max = unionBounds(left.min, left.max, right.min, right.max)
 
 		return { min = min, max = max, id = -1, left = left, right = right }
 	end
 end
 
-function LinearBVH.build(shapes: { Types.BoundingVolume }): Types.Node?
+function LinearBVH.build(cframes: { [number]: CFrame }, halfSizes: { [number]: Vector3 }): Types.Node?
 	table.clear(traversalStack)
 	table.clear(objMinCache)
 	table.clear(objMaxCache)
+	table.clear(listCache)
 
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
-	for _, shape in shapes do
-		local bMin, bMax = Geometry.getObjectBounds(shape)
+	local count = 0
+
+	-- Calculate bounds and update listCache
+	for id, cframe in cframes do
+		local halfSize = halfSizes[id]
+
+		local bMin, bMax = getObjectBounds(cframe, halfSize)
+
+		objMinCache[id] = bMin
+		objMaxCache[id] = bMax
+
 		min = vector.min(min, bMin)
 		max = vector.max(max, bMax)
+
+		count += 1
+
+		local cachedEntry = listCache[count]
+		if cachedEntry then
+			cachedEntry.id = id
+			cachedEntry.mortonCode = 0
+		else
+			listCache[count] = { id = id, mortonCode = 0 }
+		end
 	end
 
-	if min == HUGE_VECTOR then
+	if count == 0 then
 		return nil
 	end
 
+	-- Add padding to avoid edge cases with flat scenes
 	local padding = vector.max(vector.one, (max - min) * 0.01)
 	local sceneMin, sceneMax = min - padding, max + padding
 
-	table.clear(listCache)
-	local objMin, objMax = objMinCache, objMaxCache
-
-	local count = 0
-	for id, shape in shapes do
-		local bMin, bMax = Geometry.getObjectBounds(shape)
-		objMin[id], objMax[id] = bMin, bMax
-
-		count += 1
-		listCache[count] = {
-			id = id,
-			mortonCode = Geometry.positionToMortonCode(shape.position, sceneMin, sceneMax),
-		}
+	for i = 1, count do
+		local entry = listCache[i]
+		local pos = cframes[entry.id].Position -- Fast property access
+		entry.mortonCode = positionToMortonCode(pos, sceneMin, sceneMax)
 	end
 
 	table.sort(listCache, function(a, b)
 		return a.mortonCode < b.mortonCode
 	end)
 
-	if count > 0 then
-		return createSubTree(listCache, objMin, objMax, 1, count)
+	-- Remove unused cached entries at tail
+	for i = count + 1, #listCache do
+		listCache[i] = nil
 	end
 
-	return nil
+	return createSubTree(listCache, objMinCache, objMaxCache, 1, count)
 end
 
 function LinearBVH.queryPoint(root: Types.Node?, point: Vector3, callback: (id: number) -> ())
