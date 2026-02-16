@@ -18,7 +18,7 @@ Zone.__index = Zone
 function Zone.new(
 	cframe: CFrame,
 	size: Vector3,
-	shapeType: Types.ShapeType,
+	shapeType: number,
 	associatedPart: BasePart?,
 	isDynamic: boolean?,
 	metadata: any?
@@ -239,7 +239,17 @@ end
 	@return ShapeType
 ]=]
 function Zone.getShape(self: Types.InternalZone): Types.ShapeType
-	return self.dynamic and State.dynamicTypes[self.id] or State.staticTypes[self.id]
+	local shapeType = self.dynamic and State.dynamicTypes[self.id] or State.staticTypes[self.id]
+	if shapeType == Enum.PartType.Block.Value then
+		return 'Block'
+	elseif shapeType == Enum.PartType.Ball.Value then
+		return 'Ball'
+	elseif shapeType == Enum.PartType.Cylinder.Value then
+		return 'Cylinder'
+	elseif shapeType == Enum.PartType.Wedge.Value then
+		return 'Wedge'
+	end
+	return 'Block'
 end
 
 --[=[ 

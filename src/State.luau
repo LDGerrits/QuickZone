@@ -10,11 +10,11 @@ State.nextGroupId = 1
 
 State.staticCFrames = {} :: { [number]: CFrame }
 State.staticHalfSizes = {} :: { [number]: Vector3 }
-State.staticTypes = {} :: { [number]: Types.ShapeType }
+State.staticTypes = {} :: { [number]: number }
 
 State.dynamicCFrames = {} :: { [number]: CFrame }
 State.dynamicHalfSizes = {} :: { [number]: Vector3 }
-State.dynamicTypes = {} :: { [number]: Types.ShapeType }
+State.dynamicTypes = {} :: { [number]: number }
 
 State.staticRootNode = nil :: Types.Node?
 State.dynamicRootNode = nil :: Types.Node?

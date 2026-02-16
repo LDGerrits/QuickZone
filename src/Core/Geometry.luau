@@ -11,6 +11,11 @@ local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
 
+local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
+local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
+local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
+local WEDGE_SHAPE_VALUE = Enum.PartType.Wedge.Value
+
 local MORTON_SHIFT16_MASK = 0xFF0000FF
 local MORTON_SHIFT8_MASK = 0xF00F00F
 local MORTON_SHIFT4_MASK = 0x30C30C3
@@ -82,14 +87,14 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 		shapeType = staticTypes[zoneId]
 	end
 
-	if shapeType == 'Block' then
+	if shapeType == BLOCK_SHAPE_VALUE then
 		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
 		return vector.min(localPoint, halfSize) == localPoint
-	elseif shapeType == 'Ball' then
+	elseif shapeType == BALL_SHAPE_VALUE then
 		local radiusSq = halfSize.X * halfSize.X
 		local position = cframe.Position
 		return vector.dot(position - point, position - point) <= radiusSq
-	elseif shapeType == 'Cylinder' then
+	elseif shapeType == CYLINDER_SHAPE_VALUE then
 		local position = cframe.Position
 		local halfHeight = halfSize.X
 		local start = position - cframe.RightVector * halfHeight
@@ -103,7 +108,7 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 			return distanceSq <= radiusSq
 		end
 		return false
-	elseif shapeType == 'Wedge' then
+	elseif shapeType == WEDGE_SHAPE_VALUE then
 		local localPoint = cframe:PointToObjectSpace(point)
 		local absolutePoint = vector.abs(localPoint)
 		if vector.min(absolutePoint, halfSize) == absolutePoint then

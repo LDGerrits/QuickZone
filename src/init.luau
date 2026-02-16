@@ -154,7 +154,17 @@ function QuickZone.Zone(config: {
 	isDynamic: boolean?,
 	metadata: any?,
 }): Zone
-	return Zone.new(config.cframe, config.size, config.shape, config.part, config.isDynamic, config.metadata)
+	local shape
+	if config.shape == 'Block' then
+		shape = Enum.PartType.Block.Value
+	elseif config.shape == 'Ball' then
+		shape = Enum.PartType.Ball.Value
+	elseif config.shape == 'Cylinder' then
+		shape = Enum.PartType.Cylinder.Value
+	elseif config.shape == 'Wedge' then
+		shape = Enum.PartType.Wedge.Value
+	end
+	return Zone.new(config.cframe, config.size, shape, config.part, config.isDynamic, config.metadata)
 end
 
 --[=[ 
@@ -167,13 +177,15 @@ end
 	@return Zone
 ]=]
 function QuickZone.ZoneFromPart(part: BasePart, isDynamic: boolean?, metadata: any?): Zone
-	local shape: Types.ShapeType = 'Block'
-	if (part :: any).Shape == Enum.PartType.Ball then
-		shape = 'Ball'
+	local shape
+	if (part :: any).Shape == Enum.PartType.Block then
+		shape = Enum.PartType.Block.Value
+	elseif (part :: any).Shape == Enum.PartType.Ball then
+		shape = Enum.PartType.Ball.Value
 	elseif (part :: any).Shape == Enum.PartType.Cylinder then
-		shape = 'Cylinder'
+		shape = Enum.PartType.Cylinder.Value
 	elseif part:IsA('WedgePart') then
-		shape = 'Wedge'
+		shape = Enum.PartType.Wedge.Value
 	end
 	return Zone.new(part.CFrame, part.Size, shape, part, isDynamic, metadata)
 end
