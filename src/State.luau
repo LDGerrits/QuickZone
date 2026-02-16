@@ -8,8 +8,14 @@ State.nextZoneId = 1
 State.nextObserverId = 1
 State.nextGroupId = 1
 
-State.staticShapes = {} :: { Types.BoundingVolume }
-State.dynamicShapes = {} :: { Types.BoundingVolume }
+State.staticCFrames = {} :: { [number]: CFrame }
+State.staticHalfSizes = {} :: { [number]: Vector3 }
+State.staticTypes = {} :: { [number]: Types.ShapeType }
+
+State.dynamicCFrames = {} :: { [number]: CFrame }
+State.dynamicHalfSizes = {} :: { [number]: Vector3 }
+State.dynamicTypes = {} :: { [number]: Types.ShapeType }
+
 State.staticRootNode = nil :: Types.Node?
 State.dynamicRootNode = nil :: Types.Node?
 State.pendingStaticRebuild = false

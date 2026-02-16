@@ -23,32 +23,20 @@ function Zone.new(
 	isDynamic: boolean?,
 	metadata: any?
 ): Types.Zone
-	local halfSize = size / 2
-	local shape: Types.BoundingVolume = {
-		position = cframe.Position,
-		cframe = cframe,
-		halfSize = halfSize,
-		type = shapeType,
-	}
-
-	if shapeType == 'Ball' then
-		shape.radiusSq = halfSize.X * halfSize.X
-	elseif shapeType == 'Cylinder' then
-		local halfHeight = halfSize.X
-		shape.start = shape.position - shape.cframe.RightVector * halfHeight
-		shape.axis = shape.cframe.RightVector
-		shape.axisLength = halfHeight * 2
-		shape.radiusSq = halfSize.Y * halfSize.Y
-	end
-
 	local id = State.nextZoneId
 	State.nextZoneId += 1
 
+	local halfSize = size / 2
+
 	if isDynamic then
-		State.dynamicShapes[id] = shape
+		State.dynamicCFrames[id] = cframe
+		State.dynamicHalfSizes[id] = halfSize
+		State.dynamicTypes[id] = shapeType
 		State.pendingDynamicRebuild = true
 	else
-		State.staticShapes[id] = shape
+		State.staticCFrames[id] = cframe
+		State.staticHalfSizes[id] = halfSize
+		State.staticTypes[id] = shapeType
 		State.pendingStaticRebuild = true
 	end
 
@@ -137,8 +125,6 @@ end
 	@return Zone
 ]=]
 function Zone.update(self: Types.InternalZone, newCFrame: CFrame?, newSize: Vector3?): Types.Zone
-	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
-
 	-- If no arguments, use reference part if possible
 	if not newCFrame and self.part then
 		newCFrame = self.part.CFrame
@@ -150,27 +136,15 @@ function Zone.update(self: Types.InternalZone, newCFrame: CFrame?, newSize: Vect
 		return self
 	end
 
-	local shapeType = shape.type
 	local halfSize = newSize / 2
 
-	-- Update the internal data struct
-	shape.cframe = newCFrame
-	shape.position = newCFrame.Position
-	shape.halfSize = halfSize
-
-	if shapeType == 'Ball' then
-		shape.radiusSq = halfSize.X * halfSize.X
-	elseif shapeType == 'Cylinder' then
-		local halfHeight = halfSize.X
-		shape.start = shape.position - shape.cframe.RightVector * halfHeight
-		shape.axis = shape.cframe.RightVector
-		shape.axisLength = halfHeight * 2
-		shape.radiusSq = halfSize.Y * halfSize.Y
-	end
-
 	if self.dynamic then
+		State.dynamicCFrames[self.id] = newCFrame
+		State.dynamicHalfSizes[self.id] = halfSize
 		State.pendingDynamicRebuild = true
 	else
+		State.staticCFrames[self.id] = newCFrame
+		State.staticHalfSizes[self.id] = halfSize
 		State.pendingStaticRebuild = true
 	end
 
@@ -230,8 +204,8 @@ end
 	@return CFrame
 ]=]
 function Zone.getPosition(self: Types.InternalZone): Vector3
-	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
-	return shape.position
+	local cf = self.dynamic and State.dynamicCFrames[self.id] or State.staticCFrames[self.id]
+	return cf.Position
 end
 
 --[=[
@@ -242,8 +216,7 @@ end
 	@return CFrame
 ]=]
 function Zone.getCFrame(self: Types.InternalZone): CFrame
-	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
-	return shape.cframe
+	return self.dynamic and State.dynamicCFrames[self.id] or State.staticCFrames[self.id]
 end
 
 --[=[
@@ -254,8 +227,8 @@ end
 	@return Vector3
 ]=]
 function Zone.getSize(self: Types.InternalZone): Vector3
-	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
-	return shape.halfSize * 2
+	local halfSize = self.dynamic and State.dynamicHalfSizes[self.id] or State.staticHalfSizes[self.id]
+	return halfSize * 2
 end
 
 --[=[ 
@@ -266,8 +239,7 @@ end
 	@return ShapeType
 ]=]
 function Zone.getShape(self: Types.InternalZone): Types.ShapeType
-	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
-	return shape.type
+	return self.dynamic and State.dynamicTypes[self.id] or State.staticTypes[self.id]
 end
 
 --[=[ 
@@ -302,8 +274,7 @@ end
 	@return boolean
 ]=]
 function Zone.isPointInside(self: Types.InternalZone, point: Vector3): boolean
-	local shape = self.dynamic and State.dynamicShapes[self.id] or State.staticShapes[self.id]
-	return Geometry.isPointInShape(point, shape)
+	return Geometry.isPointInZone(point, self.id, self.dynamic)
 end
 
 --[=[ 
@@ -329,10 +300,14 @@ function Zone.destroy(self: Types.InternalZone): ()
 	State.zoneIdToZoneObj[self.id] = nil
 
 	if self.dynamic then
-		State.dynamicShapes[self.id] = nil
+		State.dynamicCFrames[self.id] = nil
+		State.dynamicHalfSizes[self.id] = nil
+		State.dynamicTypes[self.id] = nil
 		State.pendingDynamicRebuild = true
 	else
-		State.staticShapes[self.id] = nil
+		State.staticCFrames[self.id] = nil
+		State.staticHalfSizes[self.id] = nil
+		State.staticTypes[self.id] = nil
 		State.pendingStaticRebuild = true
 	end
 

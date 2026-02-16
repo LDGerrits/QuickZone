@@ -9,8 +9,9 @@ local State = require(script.Parent.Parent.State)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 
-local staticShapes = State.staticShapes
-local dynamicShapes = State.dynamicShapes
+local queryPoint = LinearBVH.queryPoint
+local isPointInZone = Geometry.isPointInZone
+
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerPriorityMap = State.observerPriorityMap
 local entityMetadata = State.entityMetadata
@@ -78,13 +79,13 @@ local function processZoneHit(zoneId: number)
 end
 
 local function queryCallbackStatic(zoneId: number)
-	if Geometry.isPointInShape(ctx_pos, staticShapes[zoneId]) then
+	if isPointInZone(ctx_pos, zoneId, false) then
 		processZoneHit(zoneId)
 	end
 end
 
 local function queryCallbackDynamic(zoneId: number)
-	if Geometry.isPointInShape(ctx_pos, dynamicShapes[zoneId]) then
+	if isPointInZone(ctx_pos, zoneId, true) then
 		processZoneHit(zoneId)
 	end
 end
@@ -110,13 +111,13 @@ RunService.PostSimulation:Connect(function(dt: number)
 	local start = os.clock()
 
 	if State.pendingDynamicRebuild then
-		State.dynamicRootNode = LinearBVH.build(dynamicShapes)
+		State.dynamicRootNode = LinearBVH.build(State.dynamicCFrames, State.dynamicHalfSizes)
 		State.pendingDynamicRebuild = false
 		State.isDirty = true
 	end
 
 	if State.pendingStaticRebuild then
-		State.staticRootNode = LinearBVH.build(staticShapes)
+		State.staticRootNode = LinearBVH.build(State.staticCFrames, State.staticHalfSizes)
 		State.pendingStaticRebuild = false
 		State.isDirty = true
 	end
@@ -228,11 +229,11 @@ RunService.PostSimulation:Connect(function(dt: number)
 				ctx_highestWin = -math.huge
 
 				if dynamicRoot then
-					LinearBVH.queryPoint(dynamicRoot, pos, queryCallbackDynamic)
+					queryPoint(dynamicRoot, pos, queryCallbackDynamic)
 				end
 
 				if staticRoot then
-					LinearBVH.queryPoint(staticRoot, pos, queryCallbackStatic)
+					queryPoint(staticRoot, pos, queryCallbackStatic)
 				end
 
 				local current = d.activeObserverMemberships

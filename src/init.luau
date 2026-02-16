@@ -13,8 +13,6 @@ local Observer = require(script.Classes.Observer)
 local Config = require(script.Config)
 local Scheduler = require(script.Core.Scheduler)
 
-local staticShapes = State.staticShapes
-local dynamicShapes = State.dynamicShapes
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerIdToObserverObj = State.observerIdToObserverObj
 
@@ -384,8 +382,8 @@ end
 function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	local results = {}
 
-	local function checkZone(zoneId: number, shapeList: { [number]: Types.BoundingVolume })
-		if Geometry.isPointInShape(position, shapeList[zoneId]) then
+	local function checkZone(zoneId: number, isDynamic: boolean)
+		if Geometry.isPointInZone(position, zoneId, isDynamic) then
 			local zone = State.zoneIdToZoneObj[zoneId]
 			if zone then
 				table.insert(results, zone)
@@ -395,13 +393,13 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 
 	if State.dynamicRootNode then
 		LinearBVH.queryPoint(State.dynamicRootNode, position, function(zoneId)
-			checkZone(zoneId, dynamicShapes)
+			checkZone(zoneId, true)
 		end)
 	end
 
 	if State.staticRootNode then
 		LinearBVH.queryPoint(State.staticRootNode, position, function(zoneId)
-			checkZone(zoneId, staticShapes)
+			checkZone(zoneId, false)
 		end)
 	end
 
@@ -420,8 +418,8 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 	table.clear(foundIdsCache)
 	local results = {}
 
-	local function checkZone(zoneId: number, shapeList: { [number]: Types.BoundingVolume })
-		if not Geometry.isPointInShape(position, shapeList[zoneId]) then
+	local function checkZone(zoneId: number, isDynamic: boolean)
+		if not Geometry.isPointInZone(position, zoneId, isDynamic) then
 			return
 		end
 
@@ -445,13 +443,13 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 
 	if State.dynamicRootNode then
 		LinearBVH.queryPoint(State.dynamicRootNode, position, function(zoneId)
-			checkZone(zoneId, dynamicShapes)
+			checkZone(zoneId, true)
 		end)
 	end
 
 	if State.staticRootNode then
 		LinearBVH.queryPoint(State.staticRootNode, position, function(zoneId)
-			checkZone(zoneId, staticShapes)
+			checkZone(zoneId, false)
 		end)
 	end
 
@@ -571,7 +569,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	newDebugFolder.Parent = workspace
 	debugFolder = newDebugFolder
 
-	local function updateVisual(id: number, shape: Types.BoundingVolume, color: Color3)
+	local function updateVisual(id: number, cframe: CFrame, halfSize: Vector3, color: Color3)
 		local box = debugVisuals[id]
 
 		if not box then
@@ -586,8 +584,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			box = newBox
 		end
 
-		box.Size = shape.halfSize * 2
-		box.CFrame = shape.cframe
+		box.Size = halfSize * 2
+		box.CFrame = cframe
 		box.Color3 = color
 	end
 
@@ -596,25 +594,27 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			return
 		end
 
-		-- Draw static zones
-		for id, shape in staticShapes do
+		-- Draw static and dynamic zones
+		for id, cframe in State.staticCFrames do
 			if not debugVisuals[id] then
+				local halfSize = State.staticHalfSizes[id]
 				local isActive = State.zoneAttachedObservers[id] ~= nil
 				local color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
-				updateVisual(id, shape, color)
+				updateVisual(id, cframe, halfSize, color)
 			end
 		end
-
-		-- Draw dynamic zones
-		for id, zone in dynamicShapes do
-			local isActive = State.zoneAttachedObservers[id] ~= nil
-			local color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
-			updateVisual(id, zone, color)
+		for id, cframe in State.dynamicCFrames do
+			if not debugVisuals[id] then
+				local halfSize = State.dynamicHalfSizes[id]
+				local isActive = State.zoneAttachedObservers[id] ~= nil
+				local color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
+				updateVisual(id, cframe, halfSize, color)
+			end
 		end
 
 		-- Destroy removed zones
 		for id, box in debugVisuals do
-			if not staticShapes[id] and not dynamicShapes[id] then
+			if not State.staticCFrames[id] and not State.dynamicCFrames[id] then
 				box:Destroy()
 				debugVisuals[id] = nil
 			end

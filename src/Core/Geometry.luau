@@ -1,7 +1,15 @@
 --!native
 --!strict
 
-local Types = require(script.Parent.Parent.Types)
+local State = require(script.Parent.Parent.State)
+
+local staticCFrames = State.staticCFrames
+local staticHalfSizes = State.staticHalfSizes
+local staticTypes = State.staticTypes
+
+local dynamicCFrames = State.dynamicCFrames
+local dynamicHalfSizes = State.dynamicHalfSizes
+local dynamicTypes = State.dynamicTypes
 
 local MORTON_SHIFT16_MASK = 0xFF0000FF
 local MORTON_SHIFT8_MASK = 0xF00F00F
@@ -32,16 +40,19 @@ function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB:
 	return vector.min(minA, minB), vector.max(maxA, maxB)
 end
 
-function Geometry.getObjectBounds(shape: Types.BoundingVolume): (Vector3, Vector3)
-	local halfSize = shape.halfSize
-	local cframe = shape.cframe
-	local center = shape.position
+function Geometry.getObjectBounds(cframe: CFrame, halfSize: Vector3): (Vector3, Vector3)
+	local pos = cframe.Position
+	local right = cframe.RightVector
+	local up = cframe.UpVector
+	local look = cframe.LookVector
 
-	local halfExtent = vector.abs(cframe.RightVector) * halfSize.X
-		+ vector.abs(cframe.UpVector) * halfSize.Y
-		+ vector.abs(cframe.LookVector) * halfSize.Z
+	-- Calculate the projection of the box extents onto the global axes
+	local x = math.abs(right.X) * halfSize.X + math.abs(up.X) * halfSize.Y + math.abs(look.X) * halfSize.Z
+	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(look.Y) * halfSize.Z
+	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(look.Z) * halfSize.Z
 
-	return center - halfExtent, center + halfExtent
+	local extent = Vector3.new(x, y, z)
+	return pos - extent, pos + extent
 end
 
 function Geometry.positionToMortonCode(position: Vector3, sceneMin: Vector3, sceneMax: Vector3): number
@@ -58,27 +69,45 @@ function Geometry.positionToMortonCode(position: Vector3, sceneMin: Vector3, sce
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end
 
-function Geometry.isPointInShape(point: Vector3, shape: Types.BoundingVolume): boolean
-	if shape.type == 'Block' then
-		local localPoint = vector.abs(shape.cframe:PointToObjectSpace(point))
-		return vector.min(localPoint, shape.halfSize) == localPoint
-	elseif shape.type == 'Ball' then
-		return vector.dot(shape.position - point, shape.position - point) <= shape.radiusSq
-	elseif shape.type == 'Cylinder' then
-		local toPoint = point - shape.start :: Vector3
-		local projection = vector.dot(toPoint, shape.axis :: Vector3)
+function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boolean): boolean
+	local cframe, halfSize, shapeType
 
-		if projection >= 0 and projection <= shape.axisLength :: number then
-			local closestPointOnAxis = shape.start :: Vector3 + shape.axis :: Vector3 * projection
+	if isDynamic then
+		cframe = dynamicCFrames[zoneId]
+		halfSize = dynamicHalfSizes[zoneId]
+		shapeType = dynamicTypes[zoneId]
+	else
+		cframe = staticCFrames[zoneId]
+		halfSize = staticHalfSizes[zoneId]
+		shapeType = staticTypes[zoneId]
+	end
+
+	if shapeType == 'Block' then
+		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
+		return vector.min(localPoint, halfSize) == localPoint
+	elseif shapeType == 'Ball' then
+		local radiusSq = halfSize.X * halfSize.X
+		local position = cframe.Position
+		return vector.dot(position - point, position - point) <= radiusSq
+	elseif shapeType == 'Cylinder' then
+		local position = cframe.Position
+		local halfHeight = halfSize.X
+		local start = position - cframe.RightVector * halfHeight
+		local toPoint = point - start
+		local axis = cframe.RightVector
+		local projection = vector.dot(toPoint, axis)
+		if projection >= 0 and projection <= halfHeight * 2 :: number then
+			local closestPointOnAxis = start :: Vector3 + axis :: Vector3 * projection
 			local distanceSq = vector.dot(point - closestPointOnAxis, point - closestPointOnAxis)
-			return distanceSq <= shape.radiusSq :: number
+			local radiusSq = halfSize.Y * halfSize.Y
+			return distanceSq <= radiusSq
 		end
 		return false
-	elseif shape.type == 'Wedge' then
-		local localPoint = shape.cframe:PointToObjectSpace(point)
+	elseif shapeType == 'Wedge' then
+		local localPoint = cframe:PointToObjectSpace(point)
 		local absolutePoint = vector.abs(localPoint)
-		if vector.min(absolutePoint, shape.halfSize) == absolutePoint then
-			local size = shape.halfSize * 2
+		if vector.min(absolutePoint, halfSize) == absolutePoint then
+			local size = halfSize * 2
 			return (localPoint.Y / size.Y - localPoint.Z / size.Z) <= 0
 		end
 		return false
