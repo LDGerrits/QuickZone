@@ -249,7 +249,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						local cbs = observerExitedCallbacks[observerId]
 						if cbs then
 							local z = zoneIdToZoneObj[oldZoneId]
-							local cd = entityMetadata[entity] and entityMetadata[entity][observerId]
+							local cd = entityMetadata[entity]
 							fireCallback(cbs, entity, z, cd, safety)
 						end
 					end
@@ -266,7 +266,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						local cbs = observerEnteredCallbacks[observerId]
 						if cbs then
 							local z = zoneIdToZoneObj[zoneIdx]
-							local cd = entityMetadata[entity] and entityMetadata[entity][observerId]
+							local cd = entityMetadata[entity]
 							fireCallback(cbs, entity, z, cd, safety)
 						end
 					end
