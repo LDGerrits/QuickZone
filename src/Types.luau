@@ -156,11 +156,13 @@ export type GroupClass = {
 		precision: number?,
 		entities: { Entity }?,
 	}?) -> Group,
-	localPlayer: (config: {
-		updateRate: number?,
-		precision: number?,
-		entities: { Entity }?,
-	}?) -> Group,
+	localPlayer: (
+		config: {
+			updateRate: number?,
+			precision: number?,
+			entities: { Entity }?,
+		}?
+	) -> Group,
 }
 
 export type Group = {

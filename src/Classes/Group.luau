@@ -1,4 +1,5 @@
 --!strict
+
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
@@ -187,11 +188,12 @@ function Group.players(config: {
 	if sharedPlayerGroup then
 		if config then
 			sharedPlayerGroup:setConfig(config)
+			if config.entities then
+				sharedPlayerGroup:addBulk(config.entities)
+			end
 		end
 		return sharedPlayerGroup
 	end
-
-	-- type error for config
 
 	local group = Group.new(config)
 	sharedPlayerGroup = group
@@ -267,11 +269,12 @@ function Group.localPlayer(config: {
 	if sharedLocalPlayerGroup then
 		if config then
 			sharedLocalPlayerGroup:setConfig(config)
+			if config.entities then
+				sharedLocalPlayerGroup:addBulk(config.entities)
+			end
 		end
 		return sharedLocalPlayerGroup
 	end
-
-	-- type error
 
 	local group = Group.new(config)
 	sharedLocalPlayerGroup = group
@@ -552,7 +555,7 @@ function Group.setUpdateRate(self: Types.InternalGroup, updateRate: number): Typ
 end
 
 --[=[
-	Returns the current precision of the group.
+	Set the current precision of the group.
 
 	@method setPrecision
 	@within Group

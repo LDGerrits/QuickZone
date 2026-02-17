@@ -82,9 +82,13 @@ local function newZoneInternal(
 	State.zoneIdToZoneObj[id] = self
 
 	if observers then
+		local attached = {}
+		State.zoneAttachedObservers[id] = attached
 		for _, observer in observers do
-			self:attach(observer)
+			table.insert(attached, (observer :: Types.InternalObserver).id)
 		end
+
+		State.isDirty = true
 	end
 
 	return self
@@ -98,7 +102,9 @@ end
 		cframe = CFrame.new(0, 10, 0),
 		size = Vector3.new(10, 10, 10),
 		shape = 'Block',
-		metadata = { Name = "Lobby" }
+		isDynamic = false,
+		metadata = { Name = "Lobby" },
+		observers = { observer1, observer2 }
 	})
 	```
 
@@ -139,12 +145,14 @@ function Zone.new(config: Types.ZoneConfig): Types.Zone
 end
 
 --[=[ 
-	Creates a Zone automatically based on a Part's properties.
+	Creates a Zone automatically based on the Part's properties.
 	Supported shapes: Block, Ball (Spheres), Cylinder, Wedge, and CornerWedge.
 
 	```lua
-	local parts = workspace.ZoneParts:GetChildren()
-	QuickZone.Zone.fromParts(parts, { observers = { safeObserver, queueObserver, forceFieldObserver } },
+	local part = workspace.ZonePart
+	local zone = QuickZone.Zone.fromPart(part, { 
+		observers = { safeObserver } 
+	})
 	```
 
 	@tag Constructor
@@ -176,11 +184,14 @@ end
 	Each zone corresponds to a `BasePart` and shares the same properties.
 
 	```lua
-	local zones = QuickZone.Zone.fromParts(workspace.ZoneParts:GetChildren()},
+	local zones = QuickZone.Zone.fromParts(workspace.ZoneParts:GetChildren(), {
+		isDynamic = false,
+		observers = { mainObserver }
+	})
 	```
 
 	@tag Constructor
-	@param part { BasePart } -- The parts to derive the zones from.
+	@param parts { BasePart } -- The parts to derive the zones from.
 	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }?  }?
 	@return { Zone }
 ]=]
@@ -487,6 +498,8 @@ function Zone.getShape(self: Types.InternalZone): Types.ShapeType
 		return 'Cylinder'
 	elseif shapeType == Enum.PartType.Wedge.Value then
 		return 'Wedge'
+	elseif shapeType == Enum.PartType.CornerWedge.Value then
+		return 'CornerWedge'
 	end
 	return 'Block'
 end
