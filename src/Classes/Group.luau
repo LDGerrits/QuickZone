@@ -204,7 +204,7 @@ function Group.remove(self: Types.InternalGroup, ...: Types.Entity): Types.Group
 			end
 
 			local z = State.zoneIdToZoneObj[oldZoneId]
-			local cd = State.entityMetadata[entity] and State.entityMetadata[entity][observerId]
+			local cd = State.entityMetadata[entity]
 			for _, fn in cbs do
 				if safety then
 					task.spawn(fn, entity, z, cd)
