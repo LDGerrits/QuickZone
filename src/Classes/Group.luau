@@ -118,16 +118,18 @@ Group.__index = Group
 	local myGroup = Group.new({
 		updateRate = 20, -- Check at 20Hz
 		precision = 0.5, -- Ignore movement smaller than 0.5 studs
+		entities = { NPC1, NPC2, NPC3 } -- Add entities
 	})
 	```
 
 	@tag Constructor
-	@param config { updateRate: number?, precision: number? }?
+	@param config { updateRate: number?, precision: number?, entities: { Types.Entity }? }?
 	@return Group
 ]=]
 function Group.new(config: {
 	updateRate: number?,
 	precision: number?,
+	entities: { Types.Entity }?,
 }?): Types.Group
 	local hz = config and config.updateRate
 	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
@@ -156,6 +158,10 @@ function Group.new(config: {
 	State.groupToObservers[id] = {}
 	table.insert(State.groupList, self)
 
+	if config and config.entities then
+		self:addBulk(config.entities)
+	end
+
 	return self
 end
 
@@ -170,12 +176,13 @@ end
 	:::
 
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?}?
+	@param config { updateRate: number?, precision: number?, entities: { Types.Entity }? }?
 	@return Group
 ]=]
 function Group.players(config: {
 	updateRate: number?,
 	precision: number?,
+	entities: { Types.Entity }?,
 }?): Types.Group
 	if sharedPlayerGroup then
 		if config then
@@ -183,6 +190,8 @@ function Group.players(config: {
 		end
 		return sharedPlayerGroup
 	end
+
+	-- type error for config
 
 	local group = Group.new(config)
 	sharedPlayerGroup = group
@@ -245,12 +254,13 @@ end
 
 	@client
 	@tag Constructor
-	@param config { updateRate: number?, precision: number? }?
+	@param config { updateRate: number?, precision: number?, entities: { Types.Entity }? }?
 	@return Group
 ]=]
 function Group.localPlayer(config: {
 	updateRate: number?,
 	precision: number?,
+	entities: { Types.Entity }?,
 }?): Types.Group
 	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
 
@@ -260,6 +270,8 @@ function Group.localPlayer(config: {
 		end
 		return sharedLocalPlayerGroup
 	end
+
+	-- type error
 
 	local group = Group.new(config)
 	sharedLocalPlayerGroup = group

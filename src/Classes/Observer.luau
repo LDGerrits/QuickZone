@@ -55,37 +55,52 @@ Observer.__index = Observer
 --[=[ 
 	Creates an Observer. Observers listen for entities entering or exiting assigned Zones.
 
+	```lua
+	local observer = QuickZone.Observer.new({
+		priority = 20, -- The priority value is used to resolve overlaps
+		enabled = false, -- Observer will not start processing spatial checks
+		safety = false, -- Do not wrap callbacks in task.spawn
+		groups = { enemyGroup, playerGroup } -- Immediately subscribe to these groups
+	})
+	```
+
 	:::info Resolution Priority
-	The `priority` value is used to resolve overlaps. When an entity is 
-	inside multiple zones watched by different observers, higher priority 
-	observers take complete control.
+	When an entity is inside multiple zones watched by different observers, 
+	higher priority observers take complete control.
 	:::
 
 	@tag Constructor
-	@param config { priority: number?, enabled: boolean?, safety: boolean? }?
+	@param config { priority: number?, enabled: boolean?, safety: boolean?, groups: { Types.Group }?, }?
 	@return Observer
 ]=]
 function Observer.new(config: {
 	priority: number?,
 	enabled: boolean?,
 	safety: boolean?,
+	groups: { Types.Group }?,
 }?): Types.Observer
-	local observer: Types.InternalObserver = setmetatable({
-		id = State.nextObserverId,
+	local id = State.nextObserverId
+	State.nextObserverId += 1
+
+	local self: Types.InternalObserver = setmetatable({
+		id = id,
 	}, Observer) :: any
 
-	State.observerPriorityMap[observer.id] = config and config.priority or 0
-	State.observerEnteredCallbacks[observer.id] = {}
-	State.observerExitedCallbacks[observer.id] = {}
-	State.observerTrackingEntities[observer.id] = {}
-	State.observerIdToObserverObj[observer.id] = observer
-	State.observerEnabled[observer.id] = true
-	State.observerSafety[observer.id] = if config and config.safety ~= nil
-		then config.safety
-		else Config.Scheduler.safety
+	State.observerPriorityMap[id] = config and config.priority or 0
+	State.observerEnteredCallbacks[id] = {}
+	State.observerExitedCallbacks[id] = {}
+	State.observerTrackingEntities[id] = {}
+	State.observerIdToObserverObj[id] = self
+	State.observerEnabled[id] = true
+	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Scheduler.safety
 
-	State.nextObserverId += 1
-	return observer
+	if config and config.groups then
+		for _, group in config.groups do
+			self:subscribe(group)
+		end
+	end
+
+	return self
 end
 
 --[=[ 
@@ -528,6 +543,7 @@ end
 
 --[=[ 
 	Updates the resolution priority of the observer.
+
 	@method setPriority
 	@within Observer
 	@param p number
@@ -541,6 +557,7 @@ end
 
 --[=[ 
 	Checks if the observer is currently enabled.
+
 	@method isEnabled
 	@within Observer
 	@return boolean

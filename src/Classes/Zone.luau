@@ -54,7 +54,8 @@ local function newZoneInternal(
 	shapeType: number,
 	part: BasePart?,
 	isDynamic: boolean,
-	metadata: any?
+	metadata: any?,
+	observers: { Types.Observer }?
 ): Types.Zone
 	local id = State.nextZoneId
 	State.nextZoneId += 1
@@ -72,15 +73,21 @@ local function newZoneInternal(
 		State.pendingStaticRebuild = true
 	end
 
-	local self = setmetatable({
+	local self: Types.InternalZone = setmetatable({
 		id = id,
 		part = part,
 		dynamic = isDynamic,
 		metadata = metadata,
-	}, Zone)
+	}, Zone) :: any
+	State.zoneIdToZoneObj[id] = self
 
-	State.zoneIdToZoneObj[id] = self :: any
-	return self :: any
+	if observers then
+		for _, observer in observers do
+			self:attach(observer)
+		end
+	end
+
+	return self
 end
 
 --[=[ 
@@ -126,20 +133,29 @@ function Zone.new(config: Types.ZoneConfig): Types.Zone
 		shapeType,
 		config.part,
 		config.isDynamic or false,
-		config.metadata
+		config.metadata,
+		config.observers
 	)
 end
 
 --[=[ 
 	Creates a Zone automatically based on a Part's properties.
-	Supported shapes: Block, Ball (Spheres), Cylinder, and Wedge.
+	Supported shapes: Block, Ball (Spheres), Cylinder, Wedge, and CornerWedge.
+
+	```lua
+	local parts = workspace.ZoneParts:GetChildren()
+	QuickZone.Zone.fromParts(parts, { observers = { safeObserver, queueObserver, forceFieldObserver } },
+	```
 
 	@tag Constructor
 	@param part BasePart -- The part to derive the zone from.
-	@param config { isDynamic: boolean?, metadata: any? }?
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }?  }?
 	@return Zone
 ]=]
-function Zone.fromPart(part: BasePart, config: { isDynamic: boolean?, metadata: any? }?): Types.Zone
+function Zone.fromPart(
+	part: BasePart,
+	config: { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+): Types.Zone
 	local shapeId = Enum.PartType.Block.Value
 	if part:IsA('Part') then
 		shapeId = part.Shape.Value
@@ -151,23 +167,31 @@ function Zone.fromPart(part: BasePart, config: { isDynamic: boolean?, metadata: 
 
 	local isDynamic = config and config.isDynamic or false
 	local metadata = config and config.metadata
-
-	return newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata)
+	local observers = config and config.observers
+	return newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata, observers)
 end
 
 --[=[ 
 	Create a list of zones corresponding to the list of `BaseParts`.
 	Each zone corresponds to a `BasePart` and shares the same properties.
 
+	```lua
+	local zones = QuickZone.Zone.fromParts(workspace.ZoneParts:GetChildren()},
+	```
+
 	@tag Constructor
 	@param part { BasePart } -- The parts to derive the zones from.
-	@param config { isDynamic: boolean?, metadata: any? }? -- Optional config shared across all zones
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }?  }?
 	@return { Zone }
 ]=]
-function Zone.fromParts(parts: { BasePart }, config: { isDynamic: boolean?, metadata: any? }?): { Types.Zone }
+function Zone.fromParts(
+	parts: { BasePart },
+	config: { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+): { Types.Zone }
 	local zones = table.create(#parts)
 	local isDynamic = config and config.isDynamic or false
 	local metadata = config and config.metadata
+	local observers = config and config.observers
 
 	for i, part in parts do
 		local shapeId = Enum.PartType.Block.Value
@@ -179,7 +203,7 @@ function Zone.fromParts(parts: { BasePart }, config: { isDynamic: boolean?, meta
 			shapeId = Enum.PartType.CornerWedge.Value
 		end
 
-		zones[i] = newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata)
+		zones[i] = newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata, observers)
 	end
 
 	return zones

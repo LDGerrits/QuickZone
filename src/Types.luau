@@ -43,6 +43,7 @@ export type ZoneConfig = {
 	part: BasePart?,
 	isDynamic: boolean?,
 	metadata: any?,
+	observers: { Observer }?,
 }
 
 export type QuickZone = {
@@ -62,8 +63,11 @@ export type QuickZone = {
 
 export type ZoneClass = {
 	new: (config: ZoneConfig) -> Zone,
-	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any? }?) -> Zone,
-	fromParts: (parts: { BasePart }, config: { isDynamic: boolean?, metadata: any? }?) -> { Zone },
+	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zone,
+	fromParts: (
+		parts: { BasePart },
+		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	) -> { Zone },
 }
 
 export type Zone = {
@@ -98,11 +102,14 @@ export type InternalZone = Zone & {
 export type Callback = (Entity, Zone, any?) -> ()
 
 export type ObserverClass = {
-	new: (config: {
-		priority: number?,
-		enabled: boolean?,
-		safety: boolean?,
-	}?) -> Observer,
+	new: (
+		config: {
+			priority: number?,
+			enabled: boolean?,
+			safety: boolean?,
+			groups: { Group }?,
+		}?
+	) -> Observer,
 }
 
 export type Observer = {
@@ -142,14 +149,17 @@ export type GroupClass = {
 	new: (config: {
 		updateRate: number?,
 		precision: number?,
+		entities: { Entity }?,
 	}?) -> Group,
 	players: (config: {
 		updateRate: number?,
 		precision: number?,
+		entities: { Entity }?,
 	}?) -> Group,
 	localPlayer: (config: {
 		updateRate: number?,
 		precision: number?,
+		entities: { Entity }?,
 	}?) -> Group,
 }
 
