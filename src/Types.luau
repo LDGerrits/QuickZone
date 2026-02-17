@@ -39,7 +39,7 @@ export type Node = {
 export type ZoneConfig = {
 	cframe: CFrame,
 	size: Vector3,
-	shape: ShapeType,
+	shape: ShapeType?,
 	part: BasePart?,
 	isDynamic: boolean?,
 	metadata: any?,
@@ -47,22 +47,26 @@ export type ZoneConfig = {
 
 export type QuickZone = {
 	Zone: (ZoneConfig) -> Zone,
-	ZoneFromPart: (part: BasePart, isDynamic: boolean?, metadata: any?) -> Zone,
-	Observer: (priority: number?) -> Observer,
+	ZoneFromPart: (part: BasePart, {
+		isDynamic: boolean?,
+		metadata: any?,
+	}?) -> Zone,
+	Observer: (config: {
+		priority: number?,
+		enabled: boolean?,
+		safety: boolean?,
+	}?) -> Observer,
 	Group: ({
 		updateRate: number?,
 		precision: number?,
-		safety: boolean?,
 	}?) -> Group,
 	PlayerGroup: ({
 		updateRate: number?,
 		precision: number?,
-		safety: boolean?,
 	}?) -> Group,
 	LocalPlayerGroup: ({
 		updateRate: number?,
 		precision: number?,
-		safety: boolean?,
 	}?) -> Group,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
@@ -104,11 +108,13 @@ export type Callback = (Entity, Zone, any?) -> ()
 
 export type Observer = {
 	destroy: (self: Observer) -> (),
-	setPriority: (self: Observer, n: number) -> Observer,
 	subscribe: (self: Observer, ...Group) -> Observer,
 	unsubscribe: (self: Observer, ...Group) -> Observer,
+	setPriority: (self: Observer, n: number) -> Observer,
 	setEnabled: (self: Observer, enabled: boolean) -> Observer,
+	setSafety: (self: Observer, enabled: boolean) -> Observer,
 	isEnabled: (self: Observer) -> boolean,
+	isSafe: (self: Observer) -> boolean,
 	isPlayerInside: (self: Observer, player: Player) -> boolean,
 	isLocalPlayerInside: (self: Observer) -> boolean,
 	isEntityInside: (self: Observer, entity: Entity) -> boolean,
@@ -138,7 +144,6 @@ export type Group = {
 	setConfig: (self: Group, {
 		updateRate: number?,
 		precision: number?,
-		safety: boolean?,
 	}) -> Group,
 	add: (self: Group, entity: Entity, metadata: any?) -> Group,
 	remove: (self: Group, ...Entity) -> Group,
@@ -148,7 +153,6 @@ export type Group = {
 	getConfig: (self: Group) -> {
 		updateRate: number,
 		precision: number,
-		safety: boolean,
 	},
 	contains: (self: Group, entity: Entity) -> boolean,
 }
@@ -161,7 +165,6 @@ export type InternalGroup = Group & {
 	config: {
 		updateRate: number,
 		precisionSq: number,
-		safety: boolean,
 	},
 }
 

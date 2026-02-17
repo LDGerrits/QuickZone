@@ -149,22 +149,27 @@ local QuickZone = {}
 function QuickZone.Zone(config: {
 	cframe: CFrame,
 	size: Vector3,
-	shape: Types.ShapeType,
+	shape: Types.ShapeType?,
 	part: BasePart?,
 	isDynamic: boolean?,
 	metadata: any?,
 }): Zone
-	local shape
-	if config.shape == 'Block' then
-		shape = Enum.PartType.Block.Value
-	elseif config.shape == 'Ball' then
-		shape = Enum.PartType.Ball.Value
-	elseif config.shape == 'Cylinder' then
-		shape = Enum.PartType.Cylinder.Value
-	elseif config.shape == 'Wedge' then
-		shape = Enum.PartType.Wedge.Value
+	local shapeType
+	local shape = config.shape
+	if not shape then
+		shapeType = Enum.PartType.Block.Value
+	else
+		if shape == 'Block' then
+			shapeType = Enum.PartType.Block.Value
+		elseif shape == 'Ball' then
+			shapeType = Enum.PartType.Ball.Value
+		elseif shape == 'Cylinder' then
+			shapeType = Enum.PartType.Cylinder.Value
+		elseif shape == 'Wedge' then
+			shapeType = Enum.PartType.Wedge.Value
+		end
 	end
-	return Zone.new(config.cframe, config.size, shape, config.part, config.isDynamic, config.metadata)
+	return Zone.new(config.cframe, config.size, shapeType, config.part, config.isDynamic, config.metadata)
 end
 
 --[=[ 
@@ -173,10 +178,10 @@ end
 
 	@tag Constructor
 	@param part BasePart -- The part to derive the zone from.
-	@param isDynamic boolean? -- Whether the zone should follow the part every frame.
+	@param config { isDynamic: boolean?, metadata: any? }?
 	@return Zone
 ]=]
-function QuickZone.ZoneFromPart(part: BasePart, isDynamic: boolean?, metadata: any?): Zone
+function QuickZone.ZoneFromPart(part: BasePart, config: { isDynamic: boolean?, metadata: any? }?): Zone
 	local shape
 	if (part :: any).Shape == Enum.PartType.Block then
 		shape = Enum.PartType.Block.Value
@@ -187,7 +192,7 @@ function QuickZone.ZoneFromPart(part: BasePart, isDynamic: boolean?, metadata: a
 	elseif part:IsA('WedgePart') then
 		shape = Enum.PartType.Wedge.Value
 	end
-	return Zone.new(part.CFrame, part.Size, shape, part, isDynamic, metadata)
+	return Zone.new(part.CFrame, part.Size, shape, part, config and config.isDynamic, config and config.metadata)
 end
 
 --[=[ 
@@ -196,15 +201,19 @@ end
 	:::info Resolution Priority
 	The `priority` value is used to resolve overlaps. When an entity is 
 	inside multiple zones watched by different observers, higher priority 
-	observers take precedence in specific logic chains.
+	observers take complete control.
 	:::
 
 	@tag Constructor
-	@param priority number? -- The priority level (defaults to 0).
+	@param config { priority: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
 ]=]
-function QuickZone.Observer(priority: number?): Observer
-	return Observer.new(priority)
+function QuickZone.Observer(config: {
+	priority: number?,
+	enabled: boolean?,
+	safety: boolean?,
+}?): Observer
+	return Observer.new(config)
 end
 
 --[=[ 
@@ -220,13 +229,12 @@ end
 	```
 
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?, safety: boolean? }?
+	@param config { updateRate: number?, precision: number? }?
 	@return Group
 ]=]
 function QuickZone.Group(config: {
 	updateRate: number?,
 	precision: number?,
-	safety: boolean?,
 }?): Group
 	return Group.new(config)
 end
@@ -242,13 +250,12 @@ end
 	:::
 
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?, safety: boolean? }?
+	@param config { updateRate: number?, precision: number?}?
 	@return Group
 ]=]
 function QuickZone.PlayerGroup(config: {
 	updateRate: number?,
 	precision: number?,
-	safety: boolean?,
 }?): Group
 	if sharedPlayerGroup then
 		if config then
@@ -318,13 +325,12 @@ end
 
 	@client
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?, safety: boolean? }?
+	@param config { updateRate: number?, precision: number? }?
 	@return Group
 ]=]
 function QuickZone.LocalPlayerGroup(config: {
 	updateRate: number?,
 	precision: number?,
-	safety: boolean?,
 }?): Group
 	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
 

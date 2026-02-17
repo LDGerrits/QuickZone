@@ -33,6 +33,7 @@ State.observerPriorityMap = {} :: { [number]: number }
 State.observerEnteredCallbacks = {} :: { [number]: { Types.Callback } }
 State.observerExitedCallbacks = {} :: { [number]: { Types.Callback } }
 State.observerEnabled = {} :: { [number]: boolean }
+State.observerSafety = {} :: { [number]: boolean }
 
 State.zoneAttachedObservers = {} :: { [number]: { number } }
 State.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }

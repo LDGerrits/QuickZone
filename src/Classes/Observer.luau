@@ -3,6 +3,7 @@
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
+local Config = require(script.Parent.Parent.Config)
 local Geometry = require(script.Parent.Parent.Core.Geometry)
 local LinearBVH = require(script.Parent.Parent.Core.LinearBVH)
 local State = require(script.Parent.Parent.State)
@@ -11,7 +12,7 @@ local Types = require(script.Parent.Parent.Types)
 local IS_CLIENT = RunService:IsClient()
 
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
-	local safety = group.config.safety
+	local safety = State.observerSafety[observerId]
 
 	for _, entity in group.entities do
 		local data = group.entityData[entity]
@@ -51,17 +52,24 @@ end
 local Observer = {}
 Observer.__index = Observer
 
-function Observer.new(priority: number?): Types.Observer
+function Observer.new(config: {
+	priority: number?,
+	enabled: boolean?,
+	safety: boolean?,
+}?): Types.Observer
 	local observer: Types.InternalObserver = setmetatable({
 		id = State.nextObserverId,
 	}, Observer) :: any
 
-	State.observerPriorityMap[observer.id] = priority or 0
+	State.observerPriorityMap[observer.id] = config and config.priority or 0
 	State.observerEnteredCallbacks[observer.id] = {}
 	State.observerExitedCallbacks[observer.id] = {}
 	State.observerTrackingEntities[observer.id] = {}
 	State.observerIdToObserverObj[observer.id] = observer
 	State.observerEnabled[observer.id] = true
+	State.observerSafety[observer.id] = if config and config.safety ~= nil
+		then config.safety
+		else Config.Scheduler.safety
 
 	State.nextObserverId += 1
 	return observer
@@ -749,6 +757,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerTrackingEntities[id] = nil
 	State.observerIdToObserverObj[id] = nil
 	State.observerEnabled[id] = nil
+	State.observerSafety[id] = nil
 
 	State.isDirty = true
 	setmetatable(self :: any, nil)

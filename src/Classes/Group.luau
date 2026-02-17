@@ -25,7 +25,6 @@ Group.__index = Group
 function Group.new(config: {
 	updateRate: number?,
 	precision: number?,
-	safety: boolean?,
 }?): Types.Group
 	local hz = config and config.updateRate
 	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
@@ -38,10 +37,6 @@ function Group.new(config: {
 
 	local updateRate = hz or Config.Scheduler.updateRate
 	local precision = n or Config.Scheduler.precision
-	local safety = Config.Scheduler.safety
-	if config and config.safety ~= nil then
-		safety = config.safety
-	end
 
 	local self: Types.InternalGroup = setmetatable({
 		id = id,
@@ -51,7 +46,6 @@ function Group.new(config: {
 		config = {
 			updateRate = updateRate,
 			precisionSq = precision ^ 2,
-			safety = safety,
 		},
 	}, Group) :: any
 
@@ -192,7 +186,6 @@ function Group.remove(self: Types.InternalGroup, ...: Types.Entity): Types.Group
 		local data = self.entityData[entity]
 
 		-- Trigger exit
-		local safety = self.config.safety
 		for observerId, oldZoneId in data.activeObserverMemberships do
 			if State.observerTrackingEntities[observerId] then
 				State.observerTrackingEntities[observerId][entity] = nil
@@ -203,6 +196,7 @@ function Group.remove(self: Types.InternalGroup, ...: Types.Entity): Types.Group
 				continue
 			end
 
+			local safety = State.observerSafety[observerId]
 			local z = State.zoneIdToZoneObj[oldZoneId]
 			local cd = State.entityMetadata[entity]
 			for _, fn in cbs do
@@ -268,7 +262,6 @@ function Group.setConfig(
 	config: {
 		updateRate: number?,
 		precision: number?,
-		safety: boolean?,
 	}
 ): Types.Group
 	local hz = config.updateRate
@@ -282,9 +275,6 @@ function Group.setConfig(
 	end
 	if n then
 		self.config.precisionSq = n ^ 2
-	end
-	if config.safety ~= nil then
-		self.config.safety = config.safety
 	end
 
 	return self
@@ -305,13 +295,11 @@ end
 function Group.getConfig(self: Types.InternalGroup): {
 	updateRate: number,
 	precision: number,
-	safety: boolean,
 }
 	local config = self.config
 	return {
 		updateRate = config.updateRate,
 		precision = math.sqrt(config.precisionSq),
-		safety = config.safety,
 	}
 end
 

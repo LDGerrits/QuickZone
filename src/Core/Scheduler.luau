@@ -19,6 +19,7 @@ local observerEnteredCallbacks = State.observerEnteredCallbacks
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
 local observerEnabled = State.observerEnabled
+local observerSafety = State.observerSafety
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local groupList = State.groupList
 local groupToObservers = State.groupToObservers
@@ -152,7 +153,6 @@ RunService.PostSimulation:Connect(function(dt: number)
 		local groupConfig = group.config
 		local rate = groupConfig.updateRate
 		local precisionSq = groupConfig.precisionSq
-		local safety = groupConfig.safety
 
 		local workQuota = math.ceil(totalEntities * rate * dt)
 		if workQuota < 1 then
@@ -245,6 +245,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 						local cbs = observerExitedCallbacks[observerId]
 						if cbs then
+							local safety = observerSafety[observerId]
 							local z = zoneIdToZoneObj[oldZoneId]
 							local cd = entityMetadata[entity]
 							fireCallback(cbs, entity, z, cd, safety)
@@ -262,6 +263,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						observerTrackingEntities[observerId][entity] = true
 						local cbs = observerEnteredCallbacks[observerId]
 						if cbs then
+							local safety = observerSafety[observerId]
 							local z = zoneIdToZoneObj[zoneIdx]
 							local cd = entityMetadata[entity]
 							fireCallback(cbs, entity, z, cd, safety)
