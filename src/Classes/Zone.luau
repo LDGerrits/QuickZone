@@ -21,9 +21,9 @@ local function getShapeEnumValue(part: BasePart): number
 		return Enum.PartType.Wedge.Value
 	end
 
-	-- if part:IsA('CornerWedgePart') then
-	-- 	return Enum.PartType.CornerWedge.Value
-	-- end
+	if part:IsA('CornerWedgePart') then
+		return Enum.PartType.CornerWedge.Value
+	end
 
 	-- Fallback for Meshes, Unions, CornerWedges, Trusses
 	return Enum.PartType.Block.Value
@@ -52,7 +52,6 @@ function Zone.new(
 	State.nextZoneId += 1
 
 	local halfSize = size / 2
-
 	if isDynamic then
 		dynamicCFrames[id] = cframe
 		dynamicHalfSizes[id] = halfSize
@@ -68,7 +67,6 @@ function Zone.new(
 	local self: Types.InternalZone =
 		setmetatable({ id = id, part = associatedPart, dynamic = isDynamic or false, metadata = metadata }, Zone) :: any
 	State.zoneIdToZoneObj[id] = self
-
 	return self
 end
 
@@ -240,6 +238,8 @@ function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.
 		shapeType = Enum.PartType.Ball.Value
 	elseif shape == 'Wedge' then
 		shapeType = Enum.PartType.Wedge.Value
+	elseif shape == 'CornerWedge' then
+		shapeType = Enum.PartType.CornerWedge.Value
 	else
 		shapeType = Enum.PartType.Block.Value
 	end

@@ -167,6 +167,10 @@ function QuickZone.Zone(config: {
 			shapeType = Enum.PartType.Ball.Value
 		elseif shape == 'Wedge' then
 			shapeType = Enum.PartType.Wedge.Value
+		elseif shape == 'CornerWedge' then
+			shapeType = Enum.PartType.CornerWedge.Value
+		else
+			shapeType = Enum.PartType.Block.Value
 		end
 	end
 	return Zone.new(config.cframe, config.size, shapeType, config.part, config.isDynamic, config.metadata)
@@ -182,7 +186,16 @@ end
 	@return Zone
 ]=]
 function QuickZone.ZoneFromPart(part: BasePart, config: { isDynamic: boolean?, metadata: any? }?): Zone
-	local shapeType = ((part :: any).Shape :: Enum.PartType).Value
+	local shapeType
+	if part:IsA('Part') then
+		shapeType = part.Shape.Value
+	elseif part:IsA('WedgePart') then
+		shapeType = Enum.PartType.Wedge.Value
+	elseif part:IsA('CornerWedgePart') then
+		shapeType = Enum.PartType.CornerWedge.Value
+	else
+		shapeType = Enum.PartType.Block.Value
+	end
 	return Zone.new(part.CFrame, part.Size, shapeType, part, config and config.isDynamic, config and config.metadata)
 end
 
