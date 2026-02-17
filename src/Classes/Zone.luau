@@ -12,6 +12,14 @@ local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
 
+local SHAPE_MAP = {
+	Block = Enum.PartType.Block.Value,
+	Cylinder = Enum.PartType.Cylinder.Value,
+	Ball = Enum.PartType.Ball.Value,
+	Wedge = Enum.PartType.Wedge.Value,
+	CornerWedge = Enum.PartType.CornerWedge.Value,
+}
+
 local function getShapeEnumValue(part: BasePart): number
 	if part:IsA('Part') then
 		return part.Shape.Value
@@ -40,34 +48,141 @@ end
 local Zone = {}
 Zone.__index = Zone
 
-function Zone.new(
+local function newZoneInternal(
 	cframe: CFrame,
 	size: Vector3,
 	shapeType: number,
-	associatedPart: BasePart?,
-	isDynamic: boolean?,
+	part: BasePart?,
+	isDynamic: boolean,
 	metadata: any?
 ): Types.Zone
 	local id = State.nextZoneId
 	State.nextZoneId += 1
 
-	local halfSize = size / 2
+	local halfSize = size * 0.5
 	if isDynamic then
-		dynamicCFrames[id] = cframe
-		dynamicHalfSizes[id] = halfSize
-		dynamicTypes[id] = shapeType
+		State.dynamicCFrames[id] = cframe
+		State.dynamicHalfSizes[id] = halfSize
+		State.dynamicTypes[id] = shapeType
 		State.pendingDynamicRebuild = true
 	else
-		staticCFrames[id] = cframe
-		staticHalfSizes[id] = halfSize
-		staticTypes[id] = shapeType
+		State.staticCFrames[id] = cframe
+		State.staticHalfSizes[id] = halfSize
+		State.staticTypes[id] = shapeType
 		State.pendingStaticRebuild = true
 	end
 
-	local self: Types.InternalZone =
-		setmetatable({ id = id, part = associatedPart, dynamic = isDynamic or false, metadata = metadata }, Zone) :: any
-	State.zoneIdToZoneObj[id] = self
-	return self
+	local self = setmetatable({
+		id = id,
+		part = part,
+		dynamic = isDynamic,
+		metadata = metadata,
+	}, Zone)
+
+	State.zoneIdToZoneObj[id] = self :: any
+	return self :: any
+end
+
+--[=[ 
+	Creates a Zone object.
+
+	```lua
+	local zone = QuickZone.Zone({
+		cframe = CFrame.new(0, 10, 0),
+		size = Vector3.new(10, 10, 10),
+		shape = 'Block',
+		metadata = { Name = "Lobby" }
+	})
+	```
+
+	:::caution Performance
+	If this zone moves (e.g., attached to a moving platform) or changes size, 
+	you **must** set `isDynamic` to `true`. 
+
+	Static zones are optimized into a large, pre-calculated tree. Updating a 
+	static zone forces a full recalculation of that tree, which is expensive. 
+	Dynamic zones are handled separately and are much cheaper to update.
+	:::
+
+	@tag Constructor
+	@param config ZoneConfig
+	@return Zone
+]=]
+function Zone.new(config: Types.ZoneConfig): Types.Zone
+	local shapeType = Enum.PartType.Block.Value
+
+	if config.shape then
+		local mapped = SHAPE_MAP[config.shape]
+		if mapped then
+			shapeType = mapped
+		else
+			warn(`[QuickZone] Invalid shape '{config.shape}'. Defaulting to Block.`)
+		end
+	end
+
+	return newZoneInternal(
+		config.cframe,
+		config.size,
+		shapeType,
+		config.part,
+		config.isDynamic or false,
+		config.metadata
+	)
+end
+
+--[=[ 
+	Creates a Zone automatically based on a Part's properties.
+	Supported shapes: Block, Ball (Spheres), Cylinder, and Wedge.
+
+	@tag Constructor
+	@param part BasePart -- The part to derive the zone from.
+	@param config { isDynamic: boolean?, metadata: any? }?
+	@return Zone
+]=]
+function Zone.fromPart(part: BasePart, config: { isDynamic: boolean?, metadata: any? }?): Types.Zone
+	local shapeId = Enum.PartType.Block.Value
+	if part:IsA('Part') then
+		shapeId = part.Shape.Value
+	elseif part:IsA('WedgePart') then
+		shapeId = Enum.PartType.Wedge.Value
+	elseif part:IsA('CornerWedgePart') then
+		shapeId = Enum.PartType.CornerWedge.Value
+	end
+
+	local isDynamic = config and config.isDynamic or false
+	local metadata = config and config.metadata
+
+	return newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata)
+end
+
+--[=[ 
+	Create a list of zones corresponding to the list of `BaseParts`.
+	Each zone corresponds to a `BasePart` and shares the same properties.
+
+	@tag Constructor
+	@param part { BasePart } -- The parts to derive the zones from.
+	@param config { isDynamic: boolean?, metadata: any? }? -- Optional config shared across all zones
+	@return { Zone }
+]=]
+function Zone.fromParts(parts: { BasePart }, config: { isDynamic: boolean?, metadata: any? }?): { Types.Zone }
+	local zones = table.create(#parts)
+	local isDynamic = config and config.isDynamic or false
+	local metadata = config and config.metadata
+
+	for i, part in parts do
+		local shapeId = Enum.PartType.Block.Value
+		if part:IsA('Part') then
+			shapeId = part.Shape.Value
+		elseif part:IsA('WedgePart') then
+			shapeId = Enum.PartType.Wedge.Value
+		elseif part:IsA('CornerWedgePart') then
+			shapeId = Enum.PartType.CornerWedge.Value
+		end
+
+		zones[i] = newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata)
+	end
+
+	return zones
 end
 
 --[=[ 
@@ -229,19 +344,13 @@ end
 	@return Zone
 ]=]
 function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.Zone
-	local shapeType
-	if shape == 'Block' then
-		shapeType = Enum.PartType.Block.Value
-	elseif shape == 'Cylinder' then
-		shapeType = Enum.PartType.Cylinder.Value
-	elseif shape == 'Ball' then
-		shapeType = Enum.PartType.Ball.Value
-	elseif shape == 'Wedge' then
-		shapeType = Enum.PartType.Wedge.Value
-	elseif shape == 'CornerWedge' then
-		shapeType = Enum.PartType.CornerWedge.Value
+	local shapeType = Enum.PartType.Block.Value
+
+	local mapped = SHAPE_MAP[shape]
+	if mapped then
+		shapeType = mapped
 	else
-		shapeType = Enum.PartType.Block.Value
+		warn(`[QuickZone] Invalid shape '{shape}'. Defaulting to Block.`)
 	end
 
 	if self.dynamic then

@@ -52,6 +52,19 @@ end
 local Observer = {}
 Observer.__index = Observer
 
+--[=[ 
+	Creates an Observer. Observers listen for entities entering or exiting assigned Zones.
+
+	:::info Resolution Priority
+	The `priority` value is used to resolve overlaps. When an entity is 
+	inside multiple zones watched by different observers, higher priority 
+	observers take complete control.
+	:::
+
+	@tag Constructor
+	@param config { priority: number?, enabled: boolean?, safety: boolean? }?
+	@return Observer
+]=]
 function Observer.new(config: {
 	priority: number?,
 	enabled: boolean?,

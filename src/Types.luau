@@ -46,28 +46,9 @@ export type ZoneConfig = {
 }
 
 export type QuickZone = {
-	Zone: (ZoneConfig) -> Zone,
-	ZoneFromPart: (part: BasePart, {
-		isDynamic: boolean?,
-		metadata: any?,
-	}?) -> Zone,
-	Observer: (config: {
-		priority: number?,
-		enabled: boolean?,
-		safety: boolean?,
-	}?) -> Observer,
-	Group: ({
-		updateRate: number?,
-		precision: number?,
-	}?) -> Group,
-	PlayerGroup: ({
-		updateRate: number?,
-		precision: number?,
-	}?) -> Group,
-	LocalPlayerGroup: ({
-		updateRate: number?,
-		precision: number?,
-	}?) -> Group,
+	Zone: Zone,
+	Observer: Observer,
+	Group: Group,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
@@ -80,7 +61,9 @@ export type QuickZone = {
 }
 
 export type Zone = {
-	destroy: (self: Zone) -> (),
+	new: (config: ZoneConfig) -> Zone,
+	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any? }?) -> Zone,
+	fromParts: (parts: { BasePart }, config: { isDynamic: boolean?, metadata: any? }?) -> { Zone },
 	attach: (self: Zone, ...Observer) -> Zone,
 	detach: (self: Zone, ...Observer) -> Zone,
 	syncToPart: (self: Zone) -> Zone,
@@ -99,6 +82,7 @@ export type Zone = {
 	getObservers: (self: Zone) -> { Observer },
 	isDynamic: (self: Zone) -> boolean,
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
+	destroy: (self: Zone) -> (),
 }
 
 export type InternalZone = Zone & {
@@ -111,7 +95,11 @@ export type InternalZone = Zone & {
 export type Callback = (Entity, Zone, any?) -> ()
 
 export type Observer = {
-	destroy: (self: Observer) -> (),
+	new: (config: {
+		priority: number?,
+		enabled: boolean?,
+		safety: boolean?,
+	}?) -> Observer,
 	subscribe: (self: Observer, ...Group) -> Observer,
 	unsubscribe: (self: Observer, ...Group) -> Observer,
 	setPriority: (self: Observer, n: number) -> Observer,
@@ -137,6 +125,7 @@ export type Observer = {
 	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
+	destroy: (self: Observer) -> (),
 }
 
 export type InternalObserver = Observer & {
@@ -144,7 +133,18 @@ export type InternalObserver = Observer & {
 }
 
 export type Group = {
-	destroy: (self: Group) -> (),
+	new: (config: {
+		updateRate: number?,
+		precision: number?,
+	}?) -> Group,
+	players: (config: {
+		updateRate: number?,
+		precision: number?,
+	}?) -> Group,
+	localPlayer: (config: {
+		updateRate: number?,
+		precision: number?,
+	}?) -> Group,
 	add: (self: Group, entity: Entity, metadata: any?) -> Group,
 	remove: (self: Group, ...Entity) -> Group,
 	setConfig: (self: Group, {
@@ -163,6 +163,7 @@ export type Group = {
 		precision: number,
 	},
 	contains: (self: Group, entity: Entity) -> boolean,
+	destroy: (self: Group) -> (),
 }
 
 export type InternalGroup = Group & {

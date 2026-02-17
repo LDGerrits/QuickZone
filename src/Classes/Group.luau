@@ -1,14 +1,102 @@
 --!strict
+local Players = game:GetService('Players')
+local RunService = game:GetService('RunService')
 
 local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+
+local sharedPlayerGroup: Types.Group?
+local sharedLocalPlayerGroup: Types.Group?
+local bridgeRefreshPlayerGroup: ((Player) -> ())?
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 local STRAT_PIVOT = Config.Strategy.PIVOT
+
+local IS_CLIENT = RunService:IsClient()
+
+local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [Player]: () -> () })
+	if trackerStore[player] then
+		return
+	end
+
+	local charConns: { RBXScriptConnection } = {}
+	local currentHrp: BasePart? = nil
+
+	local function cleanCharacter()
+		if currentHrp then
+			group:remove(currentHrp)
+			currentHrp = nil
+		end
+		for _, c in charConns do
+			c:Disconnect()
+		end
+		table.clear(charConns)
+	end
+
+	local function onCharAdded(char: Model)
+		cleanCharacter()
+
+		task.spawn(function()
+			-- To prioritize LocalPlayerGroup, do early return if it is local player and LocalPlayerGroup exists
+			if
+				IS_CLIENT
+				and group == sharedPlayerGroup
+				and player == Players.LocalPlayer
+				and sharedLocalPlayerGroup
+			then
+				return
+			end
+
+			local hrp = char:WaitForChild('HumanoidRootPart', 10)
+
+			if not hrp or not player:IsDescendantOf(Players) then
+				return
+			end
+
+			if player.Character ~= char then
+				return
+			end
+
+			if hrp:IsA('BasePart') then
+				currentHrp = hrp
+
+				group:add(hrp, { Player = player }) -- Custom data is needed to trigger specific player events
+
+				table.insert(
+					charConns,
+					hrp.AncestryChanged:Connect(function(_, parent)
+						if not parent then
+							cleanCharacter()
+						end
+					end)
+				)
+			end
+		end)
+	end
+
+	local addedConn = player.CharacterAdded:Connect(onCharAdded)
+
+	trackerStore[player] = function()
+		addedConn:Disconnect()
+		cleanCharacter()
+	end
+
+	if player.Character then
+		onCharAdded(player.Character)
+	end
+end
+
+local function untrackPlayer(player: Player, trackerStore: { [Player]: () -> () })
+	local cleanup = trackerStore[player]
+	if cleanup then
+		cleanup()
+		trackerStore[player] = nil
+	end
+end
 
 --[=[ 
 	Groups represent a collection of entities that should be tracked by the system.
@@ -22,6 +110,21 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 local Group = {}
 Group.__index = Group
 
+--[=[ 
+	Creates a generic Group. 
+	Groups manage collections of Entities (any instance with a position in the world like BaseParts, Models, Attachments, etc.) that Observers should track.
+
+	```lua
+	local myGroup = Group.new({
+		updateRate = 20, -- Check at 20Hz
+		precision = 0.5, -- Ignore movement smaller than 0.5 studs
+	})
+	```
+
+	@tag Constructor
+	@param config { updateRate: number?, precision: number? }?
+	@return Group
+]=]
 function Group.new(config: {
 	updateRate: number?,
 	precision: number?,
@@ -54,6 +157,132 @@ function Group.new(config: {
 	table.insert(State.groupList, self)
 
 	return self
+end
+
+--[=[ 
+	Returns a singleton Group that automatically tracks all Players in the server.
+
+	:::info Behavior
+	* Automatically tracks the `HumanoidRootPart` of every player.
+	* Handles `PlayerAdded` and `CharacterAdded` internally.
+	* If a LocalPlayerGroup exists on the client, the local player is excluded 
+	  from this group to avoid duplicate tracking.
+	:::
+
+	@tag Constructor
+	@param config { updateRate: number?, precision: number?}?
+	@return Group
+]=]
+function Group.players(config: {
+	updateRate: number?,
+	precision: number?,
+}?): Types.Group
+	if sharedPlayerGroup then
+		if config then
+			sharedPlayerGroup:setConfig(config)
+		end
+		return sharedPlayerGroup
+	end
+
+	local group = Group.new(config)
+	sharedPlayerGroup = group
+
+	local trackerStore = {} :: { [Player]: () -> () }
+	local mainConnections = {} :: { RBXScriptConnection }
+
+	bridgeRefreshPlayerGroup = function(player: Player)
+		untrackPlayer(player, trackerStore)
+		trackPlayer(group, player, trackerStore)
+	end
+
+	table.insert(
+		mainConnections,
+		Players.PlayerAdded:Connect(function(player)
+			trackPlayer(group, player, trackerStore)
+		end)
+	)
+
+	table.insert(
+		mainConnections,
+		Players.PlayerRemoving:Connect(function(player)
+			untrackPlayer(player, trackerStore)
+		end)
+	)
+
+	for _, player in Players:GetPlayers() do
+		trackPlayer(group, player, trackerStore)
+	end
+
+	local originalDestroyHook = group.destroy
+	group.destroy = function(self)
+		for _, conn in mainConnections do
+			conn:Disconnect()
+		end
+		for _, cleanup in trackerStore do
+			cleanup()
+		end
+
+		table.clear(mainConnections)
+		table.clear(trackerStore)
+
+		bridgeRefreshPlayerGroup = nil
+		sharedPlayerGroup = nil
+
+		originalDestroyHook(self)
+	end
+
+	return group
+end
+
+--[=[ 
+	Returns a singleton Group that tracks only the LocalPlayer.
+
+	:::info Behavior
+	* This group takes 'ownership of the local player's character.
+	* When this group is destroyed, the local player is automatically handed back 
+	  to the global `PlayerGroup` if it exists.
+	:::
+
+	@client
+	@tag Constructor
+	@param config { updateRate: number?, precision: number? }?
+	@return Group
+]=]
+function Group.localPlayer(config: {
+	updateRate: number?,
+	precision: number?,
+}?): Types.Group
+	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
+
+	if sharedLocalPlayerGroup then
+		if config then
+			sharedLocalPlayerGroup:setConfig(config)
+		end
+		return sharedLocalPlayerGroup
+	end
+
+	local group = Group.new(config)
+	sharedLocalPlayerGroup = group
+
+	local lp = Players.LocalPlayer
+	local trackers = {}
+
+	trackPlayer(group, lp, trackers)
+
+	local originalDestroyHook = group.destroy
+	group.destroy = function(self)
+		untrackPlayer(lp, trackers)
+		sharedLocalPlayerGroup = nil
+
+		-- The player should immediately be handed over to PlayerGroup
+		if bridgeRefreshPlayerGroup then
+			bridgeRefreshPlayerGroup(Players.LocalPlayer)
+		end
+
+		originalDestroyHook(self)
+	end
+
+	return group
 end
 
 --[=[ 
@@ -128,12 +357,7 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity, metadata: an
 	end
 
 	if not strat then
-		warn(
-			string.format(
-				'[QuickZone] Group:add skipped invalid entity (%s). Expected BasePart, Model, etc.',
-				tostring(entity)
-			)
-		)
+		warn(string.format('[QuickZone] Invalid entity (%s). Expected BasePart, Model, etc.', tostring(entity)))
 		return self
 	end
 
