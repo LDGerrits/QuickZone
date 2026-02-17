@@ -30,9 +30,9 @@ export type Entity = Types.Entity
 	@class QuickZone
 ]=]
 local QuickZone = {
-	Zone = require(script.Classes.Zone) :: Zone,
-	Observer = require(script.Classes.Observer) :: Observer,
-	Group = require(script.Classes.Group) :: Group,
+	Zone = require(script.Classes.Zone) :: Types.ZoneClass,
+	Observer = require(script.Classes.Observer) :: Types.ObserverClass,
+	Group = require(script.Classes.Group) :: Types.GroupClass,
 }
 
 --[=[ 

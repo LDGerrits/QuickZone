@@ -46,9 +46,9 @@ export type ZoneConfig = {
 }
 
 export type QuickZone = {
-	Zone: Zone,
-	Observer: Observer,
-	Group: Group,
+	Zone: ZoneClass,
+	Observer: ObserverClass,
+	Group: GroupClass,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
@@ -60,10 +60,13 @@ export type QuickZone = {
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,
 }
 
-export type Zone = {
+export type ZoneClass = {
 	new: (config: ZoneConfig) -> Zone,
 	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any? }?) -> Zone,
 	fromParts: (parts: { BasePart }, config: { isDynamic: boolean?, metadata: any? }?) -> { Zone },
+}
+
+export type Zone = {
 	attach: (self: Zone, ...Observer) -> Zone,
 	detach: (self: Zone, ...Observer) -> Zone,
 	syncToPart: (self: Zone) -> Zone,
@@ -94,12 +97,15 @@ export type InternalZone = Zone & {
 
 export type Callback = (Entity, Zone, any?) -> ()
 
-export type Observer = {
+export type ObserverClass = {
 	new: (config: {
 		priority: number?,
 		enabled: boolean?,
 		safety: boolean?,
 	}?) -> Observer,
+}
+
+export type Observer = {
 	subscribe: (self: Observer, ...Group) -> Observer,
 	unsubscribe: (self: Observer, ...Group) -> Observer,
 	setPriority: (self: Observer, n: number) -> Observer,
@@ -132,7 +138,7 @@ export type InternalObserver = Observer & {
 	id: number,
 }
 
-export type Group = {
+export type GroupClass = {
 	new: (config: {
 		updateRate: number?,
 		precision: number?,
@@ -145,6 +151,10 @@ export type Group = {
 		updateRate: number?,
 		precision: number?,
 	}?) -> Group,
+}
+
+export type Group = {
+
 	add: (self: Group, entity: Entity, metadata: any?) -> Group,
 	remove: (self: Group, ...Entity) -> Group,
 	setConfig: (self: Group, {
