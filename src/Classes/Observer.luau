@@ -509,6 +509,19 @@ function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Ty
 	return self
 end
 
+--[=[
+	Whether to wrap callbacks in task.spawn (safe) or not (unsafe).
+
+	@method setSafety
+	@within Observer
+	@param enabled boolean
+	@return Observer
+]=]
+function Observer.setSafety(self: Types.InternalObserver, enabled: boolean): Types.Observer
+	State.observerSafety[self.id] = enabled
+	return self
+end
+
 --[=[ 
 	Updates the resolution priority of the observer.
 	@method setPriority
@@ -639,6 +652,17 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 	end
 
 	return isInside
+end
+
+--[=[ 
+	Checks if the observer wraps callbacks in task.spawn (safe) or not (unsafe).
+
+	@method isSafe
+	@within Observer
+	@return boolean
+]=]
+function Observer.isSafe(self: Types.InternalObserver): boolean
+	return State.observerSafety[self.id]
 end
 
 --[=[ 

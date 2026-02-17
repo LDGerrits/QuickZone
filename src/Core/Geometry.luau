@@ -90,10 +90,6 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 	if shapeType == BLOCK_SHAPE_VALUE then
 		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
 		return vector.min(localPoint, halfSize) == localPoint
-	elseif shapeType == BALL_SHAPE_VALUE then
-		local radiusSq = halfSize.X * halfSize.X
-		local position = cframe.Position
-		return vector.dot(position - point, position - point) <= radiusSq
 	elseif shapeType == CYLINDER_SHAPE_VALUE then
 		local position = cframe.Position
 		local halfHeight = halfSize.X
@@ -108,6 +104,10 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 			return distanceSq <= radiusSq
 		end
 		return false
+	elseif shapeType == BALL_SHAPE_VALUE then
+		local radiusSq = halfSize.X * halfSize.X
+		local position = cframe.Position
+		return vector.dot(position - point, position - point) <= radiusSq
 	elseif shapeType == WEDGE_SHAPE_VALUE then
 		local localPoint = cframe:PointToObjectSpace(point)
 		local absolutePoint = vector.abs(localPoint)

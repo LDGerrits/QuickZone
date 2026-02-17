@@ -281,12 +281,33 @@ function Group.setConfig(
 end
 
 --[=[
-	Returns the current configuration settings for this group.
+	Set the update rate of the group.
 
-	```lua
-	local config = myGroup:getConfig()
-	print('Update Rate: ' .. config.updateRate .. 'Hz')
-	```
+	@method setUpdateRate
+	@within Group
+	@param updateRate number
+	@return Group
+]=]
+function Group.setUpdateRate(self: Types.InternalGroup, updateRate: number): Types.Group
+	self.config.updateRate = updateRate
+	return self
+end
+
+--[=[
+	Returns the current precision of the group.
+
+	@method setPrecision
+	@within Group
+	@param precision number
+	@return Group
+]=]
+function Group.setPrecision(self: Types.InternalGroup, precision: number): Types.Group
+	self.config.precisionSq = precision ^ 2
+	return self
+end
+
+--[=[
+	Returns the current configuration settings for the group.
 
 	@method getConfig
 	@within Group
@@ -303,8 +324,30 @@ function Group.getConfig(self: Types.InternalGroup): {
 	}
 end
 
+--[=[
+	Returns the current update rate of the group.
+
+	@method getUpdateRate
+	@within Group
+	@return number
+]=]
+function Group.getUpdateRate(self: Types.InternalGroup): number
+	return self.config.updateRate
+end
+
+--[=[
+	Returns the current precision of the group.
+
+	@method getPrecision
+	@within Group
+	@return number
+]=]
+function Group.getPrecision(self: Types.InternalGroup): number
+	return math.sqrt(self.config.precisionSq)
+end
+
 --[=[ 
-	Returns the unique internal ID of this group.
+	Returns the unique internal ID of the group.
 
 	@method getId
 	@within Group
@@ -315,7 +358,7 @@ function Group.getId(self: Types.InternalGroup): number
 end
 
 --[=[ 
-	Returns a list of all entities currently belonging to this group.
+	Returns a list of all entities currently belonging to the group.
 
 	@method getEntities
 	@within Group
@@ -328,7 +371,7 @@ function Group.getEntities(self: Types.InternalGroup): { Types.Entity }
 end
 
 --[=[
-	Returns a list of all Observers currently watching this group.
+	Returns a list of all Observers currently watching the group.
 
 	```lua
 	local observers = myGroup:getObservers()

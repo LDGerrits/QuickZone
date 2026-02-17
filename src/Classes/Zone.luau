@@ -4,6 +4,31 @@ local Geometry = require(script.Parent.Parent.Core.Geometry)
 local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
+local staticCFrames = State.staticCFrames
+local staticHalfSizes = State.staticHalfSizes
+local staticTypes = State.staticTypes
+
+local dynamicCFrames = State.dynamicCFrames
+local dynamicHalfSizes = State.dynamicHalfSizes
+local dynamicTypes = State.dynamicTypes
+
+local function getShapeEnumValue(part: BasePart): number
+	if part:IsA('Part') then
+		return part.Shape.Value
+	end
+
+	if part:IsA('WedgePart') then
+		return Enum.PartType.Wedge.Value
+	end
+
+	-- if part:IsA('CornerWedgePart') then
+	-- 	return Enum.PartType.CornerWedge.Value
+	-- end
+
+	-- Fallback for Meshes, Unions, CornerWedges, Trusses
+	return Enum.PartType.Block.Value
+end
+
 --[=[ 
 	Zones define physical areas in world space. They can be static or dynamic 
 	and support shapes like Blocks, Balls, and Cylinders.
@@ -29,14 +54,14 @@ function Zone.new(
 	local halfSize = size / 2
 
 	if isDynamic then
-		State.dynamicCFrames[id] = cframe
-		State.dynamicHalfSizes[id] = halfSize
-		State.dynamicTypes[id] = shapeType
+		dynamicCFrames[id] = cframe
+		dynamicHalfSizes[id] = halfSize
+		dynamicTypes[id] = shapeType
 		State.pendingDynamicRebuild = true
 	else
-		State.staticCFrames[id] = cframe
-		State.staticHalfSizes[id] = halfSize
-		State.staticTypes[id] = shapeType
+		staticCFrames[id] = cframe
+		staticHalfSizes[id] = halfSize
+		staticTypes[id] = shapeType
 		State.pendingStaticRebuild = true
 	end
 
@@ -102,52 +127,131 @@ function Zone.detach(self: Types.InternalZone, ...: Types.InternalObserver): Typ
 end
 
 --[=[ 
-	Updates the zone's position and size.
+	Update the zone to the part's current CFrame, Size and Shape.
 
-	```lua
-	-- Manual update
-	zone:update(CFrame.new(0, 20, 0), Vector3.new(5, 5, 5))
-
-	-- Sync with associated part
-	zone:update()
-	```
-
-	:::info Auto-Sync
-	If the zone was created with an `associatedPart`, calling `update()` 
-	without arguments will automatically sync the zone to that part's current 
-	CFrame and Size.
-	:::
-
-	@method update
+	@method syncToPart
 	@within Zone
-	@param newCFrame CFrame? -- Optional new position/rotation.
-	@param newSize Vector3? -- Optional new dimensions.
 	@return Zone
 ]=]
-function Zone.update(self: Types.InternalZone, newCFrame: CFrame?, newSize: Vector3?): Types.Zone
-	-- If no arguments, use reference part if possible
-	if not newCFrame and self.part then
-		newCFrame = self.part.CFrame
-		newSize = self.part.Size
-	end
-
-	if not newCFrame or not newSize then
-		warn('[QuickZone] Zone:update failed. No Part given and no CFrame provided.')
+function Zone.syncToPart(self: Types.InternalZone): Types.Zone
+	local part = self.part
+	if not part then
+		warn('[QuickZone] Zone:syncToPart failed. No reference part found.')
 		return self
 	end
 
-	local halfSize = newSize / 2
+	local id = self.id
+	local newCFrame = part.CFrame
+	local halfSize = part.Size * 0.5
+	local shapeType = getShapeEnumValue(part)
 
 	if self.dynamic then
-		State.dynamicCFrames[self.id] = newCFrame
-		State.dynamicHalfSizes[self.id] = halfSize
+		if dynamicCFrames[id] == newCFrame and dynamicHalfSizes[id] == halfSize and dynamicTypes[id] == shapeType then
+			return self
+		end
+
+		dynamicCFrames[id] = newCFrame
+		dynamicHalfSizes[id] = halfSize
+		dynamicTypes[id] = shapeType
 		State.pendingDynamicRebuild = true
 	else
-		State.staticCFrames[self.id] = newCFrame
-		State.staticHalfSizes[self.id] = halfSize
+		if staticCFrames[id] == newCFrame and staticHalfSizes[id] == halfSize and staticTypes[id] == shapeType then
+			return self
+		end
+
+		staticCFrames[id] = newCFrame
+		staticHalfSizes[id] = halfSize
+		staticTypes[id] = shapeType
 		State.pendingStaticRebuild = true
 	end
 
+	return self
+end
+
+--[=[ 
+	Updates the Zone's CFrame.
+
+	@method setCFrame
+	@within Zone
+	@param cf CFrame
+	@return Zone
+]=]
+function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
+	if self.dynamic then
+		dynamicCFrames[self.id] = cf
+		State.pendingDynamicRebuild = true
+	else
+		staticCFrames[self.id] = cf
+		State.pendingStaticRebuild = true
+	end
+	return self
+end
+
+--[=[ 
+	Updates the Zone's Position while preserving its current Rotation.
+
+	@method setPosition
+	@within Zone
+	@param pos Vector3
+	@return Zone
+]=]
+function Zone.setPosition(self: Types.InternalZone, pos: Vector3): Types.Zone
+	local currentCF = self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
+	local newCF = currentCF.Rotation + pos
+	return self:setCFrame(newCF)
+end
+
+--[=[ 
+	Updates the Zone's Size.
+
+	@method setSize
+	@within Zone
+	@param size Vector3
+	@return Zone
+]=]
+function Zone.setSize(self: Types.InternalZone, size: Vector3): Types.Zone
+	local halfSize = size * 0.5
+
+	if self.dynamic then
+		dynamicHalfSizes[self.id] = halfSize
+		State.pendingDynamicRebuild = true
+	else
+		staticHalfSizes[self.id] = halfSize
+		State.pendingStaticRebuild = true
+	end
+	return self
+end
+
+--[=[ 
+	Updates the Zone's geometric shape.
+	
+	@method setShape
+	@within Zone
+	@param shape ShapeType
+	@return Zone
+]=]
+function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.Zone
+	local shapeType
+	if shape == 'Block' then
+		shapeType = Enum.PartType.Block.Value
+	elseif shape == 'Cylinder' then
+		shapeType = Enum.PartType.Cylinder.Value
+	elseif shape == 'Ball' then
+		shapeType = Enum.PartType.Ball.Value
+	elseif shape == 'Wedge' then
+		shapeType = Enum.PartType.Wedge.Value
+	else
+		shapeType = Enum.PartType.Block.Value
+	end
+
+	if self.dynamic then
+		dynamicTypes[self.id] = shapeType
+	else
+		staticTypes[self.id] = shapeType
+	end
+
+	-- Changing the shape doesn't need a rebuild.
+	State.isDirty = true
 	return self
 end
 
@@ -199,12 +303,12 @@ end
 --[=[
 	Returns the current position of the zone.
 
-	@method getPositioin
+	@method getPosition
 	@within Zone
 	@return CFrame
 ]=]
 function Zone.getPosition(self: Types.InternalZone): Vector3
-	local cf = self.dynamic and State.dynamicCFrames[self.id] or State.staticCFrames[self.id]
+	local cf = self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
 	return cf.Position
 end
 
@@ -216,7 +320,7 @@ end
 	@return CFrame
 ]=]
 function Zone.getCFrame(self: Types.InternalZone): CFrame
-	return self.dynamic and State.dynamicCFrames[self.id] or State.staticCFrames[self.id]
+	return self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
 end
 
 --[=[
@@ -227,7 +331,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getSize(self: Types.InternalZone): Vector3
-	local halfSize = self.dynamic and State.dynamicHalfSizes[self.id] or State.staticHalfSizes[self.id]
+	local halfSize = self.dynamic and dynamicHalfSizes[self.id] or staticHalfSizes[self.id]
 	return halfSize * 2
 end
 
@@ -239,7 +343,7 @@ end
 	@return ShapeType
 ]=]
 function Zone.getShape(self: Types.InternalZone): Types.ShapeType
-	local shapeType = self.dynamic and State.dynamicTypes[self.id] or State.staticTypes[self.id]
+	local shapeType = self.dynamic and dynamicTypes[self.id] or staticTypes[self.id]
 	if shapeType == Enum.PartType.Block.Value then
 		return 'Block'
 	elseif shapeType == Enum.PartType.Ball.Value then
@@ -310,14 +414,14 @@ function Zone.destroy(self: Types.InternalZone): ()
 	State.zoneIdToZoneObj[self.id] = nil
 
 	if self.dynamic then
-		State.dynamicCFrames[self.id] = nil
-		State.dynamicHalfSizes[self.id] = nil
-		State.dynamicTypes[self.id] = nil
+		dynamicCFrames[self.id] = nil
+		dynamicHalfSizes[self.id] = nil
+		dynamicTypes[self.id] = nil
 		State.pendingDynamicRebuild = true
 	else
-		State.staticCFrames[self.id] = nil
-		State.staticHalfSizes[self.id] = nil
-		State.staticTypes[self.id] = nil
+		staticCFrames[self.id] = nil
+		staticHalfSizes[self.id] = nil
+		staticTypes[self.id] = nil
 		State.pendingStaticRebuild = true
 	end
 
