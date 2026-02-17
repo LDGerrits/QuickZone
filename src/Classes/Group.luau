@@ -291,13 +291,8 @@ end
 
 	#### Example: Adding Different Entity Types
 	```lua
-	local myGroup = QuickZone.Group()
-
-	-- Adding a BasePart
-	myGroup:add(workspace.Part)
-
-	-- Adding a Model with custom metadata
-	myGroup:add(workspace.NPCModel, { Type = 'Enemy', Level = 42 })
+	-- Adding a BasePart and a Model with custom metadata (using chaining)
+	myGroup:add(workspace.Part):add(workspace.NPCModel, { Type = 'Enemy', Level = 42 })
 
 	-- Adding a custom table
 	local spell = {
@@ -312,6 +307,7 @@ end
 	* **BasePart:** Uses `Position`
 	* **Model:** Uses `PrimaryPart.Position` or `GetPivot()`
 	* **Attachment/Bone:** Uses `WorldPosition`
+	* **Camera:** Uses `CFrame`
 	* **Table:** Looks for `.Position`, `.CFrame`, `.WorldPosition`, or `:GetPivot()`.
 	:::
 
@@ -386,72 +382,98 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity, metadata: an
 end
 
 --[=[ 
-	Removes one or more entities from the group.
+	Adds multiple entities to the group.
 
 	```lua
-	-- Single removal
-	myGroup:remove(workspace.Part)
-
-	-- Multiple removal in one call
-	myGroup:remove(partA, partB, modelC, spellTable)
+	-- Add an entire folder of NPCs at once
+	myGroup:addBulk(workspace.Enemies:GetChildren(), { Team = "Red" })
 	```
-	
-	@method remove
+
+	@method addBulk
 	@within Group
-	@param ... Entity -- The entities to stop tracking.
+	@param entities { Entity } -- Array of entities to add.
+	@param metadata any? -- Optional metadata applied to all added entities.
 	@return Group
 ]=]
-function Group.remove(self: Types.InternalGroup, ...: Types.Entity): Types.Group
-	for _, entity in { ... } do
-		if State.entityToGroup[entity] ~= self.id then
+function Group.addBulk(self: Types.InternalGroup, entities: { Types.Entity }, metadata: any?): Types.Group
+	for _, entity in entities do
+		self:add(entity, metadata)
+	end
+	return self
+end
+
+--[=[ 
+	Removes the entity from the group.
+
+	@method remove
+	@within Group
+	@param entity Entity
+	@return Group
+]=]
+function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+	if State.entityToGroup[entity] ~= self.id then
+		return self
+	end
+
+	local data = self.entityData[entity]
+
+	-- Trigger exit
+	for observerId, oldZoneId in data.activeObserverMemberships do
+		if State.observerTrackingEntities[observerId] then
+			State.observerTrackingEntities[observerId][entity] = nil
+		end
+
+		local cbs = State.observerExitedCallbacks[observerId]
+		if not cbs then
 			continue
 		end
 
-		local data = self.entityData[entity]
-
-		-- Trigger exit
-		for observerId, oldZoneId in data.activeObserverMemberships do
-			if State.observerTrackingEntities[observerId] then
-				State.observerTrackingEntities[observerId][entity] = nil
-			end
-
-			local cbs = State.observerExitedCallbacks[observerId]
-			if not cbs then
-				continue
-			end
-
-			local safety = State.observerSafety[observerId]
-			local z = State.zoneIdToZoneObj[oldZoneId]
-			local cd = State.entityMetadata[entity]
-			for _, fn in cbs do
-				if safety then
-					task.spawn(fn, entity, z, cd)
-				else
-					fn(entity, z, cd)
-				end
+		local safety = State.observerSafety[observerId]
+		local z = State.zoneIdToZoneObj[oldZoneId]
+		local cd = State.entityMetadata[entity]
+		for _, fn in cbs do
+			if safety then
+				task.spawn(fn, entity, z, cd)
+			else
+				fn(entity, z, cd)
 			end
 		end
-
-		-- Swap-remove from Array
-		local idx = self.entityIndices[entity]
-		local lastIdx = #self.entities
-		local lastEntity = self.entities[lastIdx]
-
-		if idx == lastIdx then
-			self.entities[lastIdx] = nil
-			self.entityIndices[entity] = nil
-		else
-			self.entities[idx] = lastEntity
-			self.entityIndices[lastEntity] = idx
-			self.entities[lastIdx] = nil
-			self.entityIndices[entity] = nil
-		end
-
-		self.entityData[entity] = nil
-		State.entityToGroup[entity] = nil
-		State.entityMetadata[entity] = nil
 	end
 
+	-- Swap-remove from Array
+	local idx = self.entityIndices[entity]
+	local lastIdx = #self.entities
+	local lastEntity = self.entities[lastIdx]
+
+	if idx == lastIdx then
+		self.entities[lastIdx] = nil
+		self.entityIndices[entity] = nil
+	else
+		self.entities[idx] = lastEntity
+		self.entityIndices[lastEntity] = idx
+		self.entities[lastIdx] = nil
+		self.entityIndices[entity] = nil
+	end
+
+	self.entityData[entity] = nil
+	State.entityToGroup[entity] = nil
+	State.entityMetadata[entity] = nil
+
+	return self
+end
+
+--[=[ 
+	Removes multiple entities from the group.
+	
+	@method removeBulk
+	@within Group
+	@param entities { Entity }
+	@return Group
+]=]
+function Group.removeBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+	for _, entity in entities do
+		self:remove(entity)
+	end
 	return self
 end
 

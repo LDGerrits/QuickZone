@@ -67,8 +67,8 @@ export type ZoneClass = {
 }
 
 export type Zone = {
-	attach: (self: Zone, ...Observer) -> Zone,
-	detach: (self: Zone, ...Observer) -> Zone,
+	attach: (self: Zone, observer: Observer) -> Zone,
+	detach: (self: Zone, observer: Observer) -> Zone,
 	syncToPart: (self: Zone) -> Zone,
 	setCFrame: (self: Zone, cf: CFrame) -> Zone,
 	setPosition: (self: Zone, pos: Vector3) -> Zone,
@@ -106,8 +106,8 @@ export type ObserverClass = {
 }
 
 export type Observer = {
-	subscribe: (self: Observer, ...Group) -> Observer,
-	unsubscribe: (self: Observer, ...Group) -> Observer,
+	subscribe: (self: Observer, group: Group) -> Observer,
+	unsubscribe: (self: Observer, group: Group) -> Observer,
 	setPriority: (self: Observer, n: number) -> Observer,
 	setEnabled: (self: Observer, enabled: boolean) -> Observer,
 	setSafety: (self: Observer, enabled: boolean) -> Observer,
@@ -154,9 +154,10 @@ export type GroupClass = {
 }
 
 export type Group = {
-
 	add: (self: Group, entity: Entity, metadata: any?) -> Group,
-	remove: (self: Group, ...Entity) -> Group,
+	addBulk: (self: Group, entities: { Entity }, metadata: any?) -> Group,
+	remove: (self: Group, entity: Entity) -> Group,
+	removeBulk: (self: Group, entities: { Entity }) -> Group,
 	setConfig: (self: Group, {
 		updateRate: number?,
 		precision: number?,

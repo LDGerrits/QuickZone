@@ -89,50 +89,41 @@ function Observer.new(config: {
 end
 
 --[=[ 
-	Links this observer to one or more entity groups. The observer will only
+	Links this observer to the specified group. The observer will only
 	track entities that belong to subscribed groups.
 
 	```lua
-	observer:subscribe(QuickZone.PlayerGroup())
+	observer:subscribe(playerGroup):subscribe(enemyGroup)
 	```
 
 	@method subscribe
 	@within Observer
-	@param ... Group -- The groups to monitor.
+	@param group Group -- The group to monitor.
 	@return Observer
 ]=]
-function Observer.subscribe(self: Types.InternalObserver, ...: Types.InternalGroup): Types.Observer
-	for _, group in { ... } do
-		local groupId = group.id
-
-		if not State.groupToObservers[groupId] then
-			State.groupToObservers[groupId] = {}
-		end
-
-		State.groupToObservers[groupId][self.id] = true
+function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	local groupId = group.id
+	if not State.groupToObservers[groupId] then
+		State.groupToObservers[groupId] = {}
 	end
-
+	State.groupToObservers[groupId][self.id] = true
 	return self
 end
 
 --[=[ 
-	Stops the observer from monitoring the specified groups.
+	Stops the observer from monitoring the specified group.
 
 	@method unsubscribe
 	@within Observer
-	@param ... Group -- The groups to stop monitoring.
+	@param group Group -- The group to stop monitoring.
 	@return Observer
 ]=]
-function Observer.unsubscribe(self: Types.InternalObserver, ...: Types.InternalGroup): Types.Observer
-	for _, group in { ... } do
-		disconnectObserverFromGroup(self.id, group)
-
-		local groupId = group.id
-		if State.groupToObservers[groupId] then
-			State.groupToObservers[groupId][self.id] = nil
-		end
+function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	disconnectObserverFromGroup(self.id, group)
+	local groupId = group.id
+	if State.groupToObservers[groupId] then
+		State.groupToObservers[groupId][self.id] = nil
 	end
-
 	return self
 end
 

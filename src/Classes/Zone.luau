@@ -186,51 +186,53 @@ function Zone.fromParts(parts: { BasePart }, config: { isDynamic: boolean?, meta
 end
 
 --[=[ 
-	Attaches one or more Observers to this zone. The observers will begin 
+	Attaches an Observer to this zone. The observer will begin 
 	monitoring this area for entity overlaps.
 
 	```lua
-	zone:attach(myObserver)
+	-- You are also able to chain calls
+	zone:attach(damageObserver)
+		:attach(visualObserver)
+		:attach(soundObserver)
 	```
 
 	@method attach
 	@within Zone
-	@param ... Observer -- The observers to link.
+	@param observer Observer -- The observer to link.
 	@return Zone
 ]=]
-function Zone.attach(self: Types.InternalZone, ...: Types.InternalObserver): Types.Zone
+function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
 	local attached = State.zoneAttachedObservers[self.id] or {}
 	State.zoneAttachedObservers[self.id] = attached
-	for _, observer in { ... } do
-		if not table.find(attached, observer.id) then
-			table.insert(attached, observer.id)
-		end
+
+	if not table.find(attached, observer.id) then
+		table.insert(attached, observer.id)
 	end
+
 	State.isDirty = true
 	return self
 end
 
 --[=[ 
-	Detaches observers from this zone.
+	Detaches observer from this zone.
 
 	@method detach
 	@within Zone
-	@param ... Observer -- The observers to unlink.
+	@param observer Observer -- The observer to unlink.
 	@return Zone
 ]=]
-function Zone.detach(self: Types.InternalZone, ...: Types.InternalObserver): Types.Zone
+function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
 	local attached = State.zoneAttachedObservers[self.id]
 	if not attached then
 		return self
 	end
 
-	for _, observer in { ... } do
-		local idx = table.find(attached, observer.id)
-		while idx do
-			table.remove(attached, idx)
-			idx = table.find(attached, observer.id)
-		end
+	local idx = table.find(attached, observer.id)
+	while idx do
+		table.remove(attached, idx)
+		idx = table.find(attached, observer.id)
 	end
+
 	if #attached == 0 then
 		State.zoneAttachedObservers[self.id] = nil
 	end
