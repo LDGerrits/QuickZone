@@ -7,13 +7,31 @@
 Zones define physical areas in world space. They can be static or dynamic 
 and support shapes like Blocks, Balls, and Cylinders.
 
-Zones themselves are &#x27;passive&#x27;, meaning they must be attached to an Observer before any detection occurs."><meta data-rh="true" property="og:description" content=" 
+Zones themselves are &#x27;passive&#x27;, meaning they must be attached to an Observer before any detection occurs.
+
+:::caution Performance
+If a zone moves (e.g., attached to a moving platform) or changes size, 
+you should make the zone dynamic by setting `isDynamic` to `true`. 
+
+Static zones are optimized into a large, pre-calculated tree. Updating a 
+static zone forces a full recalculation of that tree, which is expensive. 
+Dynamic zones are handled separately and are much cheaper to update.
+:::"><meta data-rh="true" property="og:description" content=" 
 Zones define physical areas in world space. They can be static or dynamic 
 and support shapes like Blocks, Balls, and Cylinders.
 
-Zones themselves are &#x27;passive&#x27;, meaning they must be attached to an Observer before any detection occurs."><link data-rh="true" rel="canonical" href="https://LDGerrits.github.io/QuickZone/api/Zone"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Zone" hreflang="en"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Zone" hreflang="x-default"><link rel="stylesheet" href="/QuickZone/assets/css/styles.5cbed574.css">
-<script src="/QuickZone/assets/js/runtime~main.6e4fb43c.js" defer="defer"></script>
-<script src="/QuickZone/assets/js/main.eafe0372.js" defer="defer"></script>
+Zones themselves are &#x27;passive&#x27;, meaning they must be attached to an Observer before any detection occurs.
+
+:::caution Performance
+If a zone moves (e.g., attached to a moving platform) or changes size, 
+you should make the zone dynamic by setting `isDynamic` to `true`. 
+
+Static zones are optimized into a large, pre-calculated tree. Updating a 
+static zone forces a full recalculation of that tree, which is expensive. 
+Dynamic zones are handled separately and are much cheaper to update.
+:::"><link data-rh="true" rel="canonical" href="https://LDGerrits.github.io/QuickZone/api/Zone"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Zone" hreflang="en"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Zone" hreflang="x-default"><link rel="stylesheet" href="/QuickZone/assets/css/styles.5cbed574.css">
+<script src="/QuickZone/assets/js/runtime~main.dfebf7a5.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/main.18c53210.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
 <script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();null!==e?t(e):window.matchMedia("(prefers-color-scheme: dark)").matches?t("dark"):(window.matchMedia("(prefers-color-scheme: light)").matches,t("light"))}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="navbar navbar--fixed-top"><div class="navbar__inner"><div class="navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/QuickZone/"><b class="navbar__title text--truncate">QuickZone</b></a><a class="navbar__item navbar__link" href="/QuickZone/docs/intro">Docs</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/QuickZone/api/">API</a></div><div class="navbar__items navbar__items--right"><a href="https://github.com/LDgerrits/QuickZone" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="Switch between dark and light mode (currently light mode)" aria-label="Switch between dark and light mode (currently light mode)" aria-live="polite" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" class="lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" class="darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><div class="navbar__search"><span aria-label="expand searchbar" role="button" class="search-icon" tabindex="0"></span><input id="search_input_react" type="search" placeholder="Loading..." aria-label="Search" class="navbar__search-input search-bar" disabled=""></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="main-wrapper mainWrapper_z2l0 docPageContainer_wNNk"><div class="docPage_Dpn1"><div class="docSidebarContainer_o_re"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/QuickZone">​Quick​Zone</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" href="/QuickZone/api/Zone">​Zone</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Observer">​Observer</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Group">​Group</a></li></ul></nav></div></div><main class="docMainContainer_HJE1"><div class="container padding-vert--lg"><div class="row"><div class="col docItemCol_MU3C"><div class="docItemContainer_Wv98"><article><div class="member_J0w1 markdown"><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_oUs_"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><header><h1 class="docTitle_mZRt" style="text-decoration:none"><span style="display:inline-block">Zone</span></h1><div class="luaClassTags_EipM"></div><div>
@@ -22,31 +40,186 @@ Zones themselves are &#x27;passive&#x27;, meaning they must be attached to an Ob
   and support shapes like Blocks, Balls, and Cylinders.
 </p>
 <p>Zones themselves are 'passive', meaning they must be attached to an Observer before any detection occurs.</p>
-</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="attach"><code style="text-decoration:none">attach</code><a href="#attach" class="hash-link" aria-label="Direct link to attach" title="Direct link to attach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L63"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">attach</code><code>(</code><div class="inset_uKQm"><div><code>...<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><span class="inlineDescription_G7Er">-- <span>
-<p>The observers to link.</p>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Performance</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>
+            If a zone moves (e.g., attached to a moving platform) or changes size,
+            you should make the zone dynamic by setting <code>isDynamic</code> to <code>true</code>.
+          </p>
+          <p>
+            Static zones are optimized into a large, pre-calculated tree. Updating a
+            static zone forces a full recalculation of that tree, which is expensive.
+            Dynamic zones are handled separately and are much cheaper to update.
+          </p>
+        </div>
+      </div>
+    
+  
+
+</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="new"><code style="text-decoration:none">new</code><a href="#new" class="hash-link" aria-label="Direct link to new" title="Direct link to new">​</a></h3><span class="docTag__6UZ" style="border-color:#ff793f;color:#ff793f">Constructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L130"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->.</code><code class="green_DgR4">new</code><code>(</code><code>config<!-- -->: </code><code class="purple_ieR2">{</code><div class="inset_uKQm"><code>cframe<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>size<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>shape<!-- -->: </code><code class="blue_P4bS">Types.ShapeType?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>part<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>isDynamic<!-- -->: </code><code class="blue_P4bS">boolean?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>metadata<!-- -->: </code><code class="blue_P4bS">any?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>observers<!-- -->: </code><code class="green_DgR4">{</code><code class="blue_P4bS">Types.Observer</code><code class="green_DgR4">}</code><code class="blue_P4bS">?</code></div><code class="purple_ieR2">}</code><code class="blue_P4bS">?</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>Creates a Zone object.</p>
+<pre class="language-lua"><code class="language-lua"><span class="token keyword">local</span> zone <span class="token operator">=</span> QuickZone<span class="token punctuation">.</span><span class="token function">Zone</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+	cframe <span class="token operator">=</span> CFrame<span class="token punctuation">.</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+	size <span class="token operator">=</span> Vector3<span class="token punctuation">.</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+	shape <span class="token operator">=</span> <span class="token string">'Block'</span><span class="token punctuation">,</span>
+	isDynamic <span class="token operator">=</span> <span class="token keyword">false</span><span class="token punctuation">,</span>
+	metadata <span class="token operator">=</span> <span class="token punctuation">{</span> Name <span class="token operator">=</span> <span class="token string">"Lobby"</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+	observers <span class="token operator">=</span> <span class="token punctuation">{</span> observer1<span class="token punctuation">,</span> observer2 <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Dynamic Zones</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>If a zone moves, set <code>isDynamic</code> to <code>true</code> for maximum performance.</p>
+        </div>
+      </div>
+    
+  
+
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="fromPart"><code style="text-decoration:none">fromPart</code><a href="#fromPart" class="hash-link" aria-label="Direct link to fromPart" title="Direct link to fromPart">​</a></h3><span class="docTag__6UZ" style="border-color:#ff793f;color:#ff793f">Constructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L185"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->.</code><code class="green_DgR4">fromPart</code><code>(</code><div class="inset_uKQm"><div><code>part<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+<p>The part to derive the zone from.</p>
+</span></span></div><div><code>config<!-- -->: </code><code class="purple_ieR2">{</code><div class="inset_uKQm"><code>isDynamic<!-- -->: </code><code class="blue_P4bS">boolean?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>metadata<!-- -->: </code><code class="blue_P4bS">any?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>observers<!-- -->: </code><code class="green_DgR4">{</code><code class="blue_P4bS">Types.Observer</code><code class="green_DgR4">}</code><code class="blue_P4bS">?</code></div><code class="purple_ieR2">}</code><code class="blue_P4bS">?</code></div></div><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>
+  Creates a Zone automatically based on the Part's properties.
+  Supported shapes: Block, Ball (Spheres), Cylinder, Wedge, and CornerWedge.
+</p>
+<pre class="language-lua"><code class="language-lua"><span class="token keyword">local</span> part <span class="token operator">=</span> workspace<span class="token punctuation">.</span>ZonePart
+<span class="token keyword">local</span> zone <span class="token operator">=</span> QuickZone<span class="token punctuation">.</span>Zone<span class="token punctuation">.</span><span class="token function">fromPart</span><span class="token punctuation">(</span>part<span class="token punctuation">,</span> <span class="token punctuation">{</span> 
+	observers <span class="token operator">=</span> <span class="token punctuation">{</span> safeObserver<span class="token punctuation">,</span> healingObserver <span class="token punctuation">}</span> 
+<span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Dynamic Zones</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>If a zone moves, set <code>isDynamic</code> to <code>true</code> for maximum performance.</p>
+        </div>
+      </div>
+    
+  
+
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="fromParts"><code style="text-decoration:none">fromParts</code><a href="#fromParts" class="hash-link" aria-label="Direct link to fromParts" title="Direct link to fromParts">​</a></h3><span class="docTag__6UZ" style="border-color:#ff793f;color:#ff793f">Constructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L228"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->.</code><code class="green_DgR4">fromParts</code><code>(</code><div class="inset_uKQm"><div><code>parts<!-- -->: </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">}</code><code>,</code><span class="inlineDescription_G7Er">-- <span>
+<p>The parts to derive the zones from.</p>
+</span></span></div><div><code>config<!-- -->: </code><code class="purple_ieR2">{</code><div class="inset_uKQm"><code>isDynamic<!-- -->: </code><code class="blue_P4bS">boolean?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>metadata<!-- -->: </code><code class="blue_P4bS">any?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>observers<!-- -->: </code><code class="green_DgR4">{</code><code class="blue_P4bS">Types.Observer</code><code class="green_DgR4">}</code><code class="blue_P4bS">?</code></div><code class="purple_ieR2">}</code><code class="blue_P4bS">?</code></div></div><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">}</code></div><div>
+<p>
+  Create a list of zones corresponding to the list of <code>BaseParts</code>.
+  Each zone corresponds to a <code>BasePart</code> and shares the same properties.
+</p>
+<pre class="language-lua"><code class="language-lua"><span class="token keyword">local</span> zones <span class="token operator">=</span> QuickZone<span class="token punctuation">.</span>Zone<span class="token punctuation">.</span><span class="token function">fromParts</span><span class="token punctuation">(</span>workspace<span class="token punctuation">.</span>ZoneParts<span class="token punctuation">:</span><span class="token function">GetChildren</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+	isDynamic <span class="token operator">=</span> <span class="token keyword">false</span><span class="token punctuation">,</span>
+	observers <span class="token operator">=</span> <span class="token punctuation">{</span> mainObserver <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Dynamic Zones</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>If a zone moves, set <code>isDynamic</code> to <code>true</code> for maximum performance.</p>
+        </div>
+      </div>
+    
+  
+
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="attach"><code style="text-decoration:none">attach</code><a href="#attach" class="hash-link" aria-label="Direct link to attach" title="Direct link to attach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L269"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">attach</code><code>(</code><div class="inset_uKQm"><div><code>observer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><span class="inlineDescription_G7Er">-- <span>
+<p>The observer to link.</p>
 </span></span></div></div><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
 <p>
-  Attaches one or more Observers to this zone. The observers will begin
+  Attaches an Observer to this zone. The observer will begin
   monitoring this area for entity overlaps.
 </p>
-<pre class="language-lua"><code class="language-lua">zone<span class="token punctuation">:</span><span class="token function">attach</span><span class="token punctuation">(</span>myObserver<span class="token punctuation">)</span>
+<pre class="language-lua"><code class="language-lua"><span class="token comment">-- You are also able to chain calls</span>
+zone<span class="token punctuation">:</span><span class="token function">attach</span><span class="token punctuation">(</span>damageObserver<span class="token punctuation">)</span>
+	<span class="token punctuation">:</span><span class="token function">attach</span><span class="token punctuation">(</span>visualObserver<span class="token punctuation">)</span>
+	<span class="token punctuation">:</span><span class="token function">attach</span><span class="token punctuation">(</span>soundObserver<span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="detach"><code style="text-decoration:none">detach</code><a href="#detach" class="hash-link" aria-label="Direct link to detach" title="Direct link to detach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L83"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">detach</code><code>(</code><div class="inset_uKQm"><div><code>...<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><span class="inlineDescription_G7Er">-- <span>
-<p>The observers to unlink.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="detach"><code style="text-decoration:none">detach</code><a href="#detach" class="hash-link" aria-label="Direct link to detach" title="Direct link to detach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L289"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">detach</code><code>(</code><div class="inset_uKQm"><div><code>observer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><span class="inlineDescription_G7Er">-- <span>
+<p>The observer to unlink.</p>
 </span></span></div></div><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
-<p>Detaches observers from this zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="update"><code style="text-decoration:none">update</code><a href="#update" class="hash-link" aria-label="Direct link to update" title="Direct link to update">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L127"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">update</code><code>(</code><div class="inset_uKQm"><div><code>newCFrame<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>,</code><span class="inlineDescription_G7Er">-- <span>
-<p>Optional new position/rotation.</p>
-</span></span></div><div><code>newSize<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><span class="inlineDescription_G7Er">-- <span>
-<p>Optional new dimensions.</p>
-</span></span></div></div><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
-<p>Updates the zone's position and size.</p>
-<pre class="language-lua"><code class="language-lua"><span class="token comment">-- Manual update</span>
-zone<span class="token punctuation">:</span><span class="token function">update</span><span class="token punctuation">(</span>CFrame<span class="token punctuation">.</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">20</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> Vector3<span class="token punctuation">.</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
-
-<span class="token comment">-- Sync with associated part</span>
-zone<span class="token punctuation">:</span><span class="token function">update</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
-</code></pre>
+<p>Detaches observer from this zone.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="syncToPart"><code style="text-decoration:none">syncToPart</code><a href="#syncToPart" class="hash-link" aria-label="Direct link to syncToPart" title="Direct link to syncToPart">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L322"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">syncToPart</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>Update the zone to the part's current CFrame, Size and Shape.</p>
 
   
     
@@ -55,52 +228,213 @@ zone<span class="token punctuation">:</span><span class="token function">update<
         <div class="admonition-heading">
           <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16">
                 <path d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"></path>
-              </svg></span><span class="admonition-title">Auto-Sync</span></h5>
+              </svg></span><span class="admonition-title">Rebuild</span></h5>
         </div>
         <div class="admonition-content">
-          <p>
-            If the zone was created with an <code>associatedPart</code>, calling <code>update()</code>
-            without arguments will automatically sync the zone to that part's current
-            CFrame and Size.
-          </p>
+          <p>This method flags the zone for an update. The actual tree rebuild is batched and occurs once per frame.</p>
+          <ul>
+            <li>Static Zones: Expensive. Forces a rebuild of the main static tree.</li>
+            <li>Dynamic Zones: Cheap. Forces a rebuild of the smaller dynamic tree.</li>
+          </ul>
         </div>
       </div>
     
   
 
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setMetadata"><code style="text-decoration:none">setMetadata</code><a href="#setMetadata" class="hash-link" aria-label="Direct link to setMetadata" title="Direct link to setMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L161"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">setMetadata</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setCFrame"><code style="text-decoration:none">setCFrame</code><a href="#setCFrame" class="hash-link" aria-label="Direct link to setCFrame" title="Direct link to setCFrame">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L369"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">setCFrame</code><code>(</code><code>cf<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>Updates the Zone's CFrame.</p>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setPosition"><code style="text-decoration:none">setPosition</code><a href="#setPosition" class="hash-link" aria-label="Direct link to setPosition" title="Direct link to setPosition">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L392"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">setPosition</code><code>(</code><code>pos<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>Updates the Zone's Position while preserving its current Rotation.</p>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setSize"><code style="text-decoration:none">setSize</code><a href="#setSize" class="hash-link" aria-label="Direct link to setSize" title="Direct link to setSize">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L410"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">setSize</code><code>(</code><code>size<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>Updates the Zone's Size.</p>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setShape"><code style="text-decoration:none">setShape</code><a href="#setShape" class="hash-link" aria-label="Direct link to setShape" title="Direct link to setShape">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L431"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">setShape</code><code>(</code><code>shape<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#ShapeType">ShapeType</a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><div>
+<p>Updates the Zone's geometric shape.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setMetadata"><code style="text-decoration:none">setMetadata</code><a href="#setMetadata" class="hash-link" aria-label="Direct link to setMetadata" title="Direct link to setMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L459"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">setMetadata</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Set the metadata of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getMetadata"><code style="text-decoration:none">getMetadata</code><a href="#getMetadata" class="hash-link" aria-label="Direct link to getMetadata" title="Direct link to getMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L173"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getMetadata</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getMetadata"><code style="text-decoration:none">getMetadata</code><a href="#getMetadata" class="hash-link" aria-label="Direct link to getMetadata" title="Direct link to getMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L471"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getMetadata</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Returns the metadata of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getId"><code style="text-decoration:none">getId</code><a href="#getId" class="hash-link" aria-label="Direct link to getId" title="Direct link to getId">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L184"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getId</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getId"><code style="text-decoration:none">getId</code><a href="#getId" class="hash-link" aria-label="Direct link to getId" title="Direct link to getId">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L482"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getId</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Returns the unique internal ID of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPart"><code style="text-decoration:none">getPart</code><a href="#getPart" class="hash-link" aria-label="Direct link to getPart" title="Direct link to getPart">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L195"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getPart</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPart"><code style="text-decoration:none">getPart</code><a href="#getPart" class="hash-link" aria-label="Direct link to getPart" title="Direct link to getPart">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L493"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getPart</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/BasePart" target="_blank" rel="noopener noreferrer">BasePart?<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
 <p>Returns the BasePart associated with this zone, if any.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPositioin"><code style="text-decoration:none">getPositioin</code><a href="#getPositioin" class="hash-link" aria-label="Direct link to getPositioin" title="Direct link to getPositioin">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L206"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getPositioin</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPosition"><code style="text-decoration:none">getPosition</code><a href="#getPosition" class="hash-link" aria-label="Direct link to getPosition" title="Direct link to getPosition">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L504"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getPosition</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
 <p>Returns the current position of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getCFrame"><code style="text-decoration:none">getCFrame</code><a href="#getCFrame" class="hash-link" aria-label="Direct link to getCFrame" title="Direct link to getCFrame">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L218"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getCFrame</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getCFrame"><code style="text-decoration:none">getCFrame</code><a href="#getCFrame" class="hash-link" aria-label="Direct link to getCFrame" title="Direct link to getCFrame">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L516"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getCFrame</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/CFrame" target="_blank" rel="noopener noreferrer">CFrame<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
 <p>Returns the current CFrame of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getSize"><code style="text-decoration:none">getSize</code><a href="#getSize" class="hash-link" aria-label="Direct link to getSize" title="Direct link to getSize">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L229"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getSize</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getSize"><code style="text-decoration:none">getSize</code><a href="#getSize" class="hash-link" aria-label="Direct link to getSize" title="Direct link to getSize">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L527"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getSize</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code></div><div>
 <p>Returns the full size of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getShape"><code style="text-decoration:none">getShape</code><a href="#getShape" class="hash-link" aria-label="Direct link to getShape" title="Direct link to getShape">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L241"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getShape</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#ShapeType">ShapeType</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getShape"><code style="text-decoration:none">getShape</code><a href="#getShape" class="hash-link" aria-label="Direct link to getShape" title="Direct link to getShape">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L539"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getShape</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#ShapeType">ShapeType</a></code></div><div>
 <p>Returns the geometric shape type of the zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getObservers"><code style="text-decoration:none">getObservers</code><a href="#getObservers" class="hash-link" aria-label="Direct link to getObservers" title="Direct link to getObservers">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L262"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getObservers</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code class="purple_ieR2">}</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getObservers"><code style="text-decoration:none">getObservers</code><a href="#getObservers" class="hash-link" aria-label="Direct link to getObservers" title="Direct link to getObservers">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L562"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">getObservers</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code class="purple_ieR2">}</code></div><div>
 <p>Returns a list of all Observers currently attached to this zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPointInside"><code style="text-decoration:none">isPointInside</code><a href="#isPointInside" class="hash-link" aria-label="Direct link to isPointInside" title="Direct link to isPointInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L286"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">isPointInside</code><code>(</code><code>point<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPointInside"><code style="text-decoration:none">isPointInside</code><a href="#isPointInside" class="hash-link" aria-label="Direct link to isPointInside" title="Direct link to isPointInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L586"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">isPointInside</code><code>(</code><code>point<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if a point is inside this specific zone.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isDynamic"><code style="text-decoration:none">isDynamic</code><a href="#isDynamic" class="hash-link" aria-label="Direct link to isDynamic" title="Direct link to isDynamic">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L297"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">isDynamic</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isDynamic"><code style="text-decoration:none">isDynamic</code><a href="#isDynamic" class="hash-link" aria-label="Direct link to isDynamic" title="Direct link to isDynamic">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L597"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">isDynamic</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Returns whether the zone is currently registered as a dynamic object.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="destroy"><code style="text-decoration:none">destroy</code><a href="#destroy" class="hash-link" aria-label="Direct link to destroy" title="Direct link to destroy">​</a></h3><span class="docTag__6UZ" style="border-color:#dc0073;color:#dc0073">Destructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L308"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">destroy</code><code>(</code><code>) → </code><code>(</code><code>)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="destroy"><code style="text-decoration:none">destroy</code><a href="#destroy" class="hash-link" aria-label="Direct link to destroy" title="Direct link to destroy">​</a></h3><span class="docTag__6UZ" style="border-color:#dc0073;color:#dc0073">Destructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zone.luau#L612"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zone<!-- -->:</code><code class="green_DgR4">destroy</code><code>(</code><code>) → </code><code>(</code><code>)</code></div><div>
 <p>Cleans up the zone, removes it from the LBVH tree, and detaches all observers.</p>
+
+  
+    
+    
+      <div class="admonition admonition-caution alert alert--warning">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.893 1.5c-.183-.31-.52-.5-.887-.5s-.703.19-.886.5L.138 13.499a.98.98 0 0 0 0 1.001c.193.31.53.501.886.501h13.964c.367 0 .704-.19.877-.5a1.03 1.03 0 0 0 .01-1.002L8.893 1.5zm.133 11.497H6.987v-2.003h2.039v2.003zm0-3.004H6.987V5.987h2.039v4.006z"></path>
+              </svg></span><span class="admonition-title">Rebuild Request</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Requests a rebuild of corresponding tree (batched per frame).</p>
+        </div>
+      </div>
+    
+  
+
 </div></div></article></div><details><summary>Show raw api</summary><pre style="max-width:100%;white-space:pre-wrap">{
     &quot;functions&quot;: [
         {
-            &quot;name&quot;: &quot;attach&quot;,
-            &quot;desc&quot;: &quot; \nAttaches one or more Observers to this zone. The observers will begin \nmonitoring this area for entity overlaps.\n\n```lua\nzone:attach(myObserver)\n```&quot;,
+            &quot;name&quot;: &quot;new&quot;,
+            &quot;desc&quot;: &quot; \nCreates a Zone object.\n\n```lua\nlocal zone = QuickZone.Zone({\n\tcframe = CFrame.new(0, 10, 0),\n\tsize = Vector3.new(10, 10, 10),\n\tshape = &#x27;Block&#x27;,\n\tisDynamic = false,\n\tmetadata = { Name = \&quot;Lobby\&quot; },\n\tobservers = { observer1, observer2 }\n})\n```\n\n:::caution Dynamic Zones\nIf a zone moves, set `isDynamic` to `true` for maximum performance. \n:::\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
             &quot;params&quot;: [
                 {
-                    &quot;name&quot;: &quot;...&quot;,
-                    &quot;desc&quot;: &quot;The observers to link.&quot;,
+                    &quot;name&quot;: &quot;config&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;{ cframe: CFrame, size: Vector3, shape: Types.ShapeType?, part: BasePart?, isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zone&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;static&quot;,
+            &quot;tags&quot;: [
+                &quot;Constructor&quot;
+            ],
+            &quot;source&quot;: {
+                &quot;line&quot;: 130,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;fromPart&quot;,
+            &quot;desc&quot;: &quot; \nCreates a Zone automatically based on the Part&#x27;s properties.\nSupported shapes: Block, Ball (Spheres), Cylinder, Wedge, and CornerWedge.\n\n```lua\nlocal part = workspace.ZonePart\nlocal zone = QuickZone.Zone.fromPart(part, { \n\tobservers = { safeObserver, healingObserver } \n})\n```\n\n:::caution Dynamic Zones\nIf a zone moves, set `isDynamic` to `true` for maximum performance. \n:::\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;part&quot;,
+                    &quot;desc&quot;: &quot;The part to derive the zone from.&quot;,
+                    &quot;lua_type&quot;: &quot;BasePart&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;config&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;{ isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zone&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;static&quot;,
+            &quot;tags&quot;: [
+                &quot;Constructor&quot;
+            ],
+            &quot;source&quot;: {
+                &quot;line&quot;: 185,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;fromParts&quot;,
+            &quot;desc&quot;: &quot; \nCreate a list of zones corresponding to the list of `BaseParts`.\nEach zone corresponds to a `BasePart` and shares the same properties.\n\n```lua\nlocal zones = QuickZone.Zone.fromParts(workspace.ZoneParts:GetChildren(), {\n\tisDynamic = false,\n\tobservers = { mainObserver }\n})\n```\n\n:::caution Dynamic Zones\nIf a zone moves, set `isDynamic` to `true` for maximum performance. \n:::\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;parts&quot;,
+                    &quot;desc&quot;: &quot;The parts to derive the zones from.&quot;,
+                    &quot;lua_type&quot;: &quot;{ BasePart }&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;config&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;{ isDynamic: boolean?, metadata: any?, observers: { Types.Observer }?  }?&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;{ Zone }&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;static&quot;,
+            &quot;tags&quot;: [
+                &quot;Constructor&quot;
+            ],
+            &quot;source&quot;: {
+                &quot;line&quot;: 228,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;attach&quot;,
+            &quot;desc&quot;: &quot; \nAttaches an Observer to this zone. The observer will begin \nmonitoring this area for entity overlaps.\n\n```lua\n-- You are also able to chain calls\nzone:attach(damageObserver)\n\t:attach(visualObserver)\n\t:attach(soundObserver)\n```&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;observer&quot;,
+                    &quot;desc&quot;: &quot;The observer to link.&quot;,
                     &quot;lua_type&quot;: &quot;Observer&quot;
                 }
             ],
@@ -112,17 +446,17 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 63,
+                &quot;line&quot;: 269,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
         {
             &quot;name&quot;: &quot;detach&quot;,
-            &quot;desc&quot;: &quot; \nDetaches observers from this zone.&quot;,
+            &quot;desc&quot;: &quot; \nDetaches observer from this zone.&quot;,
             &quot;params&quot;: [
                 {
-                    &quot;name&quot;: &quot;...&quot;,
-                    &quot;desc&quot;: &quot;The observers to unlink.&quot;,
+                    &quot;name&quot;: &quot;observer&quot;,
+                    &quot;desc&quot;: &quot;The observer to unlink.&quot;,
                     &quot;lua_type&quot;: &quot;Observer&quot;
                 }
             ],
@@ -134,23 +468,34 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 83,
+                &quot;line&quot;: 289,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
         {
-            &quot;name&quot;: &quot;update&quot;,
-            &quot;desc&quot;: &quot; \nUpdates the zone&#x27;s position and size.\n\n```lua\n-- Manual update\nzone:update(CFrame.new(0, 20, 0), Vector3.new(5, 5, 5))\n\n-- Sync with associated part\nzone:update()\n```\n\n:::info Auto-Sync\nIf the zone was created with an `associatedPart`, calling `update()` \nwithout arguments will automatically sync the zone to that part&#x27;s current \nCFrame and Size.\n:::&quot;,
+            &quot;name&quot;: &quot;syncToPart&quot;,
+            &quot;desc&quot;: &quot; \nUpdate the zone to the part&#x27;s current CFrame, Size and Shape.\n\n:::info Rebuild\nThis method flags the zone for an update. The actual tree rebuild is batched and occurs once per frame.\n* Static Zones: Expensive. Forces a rebuild of the main static tree.\n* Dynamic Zones: Cheap. Forces a rebuild of the smaller dynamic tree.\n:::&quot;,
+            &quot;params&quot;: [],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zone&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 322,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;setCFrame&quot;,
+            &quot;desc&quot;: &quot; \nUpdates the Zone&#x27;s CFrame.\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
             &quot;params&quot;: [
                 {
-                    &quot;name&quot;: &quot;newCFrame&quot;,
-                    &quot;desc&quot;: &quot;Optional new position/rotation.&quot;,
-                    &quot;lua_type&quot;: &quot;CFrame?&quot;
-                },
-                {
-                    &quot;name&quot;: &quot;newSize&quot;,
-                    &quot;desc&quot;: &quot;Optional new dimensions.&quot;,
-                    &quot;lua_type&quot;: &quot;Vector3?&quot;
+                    &quot;name&quot;: &quot;cf&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;CFrame&quot;
                 }
             ],
             &quot;returns&quot;: [
@@ -161,7 +506,73 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 127,
+                &quot;line&quot;: 369,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;setPosition&quot;,
+            &quot;desc&quot;: &quot; \nUpdates the Zone&#x27;s Position while preserving its current Rotation.\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;pos&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Vector3&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zone&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 392,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;setSize&quot;,
+            &quot;desc&quot;: &quot; \nUpdates the Zone&#x27;s Size.\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;size&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Vector3&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zone&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 410,
+                &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;setShape&quot;,
+            &quot;desc&quot;: &quot; \nUpdates the Zone&#x27;s geometric shape.&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;shape&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;ShapeType&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zone&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 431,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -177,7 +588,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 161,
+                &quot;line&quot;: 459,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -193,7 +604,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 173,
+                &quot;line&quot;: 471,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -209,7 +620,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 184,
+                &quot;line&quot;: 482,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -225,12 +636,12 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 195,
+                &quot;line&quot;: 493,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
         {
-            &quot;name&quot;: &quot;getPositioin&quot;,
+            &quot;name&quot;: &quot;getPosition&quot;,
             &quot;desc&quot;: &quot;Returns the current position of the zone.&quot;,
             &quot;params&quot;: [],
             &quot;returns&quot;: [
@@ -241,7 +652,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 206,
+                &quot;line&quot;: 504,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -257,7 +668,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 218,
+                &quot;line&quot;: 516,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -273,7 +684,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 229,
+                &quot;line&quot;: 527,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -289,7 +700,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 241,
+                &quot;line&quot;: 539,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -305,7 +716,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 262,
+                &quot;line&quot;: 562,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -327,7 +738,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 286,
+                &quot;line&quot;: 586,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
@@ -343,13 +754,13 @@ zone<span class="token punctuation">:</span><span class="token function">update<
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 297,
+                &quot;line&quot;: 597,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         },
         {
             &quot;name&quot;: &quot;destroy&quot;,
-            &quot;desc&quot;: &quot; \nCleans up the zone, removes it from the LBVH tree, and detaches all observers.&quot;,
+            &quot;desc&quot;: &quot; \nCleans up the zone, removes it from the LBVH tree, and detaches all observers.\n\n:::caution Rebuild Request\nRequests a rebuild of corresponding tree (batched per frame).\n:::&quot;,
             &quot;params&quot;: [],
             &quot;returns&quot;: [],
             &quot;function_type&quot;: &quot;method&quot;,
@@ -357,7 +768,7 @@ zone<span class="token punctuation">:</span><span class="token function">update<
                 &quot;Destructor&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 308,
+                &quot;line&quot;: 612,
                 &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
             }
         }
@@ -365,11 +776,11 @@ zone<span class="token punctuation">:</span><span class="token function">update<
     &quot;properties&quot;: [],
     &quot;types&quot;: [],
     &quot;name&quot;: &quot;Zone&quot;,
-    &quot;desc&quot;: &quot; \nZones define physical areas in world space. They can be static or dynamic \nand support shapes like Blocks, Balls, and Cylinders.\n\nZones themselves are &#x27;passive&#x27;, meaning they must be attached to an Observer before any detection occurs.&quot;,
+    &quot;desc&quot;: &quot; \nZones define physical areas in world space. They can be static or dynamic \nand support shapes like Blocks, Balls, and Cylinders.\n\nZones themselves are &#x27;passive&#x27;, meaning they must be attached to an Observer before any detection occurs.\n\n:::caution Performance\nIf a zone moves (e.g., attached to a moving platform) or changes size, \nyou should make the zone dynamic by setting `isDynamic` to `true`. \n\nStatic zones are optimized into a large, pre-calculated tree. Updating a \nstatic zone forces a full recalculation of that tree, which is expensive. \nDynamic zones are handled separately and are much cheaper to update.\n:::&quot;,
     &quot;source&quot;: {
-        &quot;line&quot;: 15,
+        &quot;line&quot;: 57,
         &quot;path&quot;: &quot;src/Classes/Zone.luau&quot;
     }
-}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#attach" class="table-of-contents__link toc-highlight">:attach</a></li><li><a href="#destroy" class="table-of-contents__link toc-highlight">:destroy</a></li><li><a href="#detach" class="table-of-contents__link toc-highlight">:detach</a></li><li><a href="#getCFrame" class="table-of-contents__link toc-highlight">:getCFrame</a></li><li><a href="#getId" class="table-of-contents__link toc-highlight">:getId</a></li><li><a href="#getMetadata" class="table-of-contents__link toc-highlight">:getMetadata</a></li><li><a href="#getObservers" class="table-of-contents__link toc-highlight">:getObservers</a></li><li><a href="#getPart" class="table-of-contents__link toc-highlight">:getPart</a></li><li><a href="#getPositioin" class="table-of-contents__link toc-highlight">:getPositioin</a></li><li><a href="#getShape" class="table-of-contents__link toc-highlight">:getShape</a></li><li><a href="#getSize" class="table-of-contents__link toc-highlight">:getSize</a></li><li><a href="#isDynamic" class="table-of-contents__link toc-highlight">:isDynamic</a></li><li><a href="#isPointInside" class="table-of-contents__link toc-highlight">:isPointInside</a></li><li><a href="#setMetadata" class="table-of-contents__link toc-highlight">:setMetadata</a></li><li><a href="#update" class="table-of-contents__link toc-highlight">:update</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 LDGerrits. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
+}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#attach" class="table-of-contents__link toc-highlight">:attach</a></li><li><a href="#destroy" class="table-of-contents__link toc-highlight">:destroy</a></li><li><a href="#detach" class="table-of-contents__link toc-highlight">:detach</a></li><li><a href="#getCFrame" class="table-of-contents__link toc-highlight">:getCFrame</a></li><li><a href="#getId" class="table-of-contents__link toc-highlight">:getId</a></li><li><a href="#getMetadata" class="table-of-contents__link toc-highlight">:getMetadata</a></li><li><a href="#getObservers" class="table-of-contents__link toc-highlight">:getObservers</a></li><li><a href="#getPart" class="table-of-contents__link toc-highlight">:getPart</a></li><li><a href="#getPosition" class="table-of-contents__link toc-highlight">:getPosition</a></li><li><a href="#getShape" class="table-of-contents__link toc-highlight">:getShape</a></li><li><a href="#getSize" class="table-of-contents__link toc-highlight">:getSize</a></li><li><a href="#isDynamic" class="table-of-contents__link toc-highlight">:isDynamic</a></li><li><a href="#isPointInside" class="table-of-contents__link toc-highlight">:isPointInside</a></li><li><a href="#setCFrame" class="table-of-contents__link toc-highlight">:setCFrame</a></li><li><a href="#setMetadata" class="table-of-contents__link toc-highlight">:setMetadata</a></li><li><a href="#setPosition" class="table-of-contents__link toc-highlight">:setPosition</a></li><li><a href="#setShape" class="table-of-contents__link toc-highlight">:setShape</a></li><li><a href="#setSize" class="table-of-contents__link toc-highlight">:setSize</a></li><li><a href="#syncToPart" class="table-of-contents__link toc-highlight">:syncToPart</a></li><li><a href="#fromPart" class="table-of-contents__link toc-highlight">.fromPart</a></li><li><a href="#fromParts" class="table-of-contents__link toc-highlight">.fromParts</a></li><li><a href="#new" class="table-of-contents__link toc-highlight">.new</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 LDGerrits. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
 </body>
 </html>
