@@ -74,7 +74,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^0.3.11
+ldgerrits/quickzone@^0.4.0
 ```
 
 ### Manual
@@ -87,12 +87,20 @@ local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local QuickZone = require(ReplicatedStorage.QuickZone)
 
--- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
-local myPlayer = QuickZone.LocalPlayerGroup()
+-- Assign the classes to local variables here if you want
+local Group = QuickZone.Group
+local Observer = QuickZone.Observer
+local Zone = QuickZone.Zone
 
--- Create an observer with a priority of 42. If zones overlap of different observers, the higher priority one will completely take over.
-local swimObserver = QuickZone.Observer(42)
-swimObserver:subscribe(myPlayer)
+-- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
+local myPlayer = Group.localPlayer()
+
+-- Create an observer subscribed to that group. 
+-- Priority 42 ensures this logic overrides lower-priority overlaps.
+local swimObserver = Observer.new({ 
+    priority = 42,
+    groups = { myPlayer } 
+})
 
 -- Define behavior
 swimObserver:observeLocalPlayer(function()
@@ -102,15 +110,20 @@ swimObserver:observeLocalPlayer(function()
     local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid then return end
     
+    -- On Enter
     humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
     humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
 
+    -- Return cleanup (On Exit)
     return function() 
         humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
     end)
 end)
 
--- Create zones and attach them to the observer to let the observer 'see'
-local poolZone = QuickZone.ZoneFromPart(workspace.PoolWater)
-poolZone:attach(swimObserver)
+-- Create zones based on parts inside workspace.WaterParts,
+-- and attach them to the observer automatically.
+-- This uses the declarative config pattern to attach everything in one step.
+Zone.fromParts(workspace.WaterParts:GetChildren(), { 
+    observers = { swimObserver } 
+})
 ```

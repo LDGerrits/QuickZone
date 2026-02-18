@@ -16,8 +16,8 @@ enabled = true
 includeReadme = false
 
 [[home.features]]
-title = "Fast Spatial Queries"
-description = "Process thousands of spatial queries per second with negligible FPS impact."
+title = "Lifecycle Management"
+description = "Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore."
 
 [[home.features]]
 title = "Track Anything"

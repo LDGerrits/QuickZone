@@ -15,6 +15,7 @@ local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
 local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
 local WEDGE_SHAPE_VALUE = Enum.PartType.Wedge.Value
+local CORNER_WEDGE_SHAPE_VALUE = Enum.PartType.CornerWedge.Value
 
 local MORTON_SHIFT16_MASK = 0xFF0000FF
 local MORTON_SHIFT8_MASK = 0xF00F00F
@@ -76,7 +77,6 @@ end
 
 function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boolean): boolean
 	local cframe, halfSize, shapeType
-
 	if isDynamic then
 		cframe = dynamicCFrames[zoneId]
 		halfSize = dynamicHalfSizes[zoneId]
@@ -90,10 +90,6 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 	if shapeType == BLOCK_SHAPE_VALUE then
 		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
 		return vector.min(localPoint, halfSize) == localPoint
-	elseif shapeType == BALL_SHAPE_VALUE then
-		local radiusSq = halfSize.X * halfSize.X
-		local position = cframe.Position
-		return vector.dot(position - point, position - point) <= radiusSq
 	elseif shapeType == CYLINDER_SHAPE_VALUE then
 		local position = cframe.Position
 		local halfHeight = halfSize.X
@@ -108,6 +104,10 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 			return distanceSq <= radiusSq
 		end
 		return false
+	elseif shapeType == BALL_SHAPE_VALUE then
+		local radiusSq = halfSize.X * halfSize.X
+		local position = cframe.Position
+		return vector.dot(position - point, position - point) <= radiusSq
 	elseif shapeType == WEDGE_SHAPE_VALUE then
 		local localPoint = cframe:PointToObjectSpace(point)
 		local absolutePoint = vector.abs(localPoint)
@@ -116,6 +116,19 @@ function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boole
 			return (localPoint.Y / size.Y - localPoint.Z / size.Z) <= 0
 		end
 		return false
+	elseif shapeType == CORNER_WEDGE_SHAPE_VALUE then
+		local size = halfSize * 2
+		local localPoint = cframe:PointToObjectSpace(point)
+		local plane1_normal = vector.normalize(Vector3.new(0, size.Z, size.Y))
+		if vector.dot(localPoint, plane1_normal) > 0 then
+			return false
+		end
+		local plane2_normal = vector.normalize(Vector3.new(-size.Y, size.X, 0))
+		if vector.dot(localPoint, plane2_normal) > 0 then
+			return false
+		end
+		local absolute_point = vector.abs(localPoint)
+		return vector.min(absolute_point, halfSize) == absolute_point
 	end
 
 	return false
