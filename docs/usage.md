@@ -23,7 +23,7 @@ The easiest way to create a zone.
 local staticZone = QuickZone.ZoneFromPart(workspace.SafeZone)
 
 -- Dynamic Zone
--- Passing 'true' makes the zone follow the part's CFrame on :update()
+-- Passing 'true' makes the zone follow the part's CFrame on :syncToPart()
 local trainZone = QuickZone.ZoneFromPart(workspace.TrainCarriage, true, { canDamage = true })
 ```
 
@@ -47,14 +47,14 @@ QuickZone batches tree rebuilds once per frame. By keeping the Dynamic Tree smal
 :::
 
 ### Updating Zones
-If you create a zone manually or want to sync a dynamic zone to a new reference, use `:update()`.
+If you create a zone manually or want to sync a dynamic zone to a new reference, use `:syncToPart()`.
 
 ```lua
--- Manually move a zone
-zone:update(CFrame.new(0, 50, 0), Vector3.new(10, 10, 10))
+-- Manually move a dynamic zone
+dynamicZone:setPosition(Vector3.new(0, 50, 0))
 
--- Sync a dynamic zone to its associated part
-dynamicZone:update()
+-- Sync a dynamic zone to its associated part's current CFrame, Size, and Shape
+dynamicZone:syncToPart()
 ```
 
 ---
