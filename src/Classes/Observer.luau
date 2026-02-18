@@ -3,6 +3,7 @@
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
+local Config = require(script.Parent.Parent.Config)
 local Geometry = require(script.Parent.Parent.Core.Geometry)
 local LinearBVH = require(script.Parent.Parent.Core.LinearBVH)
 local State = require(script.Parent.Parent.State)
@@ -11,7 +12,7 @@ local Types = require(script.Parent.Parent.Types)
 local IS_CLIENT = RunService:IsClient()
 
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
-	local safety = group.config.safety
+	local safety = State.observerSafety[observerId]
 
 	for _, entity in group.entities do
 		local data = group.entityData[entity]
@@ -51,67 +52,93 @@ end
 local Observer = {}
 Observer.__index = Observer
 
-function Observer.new(priority: number?): Types.Observer
-	local observer: Types.InternalObserver = setmetatable({
-		id = State.nextObserverId,
-	}, Observer) :: any
-
-	State.observerPriorityMap[observer.id] = priority or 0
-	State.observerEnteredCallbacks[observer.id] = {}
-	State.observerExitedCallbacks[observer.id] = {}
-	State.observerTrackingEntities[observer.id] = {}
-	State.observerIdToObserverObj[observer.id] = observer
-	State.observerEnabled[observer.id] = true
-
-	State.nextObserverId += 1
-	return observer
-end
-
 --[=[ 
-	Links this observer to one or more entity groups. The observer will only
-	track entities that belong to subscribed groups.
+	Creates an Observer. Observers listen for entities entering or exiting assigned Zones.
 
 	```lua
-	observer:subscribe(QuickZone.PlayerGroup())
+	local observer = QuickZone.Observer.new({
+		priority = 20, -- The priority value is used to resolve overlaps
+		enabled = false, -- Observer will not start processing spatial checks
+		safety = false, -- Do not wrap callbacks in task.spawn
+		groups = { enemyGroup, playerGroup } -- Immediately subscribe to these groups
+	})
 	```
 
-	@method subscribe
-	@within Observer
-	@param ... Group -- The groups to monitor.
+	:::info Resolution Priority
+	When an entity is inside multiple zones watched by different observers, 
+	higher priority observers take complete control.
+	:::
+
+	@tag Constructor
+	@param config { priority: number?, enabled: boolean?, safety: boolean?, groups: { Types.Group }?, }?
 	@return Observer
 ]=]
-function Observer.subscribe(self: Types.InternalObserver, ...: Types.InternalGroup): Types.Observer
-	for _, group in { ... } do
-		local groupId = group.id
+function Observer.new(config: {
+	priority: number?,
+	enabled: boolean?,
+	safety: boolean?,
+	groups: { Types.Group }?,
+}?): Types.Observer
+	local id = State.nextObserverId
+	State.nextObserverId += 1
 
-		if not State.groupToObservers[groupId] then
-			State.groupToObservers[groupId] = {}
+	local self: Types.InternalObserver = setmetatable({
+		id = id,
+	}, Observer) :: any
+
+	State.observerPriorityMap[id] = config and config.priority or 0
+	State.observerEnteredCallbacks[id] = {}
+	State.observerExitedCallbacks[id] = {}
+	State.observerTrackingEntities[id] = {}
+	State.observerIdToObserverObj[id] = self
+	State.observerEnabled[id] = true
+	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Scheduler.safety
+
+	if config and config.groups then
+		for _, group in config.groups do
+			self:subscribe(group)
 		end
-
-		State.groupToObservers[groupId][self.id] = true
 	end
 
 	return self
 end
 
 --[=[ 
-	Stops the observer from monitoring the specified groups.
+	Links this observer to the specified group. The observer will only
+	track entities that belong to subscribed groups.
+
+	```lua
+	observer:subscribe(playerGroup):subscribe(enemyGroup)
+	```
+
+	@method subscribe
+	@within Observer
+	@param group Group -- The group to monitor.
+	@return Observer
+]=]
+function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	local groupId = group.id
+	if not State.groupToObservers[groupId] then
+		State.groupToObservers[groupId] = {}
+	end
+	State.groupToObservers[groupId][self.id] = true
+	return self
+end
+
+--[=[ 
+	Stops the observer from monitoring the specified group.
 
 	@method unsubscribe
 	@within Observer
-	@param ... Group -- The groups to stop monitoring.
+	@param group Group -- The group to stop monitoring.
 	@return Observer
 ]=]
-function Observer.unsubscribe(self: Types.InternalObserver, ...: Types.InternalGroup): Types.Observer
-	for _, group in { ... } do
-		disconnectObserverFromGroup(self.id, group)
-
-		local groupId = group.id
-		if State.groupToObservers[groupId] then
-			State.groupToObservers[groupId][self.id] = nil
-		end
+function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	disconnectObserverFromGroup(self.id, group)
+	local groupId = group.id
+	if State.groupToObservers[groupId] then
+		State.groupToObservers[groupId][self.id] = nil
 	end
-
 	return self
 end
 
@@ -501,8 +528,22 @@ function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Ty
 	return self
 end
 
+--[=[
+	Whether to wrap callbacks in task.spawn (safe) or not (unsafe).
+
+	@method setSafety
+	@within Observer
+	@param enabled boolean
+	@return Observer
+]=]
+function Observer.setSafety(self: Types.InternalObserver, enabled: boolean): Types.Observer
+	State.observerSafety[self.id] = enabled
+	return self
+end
+
 --[=[ 
 	Updates the resolution priority of the observer.
+
 	@method setPriority
 	@within Observer
 	@param p number
@@ -516,6 +557,7 @@ end
 
 --[=[ 
 	Checks if the observer is currently enabled.
+
 	@method isEnabled
 	@within Observer
 	@return boolean
@@ -634,6 +676,17 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 end
 
 --[=[ 
+	Checks if the observer wraps callbacks in task.spawn (safe) or not (unsafe).
+
+	@method isSafe
+	@within Observer
+	@return boolean
+]=]
+function Observer.isSafe(self: Types.InternalObserver): boolean
+	return State.observerSafety[self.id]
+end
+
+--[=[ 
 	Returns the unique internal ID of the observer.
 
 	@method getId
@@ -749,6 +802,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerTrackingEntities[id] = nil
 	State.observerIdToObserverObj[id] = nil
 	State.observerEnabled[id] = nil
+	State.observerSafety[id] = nil
 
 	State.isDirty = true
 	setmetatable(self :: any, nil)

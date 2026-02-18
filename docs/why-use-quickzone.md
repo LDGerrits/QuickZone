@@ -41,13 +41,13 @@ A Group is a collection of entities that share performance characteristics and l
 
 ```lua
 -- Real-time frequency (60Hz), zero tolerance.
-local cameraGroup = QuickZone.Group({
+local cameraGroup = QuickZone.Group.new({
     updateRate = 60,
     precision = 0,
 })
 
 -- Low frequency (2Hz), low precision.
-local NPCGroup = QuickZone.Group({
+local NPCGroup = QuickZone.Group.new({
     updateRate = 2,
     precision = 4,
 })
@@ -60,8 +60,8 @@ Observers act as the logic bridge. They subscribe to Groups and attach to Zones,
 
 ```lua
 -- Create an Observer and subscribe to a group
-local safeObserver = QuickZone.Observer()
-safeObserver:subscribe(QuickZone.LocalPlayerGroup())
+local safeObserver = QuickZone.Observer.new()
+safeObserver:subscribe(QuickZone.Group.localPlayer())
 
 -- Logic is defined once, not per zone
 safeObserver:onEntered(function(player, zone)
@@ -69,12 +69,8 @@ safeObserver:onEntered(function(player, zone)
 end)
 
 -- Create Zones from parts and attach them to the observer
-for _, part in workspace.SafeZones:GetChildren() do
-    if part:IsA('BasePart') then
-        local zone = QuickZone.ZoneFromPart(part)
-        zone:attach(safeObserver)
-    end
-end
+local parts = workspace.SafeZones:GetChildren()
+QuickZone.Zone.fromParts(parts, { observers = { safeObserver }})
 ```
 
 ---

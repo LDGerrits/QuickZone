@@ -1,12 +1,12 @@
 --!strict
 
 --[=[
-	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge"
+	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
 	@within QuickZone
 
 	The geometric shape of a Zone.
 ]=]
-export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge'
+export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge'
 export type BoundingVolume = {
 	position: Vector3,
 	cframe: CFrame,
@@ -26,44 +26,10 @@ export type Node = {
 	id: number, -- -1 for internal nodes
 }
 
---[=[ 
-	@interface ZoneConfig
-	@within QuickZone
-	.cframe CFrame -- The center position and orientation.
-	.size Vector3 -- The full dimensions of the zone.
-	.shape ShapeType -- The geometric shape ('Block', 'Ball', 'Cylinder', etc).
-	.part BasePart? -- Optional part to sync the zone with.
-	.isDynamic boolean? -- Optionally set to true if the zone moves/resizes (i.e. not static).
-	.metadata any? -- Optional metadata.
-]=]
-export type ZoneConfig = {
-	cframe: CFrame,
-	size: Vector3,
-	shape: ShapeType,
-	part: BasePart?,
-	isDynamic: boolean?,
-	metadata: any?,
-}
-
 export type QuickZone = {
-	Zone: (ZoneConfig) -> Zone,
-	ZoneFromPart: (part: BasePart, isDynamic: boolean?, metadata: any?) -> Zone,
-	Observer: (priority: number?) -> Observer,
-	Group: ({
-		updateRate: number?,
-		precision: number?,
-		safety: boolean?,
-	}?) -> Group,
-	PlayerGroup: ({
-		updateRate: number?,
-		precision: number?,
-		safety: boolean?,
-	}?) -> Group,
-	LocalPlayerGroup: ({
-		updateRate: number?,
-		precision: number?,
-		safety: boolean?,
-	}?) -> Group,
+	Zone: ZoneClass,
+	Observer: ObserverClass,
+	Group: GroupClass,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
@@ -75,11 +41,33 @@ export type QuickZone = {
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,
 }
 
+export type ZoneClass = {
+	new: (
+		config: {
+			cframe: CFrame,
+			size: Vector3,
+			shape: ShapeType?,
+			part: BasePart?,
+			isDynamic: boolean?,
+			metadata: any?,
+			observers: { Observer }?,
+		}
+	) -> Zone,
+	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zone,
+	fromParts: (
+		parts: { BasePart },
+		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	) -> { Zone },
+}
+
 export type Zone = {
-	destroy: (self: Zone) -> (),
-	attach: (self: Zone, ...Observer) -> Zone,
-	detach: (self: Zone, ...Observer) -> Zone,
-	update: (self: Zone, newCFrame: CFrame?, newSize: Vector3?) -> Zone,
+	attach: (self: Zone, observer: Observer) -> Zone,
+	detach: (self: Zone, observer: Observer) -> Zone,
+	syncToPart: (self: Zone) -> Zone,
+	setCFrame: (self: Zone, cf: CFrame) -> Zone,
+	setPosition: (self: Zone, pos: Vector3) -> Zone,
+	setSize: (self: Zone, size: Vector3) -> Zone,
+	setShape: (self: Zone, shape: ShapeType) -> Zone,
 	setMetadata: (self: Zone, metadata: any?) -> Zone,
 	getMetadata: (self: Zone) -> any?,
 	getId: (self: Zone) -> number,
@@ -91,6 +79,7 @@ export type Zone = {
 	getObservers: (self: Zone) -> { Observer },
 	isDynamic: (self: Zone) -> boolean,
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
+	destroy: (self: Zone) -> (),
 }
 
 export type InternalZone = Zone & {
@@ -102,13 +91,25 @@ export type InternalZone = Zone & {
 
 export type Callback = (Entity, Zone, any?) -> ()
 
+export type ObserverClass = {
+	new: (
+		config: {
+			priority: number?,
+			enabled: boolean?,
+			safety: boolean?,
+			groups: { Group }?,
+		}?
+	) -> Observer,
+}
+
 export type Observer = {
-	destroy: (self: Observer) -> (),
+	subscribe: (self: Observer, group: Group) -> Observer,
+	unsubscribe: (self: Observer, group: Group) -> Observer,
 	setPriority: (self: Observer, n: number) -> Observer,
-	subscribe: (self: Observer, ...Group) -> Observer,
-	unsubscribe: (self: Observer, ...Group) -> Observer,
 	setEnabled: (self: Observer, enabled: boolean) -> Observer,
+	setSafety: (self: Observer, enabled: boolean) -> Observer,
 	isEnabled: (self: Observer) -> boolean,
+	isSafe: (self: Observer) -> boolean,
 	isPlayerInside: (self: Observer, player: Player) -> boolean,
 	isLocalPlayerInside: (self: Observer) -> boolean,
 	isEntityInside: (self: Observer, entity: Entity) -> boolean,
@@ -127,30 +128,56 @@ export type Observer = {
 	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
+	destroy: (self: Observer) -> (),
 }
 
 export type InternalObserver = Observer & {
 	id: number,
 }
 
+export type GroupClass = {
+	new: (config: {
+		updateRate: number?,
+		precision: number?,
+		entities: { Entity }?,
+	}?) -> Group,
+	players: (config: {
+		updateRate: number?,
+		precision: number?,
+		entities: { Entity }?,
+	}?) -> Group,
+	localPlayer: (
+		config: {
+			updateRate: number?,
+			precision: number?,
+			entities: { Entity }?,
+		}?
+	) -> Group,
+}
+
 export type Group = {
-	destroy: (self: Group) -> (),
+	add: (self: Group, entity: Entity, metadata: any?) -> Group,
+	addBulk: (self: Group, entities: { Entity }, metadata: any?) -> Group,
+	remove: (self: Group, entity: Entity) -> Group,
+	removeBulk: (self: Group, entities: { Entity }) -> Group,
+	clear: (self: Group) -> Group,
 	setConfig: (self: Group, {
 		updateRate: number?,
 		precision: number?,
-		safety: boolean?,
 	}) -> Group,
-	add: (self: Group, entity: Entity, metadata: any?) -> Group,
-	remove: (self: Group, ...Entity) -> Group,
+	setUpdateRate: (self: Group, updateRate: number) -> Group,
+	setPrecision: (self: Group, precision: number) -> Group,
+	getUpdateRate: (self: Group) -> number,
+	getPrecision: (self: Group) -> number,
 	getId: (self: Group) -> number,
 	getEntities: (self: Group) -> { Entity },
 	getObservers: (self: Group) -> { Observer },
 	getConfig: (self: Group) -> {
 		updateRate: number,
 		precision: number,
-		safety: boolean,
 	},
 	contains: (self: Group, entity: Entity) -> boolean,
+	destroy: (self: Group) -> (),
 }
 
 export type InternalGroup = Group & {
@@ -161,7 +188,6 @@ export type InternalGroup = Group & {
 	config: {
 		updateRate: number,
 		precisionSq: number,
-		safety: boolean,
 	},
 }
 
