@@ -26,26 +26,6 @@ export type Node = {
 	id: number, -- -1 for internal nodes
 }
 
---[=[ 
-	@interface ZoneConfig
-	@within QuickZone
-	.cframe CFrame -- The center position and orientation.
-	.size Vector3 -- The full dimensions of the zone.
-	.shape ShapeType -- The geometric shape ('Block', 'Ball', 'Cylinder', etc).
-	.part BasePart? -- Optional part to sync the zone with.
-	.isDynamic boolean? -- Optionally set to true if the zone moves/resizes (i.e. not static).
-	.metadata any? -- Optional metadata.
-]=]
-export type ZoneConfig = {
-	cframe: CFrame,
-	size: Vector3,
-	shape: ShapeType?,
-	part: BasePart?,
-	isDynamic: boolean?,
-	metadata: any?,
-	observers: { Observer }?,
-}
-
 export type QuickZone = {
 	Zone: ZoneClass,
 	Observer: ObserverClass,
@@ -62,7 +42,17 @@ export type QuickZone = {
 }
 
 export type ZoneClass = {
-	new: (config: ZoneConfig) -> Zone,
+	new: (
+		config: {
+			cframe: CFrame,
+			size: Vector3,
+			shape: ShapeType?,
+			part: BasePart?,
+			isDynamic: boolean?,
+			metadata: any?,
+			observers: { Observer }?,
+		}
+	) -> Zone,
 	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zone,
 	fromParts: (
 		parts: { BasePart },
@@ -170,6 +160,7 @@ export type Group = {
 	addBulk: (self: Group, entities: { Entity }, metadata: any?) -> Group,
 	remove: (self: Group, entity: Entity) -> Group,
 	removeBulk: (self: Group, entities: { Entity }) -> Group,
+	clear: (self: Group) -> Group,
 	setConfig: (self: Group, {
 		updateRate: number?,
 		precision: number?,

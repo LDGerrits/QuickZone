@@ -8,6 +8,48 @@ QuickZone is designed around a three-tier architecture: Zones (where), Groups (w
 
 ![Priority](topology_quickzone.png)
 
+```lua
+local QuickZone = require(game:GetService("ReplicatedStorage").QuickZone)
+
+-- We recommend assigning the classes to local variables
+local Zone = QuickZone.Zone
+local Observer = QuickZone.Observer
+local Group = QuickZone.Group
+```
+
+### The Two Workflows
+
+QuickZone offers two ways to structure your code: **Declarative** (Configuration-based) and **Imperative** (Chain-based).
+
+#### Style A: Declarative
+Define your object's properties and its relationships in the constructors.
+
+```lua
+local localPlayerGroup = Group.localPlayer()
+
+local observer = Observer.new({
+    groups = { localPlayerGroup }, -- Immediately subscribes to these groups
+    priority = 1,
+})
+
+Zone.fromPart(workspace.SafeZone, {
+    observers = { observer } -- Imediately attaches to these observers
+})
+```
+
+#### Style B: Imperative
+Create objects first, then link them together. You can do this at any point in their lifecycles.
+
+```lua
+local localPlayerGroup = Group.localPlayer()
+local observer = Observer.new({ priority = 1 })
+local zone = Zone.fromPart(workspace.SafeZone)
+
+-- Link them manually
+observer:subscribe(localPlayerGroup)
+zone:attach(observer)
+```
+
 ---
 
 ## Zones
@@ -20,11 +62,15 @@ The easiest way to create a zone.
 ```lua
 -- Static Zone (Fastest)
 -- Ideal for shops, biomes, or permanent regions.
-local staticZone = QuickZone.ZoneFromPart(workspace.SafeZone)
+local staticZones = Zone.fromParts(workspace.SafeZones:GetChildren())
 
 -- Dynamic Zone
 -- Passing 'true' makes the zone follow the part's CFrame on :update()
-local trainZone = QuickZone.ZoneFromPart(workspace.TrainCarriage, true, { canDamage = true })
+local trainZone = Zone.fromPart(workspace.TrainCarriage, { 
+    isDynamic = true,
+    metadata = { canDamage = true },
+    observers = { trainObserver }
+})
 ```
 
 _Note: The third argument (`metadata`) is optional and can be retrieved using `zone:getMetadata()`_
@@ -33,7 +79,7 @@ _Note: The third argument (`metadata`) is optional and can be retrieved using `z
 Useful for procedural generation or areas without physical parts.
 
 ```lua
-local zone = QuickZone.Zone({
+local zone = Zone.new({
     cframe = CFrame.new(0, 10, 0),
     size = Vector3.new(10, 10, 10),
     shape = 'Block',
@@ -50,13 +96,12 @@ QuickZone batches tree rebuilds once per frame. By keeping the Dynamic Tree smal
 If you create a zone manually or want to sync a dynamic zone to a new reference, use `:update()`.
 
 ```lua
--- Manually move a zone
-zone:update(CFrame.new(0, 50, 0), Vector3.new(10, 10, 10))
+-- Manually move a dynamic zone
+dynamicZone:setPosition(Vector3.new(0, 50, 0))
 
--- Sync a dynamic zone to its associated part
-dynamicZone:update()
+-- Sync a dynamic zone to its associated part's current CFrame, Size, and Shape
+dynamicZone:syncToPart()
 ```
-
 ---
 
 ## Groups
@@ -67,23 +112,23 @@ QuickZone provides built-in abstractions that automatically handle player lifecy
 
 ```lua
 -- Tracks all players in the server
-local allPlayers = QuickZone.PlayerGroup()
+local allPlayers = Group.players()
 
 -- Tracks only the local player (client-side only)
-local myPlayer = QuickZone.LocalPlayerGroup()
+local myPlayer = Group.localPlayer()
 ```
 
 ### Custom Groups
 For NPCs, projectiles, or vehicles, create a standard Group.
 
 ```lua
-local projectiles = QuickZone.Group({
+local projectiles = Group.new({
     updateRate = 60,   -- Check every frame for high-speed objects
     precision = 0,     -- Query every time it moves
-    safety = false     -- Fire callbacks immediately (faster but risky if you yield)
+    entities = workspace.Projectiles:GetChildren()
 })
 
-local NPCs = QuickZone.Group({
+local NPCs = Group.new({
     updateRate = 5,    -- Check only 5 times a second
     precision = 2.0    -- Only query if the NPC moves more than 2 studs
 })
@@ -94,6 +139,7 @@ You can add BaseParts, Models, Attachments, Bones, or tables with a Position.
 
 ```lua
 -- Add a Model (tracks the PrimaryPart or Pivot)
+-- Note: 'metadata' applies to the entity, not the group.
 enemies:add(npcModel, { Team = 'Red' })
 
 -- Add a specific Attachment (tracks the exact point)
@@ -105,7 +151,7 @@ local spell = { Position = Vector3.new(10, 5, 0) }
 enemies:add(spell)
 
 -- Remove when done
-enemies:remove(npcModel)
+enemies:removeBulk({npcModel, sword.TipAttachment, spell})
 ```
 
 _Note: The second argument (`metadata`) is optional and will be passed to your event callbacks._
@@ -120,7 +166,7 @@ Observers act as the logic layer. They subscribe to Groups and attach to Zones t
 An Observer listens to its subscribed Groups and checks if they overlap with its attached Zones.
 
 ```lua
-local observer = QuickZone.Observer()
+local observer = Observer.new()
 
 observer:subscribe(allPlayers) -- Who to watch
 healingZone:attach(observer)   -- Where to watch
@@ -150,7 +196,7 @@ observer:observePlayer(function(player, zone)
     end
 end)
 
--- Local Player specific
+-- LocalPlayer specific
 observer:observeLocalPlayer(function(zone)
     local sound = workspace.Sounds.SafeZoneAmbience
     sound:Play()
@@ -167,12 +213,12 @@ For logic that happens exactly once on entry or exit (e.g., playing a sound effe
 ```lua
 -- Fires when an entity enters a zone for this observer
 local enteredConn = observer:onEntered(function(entity, zone, metadata)
-    print(entity.Name .. ' entered ' .. zone:getId() .. ' with ' .. tostring(zone:getMetadata()))
+    print(entity.Name .. ' entered ' .. zone:getId())
 end)
 
 -- Fires when an entity enters a zone for this observer
 local exitedConn = observer:onExited(function(entity, zone, metadata)
-    print(entity.Name .. ' exited ' .. zone:getId() .. ' with ' .. tostring(zone:getMetadata()))
+    print(entity.Name .. ' exited ' .. zone:getId())
 end)
 
 -- Convenience wrappers
@@ -186,8 +232,8 @@ observer:onLocalPlayerExited(function(zone) ... end)
 Observers use a priority system to handle overlapping zones. An entity 'belongs' to only one zone state per observer at a time when using priorities.
 
 ```lua
-local lowPriority = QuickZone.Observer(0)
-local highPriority = QuickZone.Observer(10)
+local lowPriority = Observer.new({ priority = 0 })
+local highPriority = Observer.new({ priority = 10 })
 
 -- If a player is inside Zone A (Low) and Zone B (High) simultaneously:
 -- 1. highPriority:onEntered() fires for Zone B.

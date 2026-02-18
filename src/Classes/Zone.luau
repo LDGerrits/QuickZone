@@ -43,6 +43,15 @@ end
 	
 	Zones themselves are 'passive', meaning they must be attached to an Observer before any detection occurs.
 
+	:::caution Performance
+	If a zone moves (e.g., attached to a moving platform) or changes size, 
+	you should make the zone dynamic by setting `isDynamic` to `true`. 
+
+	Static zones are optimized into a large, pre-calculated tree. Updating a 
+	static zone forces a full recalculation of that tree, which is expensive. 
+	Dynamic zones are handled separately and are much cheaper to update.
+	:::
+
 	@class Zone
 ]=]
 local Zone = {}
@@ -87,8 +96,6 @@ local function newZoneInternal(
 		for _, observer in observers do
 			table.insert(attached, (observer :: Types.InternalObserver).id)
 		end
-
-		State.isDirty = true
 	end
 
 	return self
@@ -108,20 +115,27 @@ end
 	})
 	```
 
-	:::caution Performance
-	If this zone moves (e.g., attached to a moving platform) or changes size, 
-	you **must** set `isDynamic` to `true`. 
+	:::caution Dynamic Zones
+	If a zone moves, set `isDynamic` to `true` for maximum performance. 
+	:::
 
-	Static zones are optimized into a large, pre-calculated tree. Updating a 
-	static zone forces a full recalculation of that tree, which is expensive. 
-	Dynamic zones are handled separately and are much cheaper to update.
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
 	:::
 
 	@tag Constructor
-	@param config ZoneConfig
+	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, part: BasePart?, isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
 	@return Zone
 ]=]
-function Zone.new(config: Types.ZoneConfig): Types.Zone
+function Zone.new(config: {
+	cframe: CFrame,
+	size: Vector3,
+	shape: Types.ShapeType?,
+	part: BasePart?,
+	isDynamic: boolean?,
+	metadata: any?,
+	observers: { Types.Observer }?,
+}): Types.Zone
 	local shapeType = Enum.PartType.Block.Value
 
 	if config.shape then
@@ -151,13 +165,21 @@ end
 	```lua
 	local part = workspace.ZonePart
 	local zone = QuickZone.Zone.fromPart(part, { 
-		observers = { safeObserver } 
+		observers = { safeObserver, healingObserver } 
 	})
 	```
 
+	:::caution Dynamic Zones
+	If a zone moves, set `isDynamic` to `true` for maximum performance. 
+	:::
+
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
+	:::
+
 	@tag Constructor
 	@param part BasePart -- The part to derive the zone from.
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }?  }?
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
 	@return Zone
 ]=]
 function Zone.fromPart(
@@ -189,6 +211,14 @@ end
 		observers = { mainObserver }
 	})
 	```
+
+	:::caution Dynamic Zones
+	If a zone moves, set `isDynamic` to `true` for maximum performance. 
+	:::
+
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
+	:::
 
 	@tag Constructor
 	@param parts { BasePart } -- The parts to derive the zones from.
@@ -279,6 +309,12 @@ end
 --[=[ 
 	Update the zone to the part's current CFrame, Size and Shape.
 
+	:::info Rebuild
+	This method flags the zone for an update. The actual tree rebuild is batched and occurs once per frame.
+	* Static Zones: Expensive. Forces a rebuild of the main static tree.
+	* Dynamic Zones: Cheap. Forces a rebuild of the smaller dynamic tree.
+	:::
+
 	@method syncToPart
 	@within Zone
 	@return Zone
@@ -321,6 +357,10 @@ end
 --[=[ 
 	Updates the Zone's CFrame.
 
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
+	:::
+
 	@method setCFrame
 	@within Zone
 	@param cf CFrame
@@ -340,6 +380,10 @@ end
 --[=[ 
 	Updates the Zone's Position while preserving its current Rotation.
 
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
+	:::
+
 	@method setPosition
 	@within Zone
 	@param pos Vector3
@@ -354,6 +398,10 @@ end
 --[=[ 
 	Updates the Zone's Size.
 
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
+	:::
+	
 	@method setSize
 	@within Zone
 	@param size Vector3
@@ -552,6 +600,10 @@ end
 
 --[=[ 
 	Cleans up the zone, removes it from the LBVH tree, and detaches all observers.
+
+	:::caution Rebuild Request
+	Requests a rebuild of corresponding tree (batched per frame).
+	:::
 	
 	@tag Destructor
 	@method destroy

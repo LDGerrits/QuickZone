@@ -493,6 +493,23 @@ function Group.removeBulk(self: Types.InternalGroup, entities: { Types.Entity })
 end
 
 --[=[ 
+	Removes all entities from the group.
+	This fires 'onExited' events for every entity currently inside a zone.
+
+	@method clear
+	@within Group
+	@return Group
+]=]
+function Group.clear(self: Types.InternalGroup): Types.Group
+	-- Iterate backwards for safe removal
+	local entities = self.entities
+	for i = #entities, 1, -1 do
+		self:remove(entities[i])
+	end
+	return self
+end
+
+--[=[ 
 	Checks if a specific entity is currently a member of this group.
 
 	@method contains
