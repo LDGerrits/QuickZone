@@ -145,6 +145,12 @@ function LinearBVH.queryPoint(root: Types.Node?, point: Vector3, callback: (id: 
 		return
 	end
 
+	local px, py, pz = point.X, point.Y, point.Z
+	local rootMin, rootMax = root.min, root.max
+	if px < rootMin.X or px > rootMax.X or py < rootMin.Y or py > rootMax.Y or pz < rootMin.Z or pz > rootMax.Z then
+		return
+	end
+
 	local stackPtr = 1
 	traversalStack[1] = root
 
