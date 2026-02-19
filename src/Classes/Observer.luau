@@ -414,7 +414,7 @@ function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Ty
 		end
 	end)
 
-	local cleanupExit = self:onPlayerExited(function(_zone)
+	local cleanupExit = self:onLocalPlayerExited(function(_zone)
 		currentId = 0
 
 		if currentCleanup then
@@ -484,6 +484,174 @@ function Observer.onLocalPlayerExited(self: Types.InternalObserver, callback: (T
 	return self:onExited(function(_entity, zone, data: { Player: Player }?)
 		if data and data.Player == Players.LocalPlayer then
 			callback(zone)
+		end
+	end)
+end
+
+--[=[ 
+	Observes a Group's presence within the observer's zones.
+	The callback fires when the first entity of a group enters, and the 
+	returned cleanup function fires when the last entity of the group leaves.
+
+	```lua
+	observer:observeGroup(function(group, zone)
+		print("Group " .. group:getId() .. " has arrived!")
+		return function()
+			print("Group " .. group:getId() .. " has left entirely.")
+		end
+	end)
+	```
+
+	@method observeGroup
+	@within Observer
+	@param callback (group: Group, zone: Zone) -> (() -> ())?
+	@return () -> ()
+]=]
+function Observer.observeGroup(
+	self: Types.InternalObserver,
+	callback: (Types.Group, Types.Zone) -> (() -> ())?
+): () -> ()
+	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
+	local cleanups = {} :: { [number]: () -> () }
+
+	return self:observe(function(entity, zone, _)
+		local groupId = State.entityToGroup[entity]
+		if not groupId then
+			return
+		end
+
+		local group = State.groups[groupId]
+		if not group then
+			return
+		end
+
+		if not activeMembers[groupId] then
+			activeMembers[groupId] = {}
+		end
+
+		if next(activeMembers[groupId]) == nil then
+			activeMembers[groupId][entity] = true
+			local groupCleanup = callback(group, zone)
+			if typeof(groupCleanup) == 'function' then
+				cleanups[groupId] = groupCleanup
+			end
+		else
+			activeMembers[groupId][entity] = true
+		end
+
+		return function()
+			local members = activeMembers[groupId]
+			if not members then
+				return
+			end
+
+			members[entity] = nil
+
+			if next(members) == nil then
+				activeMembers[groupId] = nil
+				local groupCleanup = cleanups[groupId]
+				if groupCleanup then
+					groupCleanup()
+					cleanups[groupId] = nil
+				end
+			end
+		end
+	end)
+end
+
+--[=[ 
+	Fires when the first member of a Group enters any zone attached to this observer.
+	Subsequent entries by other members of the same group will not trigger this event
+	until the group has completely exited and re-entered.
+
+	@tag Event
+	@method onGroupEntered
+	@within Observer
+	@param callback (group: Group, zone: Zone) -> ()
+	@return () -> () -- Disconnect function
+]=]
+function Observer.onGroupEntered(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
+	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
+
+	return self:observe(function(entity, zone, _)
+		local groupId = State.entityToGroup[entity]
+		if not groupId then
+			return
+		end
+
+		local group = State.groups[groupId]
+		if not group then
+			return
+		end
+
+		if not activeMembers[groupId] then
+			activeMembers[groupId] = {}
+		end
+
+		local isFirst = next(activeMembers[groupId]) == nil
+		activeMembers[groupId][entity] = true
+
+		if isFirst then
+			callback(group, zone)
+		end
+
+		return function()
+			local members = activeMembers[groupId]
+			if not members then
+				return
+			end
+
+			members[entity] = nil
+
+			if next(members) == nil then
+				activeMembers[groupId] = nil
+			end
+		end
+	end)
+end
+
+--[=[ 
+	Fires when the last remaining member of a Group exits all zones attached to 
+	this observer. This is useful for "cleared" states or stopping group-wide effects.
+
+	@tag Event
+	@method onGroupExited
+	@within Observer
+	@param callback (group: Group, zone: Zone) -> ()
+	@return () -> () -- Disconnect function
+]=]
+function Observer.onGroupExited(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
+	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
+
+	return self:observe(function(entity, zone, _)
+		local groupId = State.entityToGroup[entity]
+		if not groupId then
+			return
+		end
+
+		local group = State.groups[groupId]
+		if not group then
+			return
+		end
+
+		if not activeMembers[groupId] then
+			activeMembers[groupId] = {}
+		end
+
+		activeMembers[groupId][entity] = true
+
+		return function()
+			local members = activeMembers[groupId]
+			if not members then
+				return
+			end
+
+			members[entity] = nil
+
+			if next(members) == nil then
+				activeMembers[groupId] = nil
+				callback(group, zone)
+			end
 		end
 	end)
 end

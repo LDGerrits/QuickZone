@@ -21,7 +21,7 @@ Because it calculates if it is inside or not using geometric math instead of phy
 
 - **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even pure Lua tables. If it has a position, QuickZone can track it.
 
-- **Shape Support**: Supports mathematical containment for Blocks, Balls, Cylinders, and Wedges without relying on physics collision meshes.
+- **Shape Support**: Supports mathematical containment for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes.
 
 - **Decoupled Architecture**: Separate game logic from spatial instances. Bind behaviors to categories of entities (Players, NPCs, Projectiles) for a clean, scalable architecture.
 
@@ -64,7 +64,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 | Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
 **The Result:** QuickZone is the only library that maintained near-baseline FPS (-1% impact).
-* ZonePlus caused a 28% drop in framerate, rendering the game choppy.
+* ZonePlus caused a 28% drop in framerate.
 * QuickZone handled the load with 98% less memory than ZonePlus.
 * QuickZone vs. QuickBounds: QuickZone squeezes out more performance, averaging ~1 FPS higher than QuickBounds. More importantly, QuickZone processed 4x the volume of events (2,271 vs 566).
 
@@ -74,23 +74,21 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^0.4.0
+ldgerrits/quickzone@^0.4.1
 ```
 
 ### Manual
 Download the latest .rbxm model file from the [Releases](https://github.com/LDGerrits/QuickZone/releases) tab and drag it into ReplicatedStorage.
 
 ## Quick Start
-The following example demonstrates a 'Water Zone' system. It uses an Observer to apply swimming logic to the LocalPlayerGroup only when they are inside a specific area.
-```lua
-local Players = game:GetService('Players')
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
-local QuickZone = require(ReplicatedStorage.QuickZone)
+The following example showcases a swim system. QuickZone supports two coding styles, so choose the one that fits your workflow.
 
--- Assign the classes to local variables here if you want
-local Group = QuickZone.Group
-local Observer = QuickZone.Observer
-local Zone = QuickZone.Zone
+### Option A: The QuickZone Approach (Recommended)
+Best for clean, modern code. You define relationships in a configuration table (**Declarative**) and use a single function to manage the active state (**Lifecycle**).
+
+```lua
+local QuickZone = require(game.ReplicatedStorage.QuickZone)
+local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
 
 -- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
 local myPlayer = Group.localPlayer()
@@ -126,4 +124,35 @@ end)
 Zone.fromParts(workspace.WaterParts:GetChildren(), { 
     observers = { swimObserver } 
 })
+```
+
+### Option B: The Classic Approach (ZonePlus / SimpleZone Style)
+Best for familiarity or for migrating ZonePlus code to QuickZone. You manually 'wire' objects together (**Imperative**) and use standard events like `onEntered` to trigger one-off actions (**Event-Driven**).
+
+```lua
+local QuickZone = require(game.ReplicatedStorage.QuickZone)
+local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
+
+local myPlayer = Group.localPlayer()
+local swimObserver = Observer.new({ priority = 42 })
+
+-- Subscribe the logic to the group
+swimObserver:subscribe(myPlayer)
+
+-- Connect events
+swimObserver:onLocalPlayerEntered(function(zone)
+    print("Entered water zone:", zone:getId())
+    -- Add swimming logic here
+end)
+
+swimObserver:onLocalPlayerExited(function(zone)
+    print("Exited water zone:", zone:getId())
+    -- Remove swimming logic here
+end)
+
+-- Manually attach the zones
+local zones = Zone.fromParts(workspace.WaterParts:GetChildren())
+for _, zone in zones do
+    zone:attach(swimObserver)
+end
 ```

@@ -122,12 +122,15 @@ export type Observer = {
 	observe: (self: Observer, callback: (Entity, Zone, any?) -> (() -> ())?) -> () -> (),
 	observePlayer: (self: Observer, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
 	observeLocalPlayer: (self: Observer, callback: (Zone) -> (() -> ())?) -> () -> (),
+	observeGroup: (self: Observer, callback: (Group, Zone) -> (() -> ())?) -> () -> (),
 	onEntered: (self: Observer, callback: Callback) -> () -> (),
 	onExited: (self: Observer, callback: Callback) -> () -> (),
-	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
-	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
+	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
+	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
+	onGroupEntered: (self: Observer, callback: (Group, Zone) -> ()) -> () -> (),
+	onGroupExited: (self: Observer, callback: (Group, Zone) -> ()) -> () -> (),
 	destroy: (self: Observer) -> (),
 }
 
@@ -146,13 +149,11 @@ export type GroupClass = {
 		precision: number?,
 		entities: { Entity }?,
 	}?) -> Group,
-	localPlayer: (
-		config: {
-			updateRate: number?,
-			precision: number?,
-			entities: { Entity }?,
-		}?
-	) -> Group,
+	localPlayer: (config: {
+		updateRate: number?,
+		precision: number?,
+		entities: { Entity }?,
+	}?) -> Group,
 }
 
 export type Group = {

@@ -1,15 +1,9 @@
 [package]
 name = "ldgerrits/quickzone"
 description = "A high-performance, low-footprint, spatial query library"
-version = "0.4.0"
+version = "0.4.1"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 license = "MIT"
 exclude = ["**"]
-include = [
-	"src", 
-	"src/*",
-	"wally.toml",
-	"default.project.json",
-	"LICENSE.md"
-]
+include = ["src", "src/*", "wally.toml", "default.project.json", "LICENSE.md"]

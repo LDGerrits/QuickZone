@@ -37,41 +37,12 @@ QuickZone moves away from monolithic, instance-bound logic in favor of a Group-O
 ![Priority](topology_quickzone.png)
 
 #### Groups
-A Group is a collection of entities that share performance characteristics and logical categorization. Performance can be configured per Group.
-
-```lua
--- Real-time frequency (60Hz), zero tolerance.
-local cameraGroup = QuickZone.Group.new({
-    updateRate = 60,
-    precision = 0,
-})
-
--- Low frequency (2Hz), low precision.
-local NPCGroup = QuickZone.Group.new({
-    updateRate = 2,
-    precision = 4,
-})
-```
-
-This prevents wasting CPU cycles checking a slow-moving NPC, for example.
+A Group is a collection of entities that share performance characteristics and logical categorization. Performance can be configured per Group, like setting the update rate in Hz or the precision, i.e. the minimum distance threshold to perform a spatial query, in studs. This prevents wasting CPU cycles checking a slow-moving NPC, for example.
 
 #### Observers
-Observers act as the logic bridge. They subscribe to Groups and attach to Zones, creating a many-to-many relationship that keeps game logic decoupled and clean.
+Observers act as the logic bridge. They subscribe to Groups and are attach by Zones, creating a many-to-many relationship that keeps game logic decoupled and clean.
 
-```lua
--- Create an Observer and subscribe to a group
-local safeObserver = QuickZone.Observer.new()
-safeObserver:subscribe(QuickZone.Group.localPlayer())
-
--- Logic is defined once, not per zone
-safeObserver:onEntered(function(player, zone)
-    print('Entered Safe Zone:', zone:getId())
-end)
-
--- Create Zones from parts and attach them to the observer
-local parts = workspace.SafeZones:GetChildren()
-QuickZone.Zone.fromParts(parts, { observers = { safeObserver }})
-```
+Because Observers are decoupled from the physics engine, they can aggregate spatial data. Tracking an entire Group costs no additional spatial queries.And using `observeGroup()`, an Observer can fire an event when the first member of a Group enters a zone, and clean up when the last member leaves. 
 
 ---
 

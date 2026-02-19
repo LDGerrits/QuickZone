@@ -10,11 +10,7 @@ QuickZone is designed around a three-tier architecture: Zones (where), Groups (w
 
 ```lua
 local QuickZone = require(game:GetService("ReplicatedStorage").QuickZone)
-
--- We recommend assigning the classes to local variables
-local Zone = QuickZone.Zone
-local Observer = QuickZone.Observer
-local Group = QuickZone.Group
+local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
 ```
 
 ### The Two Workflows
@@ -33,7 +29,7 @@ local observer = Observer.new({
 })
 
 Zone.fromPart(workspace.SafeZone, {
-    observers = { observer } -- Imediately attaches to these observers
+    observers = { observer } -- Immediately attaches to these observers
 })
 ```
 
@@ -50,9 +46,7 @@ observer:subscribe(localPlayerGroup)
 zone:attach(observer)
 ```
 
----
-
-## Zones
+## 1. Zones
 
 Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
 
@@ -102,9 +96,8 @@ dynamicZone:setPosition(Vector3.new(0, 50, 0))
 -- Sync a dynamic zone to its associated part's current CFrame, Size, and Shape
 dynamicZone:syncToPart()
 ```
----
 
-## Groups
+## 2. Groups
 Groups are collections of entities (Parts, Models, Players, etc.). They allow you to categorize entities and set unique performance settings per category.
 
 ### Specialized Groups
@@ -156,9 +149,7 @@ enemies:removeBulk({npcModel, sword.TipAttachment, spell})
 
 _Note: The second argument (`metadata`) is optional and will be passed to your event callbacks._
 
----
-
-## Observers
+## 3. Observers
 
 Observers act as the logic layer. They subscribe to Groups and attach to Zones to bridge spatial data with game behavior.
 
@@ -187,6 +178,19 @@ observer:observe(function(entity, zone, metadata)
     end
 end)
 
+-- The callback fires when the first entity of a group enters, and the 
+-- returned cleanup function fires when the last entity of the group leaves.
+observer:observeGroup(function(group, zone)
+    print("Group " .. group:getId() .. " has arrived!")
+    local boss = workspace.Boss:Clone()
+    boss.Parent = workspace
+    
+    return function()
+        print("The group has been wiped out or left.")
+        boss:Destroy()
+    end
+end)
+
 -- Player specific
 observer:observePlayer(function(player, zone)
     local forceField = Instance.new("ForceField", player.Character)
@@ -211,17 +215,23 @@ end)
 For logic that happens exactly once on entry or exit (e.g., playing a sound effect, dealing damage, analytics), use the event listeners.
 
 ```lua
--- Fires when an entity enters a zone for this observer
-local enteredConn = observer:onEntered(function(entity, zone, metadata)
+-- Individual entity events
+observer:onEntered(function(entity, zone, metadata)
     print(entity.Name .. ' entered ' .. zone:getId())
 end)
-
--- Fires when an entity enters a zone for this observer
-local exitedConn = observer:onExited(function(entity, zone, metadata)
+observer:onExited(function(entity, zone, metadata)
     print(entity.Name .. ' exited ' .. zone:getId())
 end)
 
--- Convenience wrappers
+-- Group-level events
+observer:onGroupEntered(function(group, zone)
+    print('The first member of group ' .. group:getId() .. ' entered!')
+end)
+observer:onGroupExited(function(group, zone)
+    print('The last member of group ' .. group:getId() .. ' left!')
+end)
+
+-- Convenient player events
 observer:onPlayerEntered(function(player, zone) ... end)
 observer:onPlayerExited(function(player, zone) ... end)
 observer:onLocalPlayerEntered(function(zone) ... end)
@@ -270,13 +280,6 @@ local zones = QuickZone:getZonesAtPoint(Vector3.new(10, 5, 0))
 
 -- Get the group an entity belongs to
 local group = QuickZone:getGroupOfEntity(workspace.Part)
-```
-
-### Debugging
-Renders zones in the workspace to verify the setup.
-
-```lua
-QuickZone:visualize(true)
 ```
 
 ---
