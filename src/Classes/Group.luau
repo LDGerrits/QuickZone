@@ -128,31 +128,17 @@ Group.__index = Group
 	@return Group
 ]=]
 function Group.new(config: {
-	updateRate: number?,
-	precision: number?,
+	tag: string?,
 	entities: { Types.Entity }?,
 }?): Types.Group
-	local hz = config and config.updateRate
-	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
-
-	local n = config and config.precision
-	assert(not n or n >= 0, '[QuickZone] precision must be non-negative')
-
 	local id = State.nextGroupId
 	State.nextGroupId += 1
-
-	local updateRate = hz or Config.Scheduler.updateRate
-	local precision = n or Config.Scheduler.precision
 
 	local self: Types.InternalGroup = setmetatable({
 		id = id,
 		entities = {},
 		entityIndices = {},
 		entityData = {},
-		config = {
-			updateRate = updateRate,
-			precisionSq = precision ^ 2,
-		},
 	}, Group) :: any
 
 	State.groups[id] = self
@@ -181,13 +167,10 @@ end
 	@return Group
 ]=]
 function Group.players(config: {
-	updateRate: number?,
-	precision: number?,
 	entities: { Types.Entity }?,
 }?): Types.Group
 	if sharedPlayerGroup then
 		if config then
-			sharedPlayerGroup:setConfig(config)
 			if config.entities then
 				sharedPlayerGroup:addBulk(config.entities)
 			end
@@ -268,7 +251,6 @@ function Group.localPlayer(config: {
 
 	if sharedLocalPlayerGroup then
 		if config then
-			sharedLocalPlayerGroup:setConfig(config)
 			if config.entities then
 				sharedLocalPlayerGroup:addBulk(config.entities)
 			end
@@ -520,108 +502,6 @@ end
 function Group.contains(self: Types.InternalGroup, entity: Types.Entity): boolean
 	local groupId = State.entityToGroup[entity]
 	return groupId and groupId == self.id
-end
-
---[=[ 
-	Updates the group's configuration. 
-
-	:::tip Precision
-	A higher `precision` value (e.g., 2.0) means entities must move further 
-	before a re-calculation is triggered, improving performance for large groups.
-	:::
-
-	@method setConfig
-	@within Group
-	@param config { updateRate: number?, precision: number?, safety: boolean? }
-	@return Group
-]=]
-function Group.setConfig(
-	self: Types.InternalGroup,
-	config: {
-		updateRate: number?,
-		precision: number?,
-	}
-): Types.Group
-	local hz = config.updateRate
-	assert(not hz or hz > 0, '[QuickZone] updateRate must be greater than 0')
-
-	local n = config.precision
-	assert(not n or n >= 0, '[QuickZone] precision must be non-negative')
-
-	if hz then
-		self.config.updateRate = hz
-	end
-	if n then
-		self.config.precisionSq = n ^ 2
-	end
-
-	return self
-end
-
---[=[
-	Set the update rate of the group.
-
-	@method setUpdateRate
-	@within Group
-	@param updateRate number
-	@return Group
-]=]
-function Group.setUpdateRate(self: Types.InternalGroup, updateRate: number): Types.Group
-	self.config.updateRate = updateRate
-	return self
-end
-
---[=[
-	Set the current precision of the group.
-
-	@method setPrecision
-	@within Group
-	@param precision number
-	@return Group
-]=]
-function Group.setPrecision(self: Types.InternalGroup, precision: number): Types.Group
-	self.config.precisionSq = precision ^ 2
-	return self
-end
-
---[=[
-	Returns the current configuration settings for the group.
-
-	@method getConfig
-	@within Group
-	@return { updateRate: number, precision: number, safety: boolean }
-]=]
-function Group.getConfig(self: Types.InternalGroup): {
-	updateRate: number,
-	precision: number,
-}
-	local config = self.config
-	return {
-		updateRate = config.updateRate,
-		precision = math.sqrt(config.precisionSq),
-	}
-end
-
---[=[
-	Returns the current update rate of the group.
-
-	@method getUpdateRate
-	@within Group
-	@return number
-]=]
-function Group.getUpdateRate(self: Types.InternalGroup): number
-	return self.config.updateRate
-end
-
---[=[
-	Returns the current precision of the group.
-
-	@method getPrecision
-	@within Group
-	@return number
-]=]
-function Group.getPrecision(self: Types.InternalGroup): number
-	return math.sqrt(self.config.precisionSq)
 end
 
 --[=[ 
