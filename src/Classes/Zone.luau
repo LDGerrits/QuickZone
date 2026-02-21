@@ -610,6 +610,54 @@ end
 	@within Zone
 ]=]
 function Zone.destroy(self: Types.InternalZone): ()
+	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler
+	local attachedObservers = State.zoneAttachedObservers[self.id]
+	if attachedObservers then
+		for _, observerId in attachedObservers do
+			local trackedEntities = State.observerTrackingEntities[observerId]
+			if not trackedEntities then
+				continue
+			end
+
+			for entity, _ in trackedEntities do
+				local groupId = State.entityToGroup[entity]
+				if not groupId then
+					continue
+				end
+
+				local group = State.groups[groupId]
+				if not group then
+					continue
+				end
+
+				local data = group.entityData[entity]
+
+				if not data or data.activeObserverMemberships[observerId] ~= self.id then
+					continue
+				end
+
+				data.activeObserverMemberships[observerId] = nil
+				trackedEntities[entity] = nil
+
+				local cbs = State.observerExitedCallbacks[observerId]
+				if not cbs then
+					continue
+				end
+
+				local safety = State.observerSafety[observerId]
+				local cd = State.entityMetadata[entity]
+
+				for _, fn in cbs do
+					if safety then
+						task.spawn(fn, entity, self, cd)
+					else
+						fn(entity, self, cd)
+					end
+				end
+			end
+		end
+	end
+
 	State.zoneAttachedObservers[self.id] = nil
 	State.zoneIdToZoneObj[self.id] = nil
 
