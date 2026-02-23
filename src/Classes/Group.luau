@@ -1,5 +1,6 @@
 --!strict
 
+local CollectionService = game:GetService('CollectionService')
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
@@ -10,7 +11,6 @@ local updateProfile = require(script.Parent.Parent.Core.updateProfile)
 
 local sharedPlayerGroup: Types.Group?
 local sharedLocalPlayerGroup: Types.Group?
-local bridgeRefreshPlayerGroup: ((Player) -> ())?
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -46,16 +46,6 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 		cleanCharacter()
 
 		task.spawn(function()
-			-- To prioritize LocalPlayerGroup, do early return if it is local player and LocalPlayerGroup exists
-			if
-				IS_CLIENT
-				and group == sharedPlayerGroup
-				and player == Players.LocalPlayer
-				and sharedLocalPlayerGroup
-			then
-				return
-			end
-
 			local hrp = char:WaitForChild('HumanoidRootPart', 10)
 
 			if not hrp or not player:IsDescendantOf(Players) then
@@ -132,7 +122,6 @@ Group.__index = Group
 	@return Group
 ]=]
 function Group.new(config: {
-	tag: string?,
 	entities: { Types.Entity }?,
 }?): Types.Group
 	local id = State.nextGroupId
@@ -155,6 +144,83 @@ function Group.new(config: {
 end
 
 --[=[ 
+	Creates a dynamic Group that automatically tracks all instances with a specific tag.
+	Instances are only tracked while they are descendants of the Workspace.
+
+	@tag Constructor
+	@param tag string
+	@return Group
+]=]
+function Group.fromTag(
+	tag: string,
+	config: {
+		entities: { Types.Entity }?,
+	}?
+): Types.Group
+	local group = Group.new(config)
+
+	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
+
+	local function checkAncestry(instance: BasePart | Model | Attachment | Bone | Camera)
+		if instance:IsDescendantOf(workspace) then
+			group:add(instance)
+		else
+			group:remove(instance)
+		end
+	end
+
+	local function startWatching(instance: Instance)
+		if watchingInstances[instance] then
+			return
+		end
+
+		if
+			not (
+				instance:IsA('BasePart')
+				or instance:IsA('Model')
+				or instance:IsA('Attachment')
+				or instance:IsA('Bone')
+				or instance:IsA('Camera')
+			)
+		then
+			return
+		end
+
+		watchingInstances[instance] = instance.AncestryChanged:Connect(function()
+			checkAncestry(instance)
+		end)
+
+		checkAncestry(instance)
+	end
+
+	local function stopWatching(instance: Instance)
+		local conn = watchingInstances[instance]
+		if conn then
+			conn:Disconnect()
+			watchingInstances[instance] = nil
+		end
+		group:remove(instance :: any)
+	end
+
+	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
+	local removedConn = CollectionService:GetInstanceRemovedSignal(tag):Connect(stopWatching)
+
+	for _, instance in CollectionService:GetTagged(tag) do
+		startWatching(instance)
+	end
+
+	group:onDestroy(function()
+		addedConn:Disconnect()
+		removedConn:Disconnect()
+		for instance, _ in watchingInstances do
+			stopWatching(instance)
+		end
+	end)
+
+	return group
+end
+
+--[=[ 
 	Returns a singleton Group that automatically tracks all Players in the server.
 
 	:::info Behavior
@@ -169,7 +235,6 @@ end
 	@return Group
 ]=]
 function Group.players(config: {
-	tag: string?,
 	entities: { Types.Entity }?,
 }?): Types.Group
 	if sharedPlayerGroup then
@@ -184,11 +249,6 @@ function Group.players(config: {
 
 	local trackerStore = {} :: { [Player]: () -> () }
 	local mainConnections = {} :: { RBXScriptConnection }
-
-	bridgeRefreshPlayerGroup = function(player: Player)
-		untrackPlayer(player, trackerStore)
-		trackPlayer(group, player, trackerStore)
-	end
 
 	table.insert(
 		mainConnections,
@@ -208,8 +268,7 @@ function Group.players(config: {
 		trackPlayer(group, player, trackerStore)
 	end
 
-	local originalDestroyHook = group.destroy
-	group.destroy = function(self)
+	group:onDestroy(function()
 		for _, conn in mainConnections do
 			conn:Disconnect()
 		end
@@ -220,11 +279,8 @@ function Group.players(config: {
 		table.clear(mainConnections)
 		table.clear(trackerStore)
 
-		bridgeRefreshPlayerGroup = nil
 		sharedPlayerGroup = nil
-
-		originalDestroyHook(self)
-	end
+	end)
 
 	return group
 end
@@ -244,7 +300,6 @@ end
 	@return Group
 ]=]
 function Group.localPlayer(config: {
-	tag: string?,
 	entities: { Types.Entity }?,
 }?): Types.Group
 	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
@@ -264,18 +319,10 @@ function Group.localPlayer(config: {
 
 	trackPlayer(group, lp, trackers)
 
-	local originalDestroyHook = group.destroy
-	group.destroy = function(self)
+	group:onDestroy(function()
 		untrackPlayer(lp, trackers)
 		sharedLocalPlayerGroup = nil
-
-		-- The player should immediately be handed over to PlayerGroup
-		if bridgeRefreshPlayerGroup then
-			bridgeRefreshPlayerGroup(Players.LocalPlayer)
-		end
-
-		originalDestroyHook(self)
-	end
+	end)
 
 	return group
 end
@@ -350,7 +397,7 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity, metadata: an
 		if not strat then
 			warn(
 				string.format(
-					'[QuickZone] Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or a duck typed table.',
+					'[QuickZone] Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or an EntityTable.',
 					tostring(entity)
 				)
 			)
@@ -374,9 +421,6 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity, metadata: an
 	self.entityIndices[entity] = idx
 
 	if metadata then
-		if not State.entityMetadata[entity] then
-			State.entityMetadata[entity] = {}
-		end
 		State.entityMetadata[entity] = metadata
 	end
 
@@ -506,8 +550,8 @@ end
 function Group.clear(self: Types.InternalGroup): Types.Group
 	-- Iterate backwards for safe removal
 	local entities = self.entities
-	for i = #entities, 1, -1 do
-		self:remove(entities[i])
+	for idx = #entities, 1, -1 do
+		self:remove(entities[idx])
 	end
 	return self
 end
@@ -580,6 +624,36 @@ function Group.getObservers(self: Types.InternalGroup): { Types.Observer }
 end
 
 --[=[ 
+	Fires when `destroy()` is called on the group.
+
+	```lua
+	local disconnect = myGroup:onDestroy(function()
+		print('Group was destroyed!')
+	end)
+	```
+
+	@tag Event
+	@method onDestroy
+	@within Group
+	@param callback () -> ()
+	@return () -> ()
+]=]
+function Group.onDestroy(self: Types.InternalGroup, callback: () -> ()): () -> ()
+	if not self.onDestroyCallbacks then
+		self.onDestroyCallbacks = {}
+	end
+
+	table.insert(self.onDestroyCallbacks :: any, callback)
+
+	return function()
+		local idx = table.find(self.onDestroyCallbacks :: any, callback)
+		if idx then
+			table.remove(self.onDestroyCallbacks :: any, idx)
+		end
+	end
+end
+
+--[=[ 
 	Cleans up the group, removes all tracked entities, and detaches any 
 	associated observers.
 	
@@ -588,8 +662,15 @@ end
 	@within Group
 ]=]
 function Group.destroy(self: Types.InternalGroup): ()
-	for i = #self.entities, 1, -1 do
-		self:remove(self.entities[i])
+	if self.onDestroyCallbacks then
+		for _, callback in self.onDestroyCallbacks do
+			task.spawn(callback)
+		end
+		table.clear(self.onDestroyCallbacks)
+	end
+
+	for idx = #self.entities, 1, -1 do
+		self:remove(self.entities[idx])
 	end
 
 	State.groupToObservers[self.id] = nil

@@ -22,7 +22,16 @@ QuickZone, on the other hand, is Entity-Centric. It keeps a list of entities and
 
 ---
 
-### 2. Data-Oriented Design (DOD)
+### 2. Expressive and Boilerplate-Free API
+Writing performant code shouldn't mean writing complicated code. QuickZone is designed to be highly ergonomic.
+
+- **CollectionService Integration**: Instead of writing boilerplate for loops to parse folders, you can use the built-in fromTag constructors. Tag your parts and bind them to your logic in a single line of code (e.g., Zone.fromTag('Lava') or Group.fromTag('Interactable')).
+
+- **Declarative Configurations**: QuickZone lets you define behaviors, priorities, and relationships upfront in simple configuration tables, drastically reducing boilerplate and keeping your scripts clean.
+
+---
+
+### 3. Data-Oriented Design (DOD)
 QuickZone focuses on how data is laid out in memory based on DOD principles.
 
 - **Contiguous Arrays**: Unlike standard OOP where data is scattered across the heap in different objects, QuickZone stores entity data in pre-allocated, contiguous arrays to improve CPU cache locality.
@@ -31,22 +40,22 @@ QuickZone focuses on how data is laid out in memory based on DOD principles.
 
 ---
 
-### 3. Architecture
+### 4. Architecture
 QuickZone moves away from monolithic, instance-bound logic in favor of a Group-Observer-Zone topology. This architecture separates what is being tracked from where the tracking occurs and how the system should respond.
 
 ![Priority](topology_quickzone.png)
 
 #### Groups
-A Group is a collection of entities that share performance characteristics and logical categorization. Performance can be configured per Group, like setting the update rate in Hz or the precision, i.e. the minimum distance threshold to perform a spatial query, in studs. This prevents wasting CPU cycles checking a slow-moving NPC, for example.
+A Group is a collection of entities that share logical categorization. An entity can be part of multiple groups at the same time.
 
 #### Observers
-Observers act as the logic bridge. They subscribe to Groups and are attach by Zones, creating a many-to-many relationship that keeps game logic decoupled and clean.
+Observers act as the logic bridge. They subscribe to Groups and are attach by Zones, creating a many-to-many relationship that keeps game logic decoupled and clean. Performance can be configured per Observer, like setting the update rate in Hz or the precision, i.e. the minimum distance threshold to perform a spatial query, in studs. This prevents wasting CPU cycles checking a slow-moving NPC, for example.
 
-Because Observers are decoupled from the physics engine, they can aggregate spatial data. Tracking an entire Group costs no additional spatial queries.And using `observeGroup()`, an Observer can fire an event when the first member of a Group enters a zone, and clean up when the last member leaves. 
+Because Observers are decoupled from the physics engine, they can aggregate spatial data. Tracking an entire Group costs no additional spatial queries. And using `observeGroup()`, an Observer can fire an event when the first member of a Group enters a zone, and clean up when the last member leaves. 
 
 ---
 
-### 4. The Budgeted Scheduler
+### 5. The Budgeted Scheduler
 A common issue with spatial libraries is stutter due to it processing too many things in one frame. QuickZone fixes this via its smart Scheduler.
 
 #### Frame Budgeting
@@ -61,7 +70,7 @@ The Scheduler uses a Round-Robin strategy for Group processing. Instead of proce
 ---
 
 
-### 5. Dual-LBVH and Batched Rebuilding
+### 6. Dual-LBVH and Batched Rebuilding
 To maintain high performance, QuickZone maintains two LBVHs:
 
 - **The Static LBVH**: Contains all non-moving, non-resizing zones.
@@ -79,7 +88,7 @@ Rebuilding the LBVHs is part of the frame budget. Thus, rebuilding will result i
 
 ---
 
-### 6. Flexibility
+### 7. Flexibility
 Because QuickZone relies on pure math rather than the Physics engine, it is not limited to BaseParts. It also supports duck typing for entities.
 
 - **BaseParts**: Uses `.Position`.
@@ -96,7 +105,7 @@ This allows you to track real-time simulations (e.g. a spell cast or an RC car) 
 
 ---
 
-### 7. Performance Benchmarks
+### 8. Performance Benchmarks
 
 We stress-tested QuickZone against the most popular alternatives in two distinct scenarios: **Entity Stress** (lots of moving parts) and **Map Stress** (lots of zones).
 

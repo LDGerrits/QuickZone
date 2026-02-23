@@ -1,8 +1,10 @@
 --!strict
+local CollectionService = game:GetService('CollectionService')
 
 local Geometry = require(script.Parent.Parent.Core.Geometry)
 local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
+local Zones = require(script.Parent.Zones)
 
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
@@ -33,7 +35,6 @@ local function getShapeEnumValue(part: BasePart): number
 		return Enum.PartType.CornerWedge.Value
 	end
 
-	-- Fallback for Meshes, Unions, CornerWedges, Trusses
 	return Enum.PartType.Block.Value
 end
 
@@ -201,51 +202,143 @@ function Zone.fromPart(
 	return newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata, observers)
 end
 
---[=[ 
-	Create a list of zones corresponding to the list of `BaseParts`.
-	Each zone corresponds to a `BasePart` and shares the same properties.
-
-	```lua
-	local zones = QuickZone.Zone.fromParts(workspace.ZoneParts:GetChildren(), {
-		isDynamic = false,
-		observers = { mainObserver }
-	})
-	```
-
-	:::caution Dynamic Zones
-	If a zone moves, set `isDynamic` to `true` for maximum performance. 
-	:::
-
-	:::caution Rebuild Request
-	Requests a rebuild of corresponding tree (batched per frame).
-	:::
-
+--[=[
+	Creates and manages a collection of Zones from a static array of BaseParts.
+	
 	@tag Constructor
-	@param parts { BasePart } -- The parts to derive the zones from.
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }?  }?
-	@return { Zone }
+	@within Zone
+	@param parts { BasePart }
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	@return Zones
 ]=]
 function Zone.fromParts(
 	parts: { BasePart },
-	config: { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
-): { Types.Zone }
-	local zones = table.create(#parts)
-	local isDynamic = config and config.isDynamic or false
-	local metadata = config and config.metadata
-	local observers = config and config.observers
+	config: {
+		isDynamic: boolean?,
+		metadata: any?,
+		observers: { Types.Observer }?,
+	}?
+): Types.Zones
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
+	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 
-	for i, part in parts do
-		local shapeId = Enum.PartType.Block.Value
-		if part:IsA('Part') then
-			shapeId = part.Shape.Value
-		elseif part:IsA('WedgePart') then
-			shapeId = Enum.PartType.Wedge.Value
-		elseif part:IsA('CornerWedgePart') then
-			shapeId = Enum.PartType.CornerWedge.Value
+	local zones = Zones.new({
+		isDynamic = isDynamic,
+		metadata = metadata,
+	}) :: Types.InternalZones
+
+	if config and config.observers then
+		for _, obs in config.observers do
+			zones:attach(obs)
 		end
-
-		zones[i] = newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata, observers)
 	end
+
+	for _, part in parts do
+		if part:IsA('BasePart') then
+			local newZone = Zone.fromPart(part, {
+				isDynamic = isDynamic,
+				metadata = zones.metadata,
+			})
+
+			zones:add(newZone)
+		end
+	end
+
+	return zones
+end
+
+--[=[
+	Dynamically creates and manages Zones for all BaseParts with a specific CollectionService tag.
+	
+	@tag Constructor
+	@within Zone
+	@param tag string
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	@return Zones
+]=]
+function Zone.fromTag(
+	tag: string,
+	config: {
+		isDynamic: boolean?,
+		metadata: any?,
+		observers: { Types.Observer }?,
+	}?
+): Types.Zones
+	-- Create Zones
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
+	local metadata = if config and config.metadata ~= nil then config.metadata else nil
+
+	local zones = Zones.new({
+		isDynamic = isDynamic,
+		metadata = metadata,
+	}) :: Types.InternalZones
+
+	if config and config.observers then
+		for _, obs in config.observers do
+			zones:attach(obs)
+		end
+	end
+
+	-- Handle dynamic creation and destruction of zones based on tag
+	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
+	local instanceToZone = {} :: { [Instance]: Types.Zone }
+
+	local function checkAncestry(instance: Instance)
+		local inWorkspace = instance:IsDescendantOf(workspace)
+		if inWorkspace and not instanceToZone[instance] then
+			if instance:IsA('BasePart') then
+				local newZone = Zone.fromPart(instance, {
+					isDynamic = isDynamic,
+					metadata = zones.metadata,
+				})
+				instanceToZone[instance] = newZone
+				zones:add(newZone)
+			end
+		elseif not inWorkspace and instanceToZone[instance] then
+			local deadZone = instanceToZone[instance]
+			instanceToZone[instance] = nil
+			deadZone:destroy()
+		end
+	end
+
+	local function startWatching(instance: Instance)
+		if watchingInstances[instance] or not instance:IsA('BasePart') then
+			return
+		end
+		watchingInstances[instance] = instance.AncestryChanged:Connect(function()
+			checkAncestry(instance)
+		end)
+		checkAncestry(instance)
+	end
+
+	local function stopWatching(instance: Instance)
+		local conn = watchingInstances[instance]
+		if conn then
+			conn:Disconnect()
+			watchingInstances[instance] = nil
+		end
+		if instanceToZone[instance] then
+			local oldZone = instanceToZone[instance]
+			instanceToZone[instance] = nil
+			oldZone:destroy()
+		end
+	end
+
+	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
+	local removedConn = CollectionService:GetInstanceRemovedSignal(tag):Connect(stopWatching)
+	for _, instance in CollectionService:GetTagged(tag) do
+		startWatching(instance)
+	end
+
+	zones:onDestroy(function()
+		addedConn:Disconnect()
+		removedConn:Disconnect()
+		for inst in watchingInstances do
+			stopWatching(inst)
+		end
+		table.clear(watchingInstances)
+		table.clear(instanceToZone)
+	end)
 
 	return zones
 end
@@ -454,7 +547,7 @@ end
 
 	@method setMetadata
 	@within Zone
-	@return number
+	@return Zone
 ]=]
 function Zone.setMetadata(self: Types.InternalZone, metadata: any?): Types.Zone
 	self.metadata = metadata
@@ -466,7 +559,7 @@ end
 	
 	@method getMetadata
 	@within Zone
-	@return number
+	@return any?
 ]=]
 function Zone.getMetadata(self: Types.InternalZone): any?
 	return self.metadata
@@ -599,6 +692,36 @@ function Zone.isDynamic(self: Types.InternalZone): boolean
 end
 
 --[=[ 
+	Fires when `destroy()` is called on the zone
+
+	```lua
+	local disconnect = myZone:onDestroy(function()
+		print('Zone was destroyed!')
+	end)
+	```
+
+	@tag Event
+	@method onDestroy
+	@within Zone
+	@param callback () -> ()
+	@return () -> ()
+]=]
+function Zone.onDestroy(self: Types.InternalZone, callback: () -> ()): () -> ()
+	if not self.onDestroyCallbacks then
+		self.onDestroyCallbacks = {}
+	end
+
+	table.insert(self.onDestroyCallbacks :: any, callback)
+
+	return function()
+		local idx = table.find(self.onDestroyCallbacks :: any, callback)
+		if idx then
+			table.remove(self.onDestroyCallbacks :: any, idx)
+		end
+	end
+end
+
+--[=[ 
 	Cleans up the zone, removes it from the LBVH tree, and detaches all observers.
 
 	:::caution Rebuild Request
@@ -610,10 +733,16 @@ end
 	@within Zone
 ]=]
 function Zone.destroy(self: Types.InternalZone): ()
-	local zoneId = self.id
+	if self.onDestroyCallbacks then
+		for _, callback in self.onDestroyCallbacks do
+			task.spawn(callback)
+		end
+		table.clear(self.onDestroyCallbacks)
+	end
 
 	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler
-	local attachedObservers = State.zoneAttachedObservers[self.id]
+	local id = self.id
+	local attachedObservers = State.zoneAttachedObservers[id]
 	if attachedObservers then
 		for _, observerId in attachedObservers do
 			local trackedEntities = State.observerTrackingEntities[observerId]
@@ -624,7 +753,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 			for entity, _ in trackedEntities do
 				local data = State.entityData[entity]
 
-				if not data or data.activeObserverMemberships[observerId] ~= zoneId then
+				if not data or data.activeObserverMemberships[observerId] ~= id then
 					continue
 				end
 
@@ -650,18 +779,18 @@ function Zone.destroy(self: Types.InternalZone): ()
 		end
 	end
 
-	State.zoneAttachedObservers[self.id] = nil
-	State.zoneIdToZoneObj[self.id] = nil
+	State.zoneAttachedObservers[id] = nil
+	State.zoneIdToZoneObj[id] = nil
 
 	if self.dynamic then
-		dynamicCFrames[self.id] = nil
-		dynamicHalfSizes[self.id] = nil
-		dynamicTypes[self.id] = nil
+		dynamicCFrames[id] = nil
+		dynamicHalfSizes[id] = nil
+		dynamicTypes[id] = nil
 		State.pendingDynamicRebuild = true
 	else
-		staticCFrames[self.id] = nil
-		staticHalfSizes[self.id] = nil
-		staticTypes[self.id] = nil
+		staticCFrames[id] = nil
+		staticHalfSizes[id] = nil
+		staticTypes[id] = nil
 		State.pendingStaticRebuild = true
 	end
 

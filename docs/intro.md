@@ -19,7 +19,7 @@ Because it calculates if it is inside or not using geometric math instead of phy
 
 - **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore (do note that QuickZone still supports Event-Driven Programming).
 
-- **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even pure Lua tables. If it has a position, QuickZone can track it.
+- **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even tables. If it has a position, QuickZone can track it.
 
 - **Shape Support**: Supports mathematical containment for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes.
 
@@ -74,7 +74,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^0.4.1
+ldgerrits/quickzone@^0.5.0
 ```
 
 ### Manual
@@ -97,15 +97,17 @@ local myPlayer = Group.localPlayer()
 -- Priority 42 ensures this logic overrides lower-priority overlaps.
 local swimObserver = Observer.new({ 
     priority = 42,
+    updateRate = 30,
+    precision = 0.1,
     groups = { myPlayer } 
 })
 
 -- Define behavior
 swimObserver:observeLocalPlayer(function()
-    local chararcter = Players.LocalPlayer.Character
+    local character = Players.LocalPlayer.Character
     if not character then return end
 
-    local humanoid = character:FindFirstChild("Humanoid")
+    local humanoid = character:FindFirstChild('Humanoid')
     if not humanoid then return end
     
     -- On Enter
@@ -115,13 +117,12 @@ swimObserver:observeLocalPlayer(function()
     -- Return cleanup (On Exit)
     return function() 
         humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-    end)
+    end
 end)
 
--- Create zones based on parts inside workspace.WaterParts,
--- and attach them to the observer automatically.
--- This uses the declarative config pattern to attach everything in one step.
-Zone.fromParts(workspace.WaterParts:GetChildren(), { 
+-- Find all current and future instances with the 'Water' tag and wrap them in a Zones object.
+-- By passing the observer in the config, all created zones are attached automatically.
+Zone.fromTag('Water', { 
     observers = { swimObserver } 
 })
 ```
@@ -134,25 +135,24 @@ local QuickZone = require(game.ReplicatedStorage.QuickZone)
 local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
 
 local myPlayer = Group.localPlayer()
-local swimObserver = Observer.new({ priority = 42 })
+local swimObserver = Observer.new():setPriority(42):setUpdateRate(30):setPrecision(0.1)
 
 -- Subscribe the logic to the group
 swimObserver:subscribe(myPlayer)
 
 -- Connect events
 swimObserver:onLocalPlayerEntered(function(zone)
-    print("Entered water zone:", zone:getId())
+    print('Entered water zone:', zone:getId())
     -- Add swimming logic here
 end)
 
 swimObserver:onLocalPlayerExited(function(zone)
-    print("Exited water zone:", zone:getId())
+    print('Exited water zone:', zone:getId())
     -- Remove swimming logic here
 end)
 
--- Manually attach the zones
+-- Create a Zones object from a folder of parts.
+-- The returned 'zones' object allows you to manage the entire collection at once.
 local zones = Zone.fromParts(workspace.WaterParts:GetChildren())
-for _, zone in zones do
-    zone:attach(swimObserver)
-end
+zones:attach(swimObserver)
 ```

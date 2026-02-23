@@ -57,7 +57,8 @@ export type ZoneClass = {
 	fromParts: (
 		parts: { BasePart },
 		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
-	) -> { Zone },
+	) -> Zones,
+	fromTag: (tag: string, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zones,
 }
 
 export type Zone = {
@@ -79,6 +80,7 @@ export type Zone = {
 	getObservers: (self: Zone) -> { Observer },
 	isDynamic: (self: Zone) -> boolean,
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
+	onDestroy: (self: Zone, callback: () -> ()) -> () -> (),
 	destroy: (self: Zone) -> (),
 }
 
@@ -87,6 +89,33 @@ export type InternalZone = Zone & {
 	part: BasePart?,
 	dynamic: boolean,
 	metadata: any?,
+	onDestroyCallbacks: { () -> () }?,
+}
+
+export type Zones = {
+	attach: (self: Zones, observer: Observer) -> Zones,
+	detach: (self: Zones, observer: Observer) -> Zones,
+	syncToParts: (self: Zones) -> Zones,
+	getZones: (self: Zones) -> { Zone },
+	getObservers: (self: Zones) -> { Observer },
+	getMetadata: (self: Zones) -> any?,
+	isDynamic: (self: Zones) -> boolean,
+	isPointInside: (self: Zones, point: Vector3) -> boolean,
+	setMetadata: (self: Zones, metadata: any?) -> Zones,
+	onDestroy: (self: Zones, callback: () -> ()) -> () -> (),
+	destroy: (self: Zones) -> (),
+}
+
+export type InternalZones = Zones & {
+	isDynamic: boolean,
+	metadata: any,
+	zones: { [Zone]: boolean },
+	observers: { [Observer]: boolean },
+	onDestroyCallbacks: { () -> () }?,
+	onDestroyObserverCleanups: { [Observer]: () -> () },
+	onDestroyZoneCleanups: { [Zone]: () -> () },
+	add: (self: InternalZones, zone: Zone) -> (),
+	remove: (self: InternalZones, zone: Zone) -> (),
 }
 
 export type Callback = (Entity, Zone, any?) -> ()
@@ -137,24 +166,26 @@ export type Observer = {
 	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onGroupEntered: (self: Observer, callback: (Group, Zone) -> ()) -> () -> (),
 	onGroupExited: (self: Observer, callback: (Group, Zone) -> ()) -> () -> (),
+	onDestroy: (self: Observer, callback: () -> ()) -> () -> (),
 	destroy: (self: Observer) -> (),
 }
 
 export type InternalObserver = Observer & {
 	id: number,
+	onDestroyCallbacks: { () -> () }?,
 }
 
 export type GroupClass = {
 	new: (config: {
-		tag: string?,
+		entities: { Entity }?,
+	}?) -> Group,
+	fromTag: (tag: string, config: {
 		entities: { Entity }?,
 	}?) -> Group,
 	players: (config: {
-		tag: string?,
 		entities: { Entity }?,
 	}?) -> Group,
 	localPlayer: (config: {
-		tag: string?,
 		entities: { Entity }?,
 	}?) -> Group,
 }
@@ -169,6 +200,7 @@ export type Group = {
 	getEntities: (self: Group) -> { Entity },
 	getObservers: (self: Group) -> { Observer },
 	contains: (self: Group, entity: Entity) -> boolean,
+	onDestroy: (self: Group, callback: () -> ()) -> () -> (),
 	destroy: (self: Group) -> (),
 }
 
@@ -176,6 +208,7 @@ export type InternalGroup = Group & {
 	id: number,
 	entities: { Entity },
 	entityIndices: { [Entity]: number },
+	onDestroyCallbacks: { () -> () }?,
 }
 
 --[=[

@@ -263,9 +263,9 @@ end
 function Observer.onEntered(self: Types.InternalObserver, callback): () -> ()
 	table.insert(State.observerEnteredCallbacks[self.id], callback)
 	return function()
-		local i = table.find(State.observerEnteredCallbacks[self.id], callback)
-		if i then
-			table.remove(State.observerEnteredCallbacks[self.id], i)
+		local idx = table.find(State.observerEnteredCallbacks[self.id], callback)
+		if idx then
+			table.remove(State.observerEnteredCallbacks[self.id], idx)
 		end
 	end
 end
@@ -282,9 +282,9 @@ end
 function Observer.onExited(self: Types.InternalObserver, callback): () -> ()
 	table.insert(State.observerExitedCallbacks[self.id], callback)
 	return function()
-		local i = table.find(State.observerExitedCallbacks[self.id], callback)
-		if i then
-			table.remove(State.observerExitedCallbacks[self.id], i)
+		local idx = table.find(State.observerExitedCallbacks[self.id], callback)
+		if idx then
+			table.remove(State.observerExitedCallbacks[self.id], idx)
 		end
 	end
 end
@@ -1027,6 +1027,36 @@ function Observer.getGroups(self: Types.InternalObserver): { Types.Group }
 end
 
 --[=[ 
+	Fires when `destroy()` is called on the observer
+
+	```lua
+	local disconnect = myObserver:onDestroy(function()
+		print('Observer was destroyed!')
+	end)
+	```
+
+	@tag Event
+	@method onDestroy
+	@within Observer
+	@param callback () -> ()
+	@return () -> ()
+]=]
+function Observer.onDestroy(self: Types.InternalObserver, callback: () -> ()): () -> ()
+	if not self.onDestroyCallbacks then
+		self.onDestroyCallbacks = {}
+	end
+
+	table.insert(self.onDestroyCallbacks :: any, callback)
+
+	return function()
+		local idx = table.find(self.onDestroyCallbacks :: any, callback)
+		if idx then
+			table.remove(self.onDestroyCallbacks :: any, idx)
+		end
+	end
+end
+
+--[=[ 
 	Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.
 	
 	@tag Destructor
@@ -1034,6 +1064,13 @@ end
 	@within Observer
 ]=]
 function Observer.destroy(self: Types.InternalObserver): ()
+	if self.onDestroyCallbacks then
+		for _, callback in self.onDestroyCallbacks do
+			task.spawn(callback)
+		end
+		table.clear(self.onDestroyCallbacks)
+	end
+
 	self:setEnabled(false)
 
 	local id = self.id
