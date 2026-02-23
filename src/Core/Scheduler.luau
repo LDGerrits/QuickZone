@@ -21,10 +21,9 @@ local observerExitedCallbacks = State.observerExitedCallbacks
 local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
 local zoneIdToZoneObj = State.zoneIdToZoneObj
-local groupToObservers = State.groupToObservers
 local bucketList = State.bucketList
 local entityData = State.entityData
-local entityToGroups = State.entityToGroups
+local entityToObservers = State.entityToObservers
 
 local ctx_pos: Vector3
 local ctx_cCount: number = 0
@@ -211,7 +210,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 				data.lastPosition = pos
 				data.isDirty = false
 
-				ctx_linkedObservers = State.entityToObservers[entity]
+				ctx_linkedObservers = entityToObservers[entity]
 
 				ctx_pos = pos
 				ctx_cCount = 0
