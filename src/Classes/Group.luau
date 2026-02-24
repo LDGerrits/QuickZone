@@ -31,7 +31,6 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 	local function cleanCharacter()
 		if currentHrp then
 			group:remove(currentHrp)
-			State.entityToPlayer[currentHrp] = nil
 			currentHrp = nil
 		end
 		for _, c in charConns do
@@ -56,10 +55,8 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 
 			if hrp:IsA('BasePart') then
 				currentHrp = hrp
-
-				group:add(hrp) -- Custom data is needed to trigger specific player events
-
 				State.entityToPlayer[hrp] = player
+				group:add(hrp)
 
 				table.insert(
 					charConns,
@@ -480,6 +477,7 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 		State.entityData[entity] = nil
 		State.entityToGroups[entity] = nil
 		State.entityToObservers[entity] = nil
+		State.entityToPlayer[entity] = nil
 	end
 
 	return self
