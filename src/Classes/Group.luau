@@ -9,9 +9,6 @@ local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
 local updateProfile = require(script.Parent.Parent.Core.updateProfile)
 
-local sharedPlayerGroup: Types.Group?
-local sharedLocalPlayerGroup: Types.Group?
-
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
@@ -219,13 +216,11 @@ function Group.fromTag(
 end
 
 --[=[ 
-	Returns a singleton Group that automatically tracks all Players in the server.
+	Returns a Group that automatically tracks all Players in the server.
 
 	:::info Behavior
 	* Automatically tracks the `HumanoidRootPart` of every player.
 	* Handles `PlayerAdded` and `CharacterAdded` internally.
-	* If a LocalPlayerGroup exists on the client, the local player is excluded 
-	  from this group to avoid duplicate tracking.
 	:::
 
 	@tag Constructor
@@ -235,15 +230,7 @@ end
 function Group.players(config: {
 	entities: { Types.Entity }?,
 }?): Types.Group
-	if sharedPlayerGroup then
-		if config and config.entities then
-			sharedPlayerGroup:addBulk(config.entities)
-		end
-		return sharedPlayerGroup
-	end
-
 	local group = Group.new(config)
-	sharedPlayerGroup = group
 
 	local trackerStore = {} :: { [Player]: () -> () }
 	local mainConnections = {} :: { RBXScriptConnection }
@@ -276,20 +263,17 @@ function Group.players(config: {
 
 		table.clear(mainConnections)
 		table.clear(trackerStore)
-
-		sharedPlayerGroup = nil
 	end)
 
 	return group
 end
 
 --[=[ 
-	Returns a singleton Group that tracks only the LocalPlayer.
+	Returns a Group that tracks only the LocalPlayer.
 
 	:::info Behavior
-	* This group takes 'ownership of the local player's character.
-	* When this group is destroyed, the local player is automatically handed back 
-	  to the global `PlayerGroup` if it exists.
+	* Automatically tracks the `HumanoidRootPart` of the local player.
+	* Handles `CharacterAdded` internally.
 	:::
 
 	@client
@@ -302,15 +286,7 @@ function Group.localPlayer(config: {
 }?): Types.Group
 	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
 
-	if sharedLocalPlayerGroup then
-		if config and config.entities then
-			sharedLocalPlayerGroup:addBulk(config.entities)
-		end
-		return sharedLocalPlayerGroup
-	end
-
 	local group = Group.new(config)
-	sharedLocalPlayerGroup = group
 
 	local lp = Players.LocalPlayer
 	local trackers = {}
@@ -319,7 +295,6 @@ function Group.localPlayer(config: {
 
 	group:onDestroy(function()
 		untrackPlayer(lp, trackers)
-		sharedLocalPlayerGroup = nil
 	end)
 
 	return group
@@ -349,6 +324,13 @@ end
 	* **Attachment/Bone:** Uses `WorldPosition`
 	* **Camera:** Uses `CFrame`
 	* **Table:** Looks for `.Position`, `.CFrame`, `.WorldPosition`, or `:GetPivot()`.
+	:::
+
+	:::warning Global Entity Metadata
+	The `metadata` argument is tied to the **Entity**, not the Group. If you add 
+	the same entity to multiple groups and pass different metadata each time, 
+	the newest metadata will globally overwrite the old metadata for that entity. 
+	If you need complex state tracking, use Roblox `Attributes` or your own state manager!
 	:::
 
 	@method add
@@ -434,6 +416,13 @@ end
 	-- Add an entire folder of NPCs at once
 	myGroup:addBulk(workspace.Enemies:GetChildren(), { Team = "Red" })
 	```
+
+	:::warning Global Entity Metadata
+	The `metadata` argument is tied to the **Entity**, not the Group. If you add 
+	the same entity to multiple groups and pass different metadata each time, 
+	the newest metadata will globally overwrite the old metadata for that entity. 
+	If you need complex state tracking, use Roblox `Attributes` or your own state manager!
+	:::
 
 	@method addBulk
 	@within Group
