@@ -248,6 +248,53 @@ function Zone.fromParts(
 end
 
 --[=[
+	Creates a Zones object from all BaseParts that are direct children of the given Instance (shallow search).
+	
+	@tag Constructor
+	@within Zone
+	@param parent Instance
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+	@return Zones
+]=]
+function Zone.fromChildren(
+	parent: Instance,
+	config: {
+		isDynamic: boolean?,
+		metadata: any?,
+		observers: { Types.Observer }?,
+	}?
+): Types.Zones
+	return Zone.fromParts(parent:GetChildren() :: any, config)
+end
+
+--[=[
+	Creates a Zones object from all BaseParts contained anywhere within the given Instance (deep search). 
+	Non-BasePart descendants are ignored.
+	
+	```lua
+	local mapZones = QuickZone.Zone.fromDescendants(workspace.HazardFolder, {
+		observers = { hazardObserver }
+	})
+	```
+	
+	@tag Constructor
+	@within Zone
+	@param parent Instance -- The container (Model, Folder, etc.) to search through.
+	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+	@return Zones
+]=]
+function Zone.fromDescendants(
+	parent: Instance,
+	config: {
+		isDynamic: boolean?,
+		metadata: any?,
+		observers: { Types.Observer }?,
+	}?
+): Types.Zones
+	return Zone.fromParts(parent:GetDescendants() :: any, config)
+end
+
+--[=[
 	Dynamically creates and manages Zones for all BaseParts with a specific CollectionService tag.
 	
 	@tag Constructor
