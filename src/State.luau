@@ -34,8 +34,8 @@ State.bucketList = {} :: { number }
 
 State.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } }
 State.observerPriorityMap = {} :: { [number]: number }
-State.observerEnteredCallbacks = {} :: { [number]: { Types.Callback } }
-State.observerExitedCallbacks = {} :: { [number]: { Types.Callback } }
+State.observerEnteredCallbacks = {} :: { [number]: { (Types.Entity, Types.Zone) -> () } }
+State.observerExitedCallbacks = {} :: { [number]: { (Types.Entity, Types.Zone) -> () } }
 State.observerEnabled = {} :: { [number]: boolean }
 State.observerSafety = {} :: { [number]: boolean }
 State.observerUpdateRate = {} :: { [number]: number }
