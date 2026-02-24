@@ -14,7 +14,6 @@ local isPointInZone = Geometry.isPointInZone
 
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerPriorityMap = State.observerPriorityMap
-local entityMetadata = State.entityMetadata
 local observerEnteredCallbacks = State.observerEnteredCallbacks
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
@@ -81,18 +80,18 @@ local function queryCallbackDynamic(zoneId: number)
 	end
 end
 
-local function fireCallback(callbacks, entity, zone, metadata, safety)
+local function fireCallback(callbacks, entity, zone, safety)
 	if not callbacks then
 		return
 	end
 
 	if safety then
 		for _, cb in callbacks do
-			task.spawn(cb, entity, zone, metadata)
+			task.spawn(cb, entity, zone)
 		end
 	else
 		for _, cb in callbacks do
-			cb(entity, zone, metadata)
+			cb(entity, zone)
 		end
 	end
 end
@@ -239,8 +238,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						if cbs then
 							local safety = observerSafety[observerId]
 							local z = zoneIdToZoneObj[oldZoneId]
-							local cd = entityMetadata[entity]
-							fireCallback(cbs, entity, z, cd, safety)
+							fireCallback(cbs, entity, z, safety)
 						end
 					end
 				end
@@ -257,8 +255,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						if cbs then
 							local safety = observerSafety[observerId]
 							local z = zoneIdToZoneObj[zoneIdx]
-							local cd = entityMetadata[entity]
-							fireCallback(cbs, entity, z, cd, safety)
+							fireCallback(cbs, entity, z, safety)
 						end
 					end
 					ctx_candidatePriority[observerId] = nil

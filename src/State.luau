@@ -26,8 +26,8 @@ State.groups = {} :: { [number]: Types.InternalGroup }
 State.groupToObservers = {} :: { [number]: { [number]: boolean } }
 State.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityData = {} :: { [Types.Entity]: Types.EntityData }
-State.entityMetadata = {} :: { [Types.Entity]: any }
 State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
+State.entityToPlayer = {} :: { [Types.Entity]: Player }
 
 State.buckets = {} :: { [number]: { Types.Entity } }
 State.bucketList = {} :: { number }

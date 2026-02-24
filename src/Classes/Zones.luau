@@ -36,7 +36,7 @@ function Zones.new(config: { isDynamic: boolean?, metadata: any? }?): Types.Zone
 end
 
 --[=[ 
-	Attaches an Observer to all underlying zones within this composite.
+	Attaches an Observer to all underlying zones.
 
 	@method attach
 	@within Zones
@@ -61,7 +61,7 @@ function Zones.attach(self: Types.InternalZones, observer: Types.Observer): Type
 end
 
 --[=[ 
-	Detaches an Observer from all underlying zones within this composite.
+	Detaches an Observer from all underlying zones.
 
 	@method detach
 	@within Zones
@@ -105,7 +105,7 @@ function Zones.syncToParts(self: Types.InternalZones): Types.Zones
 end
 
 --[=[ 
-	Returns an array of all individual Zone objects currently managed by this composite.
+	Returns an array of all individual Zone objects currently managed.
 
 	@method getZones
 	@within Zones
@@ -120,7 +120,7 @@ function Zones.getZones(self: Types.InternalZones): { Types.Zone }
 end
 
 --[=[ 
-	Returns an array of all Observers currently attached to this composite.
+	Returns an array of all Observers currently attached.
 
 	@method getObservers
 	@within Zones
@@ -135,7 +135,7 @@ function Zones.getObservers(self: Types.InternalZones): { Types.Observer }
 end
 
 --[=[ 
-	Returns whether this composite was configured to be dynamically updated.
+	Returns whether Zones is set to dynamic.
 
 	@method isDynamic
 	@within Zones
@@ -146,7 +146,7 @@ function Zones.isDynamic(self: Types.InternalZones): boolean
 end
 
 --[=[ 
-	Checks if a given Vector3 point resides inside *any* of the underlying zones managed by this composite.
+	Checks if a given Vector3 point resides inside of the underlying zones.
 
 	@method isPointInside
 	@within Zones
@@ -179,7 +179,7 @@ function Zones.setMetadata(self: Types.InternalZones, metadata: any): Types.Zone
 end
 
 --[=[ 
-	Returns the metadata associated with this composite.
+	Returns the metadata.
 
 	@method getMetadata
 	@within Zones
@@ -187,6 +187,18 @@ end
 ]=]
 function Zones.getMetadata(self: Types.InternalZones): any?
 	return self.metadata
+end
+
+--[=[ 
+	Checks if a specific Zone object is managed by this Zones collection.
+
+	@method contains
+	@within Zones
+	@param zone Zone
+	@return boolean
+]=]
+function Zones.contains(self: Types.InternalZones, zone: Types.Zone): boolean
+	return self.zones[zone] == true
 end
 
 --[=[ 

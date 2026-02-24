@@ -812,13 +812,12 @@ function Zone.destroy(self: Types.InternalZone): ()
 				end
 
 				local safety = State.observerSafety[observerId]
-				local cd = State.entityMetadata[entity]
 
 				for _, fn in cbs do
 					if safety then
-						task.spawn(fn, entity, self, cd)
+						task.spawn(fn, entity, self)
 					else
-						fn(entity, self, cd)
+						fn(entity, self)
 					end
 				end
 			end

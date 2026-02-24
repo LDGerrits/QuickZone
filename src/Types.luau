@@ -59,6 +59,14 @@ export type ZoneClass = {
 		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
 	) -> Zones,
 	fromTag: (tag: string, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zones,
+	fromDescendants: (
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	) -> Zones,
+	fromChildren: (
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	) -> Zones,
 }
 
 export type Zone = {
@@ -102,13 +110,14 @@ export type Zones = {
 	isDynamic: (self: Zones) -> boolean,
 	isPointInside: (self: Zones, point: Vector3) -> boolean,
 	setMetadata: (self: Zones, metadata: any?) -> Zones,
+	contains: (self: Zones, zone: Zone) -> boolean,
 	onDestroy: (self: Zones, callback: () -> ()) -> () -> (),
 	destroy: (self: Zones) -> (),
 }
 
 export type InternalZones = Zones & {
 	isDynamic: boolean,
-	metadata: any,
+	metadata: any?,
 	zones: { [Zone]: boolean },
 	observers: { [Observer]: boolean },
 	onDestroyCallbacks: { () -> () }?,
@@ -117,8 +126,6 @@ export type InternalZones = Zones & {
 	add: (self: InternalZones, zone: Zone) -> (),
 	remove: (self: InternalZones, zone: Zone) -> (),
 }
-
-export type Callback = (Entity, Zone, any?) -> ()
 
 export type ObserverClass = {
 	new: (
@@ -154,12 +161,12 @@ export type Observer = {
 	getPrecision: (self: Observer) -> number,
 	getZones: (self: Observer) -> { Zone },
 	getGroups: (self: Observer) -> { Group },
-	observe: (self: Observer, callback: (Entity, Zone, any?) -> (() -> ())?) -> () -> (),
+	observe: (self: Observer, callback: (Entity, Zone) -> (() -> ())?) -> () -> (),
 	observePlayer: (self: Observer, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
 	observeLocalPlayer: (self: Observer, callback: (Zone) -> (() -> ())?) -> () -> (),
 	observeGroup: (self: Observer, callback: (Group, Zone) -> (() -> ())?) -> () -> (),
-	onEntered: (self: Observer, callback: Callback) -> () -> (),
-	onExited: (self: Observer, callback: Callback) -> () -> (),
+	onEntered: (self: Observer, callback: (Entity, Zone) -> ()) -> () -> (),
+	onExited: (self: Observer, callback: (Entity, Zone) -> ()) -> () -> (),
 	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
@@ -191,8 +198,8 @@ export type GroupClass = {
 }
 
 export type Group = {
-	add: (self: Group, entity: Entity, metadata: any?) -> Group,
-	addBulk: (self: Group, entities: { Entity }, metadata: any?) -> Group,
+	add: (self: Group, entity: Entity) -> Group,
+	addBulk: (self: Group, entities: { Entity }) -> Group,
 	remove: (self: Group, entity: Entity) -> Group,
 	removeBulk: (self: Group, entities: { Entity }) -> Group,
 	clear: (self: Group) -> Group,

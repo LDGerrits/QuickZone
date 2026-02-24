@@ -31,6 +31,7 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 	local function cleanCharacter()
 		if currentHrp then
 			group:remove(currentHrp)
+			State.entityToPlayer[currentHrp] = nil
 			currentHrp = nil
 		end
 		for _, c in charConns do
@@ -39,24 +40,26 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 		table.clear(charConns)
 	end
 
-	local function onCharAdded(char: Model)
+	local function onCharAdded(character: Model)
 		cleanCharacter()
 
 		task.spawn(function()
-			local hrp = char:WaitForChild('HumanoidRootPart', 10)
+			local hrp = character:WaitForChild('HumanoidRootPart')
 
 			if not hrp or not player:IsDescendantOf(Players) then
 				return
 			end
 
-			if player.Character ~= char then
+			if player.Character ~= character then
 				return
 			end
 
 			if hrp:IsA('BasePart') then
 				currentHrp = hrp
 
-				group:add(hrp, { Player = player }) -- Custom data is needed to trigger specific player events
+				group:add(hrp) -- Custom data is needed to trigger specific player events
+
+				State.entityToPlayer[hrp] = player
 
 				table.insert(
 					charConns,
@@ -306,8 +309,8 @@ end
 
 	#### Example: Adding Different Entity Types
 	```lua
-	-- Adding a BasePart and a Model with custom metadata (using chaining)
-	myGroup:add(workspace.Part):add(workspace.NPCModel, { Type = 'Enemy', Level = 42 })
+	-- Adding a BasePart and a Model
+	myGroup:add(workspace.Part):add(workspace.NPCModel)
 
 	-- Adding a custom table
 	local spell = {
@@ -326,20 +329,12 @@ end
 	* **Table:** Looks for `.Position`, `.CFrame`, `.WorldPosition`, or `:GetPivot()`.
 	:::
 
-	:::warning Global Entity Metadata
-	The `metadata` argument is tied to the **Entity**, not the Group. If you add 
-	the same entity to multiple groups and pass different metadata each time, 
-	the newest metadata will globally overwrite the old metadata for that entity. 
-	If you need complex state tracking, use Roblox `Attributes` or your own state manager!
-	:::
-
 	@method add
 	@within Group
 	@param entity Entity -- The object to track.
-	@param metadata any? -- Optional data passed to Observer callbacks.
 	@return Group
 ]=]
-function Group.add(self: Types.InternalGroup, entity: Types.Entity, metadata: any?): Types.Group
+function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 	if not State.entityToGroups[entity] then
 		State.entityToGroups[entity] = {}
 	end
@@ -400,10 +395,6 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity, metadata: an
 	self.entities[idx] = entity
 	self.entityIndices[entity] = idx
 
-	if metadata then
-		State.entityMetadata[entity] = metadata
-	end
-
 	updateProfile(entity)
 
 	return self
@@ -414,25 +405,17 @@ end
 
 	```lua
 	-- Add an entire folder of NPCs at once
-	myGroup:addBulk(workspace.Enemies:GetChildren(), { Team = "Red" })
+	myGroup:addBulk(workspace.Enemies:GetChildren())
 	```
-
-	:::warning Global Entity Metadata
-	The `metadata` argument is tied to the **Entity**, not the Group. If you add 
-	the same entity to multiple groups and pass different metadata each time, 
-	the newest metadata will globally overwrite the old metadata for that entity. 
-	If you need complex state tracking, use Roblox `Attributes` or your own state manager!
-	:::
 
 	@method addBulk
 	@within Group
 	@param entities { Entity } -- Array of entities to add.
-	@param metadata any? -- Optional metadata applied to all added entities.
 	@return Group
 ]=]
-function Group.addBulk(self: Types.InternalGroup, entities: { Types.Entity }, metadata: any?): Types.Group
+function Group.addBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
 	for _, entity in entities do
-		self:add(entity, metadata)
+		self:add(entity)
 	end
 	return self
 end
@@ -482,12 +465,11 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 			if cbs then
 				local safety = State.observerSafety[observerId]
 				local z = State.zoneIdToZoneObj[oldZoneId]
-				local cd = State.entityMetadata[entity]
 				for _, fn in cbs do
 					if safety then
-						task.spawn(fn, entity, z, cd)
+						task.spawn(fn, entity, z)
 					else
-						fn(entity, z, cd)
+						fn(entity, z)
 					end
 				end
 			end
@@ -497,7 +479,6 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 	if next(State.entityToGroups[entity]) == nil then
 		State.entityData[entity] = nil
 		State.entityToGroups[entity] = nil
-		State.entityMetadata[entity] = nil
 		State.entityToObservers[entity] = nil
 	end
 
