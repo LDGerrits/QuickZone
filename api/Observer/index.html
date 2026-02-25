@@ -10,8 +10,8 @@ groups enter or exit any zones associated with the observer."><meta data-rh="tru
 Observers are the logical bridge between Groups and Zones.
 They monitor specific groups and trigger events when entities within those 
 groups enter or exit any zones associated with the observer."><link data-rh="true" rel="canonical" href="https://LDGerrits.github.io/QuickZone/api/Observer"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Observer" hreflang="en"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Observer" hreflang="x-default"><link rel="stylesheet" href="/QuickZone/assets/css/styles.5cbed574.css">
-<script src="/QuickZone/assets/js/runtime~main.cb87a54e.js" defer="defer"></script>
-<script src="/QuickZone/assets/js/main.5efdaefb.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/runtime~main.e1e3ae32.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/main.13342e7a.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
 <script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();null!==e?t(e):window.matchMedia("(prefers-color-scheme: dark)").matches?t("dark"):(window.matchMedia("(prefers-color-scheme: light)").matches,t("light"))}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="navbar navbar--fixed-top"><div class="navbar__inner"><div class="navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/QuickZone/"><b class="navbar__title text--truncate">QuickZone</b></a><a class="navbar__item navbar__link" href="/QuickZone/docs/intro">Docs</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/QuickZone/api/">API</a></div><div class="navbar__items navbar__items--right"><a href="https://github.com/LDgerrits/QuickZone" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="Switch between dark and light mode (currently light mode)" aria-label="Switch between dark and light mode (currently light mode)" aria-live="polite" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" class="lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" class="darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><div class="navbar__search"><span aria-label="expand searchbar" role="button" class="search-icon" tabindex="0"></span><input id="search_input_react" type="search" placeholder="Loading..." aria-label="Search" class="navbar__search-input search-bar" disabled=""></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="main-wrapper mainWrapper_z2l0 docPageContainer_wNNk"><div class="docPage_Dpn1"><div class="docSidebarContainer_o_re"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/QuickZone">​Quick​Zone</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Zone">​Zone</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" href="/QuickZone/api/Observer">​Observer</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Group">​Group</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Zones">​Zones</a></li></ul></nav></div></div><main class="docMainContainer_HJE1"><div class="container padding-vert--lg"><div class="row"><div class="col docItemCol_MU3C"><div class="docItemContainer_Wv98"><article><div class="member_J0w1 markdown"><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_oUs_"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><header><h1 class="docTitle_mZRt" style="text-decoration:none"><span style="display:inline-block">Observer</span></h1><div class="luaClassTags_EipM"></div><div>
@@ -51,7 +51,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
     
   
 
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="subscribe"><code style="text-decoration:none">subscribe</code><a href="#subscribe" class="hash-link" aria-label="Direct link to subscribe" title="Direct link to subscribe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L152"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">subscribe</code><code>(</code><div class="inset_uKQm"><div><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="subscribe"><code style="text-decoration:none">subscribe</code><a href="#subscribe" class="hash-link" aria-label="Direct link to subscribe" title="Direct link to subscribe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L153"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">subscribe</code><code>(</code><div class="inset_uKQm"><div><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><span class="inlineDescription_G7Er">-- <span>
 <p>The group to monitor.</p>
 </span></span></div></div><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>
@@ -60,12 +60,12 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 </p>
 <pre class="language-lua"><code class="language-lua">observer<span class="token punctuation">:</span><span class="token function">subscribe</span><span class="token punctuation">(</span>playerGroup<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token function">subscribe</span><span class="token punctuation">(</span>enemyGroup<span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="unsubscribe"><code style="text-decoration:none">unsubscribe</code><a href="#unsubscribe" class="hash-link" aria-label="Direct link to unsubscribe" title="Direct link to unsubscribe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L174"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">unsubscribe</code><code>(</code><div class="inset_uKQm"><div><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="unsubscribe"><code style="text-decoration:none">unsubscribe</code><a href="#unsubscribe" class="hash-link" aria-label="Direct link to unsubscribe" title="Direct link to unsubscribe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L175"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">unsubscribe</code><code>(</code><div class="inset_uKQm"><div><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><span class="inlineDescription_G7Er">-- <span>
 <p>The group to stop monitoring.</p>
 </span></span></div></div><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>Stops the observer from monitoring the specified group.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observe"><code style="text-decoration:none">observe</code><a href="#observe" class="hash-link" aria-label="Direct link to observe" title="Direct link to observe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L209"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observe</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
-<p>Function to stop observing entirely</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observe"><code style="text-decoration:none">observe</code><a href="#observe" class="hash-link" aria-label="Direct link to observe" title="Direct link to observe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L210"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observe</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
 </span></span></div><div>
 <p>
   Observes entities entering and exiting the zone.
@@ -83,20 +83,20 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 	<span class="token keyword">end</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onEntered"><code style="text-decoration:none">onEntered</code><a href="#onEntered" class="hash-link" aria-label="Direct link to onEntered" title="Direct link to onEntered">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L271"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
-<p>A function that, when called, disconnects the callback.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onEntered"><code style="text-decoration:none">onEntered</code><a href="#onEntered" class="hash-link" aria-label="Direct link to onEntered" title="Direct link to onEntered">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L272"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
 </span></span></div><div>
 <p>Fires when any entity from a subscribed group enters a zone attached to this observer.</p>
 <pre class="language-lua"><code class="language-lua"><span class="token keyword">local</span> disconnect <span class="token operator">=</span> observer<span class="token punctuation">:</span><span class="token function">onEntered</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span>entity<span class="token punctuation">,</span> zone<span class="token punctuation">)</span>
 	<span class="token function">print</span><span class="token punctuation">(</span>entity<span class="token punctuation">.</span>Name <span class="token operator">..</span> <span class="token string">' entered '</span> <span class="token operator">..</span> zone<span class="token punctuation">.</span>id<span class="token punctuation">)</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onExited"><code style="text-decoration:none">onExited</code><a href="#onExited" class="hash-link" aria-label="Direct link to onExited" title="Direct link to onExited">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L290"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
-<p>A function that, when called, disconnects the callback.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onExited"><code style="text-decoration:none">onExited</code><a href="#onExited" class="hash-link" aria-label="Direct link to onExited" title="Direct link to onExited">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L291"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
 </span></span></div><div>
 <p>Fires when an entity exits all zones attached to this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observePlayer"><code style="text-decoration:none">observePlayer</code><a href="#observePlayer" class="hash-link" aria-label="Direct link to observePlayer" title="Direct link to observePlayer">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L319"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observePlayer</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
-<p>Function to stop observing entirely.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observePlayer"><code style="text-decoration:none">observePlayer</code><a href="#observePlayer" class="hash-link" aria-label="Direct link to observePlayer" title="Direct link to observePlayer">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L320"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observePlayer</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
 </span></span></div><div>
 <p>Observes players entering and exiting the zone.</p>
 <pre class="language-lua"><code class="language-lua">observer<span class="token punctuation">:</span><span class="token function">observePlayer</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span>player<span class="token punctuation">,</span> zone<span class="token punctuation">)</span>
@@ -108,7 +108,9 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 	<span class="token keyword">end</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onPlayerEntered"><code style="text-decoration:none">onPlayerEntered</code><a href="#onPlayerEntered" class="hash-link" aria-label="Direct link to onPlayerEntered" title="Direct link to onPlayerEntered">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L387"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onPlayerEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onPlayerEntered"><code style="text-decoration:none">onPlayerEntered</code><a href="#onPlayerEntered" class="hash-link" aria-label="Direct link to onPlayerEntered" title="Direct link to onPlayerEntered">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L388"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onPlayerEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
 <p>Specialized event for Player entities.</p>
 <pre class="language-lua"><code class="language-lua">observer<span class="token punctuation">:</span><span class="token function">onPlayerEntered</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span>player<span class="token punctuation">,</span> zone<span class="token punctuation">)</span>
 	<span class="token function">print</span><span class="token punctuation">(</span>player<span class="token punctuation">.</span>Name <span class="token operator">..</span> <span class="token string">" entered safe zone "</span> <span class="token operator">..</span> zone<span class="token punctuation">:</span><span class="token function">getId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
@@ -120,15 +122,15 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 	game<span class="token punctuation">.</span>Debris<span class="token punctuation">:</span><span class="token function">AddItem</span><span class="token punctuation">(</span>sound<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onPlayerExited"><code style="text-decoration:none">onPlayerExited</code><a href="#onPlayerExited" class="hash-link" aria-label="Direct link to onPlayerExited" title="Direct link to onPlayerExited">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L406"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onPlayerExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
-<p>A function to disconnect the callback.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onPlayerExited"><code style="text-decoration:none">onPlayerExited</code><a href="#onPlayerExited" class="hash-link" aria-label="Direct link to onPlayerExited" title="Direct link to onPlayerExited">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L407"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onPlayerExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
 </span></span></div><div>
 <p>
   A specialized event for Player entities. Fires when a player's character
   exits all zones attached to this observer.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observeLocalPlayer"><code style="text-decoration:none">observeLocalPlayer</code><a href="#observeLocalPlayer" class="hash-link" aria-label="Direct link to observeLocalPlayer" title="Direct link to observeLocalPlayer">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L433"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observeLocalPlayer</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
-<p>Function to stop observing entirely.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observeLocalPlayer"><code style="text-decoration:none">observeLocalPlayer</code><a href="#observeLocalPlayer" class="hash-link" aria-label="Direct link to observeLocalPlayer" title="Direct link to observeLocalPlayer">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L434"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observeLocalPlayer</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
 </span></span></div><div>
 <p>Observes the LocalPlayer.</p>
 <pre class="language-lua"><code class="language-lua">observer<span class="token punctuation">:</span><span class="token function">observeLocalPlayer</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span>zone<span class="token punctuation">)</span>
@@ -138,7 +140,9 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 	<span class="token keyword">end</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onLocalPlayerEntered"><code style="text-decoration:none">onLocalPlayerEntered</code><a href="#onLocalPlayerEntered" class="hash-link" aria-label="Direct link to onLocalPlayerEntered" title="Direct link to onLocalPlayerEntered">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L502"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onLocalPlayerEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onLocalPlayerEntered"><code style="text-decoration:none">onLocalPlayerEntered</code><a href="#onLocalPlayerEntered" class="hash-link" aria-label="Direct link to onLocalPlayerEntered" title="Direct link to onLocalPlayerEntered">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L503"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onLocalPlayerEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
 <p>Specialized event for the LocalPlayer.</p>
 <pre class="language-lua"><code class="language-lua">observer<span class="token punctuation">:</span><span class="token function">onLocalPlayerEntered</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span>zone<span class="token punctuation">)</span>
 	<span class="token function">print</span><span class="token punctuation">(</span><span class="token string">"You entered zone "</span> <span class="token operator">..</span> zone<span class="token punctuation">:</span><span class="token function">getId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
@@ -149,12 +153,16 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 	<span class="token keyword">end</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onLocalPlayerExited"><code style="text-decoration:none">onLocalPlayerExited</code><a href="#onLocalPlayerExited" class="hash-link" aria-label="Direct link to onLocalPlayerExited" title="Direct link to onLocalPlayerExited">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L523"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onLocalPlayerExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onLocalPlayerExited"><code style="text-decoration:none">onLocalPlayerExited</code><a href="#onLocalPlayerExited" class="hash-link" aria-label="Direct link to onLocalPlayerExited" title="Direct link to onLocalPlayerExited">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L524"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onLocalPlayerExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
 <p>
   A specialized event for the LocalPlayer. Fires when the local player's
   character exits all zones attached to this observer.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observeGroup"><code style="text-decoration:none">observeGroup</code><a href="#observeGroup" class="hash-link" aria-label="Direct link to observeGroup" title="Direct link to observeGroup">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L552"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observeGroup</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="observeGroup"><code style="text-decoration:none">observeGroup</code><a href="#observeGroup" class="hash-link" aria-label="Direct link to observeGroup" title="Direct link to observeGroup">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L553"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">observeGroup</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="green_DgR4"> → </code><code class="green_DgR4">(</code><code class="green_DgR4">)</code><code class="purple_ieR2">)</code><code class="blue_P4bS">?</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
 <p>
   Observes a Group's presence within the observer's zones.
   The callback fires when the first entity of a group enters, and the
@@ -167,7 +175,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
 	<span class="token keyword">end</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onGroupEntered"><code style="text-decoration:none">onGroupEntered</code><a href="#onGroupEntered" class="hash-link" aria-label="Direct link to onGroupEntered" title="Direct link to onGroupEntered">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L617"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onGroupEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onGroupEntered"><code style="text-decoration:none">onGroupEntered</code><a href="#onGroupEntered" class="hash-link" aria-label="Direct link to onGroupEntered" title="Direct link to onGroupEntered">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L618"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onGroupEntered</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
 <p>Disconnect function</p>
 </span></span></div><div>
 <p>
@@ -175,65 +183,86 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
   Subsequent entries by other members of the same group will not trigger this event
   until the group has completely exited and re-entered.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onGroupExited"><code style="text-decoration:none">onGroupExited</code><a href="#onGroupExited" class="hash-link" aria-label="Direct link to onGroupExited" title="Direct link to onGroupExited">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L671"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onGroupExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onGroupExited"><code style="text-decoration:none">onGroupExited</code><a href="#onGroupExited" class="hash-link" aria-label="Direct link to onGroupExited" title="Direct link to onGroupExited">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L672"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onGroupExited</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>group<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
 <p>Disconnect function</p>
 </span></span></div><div>
 <p>
   Fires when the last remaining member of a Group exits all zones attached to
   this observer. This is useful for "cleared" states or stopping group-wide effects.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setEnabled"><code style="text-decoration:none">setEnabled</code><a href="#setEnabled" class="hash-link" aria-label="Direct link to setEnabled" title="Direct link to setEnabled">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L719"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setEnabled</code><code>(</code><code>enabled<!-- -->: </code><code class="blue_P4bS">boolean</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onTransitioned"><code style="text-decoration:none">onTransitioned</code><a href="#onTransitioned" class="hash-link" aria-label="Direct link to onTransitioned" title="Direct link to onTransitioned">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L722"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onTransitioned</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>newZone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>oldZone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
+<p>
+  Fires when an entity seamlessly transitions from one attached zone to another
+  overlapping attached zone. If <code>targetEntity</code> is provided, the event will silently
+  filter out all other entities.
+</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onPlayerTransitioned"><code style="text-decoration:none">onPlayerTransitioned</code><a href="#onPlayerTransitioned" class="hash-link" aria-label="Direct link to onPlayerTransitioned" title="Direct link to onPlayerTransitioned">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L746"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onPlayerTransitioned</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>newZone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>oldZone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
+<p>
+  Specialized event for Player entities transitioning between overlapping zones.
+  If <code>targetPlayer</code> is provided, the event will only fire for that specific player.
+</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onLocalPlayerTransitioned"><code style="text-decoration:none">onLocalPlayerTransitioned</code><a href="#onLocalPlayerTransitioned" class="hash-link" aria-label="Direct link to onLocalPlayerTransitioned" title="Direct link to onLocalPlayerTransitioned">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L777"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onLocalPlayerTransitioned</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><div class="inset_uKQm"><code>newZone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>oldZone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code></div><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
+<p>Specialized event for the LocalPlayer transitioning between overlapping zones.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setEnabled"><code style="text-decoration:none">setEnabled</code><a href="#setEnabled" class="hash-link" aria-label="Direct link to setEnabled" title="Direct link to setEnabled">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L809"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setEnabled</code><code>(</code><code>enabled<!-- -->: </code><code class="blue_P4bS">boolean</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>
   Enables or disables the observer. When disabled, it will no longer process
   spatial checks or fire events.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setSafety"><code style="text-decoration:none">setSafety</code><a href="#setSafety" class="hash-link" aria-label="Direct link to setSafety" title="Direct link to setSafety">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L758"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setSafety</code><code>(</code><code>enabled<!-- -->: </code><code class="blue_P4bS">boolean</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setSafety"><code style="text-decoration:none">setSafety</code><a href="#setSafety" class="hash-link" aria-label="Direct link to setSafety" title="Direct link to setSafety">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L848"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setSafety</code><code>(</code><code>enabled<!-- -->: </code><code class="blue_P4bS">boolean</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>Whether to wrap callbacks in task.spawn (safe) or not (unsafe).</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setPriority"><code style="text-decoration:none">setPriority</code><a href="#setPriority" class="hash-link" aria-label="Direct link to setPriority" title="Direct link to setPriority">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L771"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setPriority</code><code>(</code><code>p<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setPriority"><code style="text-decoration:none">setPriority</code><a href="#setPriority" class="hash-link" aria-label="Direct link to setPriority" title="Direct link to setPriority">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L861"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setPriority</code><code>(</code><code>p<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>Updates the resolution priority of the observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setUpdateRate"><code style="text-decoration:none">setUpdateRate</code><a href="#setUpdateRate" class="hash-link" aria-label="Direct link to setUpdateRate" title="Direct link to setUpdateRate">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L785"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setUpdateRate</code><code>(</code><code>hz<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setUpdateRate"><code style="text-decoration:none">setUpdateRate</code><a href="#setUpdateRate" class="hash-link" aria-label="Direct link to setUpdateRate" title="Direct link to setUpdateRate">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L875"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setUpdateRate</code><code>(</code><code>hz<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>Updates the update frequency for this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setPrecision"><code style="text-decoration:none">setPrecision</code><a href="#setPrecision" class="hash-link" aria-label="Direct link to setPrecision" title="Direct link to setPrecision">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L800"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setPrecision</code><code>(</code><code>n<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setPrecision"><code style="text-decoration:none">setPrecision</code><a href="#setPrecision" class="hash-link" aria-label="Direct link to setPrecision" title="Direct link to setPrecision">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L890"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">setPrecision</code><code>(</code><code>n<!-- -->: </code><code class="blue_P4bS">number</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code></div><div>
 <p>Updates the precision in studs for this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isEnabled"><code style="text-decoration:none">isEnabled</code><a href="#isEnabled" class="hash-link" aria-label="Direct link to isEnabled" title="Direct link to isEnabled">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L814"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isEnabled</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isEnabled"><code style="text-decoration:none">isEnabled</code><a href="#isEnabled" class="hash-link" aria-label="Direct link to isEnabled" title="Direct link to isEnabled">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L904"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isEnabled</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if the observer is currently enabled.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPlayerInside"><code style="text-decoration:none">isPlayerInside</code><a href="#isPlayerInside" class="hash-link" aria-label="Direct link to isPlayerInside" title="Direct link to isPlayerInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L827"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isPlayerInside</code><code>(</code><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPlayerInside"><code style="text-decoration:none">isPlayerInside</code><a href="#isPlayerInside" class="hash-link" aria-label="Direct link to isPlayerInside" title="Direct link to isPlayerInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L917"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isPlayerInside</code><code>(</code><code>player<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/class/Player" target="_blank" rel="noopener noreferrer">Player<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>
   Checks if a specific player's character is currently inside a zone
   attached to this observer.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isLocalPlayerInside"><code style="text-decoration:none">isLocalPlayerInside</code><a href="#isLocalPlayerInside" class="hash-link" aria-label="Direct link to isLocalPlayerInside" title="Direct link to isLocalPlayerInside">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L850"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isLocalPlayerInside</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isLocalPlayerInside"><code style="text-decoration:none">isLocalPlayerInside</code><a href="#isLocalPlayerInside" class="hash-link" aria-label="Direct link to isLocalPlayerInside" title="Direct link to isLocalPlayerInside">​</a></h3><span class="badge_Ba2I" style="color:#349AD5"><span class="badgeTooltip_cWXP">This item only works when running on the client.</span><span class="badgeToolTipTail_H9D_"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 337 304" fill="#349AD5" role="img" aria-label="This item only works when running on the client."><path d="M0 201h337v36H0v-36zm0 0zM0 0v188h337V0H0zM218 287h30c12 0 12 17 0 17H88c-11 0-11-17 0-17h31l10-39h79l10 39z"></path></svg> <!-- -->Client</span></span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L940"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isLocalPlayerInside</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>
   Checks if the local player's character is currently inside a zone
   attached to this observer.
 </p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isEntityInside"><code style="text-decoration:none">isEntityInside</code><a href="#isEntityInside" class="hash-link" aria-label="Direct link to isEntityInside" title="Direct link to isEntityInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L866"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isEntityInside</code><code>(</code><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isEntityInside"><code style="text-decoration:none">isEntityInside</code><a href="#isEntityInside" class="hash-link" aria-label="Direct link to isEntityInside" title="Direct link to isEntityInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L956"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isEntityInside</code><code>(</code><code>entity<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if a specific entity is currently inside a zone attached to this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPointInside"><code style="text-decoration:none">isPointInside</code><a href="#isPointInside" class="hash-link" aria-label="Direct link to isPointInside" title="Direct link to isPointInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L883"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isPointInside</code><code>(</code><code>position<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPointInside"><code style="text-decoration:none">isPointInside</code><a href="#isPointInside" class="hash-link" aria-label="Direct link to isPointInside" title="Direct link to isPointInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L973"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isPointInside</code><code>(</code><code>position<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if a specific point in world space is inside any zone attached to this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isSafe"><code style="text-decoration:none">isSafe</code><a href="#isSafe" class="hash-link" aria-label="Direct link to isSafe" title="Direct link to isSafe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L928"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isSafe</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isSafe"><code style="text-decoration:none">isSafe</code><a href="#isSafe" class="hash-link" aria-label="Direct link to isSafe" title="Direct link to isSafe">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1018"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">isSafe</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if the observer wraps callbacks in task.spawn (safe) or not (unsafe).</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getId"><code style="text-decoration:none">getId</code><a href="#getId" class="hash-link" aria-label="Direct link to getId" title="Direct link to getId">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L939"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getId</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getId"><code style="text-decoration:none">getId</code><a href="#getId" class="hash-link" aria-label="Direct link to getId" title="Direct link to getId">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1029"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getId</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Returns the unique internal ID of the observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPriority"><code style="text-decoration:none">getPriority</code><a href="#getPriority" class="hash-link" aria-label="Direct link to getPriority" title="Direct link to getPriority">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L950"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getPriority</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPriority"><code style="text-decoration:none">getPriority</code><a href="#getPriority" class="hash-link" aria-label="Direct link to getPriority" title="Direct link to getPriority">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1040"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getPriority</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Returns the current resolution priority.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getUpdateRate"><code style="text-decoration:none">getUpdateRate</code><a href="#getUpdateRate" class="hash-link" aria-label="Direct link to getUpdateRate" title="Direct link to getUpdateRate">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L961"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getUpdateRate</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getUpdateRate"><code style="text-decoration:none">getUpdateRate</code><a href="#getUpdateRate" class="hash-link" aria-label="Direct link to getUpdateRate" title="Direct link to getUpdateRate">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1051"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getUpdateRate</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Returns the current update frequency for this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPrecision"><code style="text-decoration:none">getPrecision</code><a href="#getPrecision" class="hash-link" aria-label="Direct link to getPrecision" title="Direct link to getPrecision">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L972"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getPrecision</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getPrecision"><code style="text-decoration:none">getPrecision</code><a href="#getPrecision" class="hash-link" aria-label="Direct link to getPrecision" title="Direct link to getPrecision">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1062"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getPrecision</code><code>(</code><code>) → </code><code class="blue_P4bS">number</code></div><div>
 <p>Updates the precision for this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getEntitiesInside"><code style="text-decoration:none">getEntitiesInside</code><a href="#getEntitiesInside" class="hash-link" aria-label="Direct link to getEntitiesInside" title="Direct link to getEntitiesInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L983"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getEntitiesInside</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">}</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getEntitiesInside"><code style="text-decoration:none">getEntitiesInside</code><a href="#getEntitiesInside" class="hash-link" aria-label="Direct link to getEntitiesInside" title="Direct link to getEntitiesInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1073"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getEntitiesInside</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/QuickZone#Entity">Entity</a></code><code class="purple_ieR2">}</code></div><div>
 <p>Returns a list of all tracked entities currently inside zones attached to this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getZones"><code style="text-decoration:none">getZones</code><a href="#getZones" class="hash-link" aria-label="Direct link to getZones" title="Direct link to getZones">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1002"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getZones</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">}</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getZones"><code style="text-decoration:none">getZones</code><a href="#getZones" class="hash-link" aria-label="Direct link to getZones" title="Direct link to getZones">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1092"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getZones</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">}</code></div><div>
 <p>Returns the list of Zones currently attached to this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getGroups"><code style="text-decoration:none">getGroups</code><a href="#getGroups" class="hash-link" aria-label="Direct link to getGroups" title="Direct link to getGroups">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1024"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getGroups</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">}</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getGroups"><code style="text-decoration:none">getGroups</code><a href="#getGroups" class="hash-link" aria-label="Direct link to getGroups" title="Direct link to getGroups">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1114"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">getGroups</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Group">Group</a></code><code class="purple_ieR2">}</code></div><div>
 <p>Returns the list of Groups currently monitored by this observer.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onDestroy"><code style="text-decoration:none">onDestroy</code><a href="#onDestroy" class="hash-link" aria-label="Direct link to onDestroy" title="Direct link to onDestroy">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1056"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onDestroy</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onDestroy"><code style="text-decoration:none">onDestroy</code><a href="#onDestroy" class="hash-link" aria-label="Direct link to onDestroy" title="Direct link to onDestroy">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1146"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">onDestroy</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+<p>Disconnect function</p>
+</span></span></div><div>
 <p>Fires when <code>destroy()</code> is called on the observer</p>
 <pre class="language-lua"><code class="language-lua"><span class="token keyword">local</span> disconnect <span class="token operator">=</span> myObserver<span class="token punctuation">:</span><span class="token function">onDestroy</span><span class="token punctuation">(</span><span class="token keyword">function</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
 	<span class="token function">print</span><span class="token punctuation">(</span><span class="token string">'Observer was destroyed!'</span><span class="token punctuation">)</span>
 <span class="token keyword">end</span><span class="token punctuation">)</span>
 </code></pre>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="destroy"><code style="text-decoration:none">destroy</code><a href="#destroy" class="hash-link" aria-label="Direct link to destroy" title="Direct link to destroy">​</a></h3><span class="docTag__6UZ" style="border-color:#dc0073;color:#dc0073">Destructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1078"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">destroy</code><code>(</code><code>) → </code><code>(</code><code>)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="destroy"><code style="text-decoration:none">destroy</code><a href="#destroy" class="hash-link" aria-label="Direct link to destroy" title="Direct link to destroy">​</a></h3><span class="docTag__6UZ" style="border-color:#dc0073;color:#dc0073">Destructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Observer.luau#L1168"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Observer<!-- -->:</code><code class="green_DgR4">destroy</code><code>(</code><code>) → </code><code>(</code><code>)</code></div><div>
 <p>Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.</p>
 </div></div></article></div><details><summary>Show raw api</summary><pre style="max-width:100%;white-space:pre-wrap">{
     &quot;functions&quot;: [
@@ -280,7 +309,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 152,
+                &quot;line&quot;: 153,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -302,7 +331,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 174,
+                &quot;line&quot;: 175,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -318,13 +347,13 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;Function to stop observing entirely&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 209,
+                &quot;line&quot;: 210,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -340,7 +369,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;A function that, when called, disconnects the callback.&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -349,7 +378,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 271,
+                &quot;line&quot;: 272,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -365,7 +394,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;A function that, when called, disconnects the callback.&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -374,7 +403,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 290,
+                &quot;line&quot;: 291,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -390,13 +419,13 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;Function to stop observing entirely.&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 319,
+                &quot;line&quot;: 320,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -412,7 +441,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -421,7 +450,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 387,
+                &quot;line&quot;: 388,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -437,7 +466,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;A function to disconnect the callback.&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -446,7 +475,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 406,
+                &quot;line&quot;: 407,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -462,7 +491,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;Function to stop observing entirely.&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -471,7 +500,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Client&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 433,
+                &quot;line&quot;: 434,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -487,7 +516,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -499,7 +528,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Client&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 502,
+                &quot;line&quot;: 503,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -515,7 +544,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -527,7 +556,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Client&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 523,
+                &quot;line&quot;: 524,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -543,13 +572,13 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 552,
+                &quot;line&quot;: 553,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -574,7 +603,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 617,
+                &quot;line&quot;: 618,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -599,7 +628,85 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 671,
+                &quot;line&quot;: 672,
+                &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;onTransitioned&quot;,
+            &quot;desc&quot;: &quot; \nFires when an entity seamlessly transitions from one attached zone to another \noverlapping attached zone. If `targetEntity` is provided, the event will silently \nfilter out all other entities.&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;callback&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;(entity: Entity, newZone: Zone, oldZone: Zone) -&gt; ()&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
+                    &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;tags&quot;: [
+                &quot;Event&quot;
+            ],
+            &quot;source&quot;: {
+                &quot;line&quot;: 722,
+                &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;onPlayerTransitioned&quot;,
+            &quot;desc&quot;: &quot; \nSpecialized event for Player entities transitioning between overlapping zones.\nIf `targetPlayer` is provided, the event will only fire for that specific player.&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;callback&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;(player: Player, newZone: Zone, oldZone: Zone) -&gt; ()&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
+                    &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;tags&quot;: [
+                &quot;Event&quot;
+            ],
+            &quot;source&quot;: {
+                &quot;line&quot;: 746,
+                &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;onLocalPlayerTransitioned&quot;,
+            &quot;desc&quot;: &quot; \nSpecialized event for the LocalPlayer transitioning between overlapping zones.&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;callback&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;(newZone: Zone, oldZone: Zone) -&gt; ()&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
+                    &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;tags&quot;: [
+                &quot;Event&quot;
+            ],
+            &quot;realm&quot;: [
+                &quot;Client&quot;
+            ],
+            &quot;source&quot;: {
+                &quot;line&quot;: 777,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -621,7 +728,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 719,
+                &quot;line&quot;: 809,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -643,7 +750,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 758,
+                &quot;line&quot;: 848,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -665,7 +772,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 771,
+                &quot;line&quot;: 861,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -687,7 +794,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 785,
+                &quot;line&quot;: 875,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -709,7 +816,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 800,
+                &quot;line&quot;: 890,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -725,7 +832,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 814,
+                &quot;line&quot;: 904,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -747,7 +854,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 827,
+                &quot;line&quot;: 917,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -766,7 +873,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Client&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 850,
+                &quot;line&quot;: 940,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -788,7 +895,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 866,
+                &quot;line&quot;: 956,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -810,7 +917,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 883,
+                &quot;line&quot;: 973,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -826,7 +933,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 928,
+                &quot;line&quot;: 1018,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -842,7 +949,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 939,
+                &quot;line&quot;: 1029,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -858,7 +965,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 950,
+                &quot;line&quot;: 1040,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -874,7 +981,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 961,
+                &quot;line&quot;: 1051,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -890,7 +997,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 972,
+                &quot;line&quot;: 1062,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -906,7 +1013,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 983,
+                &quot;line&quot;: 1073,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -922,7 +1029,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1002,
+                &quot;line&quot;: 1092,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -938,7 +1045,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 1024,
+                &quot;line&quot;: 1114,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -954,7 +1061,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
             ],
             &quot;returns&quot;: [
                 {
-                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;desc&quot;: &quot;Disconnect function&quot;,
                     &quot;lua_type&quot;: &quot;() -&gt; ()&quot;
                 }
             ],
@@ -963,7 +1070,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 1056,
+                &quot;line&quot;: 1146,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         },
@@ -977,7 +1084,7 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
                 &quot;Destructor&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 1078,
+                &quot;line&quot;: 1168,
                 &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
             }
         }
@@ -990,6 +1097,6 @@ groups enter or exit any zones associated with the observer."><link data-rh="tru
         &quot;line&quot;: 78,
         &quot;path&quot;: &quot;src/Classes/Observer.luau&quot;
     }
-}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#destroy" class="table-of-contents__link toc-highlight">:destroy</a></li><li><a href="#getEntitiesInside" class="table-of-contents__link toc-highlight">:getEntitiesInside</a></li><li><a href="#getGroups" class="table-of-contents__link toc-highlight">:getGroups</a></li><li><a href="#getId" class="table-of-contents__link toc-highlight">:getId</a></li><li><a href="#getPrecision" class="table-of-contents__link toc-highlight">:getPrecision</a></li><li><a href="#getPriority" class="table-of-contents__link toc-highlight">:getPriority</a></li><li><a href="#getUpdateRate" class="table-of-contents__link toc-highlight">:getUpdateRate</a></li><li><a href="#getZones" class="table-of-contents__link toc-highlight">:getZones</a></li><li><a href="#isEnabled" class="table-of-contents__link toc-highlight">:isEnabled</a></li><li><a href="#isEntityInside" class="table-of-contents__link toc-highlight">:isEntityInside</a></li><li><a href="#isLocalPlayerInside" class="table-of-contents__link toc-highlight">:isLocalPlayerInside</a></li><li><a href="#isPlayerInside" class="table-of-contents__link toc-highlight">:isPlayerInside</a></li><li><a href="#isPointInside" class="table-of-contents__link toc-highlight">:isPointInside</a></li><li><a href="#isSafe" class="table-of-contents__link toc-highlight">:isSafe</a></li><li><a href="#observe" class="table-of-contents__link toc-highlight">:observe</a></li><li><a href="#observeGroup" class="table-of-contents__link toc-highlight">:observeGroup</a></li><li><a href="#observeLocalPlayer" class="table-of-contents__link toc-highlight">:observeLocalPlayer</a></li><li><a href="#observePlayer" class="table-of-contents__link toc-highlight">:observePlayer</a></li><li><a href="#onDestroy" class="table-of-contents__link toc-highlight">:onDestroy</a></li><li><a href="#onEntered" class="table-of-contents__link toc-highlight">:onEntered</a></li><li><a href="#onExited" class="table-of-contents__link toc-highlight">:onExited</a></li><li><a href="#onGroupEntered" class="table-of-contents__link toc-highlight">:onGroupEntered</a></li><li><a href="#onGroupExited" class="table-of-contents__link toc-highlight">:onGroupExited</a></li><li><a href="#onLocalPlayerEntered" class="table-of-contents__link toc-highlight">:onLocalPlayerEntered</a></li><li><a href="#onLocalPlayerExited" class="table-of-contents__link toc-highlight">:onLocalPlayerExited</a></li><li><a href="#onPlayerEntered" class="table-of-contents__link toc-highlight">:onPlayerEntered</a></li><li><a href="#onPlayerExited" class="table-of-contents__link toc-highlight">:onPlayerExited</a></li><li><a href="#setEnabled" class="table-of-contents__link toc-highlight">:setEnabled</a></li><li><a href="#setPrecision" class="table-of-contents__link toc-highlight">:setPrecision</a></li><li><a href="#setPriority" class="table-of-contents__link toc-highlight">:setPriority</a></li><li><a href="#setSafety" class="table-of-contents__link toc-highlight">:setSafety</a></li><li><a href="#setUpdateRate" class="table-of-contents__link toc-highlight">:setUpdateRate</a></li><li><a href="#subscribe" class="table-of-contents__link toc-highlight">:subscribe</a></li><li><a href="#unsubscribe" class="table-of-contents__link toc-highlight">:unsubscribe</a></li><li><a href="#new" class="table-of-contents__link toc-highlight">.new</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 LDGerrits. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
+}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#destroy" class="table-of-contents__link toc-highlight">:destroy</a></li><li><a href="#getEntitiesInside" class="table-of-contents__link toc-highlight">:getEntitiesInside</a></li><li><a href="#getGroups" class="table-of-contents__link toc-highlight">:getGroups</a></li><li><a href="#getId" class="table-of-contents__link toc-highlight">:getId</a></li><li><a href="#getPrecision" class="table-of-contents__link toc-highlight">:getPrecision</a></li><li><a href="#getPriority" class="table-of-contents__link toc-highlight">:getPriority</a></li><li><a href="#getUpdateRate" class="table-of-contents__link toc-highlight">:getUpdateRate</a></li><li><a href="#getZones" class="table-of-contents__link toc-highlight">:getZones</a></li><li><a href="#isEnabled" class="table-of-contents__link toc-highlight">:isEnabled</a></li><li><a href="#isEntityInside" class="table-of-contents__link toc-highlight">:isEntityInside</a></li><li><a href="#isLocalPlayerInside" class="table-of-contents__link toc-highlight">:isLocalPlayerInside</a></li><li><a href="#isPlayerInside" class="table-of-contents__link toc-highlight">:isPlayerInside</a></li><li><a href="#isPointInside" class="table-of-contents__link toc-highlight">:isPointInside</a></li><li><a href="#isSafe" class="table-of-contents__link toc-highlight">:isSafe</a></li><li><a href="#observe" class="table-of-contents__link toc-highlight">:observe</a></li><li><a href="#observeGroup" class="table-of-contents__link toc-highlight">:observeGroup</a></li><li><a href="#observeLocalPlayer" class="table-of-contents__link toc-highlight">:observeLocalPlayer</a></li><li><a href="#observePlayer" class="table-of-contents__link toc-highlight">:observePlayer</a></li><li><a href="#onDestroy" class="table-of-contents__link toc-highlight">:onDestroy</a></li><li><a href="#onEntered" class="table-of-contents__link toc-highlight">:onEntered</a></li><li><a href="#onExited" class="table-of-contents__link toc-highlight">:onExited</a></li><li><a href="#onGroupEntered" class="table-of-contents__link toc-highlight">:onGroupEntered</a></li><li><a href="#onGroupExited" class="table-of-contents__link toc-highlight">:onGroupExited</a></li><li><a href="#onLocalPlayerEntered" class="table-of-contents__link toc-highlight">:onLocalPlayerEntered</a></li><li><a href="#onLocalPlayerExited" class="table-of-contents__link toc-highlight">:onLocalPlayerExited</a></li><li><a href="#onLocalPlayerTransitioned" class="table-of-contents__link toc-highlight">:onLocalPlayerTransitioned</a></li><li><a href="#onPlayerEntered" class="table-of-contents__link toc-highlight">:onPlayerEntered</a></li><li><a href="#onPlayerExited" class="table-of-contents__link toc-highlight">:onPlayerExited</a></li><li><a href="#onPlayerTransitioned" class="table-of-contents__link toc-highlight">:onPlayerTransitioned</a></li><li><a href="#onTransitioned" class="table-of-contents__link toc-highlight">:onTransitioned</a></li><li><a href="#setEnabled" class="table-of-contents__link toc-highlight">:setEnabled</a></li><li><a href="#setPrecision" class="table-of-contents__link toc-highlight">:setPrecision</a></li><li><a href="#setPriority" class="table-of-contents__link toc-highlight">:setPriority</a></li><li><a href="#setSafety" class="table-of-contents__link toc-highlight">:setSafety</a></li><li><a href="#setUpdateRate" class="table-of-contents__link toc-highlight">:setUpdateRate</a></li><li><a href="#subscribe" class="table-of-contents__link toc-highlight">:subscribe</a></li><li><a href="#unsubscribe" class="table-of-contents__link toc-highlight">:unsubscribe</a></li><li><a href="#new" class="table-of-contents__link toc-highlight">.new</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 LDGerrits. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
 </body>
 </html>
