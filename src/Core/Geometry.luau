@@ -61,16 +61,21 @@ function Geometry.getObjectBounds(cframe: CFrame, halfSize: Vector3): (Vector3, 
 	return pos - extent, pos + extent
 end
 
-function Geometry.positionToMortonCode(position: Vector3, sceneMin: Vector3, sceneMax: Vector3): number
+function Geometry.getMortonScale(sceneMin: Vector3, sceneMax: Vector3): (number, number, number)
 	local size = sceneMax - sceneMin
-	local scaleX = 1023 / size.X
-	local scaleY = 1023 / size.Y
-	local scaleZ = 1023 / size.Z
+	return 1023 / size.X, 1023 / size.Y, 1023 / size.Z
+end
 
-	local localPos = position - sceneMin
-	local x = math.floor(math.clamp(localPos.X * scaleX, 0, 1023))
-	local y = math.floor(math.clamp(localPos.Y * scaleY, 0, 1023))
-	local z = math.floor(math.clamp(localPos.Z * scaleZ, 0, 1023))
+function Geometry.positionToMortonCode(
+	position: Vector3,
+	sceneMin: Vector3,
+	scaleX: number,
+	scaleY: number,
+	scaleZ: number
+): number
+	local x = math.floor(math.clamp((position.X - sceneMin.X) * scaleX, 0, 1023))
+	local y = math.floor(math.clamp((position.Y - sceneMin.Y) * scaleY, 0, 1023))
+	local z = math.floor(math.clamp((position.Z - sceneMin.Z) * scaleZ, 0, 1023))
 
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end

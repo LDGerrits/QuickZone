@@ -152,12 +152,20 @@ end
 	@param entity Entity -- The Part, Model, or Table entity.
 	@return Group?
 ]=]
-function QuickZone:getGroupOfEntity(entity: Types.Entity): Types.Group?
-	local groupId = State.entityToGroup[entity]
-	if groupId then
-		return State.groups[groupId]
+function QuickZone:getGroupsOfEntity(entity: Types.Entity): { Types.Group }
+	local groupIds: { [number]: boolean } = State.entityToGroups[entity]
+	if not groupIds then
+		return {}
 	end
-	return nil
+
+	local results = {}
+	for groupId, _ in groupIds do
+		local group = State.groups[groupId]
+		if group then
+			table.insert(results, group)
+		end
+	end
+	return results
 end
 
 --[=[ 
@@ -257,47 +265,55 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	newDebugFolder.Parent = workspace
 	debugFolder = newDebugFolder
 
-	local function updateVisual(id: number, cframe: CFrame, halfSize: Vector3, color: Color3)
+	local function getOrCreateVisual(id: number): BoxHandleAdornment
 		local box = debugVisuals[id]
-
 		if not box then
-			local newBox = Instance.new('BoxHandleAdornment')
-			newBox.Name = 'Zone_' .. id
-			newBox.Adornee = workspace.Terrain
-			newBox.Transparency = Config.Debug.transparency
-			newBox.AlwaysOnTop = true
-			newBox.ZIndex = 1
-			newBox.Parent = debugFolder
-			debugVisuals[id] = newBox
-			box = newBox
+			local newbox = Instance.new('BoxHandleAdornment')
+			newbox.Name = 'Zone_' .. id
+			newbox.Adornee = workspace.Terrain
+			newbox.Transparency = Config.Debug.transparency
+			newbox.AlwaysOnTop = true
+			newbox.ZIndex = 1
+			newbox.Parent = debugFolder
+			debugVisuals[id] = newbox
+			box = newbox
 		end
-
-		box.Size = halfSize * 2
-		box.CFrame = cframe
-		box.Color3 = color
+		return box
 	end
 
-	debugConnection = RunService.PreRender:Connect(function()
+	local loopEvent: RBXScriptSignal<number> = RunService:IsClient() and RunService.PreRender or RunService.Heartbeat
+
+	debugConnection = loopEvent:Connect(function()
 		if not debugFolder then
 			return
 		end
 
-		-- Draw static and dynamic zones
+		-- Draw static zones
 		for id, cframe in State.staticCFrames do
-			if not debugVisuals[id] then
-				local halfSize = State.staticHalfSizes[id]
-				local isActive = State.zoneAttachedObservers[id] ~= nil
-				local color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
-				updateVisual(id, cframe, halfSize, color)
-			end
+			local box = getOrCreateVisual(id)
+			local halfSize = State.staticHalfSizes[id]
+
+			local observers = State.zoneAttachedObservers[id]
+			local isActive = observers and next(observers) ~= nil
+			local color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
+
+			box.Size = halfSize * 2
+			box.CFrame = cframe
+			box.Color3 = color
 		end
+
+		-- Draw dynamic zones
 		for id, cframe in State.dynamicCFrames do
-			if not debugVisuals[id] then
-				local halfSize = State.dynamicHalfSizes[id]
-				local isActive = State.zoneAttachedObservers[id] ~= nil
-				local color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
-				updateVisual(id, cframe, halfSize, color)
-			end
+			local box = getOrCreateVisual(id)
+			local halfSize = State.dynamicHalfSizes[id]
+
+			local observers = State.zoneAttachedObservers[id]
+			local isActive = observers and next(observers) ~= nil
+			local color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
+
+			box.Size = halfSize * 2
+			box.CFrame = cframe
+			box.Color3 = color
 		end
 
 		-- Destroy removed zones

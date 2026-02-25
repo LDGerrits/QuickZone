@@ -9,6 +9,7 @@ local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
 local unionBounds = Geometry.unionBounds
 local getObjectBounds = Geometry.getObjectBounds
+local getMortonScale = Geometry.getMortonScale
 local positionToMortonCode = Geometry.positionToMortonCode
 
 type ListEntity = {
@@ -23,11 +24,12 @@ local listCache = table.create(2000)
 local objMinCache = table.create(2000)
 local objMaxCache = table.create(2000)
 local traversalStack = table.create(64)
+local treePools = {} :: { [any]: {
+	nodeCache: { Types.Node },
+	nodeCount: number,
+} }
 
-local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: number): number?
-	if (endIndex - beginIndex + 1) < 2 then
-		return nil
-	end
+local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: number): number
 	if endIndex == beginIndex + 1 then
 		return beginIndex + 1
 	end
@@ -61,31 +63,58 @@ local function createSubTree(
 	boundsMin: { Vector3 },
 	boundsMax: { Vector3 },
 	beginIndex: number,
-	endIndex: number
+	endIndex: number,
+	pool: {
+		nodeCache: { Types.Node },
+		nodeCount: number,
+	}
 ): Types.Node
+	pool.nodeCount += 1
+	local node = pool.nodeCache[pool.nodeCount]
+	if not node then
+		node = {} :: Types.Node
+		pool.nodeCache[pool.nodeCount] = node
+	end
+
 	if beginIndex == endIndex then
 		local id = list[beginIndex].id
-		return { min = boundsMin[id], max = boundsMax[id], id = id }
+		node.min = boundsMin[id]
+		node.max = boundsMax[id]
+		node.id = id
+		node.left = nil
+		node.right = nil
 	else
 		local mid = getSplitPos(list, beginIndex, endIndex)
-		if mid == nil then
-			local id = list[beginIndex].id
-			return { min = boundsMin[id], max = boundsMax[id], id = id }
-		end
-
-		local left = createSubTree(list, boundsMin, boundsMax, beginIndex, mid - 1)
-		local right = createSubTree(list, boundsMin, boundsMax, mid, endIndex)
+		local left = createSubTree(list, boundsMin, boundsMax, beginIndex, mid - 1, pool)
+		local right = createSubTree(list, boundsMin, boundsMax, mid, endIndex, pool)
 		local min, max = unionBounds(left.min, left.max, right.min, right.max)
 
-		return { min = min, max = max, id = -1, left = left, right = right }
+		node.min = min
+		node.max = max
+		node.id = -1
+		node.left = left
+		node.right = right
 	end
+
+	return node
 end
 
 function LinearBVH.build(cframes: { [number]: CFrame }, halfSizes: { [number]: Vector3 }): Types.Node?
+	-- Pool per unique list reference (static and dynamic) to allow reuse.
+	-- We don't need to clear the cache, since we track count separately.
+	local pool = treePools[cframes]
+	if not pool then
+		pool = {
+			nodeCache = table.create(4000),
+			nodeCount = 0,
+		}
+		treePools[cframes] = pool
+	end
+	pool.nodeCount = 0
+
 	table.clear(traversalStack)
 	table.clear(objMinCache)
 	table.clear(objMaxCache)
-	table.clear(listCache)
 
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
@@ -121,23 +150,24 @@ function LinearBVH.build(cframes: { [number]: CFrame }, halfSizes: { [number]: V
 	-- Add padding to avoid edge cases with flat scenes
 	local padding = vector.max(vector.one, (max - min) * 0.01)
 	local sceneMin, sceneMax = min - padding, max + padding
+	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
 
 	for i = 1, count do
 		local entry = listCache[i]
 		local pos = cframes[entry.id].Position -- Fast property access
-		entry.mortonCode = positionToMortonCode(pos, sceneMin, sceneMax)
+		entry.mortonCode = positionToMortonCode(pos, sceneMin, scaleX, scaleY, scaleZ)
 	end
-
-	table.sort(listCache, function(a, b)
-		return a.mortonCode < b.mortonCode
-	end)
 
 	-- Remove unused cached entries at tail
 	for i = count + 1, #listCache do
 		listCache[i] = nil
 	end
 
-	return createSubTree(listCache, objMinCache, objMaxCache, 1, count)
+	table.sort(listCache, function(a, b)
+		return a.mortonCode < b.mortonCode
+	end)
+
+	return createSubTree(listCache, objMinCache, objMaxCache, 1, count, pool)
 end
 
 function LinearBVH.queryPoint(root: Types.Node?, point: Vector3, callback: (id: number) -> ())

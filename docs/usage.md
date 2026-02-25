@@ -9,7 +9,7 @@ QuickZone is designed around a three-tier architecture: Zones (where), Groups (w
 ![Priority](topology_quickzone.png)
 
 ```lua
-local QuickZone = require(game:GetService("ReplicatedStorage").QuickZone)
+local QuickZone = require(game:GetService('ReplicatedStorage').QuickZone)
 local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
 ```
 
@@ -24,12 +24,12 @@ Define your object's properties and its relationships in the constructors.
 local localPlayerGroup = Group.localPlayer()
 
 local observer = Observer.new({
-    groups = { localPlayerGroup }, -- Immediately subscribes to these groups
-    priority = 1,
+	groups = { localPlayerGroup }, -- Immediately subscribes to these groups
+	priority = 1,
 })
 
 Zone.fromPart(workspace.SafeZone, {
-    observers = { observer } -- Immediately attaches to these observers
+	observers = { observer } -- Immediately attaches to these observers
 })
 ```
 
@@ -50,40 +50,53 @@ zone:attach(observer)
 
 Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
 
-### Creation
-The easiest way to create a zone.
+### Bulk Creation
+The easiest way to create zones is using the bulk constructors. The `fromParts`, `fromDescendants`, `fromChildren`, and `fromTag` return a Zones collection object, which acts as a logical unit allowing you to manage multiple zones at once.
 
 ```lua
--- Static Zone (Fastest)
--- Ideal for shops, biomes, or permanent regions.
-local staticZones = Zone.fromParts(workspace.SafeZones:GetChildren())
-
--- Dynamic Zone
--- Passing 'true' makes the zone follow the part's CFrame on :update()
-local trainZone = Zone.fromPart(workspace.TrainCarriage, { 
-    isDynamic = true,
-    metadata = { canDamage = true },
-    observers = { trainObserver }
+-- Create zones from a CollectionService tag
+local lavaZones = Zone.fromTag('Lava', {
+	metadata = { damage = 10 },
+	observers = { damageObserver },
 })
-```
 
-_Note: The third argument (`metadata`) is optional and can be retrieved using `zone:getMetadata()`_
+-- Create zones from an array of parts
+local safeZones = Zone.fromParts(workspace.SafeZones:GetChildren())
+
+-- Create zones from all BaseParts inside a Model or Folder (Deep search)
+local hazardZones = Zone.fromDescendants(workspace.TrapModel)
+
+-- Create zones from only the direct children of a Folder (Shallow search)
+local flatZones = Zone.fromChildren(workspace.FlatFolder)
+
+-- You can attach an observer to the entire collection at once
+safeZones:attach(invincibilityObserver)
+```
 
 ### Manual Creation
 Useful for procedural generation or areas without physical parts.
 
 ```lua
 local zone = Zone.new({
-    cframe = CFrame.new(0, 10, 0),
-    size = Vector3.new(10, 10, 10),
-    shape = 'Block',
-    isDynamic = true,
-    metadata = { Name = 'Lobby' }
+	cframe = CFrame.new(0, 10, 0),
+	size = Vector3.new(10, 10, 10),
+	shape = 'Block',
+	isDynamic = true,
+	metadata = { Name = 'Lobby' }
 })
 ```
 
+### Single & Dynamic Creation
+For maximum perfomance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
+```lua
+local trainZone = Zone.fromPart(workspace.TrainCarriage, { 
+	isDynamic = true,
+	metadata = { route = 'North' },
+	observers = { trainObserver }
+})
+```
 :::info Performance Optimization: Static vs. Dynamic
-QuickZone batches tree rebuilds once per frame. By keeping the Dynamic Tree small, you make sure that these batched rebuilds remain super quick. For maximum perfomance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
+QuickZone batches tree rebuilds once per frame. By adding a zone to the smaller Dynamic LBVH, you prevent rebuild of the large Static LBVH and make the rebuild of the Dynamic LBVH super quick.
 :::
 
 ### Updating Zones
@@ -116,14 +129,7 @@ For NPCs, projectiles, or vehicles, create a standard Group.
 
 ```lua
 local projectiles = Group.new({
-    updateRate = 60,   -- Check every frame for high-speed objects
-    precision = 0,     -- Query every time it moves
-    entities = workspace.Projectiles:GetChildren()
-})
-
-local NPCs = Group.new({
-    updateRate = 5,    -- Check only 5 times a second
-    precision = 2.0    -- Only query if the NPC moves more than 2 studs
+	entities = workspace.Projectiles:GetChildren()
 })
 ```
 
@@ -132,22 +138,19 @@ You can add BaseParts, Models, Attachments, Bones, or tables with a Position.
 
 ```lua
 -- Add a Model (tracks the PrimaryPart or Pivot)
--- Note: 'metadata' applies to the entity, not the group.
-enemies:add(npcModel, { Team = 'Red' })
+enemies:add(npcModel)
 
 -- Add a specific Attachment (tracks the exact point)
 -- This is great for offsets if you do not want to track the middle of a part (e.g. sword tip)
-enemies:add(sword.TipAttachment, { Damage = 75 })
+enemies:add(sword.TipAttachment)
 
 -- Add a table
 local spell = { Position = Vector3.new(10, 5, 0) }
 enemies:add(spell)
 
--- Remove when done
-enemies:removeBulk({npcModel, sword.TipAttachment, spell})
+-- Clear the enemies group when done
+enemies:clear()
 ```
-
-_Note: The second argument (`metadata`) is optional and will be passed to your event callbacks._
 
 ## 3. Observers
 
@@ -157,10 +160,14 @@ Observers act as the logic layer. They subscribe to Groups and attach to Zones t
 An Observer listens to its subscribed Groups and checks if they overlap with its attached Zones.
 
 ```lua
-local observer = Observer.new()
+local observer = Observer.new({
+	updateRate = 60,   -- Check up to 60 times a second
+	precision = 1.0,   -- Only query if the entity moves more than 1 stud
+	priority = 5       -- Used to resolve overlapping zones
+})
 
-observer:subscribe(allPlayers) -- Who to watch
-healingZone:attach(observer)   -- Where to watch
+observer:subscribe(allPlayers)
+healingZones:attach(observer)
 ```
 
 ### Lifecycle Management
@@ -168,46 +175,46 @@ For logic that should persist while an entity is inside a zone (e.g., UI, music,
 
 ```lua
 -- Generic observation
-observer:observe(function(entity, zone, metadata)
-    print("Entered", entity)
-    local highlight = Instance.new("Highlight", entity)
-    
-    return function()
-        print("Exited", entity)
-        highlight:Destroy()
-    end
+observer:observe(function(entity, zone)
+	print('Entered', entity)
+	local highlight = Instance.new('Highlight', entity)
+	
+	return function()
+		print('Exited', entity)
+		highlight:Destroy()
+	end
 end)
 
 -- The callback fires when the first entity of a group enters, and the 
 -- returned cleanup function fires when the last entity of the group leaves.
 observer:observeGroup(function(group, zone)
-    print("Group " .. group:getId() .. " has arrived!")
-    local boss = workspace.Boss:Clone()
-    boss.Parent = workspace
-    
-    return function()
-        print("The group has been wiped out or left.")
-        boss:Destroy()
-    end
+	print('Group ' .. group:getId() .. ' has arrived!')
+	local boss = workspace.Boss:Clone()
+	boss.Parent = workspace
+	
+	return function()
+		print('The group has been wiped out or left.')
+		boss:Destroy()
+	end
 end)
 
 -- Player specific
 observer:observePlayer(function(player, zone)
-    local forceField = Instance.new("ForceField", player.Character)
-    
-    return function()
-        forceField:Destroy()
-    end
+	local forceField = Instance.new('ForceField', player.Character)
+	
+	return function()
+		forceField:Destroy()
+	end
 end)
 
 -- LocalPlayer specific
 observer:observeLocalPlayer(function(zone)
-    local sound = workspace.Sounds.SafeZoneAmbience
-    sound:Play()
+	local sound = workspace.Sounds.SafeZoneAmbience
+	sound:Play()
 
-    return function()
-        sound:Stop()
-    end
+	return function()
+		sound:Stop()
+	end
 end)
 ```
 
@@ -216,19 +223,19 @@ For logic that happens exactly once on entry or exit (e.g., playing a sound effe
 
 ```lua
 -- Individual entity events
-observer:onEntered(function(entity, zone, metadata)
-    print(entity.Name .. ' entered ' .. zone:getId())
+observer:onEntered(function(entity, zone)
+	print(entity.Name .. ' entered ' .. zone:getId())
 end)
-observer:onExited(function(entity, zone, metadata)
-    print(entity.Name .. ' exited ' .. zone:getId())
+observer:onExited(function(entity, zone)
+	print(entity.Name .. ' exited ' .. zone:getId())
 end)
 
 -- Group-level events
 observer:onGroupEntered(function(group, zone)
-    print('The first member of group ' .. group:getId() .. ' entered!')
+	print('The first member of group ' .. group:getId() .. ' entered!')
 end)
 observer:onGroupExited(function(group, zone)
-    print('The last member of group ' .. group:getId() .. ' left!')
+	print('The last member of group ' .. group:getId() .. ' left!')
 end)
 
 -- Convenient player events

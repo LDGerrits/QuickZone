@@ -33,7 +33,7 @@ export type QuickZone = {
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	getObserversAtPoint: (self: QuickZone, position: Vector3) -> { Observer },
-	getGroupOfEntity: (self: QuickZone, entity: Entity) -> Group?,
+	getGroupsOfEntity: (self: QuickZone, entity: Entity) -> { Group },
 	getZones: (self: QuickZone) -> { Zone },
 	getObservers: (self: QuickZone) -> { Observer },
 	getGroups: (self: QuickZone) -> { Group },
@@ -57,7 +57,16 @@ export type ZoneClass = {
 	fromParts: (
 		parts: { BasePart },
 		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
-	) -> { Zone },
+	) -> Zones,
+	fromTag: (tag: string, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zones,
+	fromDescendants: (
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	) -> Zones,
+	fromChildren: (
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	) -> Zones,
 }
 
 export type Zone = {
@@ -79,6 +88,7 @@ export type Zone = {
 	getObservers: (self: Zone) -> { Observer },
 	isDynamic: (self: Zone) -> boolean,
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
+	onDestroy: (self: Zone, callback: () -> ()) -> () -> (),
 	destroy: (self: Zone) -> (),
 }
 
@@ -87,17 +97,45 @@ export type InternalZone = Zone & {
 	part: BasePart?,
 	dynamic: boolean,
 	metadata: any?,
+	onDestroyCallbacks: { () -> () }?,
 }
 
-export type Callback = (Entity, Zone, any?) -> ()
+export type Zones = {
+	attach: (self: Zones, observer: Observer) -> Zones,
+	detach: (self: Zones, observer: Observer) -> Zones,
+	syncToParts: (self: Zones) -> Zones,
+	getZones: (self: Zones) -> { Zone },
+	getObservers: (self: Zones) -> { Observer },
+	getMetadata: (self: Zones) -> any?,
+	isDynamic: (self: Zones) -> boolean,
+	isPointInside: (self: Zones, point: Vector3) -> boolean,
+	setMetadata: (self: Zones, metadata: any?) -> Zones,
+	contains: (self: Zones, zone: Zone) -> boolean,
+	onDestroy: (self: Zones, callback: () -> ()) -> () -> (),
+	destroy: (self: Zones) -> (),
+}
+
+export type InternalZones = Zones & {
+	isDynamic: boolean,
+	metadata: any?,
+	zones: { [Zone]: boolean },
+	observers: { [Observer]: boolean },
+	onDestroyCallbacks: { () -> () }?,
+	onDestroyObserverCleanups: { [Observer]: () -> () },
+	onDestroyZoneCleanups: { [Zone]: () -> () },
+	add: (self: InternalZones, zone: Zone) -> (),
+	remove: (self: InternalZones, zone: Zone) -> (),
+}
 
 export type ObserverClass = {
 	new: (
 		config: {
+			groups: { Group }?,
 			priority: number?,
+			updateRate: number?,
+			precision: number?,
 			enabled: boolean?,
 			safety: boolean?,
-			groups: { Group }?,
 		}?
 	) -> Observer,
 }
@@ -106,6 +144,8 @@ export type Observer = {
 	subscribe: (self: Observer, group: Group) -> Observer,
 	unsubscribe: (self: Observer, group: Group) -> Observer,
 	setPriority: (self: Observer, n: number) -> Observer,
+	setUpdateRate: (self: Observer, hz: number) -> Observer,
+	setPrecision: (self: Observer, n: number) -> Observer,
 	setEnabled: (self: Observer, enabled: boolean) -> Observer,
 	setSafety: (self: Observer, enabled: boolean) -> Observer,
 	isEnabled: (self: Observer) -> boolean,
@@ -117,67 +157,57 @@ export type Observer = {
 	getEntitiesInside: (self: Observer) -> { Entity },
 	getId: (self: Observer) -> number,
 	getPriority: (self: Observer) -> number,
+	getUpdateRate: (self: Observer) -> number,
+	getPrecision: (self: Observer) -> number,
 	getZones: (self: Observer) -> { Zone },
 	getGroups: (self: Observer) -> { Group },
-	observe: (self: Observer, callback: (Entity, Zone, any?) -> (() -> ())?) -> () -> (),
+	observe: (self: Observer, callback: (Entity, Zone) -> (() -> ())?) -> () -> (),
 	observePlayer: (self: Observer, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
 	observeLocalPlayer: (self: Observer, callback: (Zone) -> (() -> ())?) -> () -> (),
 	observeGroup: (self: Observer, callback: (Group, Zone) -> (() -> ())?) -> () -> (),
-	onEntered: (self: Observer, callback: Callback) -> () -> (),
-	onExited: (self: Observer, callback: Callback) -> () -> (),
+	onEntered: (self: Observer, callback: (Entity, Zone) -> ()) -> () -> (),
+	onExited: (self: Observer, callback: (Entity, Zone) -> ()) -> () -> (),
 	onPlayerEntered: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onPlayerExited: (self: Observer, callback: (Player, Zone) -> ()) -> () -> (),
 	onLocalPlayerEntered: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onLocalPlayerExited: (self: Observer, callback: (Zone) -> ()) -> () -> (),
 	onGroupEntered: (self: Observer, callback: (Group, Zone) -> ()) -> () -> (),
 	onGroupExited: (self: Observer, callback: (Group, Zone) -> ()) -> () -> (),
+	onDestroy: (self: Observer, callback: () -> ()) -> () -> (),
 	destroy: (self: Observer) -> (),
 }
 
 export type InternalObserver = Observer & {
 	id: number,
+	onDestroyCallbacks: { () -> () }?,
 }
 
 export type GroupClass = {
 	new: (config: {
-		updateRate: number?,
-		precision: number?,
+		entities: { Entity }?,
+	}?) -> Group,
+	fromTag: (tag: string, config: {
 		entities: { Entity }?,
 	}?) -> Group,
 	players: (config: {
-		updateRate: number?,
-		precision: number?,
 		entities: { Entity }?,
 	}?) -> Group,
 	localPlayer: (config: {
-		updateRate: number?,
-		precision: number?,
 		entities: { Entity }?,
 	}?) -> Group,
 }
 
 export type Group = {
-	add: (self: Group, entity: Entity, metadata: any?) -> Group,
-	addBulk: (self: Group, entities: { Entity }, metadata: any?) -> Group,
+	add: (self: Group, entity: Entity) -> Group,
+	addBulk: (self: Group, entities: { Entity }) -> Group,
 	remove: (self: Group, entity: Entity) -> Group,
 	removeBulk: (self: Group, entities: { Entity }) -> Group,
 	clear: (self: Group) -> Group,
-	setConfig: (self: Group, {
-		updateRate: number?,
-		precision: number?,
-	}) -> Group,
-	setUpdateRate: (self: Group, updateRate: number) -> Group,
-	setPrecision: (self: Group, precision: number) -> Group,
-	getUpdateRate: (self: Group) -> number,
-	getPrecision: (self: Group) -> number,
 	getId: (self: Group) -> number,
 	getEntities: (self: Group) -> { Entity },
 	getObservers: (self: Group) -> { Observer },
-	getConfig: (self: Group) -> {
-		updateRate: number,
-		precision: number,
-	},
 	contains: (self: Group, entity: Entity) -> boolean,
+	onDestroy: (self: Group, callback: () -> ()) -> () -> (),
 	destroy: (self: Group) -> (),
 }
 
@@ -185,11 +215,7 @@ export type InternalGroup = Group & {
 	id: number,
 	entities: { Entity },
 	entityIndices: { [Entity]: number },
-	entityData: { [Entity]: EntityData },
-	config: {
-		updateRate: number,
-		precisionSq: number,
-	},
+	onDestroyCallbacks: { () -> () }?,
 }
 
 --[=[
@@ -224,7 +250,10 @@ export type EntityData = {
 	activeObserverMemberships: { [number]: number },
 	lastPosition: Vector3,
 	strategy: number,
-	isDirty: boolean,
+	lastSpatialVersion: number,
+	precisionSq: number,
+	updateRate: number,
+	bucketIndex: number,
 }
 
 return nil

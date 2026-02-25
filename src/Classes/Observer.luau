@@ -6,19 +6,44 @@ local RunService = game:GetService('RunService')
 local Config = require(script.Parent.Parent.Config)
 local Geometry = require(script.Parent.Parent.Core.Geometry)
 local LinearBVH = require(script.Parent.Parent.Core.LinearBVH)
+local updateProfile = require(script.Parent.Parent.Core.updateProfile)
 local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
 local IS_CLIENT = RunService:IsClient()
 
+local function updateAllEntitiesForObserver(observerId: number)
+	for groupId, observers in State.groupToObservers do
+		if not observers[observerId] then
+			continue
+		end
+
+		local group = State.groups[groupId]
+		if not group then
+			continue
+		end
+
+		for _, entity in group.entities do
+			updateProfile(entity)
+		end
+	end
+end
+
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
 	local safety = State.observerSafety[observerId]
 
 	for _, entity in group.entities do
-		local data = group.entityData[entity]
+		local data = State.entityData[entity]
+		if not data then
+			continue
+		end
 
+		updateProfile(entity)
+
+		local activeObservers = State.entityToObservers[entity] or {}
 		local oldZoneId = data.activeObserverMemberships[observerId]
-		if not oldZoneId then
+
+		if not oldZoneId or activeObservers[observerId] then
 			continue
 		end
 
@@ -28,15 +53,16 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 		end
 
 		local cbs = State.observerExitedCallbacks[observerId]
-		if cbs then
-			local z = State.zoneIdToZoneObj[oldZoneId]
-			local cd = State.entityMetadata[entity]
-			for _, fn in cbs do
-				if safety then
-					task.spawn(fn, entity, z, cd)
-				else
-					fn(entity, z, cd)
-				end
+		if not cbs then
+			continue
+		end
+
+		local z = State.zoneIdToZoneObj[oldZoneId]
+		for _, fn in cbs do
+			if safety then
+				task.spawn(fn, entity, z)
+			else
+				fn(entity, z)
 			end
 		end
 	end
@@ -58,6 +84,8 @@ Observer.__index = Observer
 	```lua
 	local observer = QuickZone.Observer.new({
 		priority = 20, -- The priority value is used to resolve overlaps
+		updateRate = 20, -- Check at 20Hz
+		precision = 0.5, -- Ignore movement smaller than 0.5 studs
 		enabled = false, -- Observer will not start processing spatial checks
 		safety = false, -- Do not wrap callbacks in task.spawn
 		groups = { enemyGroup, playerGroup } -- Immediately subscribe to these groups
@@ -74,10 +102,12 @@ Observer.__index = Observer
 	@return Observer
 ]=]
 function Observer.new(config: {
+	groups: { Types.Group }?,
 	priority: number?,
+	updateRate: number?,
+	precision: number?,
 	enabled: boolean?,
 	safety: boolean?,
-	groups: { Types.Group }?,
 }?): Types.Observer
 	local id = State.nextObserverId
 	State.nextObserverId += 1
@@ -87,12 +117,15 @@ function Observer.new(config: {
 	}, Observer) :: any
 
 	State.observerPriorityMap[id] = config and config.priority or 0
+	State.observerUpdateRate[id] = config and config.updateRate or Config.Observer.updateRate
+	State.observerPrecisionSq[id] = (config and config.precision or Config.Observer.precision) ^ 2
+
 	State.observerEnteredCallbacks[id] = {}
 	State.observerExitedCallbacks[id] = {}
 	State.observerTrackingEntities[id] = {}
 	State.observerIdToObserverObj[id] = self
-	State.observerEnabled[id] = true
-	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Scheduler.safety
+	State.observerEnabled[id] = if config and config.enabled ~= nil then config.enabled else true
+	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Observer.safety
 
 	if config and config.groups then
 		for _, group in config.groups do
@@ -122,6 +155,11 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 		State.groupToObservers[groupId] = {}
 	end
 	State.groupToObservers[groupId][self.id] = true
+
+	for _, entity in group.entities do
+		updateProfile(entity)
+	end
+
 	return self
 end
 
@@ -134,11 +172,14 @@ end
 	@return Observer
 ]=]
 function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
-	disconnectObserverFromGroup(self.id, group)
 	local groupId = group.id
+
 	if State.groupToObservers[groupId] then
 		State.groupToObservers[groupId][self.id] = nil
 	end
+
+	disconnectObserverFromGroup(self.id, group)
+
 	return self
 end
 
@@ -162,23 +203,20 @@ end
 
 	@method observe
 	@within Observer
-	@param callback (entity: Entity, zone: Zone, metadata: any?) -> () -> ()
+	@param callback (entity: Entity, zone: Zone) -> (() -> ())?
 	@return () -> () -- Function to stop observing entirely
 ]=]
-function Observer.observe(
-	self: Types.InternalObserver,
-	callback: (Types.Entity, Types.Zone, any?) -> () -> ()
-): () -> ()
+function Observer.observe(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> (() -> ())?): () -> ()
 	local cleanups = {} :: { [Types.Entity]: () -> () }
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0 -- sessionId for each entity
 
-	local cleanupEnter = self:onEntered(function(entity, zone, metadata)
+	local cleanupEnter = self:onEntered(function(entity, zone)
 		nextId += 1
 		local myId = nextId
 		activeIds[entity] = myId
 
-		local cleanup = callback(entity, zone, metadata)
+		local cleanup = callback(entity, zone)
 
 		if activeIds[entity] ~= myId then
 			if type(cleanup) == 'function' then
@@ -192,7 +230,7 @@ function Observer.observe(
 		end
 	end)
 
-	local cleanupExit = self:onExited(function(entity, _zone, _metadata)
+	local cleanupExit = self:onExited(function(entity, _)
 		activeIds[entity] = nil
 
 		local cleanup = cleanups[entity]
@@ -219,7 +257,7 @@ end
 	Fires when any entity from a subscribed group enters a zone attached to this observer.
 
 	```lua
-	local disconnect = observer:onEntered(function(entity, zone, metadata)
+	local disconnect = observer:onEntered(function(entity, zone)
 		print(entity.Name .. ' entered ' .. zone.id)
 	end)
 	```
@@ -227,15 +265,15 @@ end
 	@tag Event
 	@method onEntered
 	@within Observer
-	@param callback (entity: Entity, zone: Zone, metadata: any?) -> ()
+	@param callback (entity: Entity, zone: Zone) -> ()
 	@return () -> () -- A function that, when called, disconnects the callback.
 ]=]
-function Observer.onEntered(self: Types.InternalObserver, callback): () -> ()
+function Observer.onEntered(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> ()): () -> ()
 	table.insert(State.observerEnteredCallbacks[self.id], callback)
 	return function()
-		local i = table.find(State.observerEnteredCallbacks[self.id], callback)
-		if i then
-			table.remove(State.observerEnteredCallbacks[self.id], i)
+		local idx = table.find(State.observerEnteredCallbacks[self.id], callback)
+		if idx then
+			table.remove(State.observerEnteredCallbacks[self.id], idx)
 		end
 	end
 end
@@ -246,15 +284,15 @@ end
 	@tag Event
 	@method onExited
 	@within Observer
-	@param callback (entity: Entity, zone: Zone, metadata: any?) -> ()
+	@param callback (entity: Entity, zone: Zone) -> ()
 	@return () -> () -- A function that, when called, disconnects the callback.
 ]=]
-function Observer.onExited(self: Types.InternalObserver, callback): () -> ()
+function Observer.onExited(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> ()): () -> ()
 	table.insert(State.observerExitedCallbacks[self.id], callback)
 	return function()
-		local i = table.find(State.observerExitedCallbacks[self.id], callback)
-		if i then
-			table.remove(State.observerExitedCallbacks[self.id], i)
+		local idx = table.find(State.observerExitedCallbacks[self.id], callback)
+		if idx then
+			table.remove(State.observerExitedCallbacks[self.id], idx)
 		end
 	end
 end
@@ -278,7 +316,7 @@ end
 	@param callback (player: Player, zone: Zone) -> (() -> ())?
 	@return () -> () -- Function to stop observing entirely.
 ]=]
-function Observer.observePlayer(self: Types.InternalObserver, callback: (Player, Types.Zone) -> () -> ()): () -> ()
+function Observer.observePlayer(self: Types.InternalObserver, callback: (Player, Types.Zone) -> (() -> ())?): () -> ()
 	local cleanups = {} :: { [Player]: () -> () }
 	local activeIds = {} :: { [Player]: number }
 	local nextId = 0
@@ -302,7 +340,7 @@ function Observer.observePlayer(self: Types.InternalObserver, callback: (Player,
 		end
 	end)
 
-	local cleanupExit = self:onPlayerExited(function(player, _zone)
+	local cleanupExit = self:onPlayerExited(function(player, _)
 		activeIds[player] = nil
 
 		local cleanup = cleanups[player]
@@ -347,9 +385,10 @@ end
 	@return () -> ()
 ]=]
 function Observer.onPlayerEntered(self: Types.InternalObserver, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onEntered(function(_entity, zone, data: { Player: Player }?)
-		if data and data.Player then
-			callback(data.Player, zone)
+	return self:onEntered(function(entity, zone)
+		local player = State.entityToPlayer[entity]
+		if player then
+			callback(player, zone)
 		end
 	end)
 end
@@ -365,9 +404,10 @@ end
 	@return () -> () -- A function to disconnect the callback.
 ]=]
 function Observer.onPlayerExited(self: Types.InternalObserver, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onExited(function(_entity, zone, data: { Player: Player }?)
-		if data and data.Player then
-			callback(data.Player, zone)
+	return self:onExited(function(entity, zone)
+		local player = State.entityToPlayer[entity]
+		if player then
+			callback(player, zone)
 		end
 	end)
 end
@@ -390,7 +430,7 @@ end
 	@param callback (zone: Zone) -> (() -> ())?
 	@return () -> () -- Function to stop observing entirely.
 ]=]
-function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Types.Zone) -> () -> ()): () -> ()
+function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Types.Zone) -> (() -> ())?): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:observeLocalPlayer can only be called on the Client.')
 
 	local currentCleanup = nil :: (() -> ())?
@@ -414,7 +454,7 @@ function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Ty
 		end
 	end)
 
-	local cleanupExit = self:onLocalPlayerExited(function(_zone)
+	local cleanupExit = self:onLocalPlayerExited(function(_)
 		currentId = 0
 
 		if currentCleanup then
@@ -461,8 +501,9 @@ end
 ]=]
 function Observer.onLocalPlayerEntered(self: Types.InternalObserver, callback: (Types.Zone) -> ()): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerEntered can only be called on the Client.')
-	return self:onEntered(function(_entity, zone, data: { Player: Player }?)
-		if data and data.Player == Players.LocalPlayer then
+	return self:onEntered(function(entity, zone)
+		local player = State.entityToPlayer[entity]
+		if player == Players.LocalPlayer then
 			callback(zone)
 		end
 	end)
@@ -481,8 +522,9 @@ end
 ]=]
 function Observer.onLocalPlayerExited(self: Types.InternalObserver, callback: (Types.Zone) -> ()): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerExited can only be called on the Client.')
-	return self:onExited(function(_entity, zone, data: { Player: Player }?)
-		if data and data.Player == Players.LocalPlayer then
+	return self:onExited(function(entity, zone)
+		local player = State.entityToPlayer[entity]
+		if player == Players.LocalPlayer then
 			callback(zone)
 		end
 	end)
@@ -514,45 +556,47 @@ function Observer.observeGroup(
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 	local cleanups = {} :: { [number]: () -> () }
 
-	return self:observe(function(entity, zone, _)
-		local groupId = State.entityToGroup[entity]
-		if not groupId then
+	return self:observe(function(entity, zone)
+		local groups = State.entityToGroups[entity]
+		if not groups then
 			return
 		end
 
-		local group = State.groups[groupId]
-		if not group then
-			return
-		end
-
-		if not activeMembers[groupId] then
-			activeMembers[groupId] = {}
-		end
-
-		if next(activeMembers[groupId]) == nil then
-			activeMembers[groupId][entity] = true
-			local groupCleanup = callback(group, zone)
-			if typeof(groupCleanup) == 'function' then
-				cleanups[groupId] = groupCleanup
+		for groupId, _ in groups do
+			local group = State.groups[groupId]
+			if not group or not State.groupToObservers[groupId][self.id] then
+				continue
 			end
-		else
-			activeMembers[groupId][entity] = true
+
+			if not activeMembers[groupId] then
+				activeMembers[groupId] = {}
+			end
+
+			if next(activeMembers[groupId]) == nil then
+				activeMembers[groupId][entity] = true
+				local groupCleanup = callback(group, zone)
+				if typeof(groupCleanup) == 'function' then
+					cleanups[groupId] = groupCleanup
+				end
+			else
+				activeMembers[groupId][entity] = true
+			end
 		end
 
 		return function()
-			local members = activeMembers[groupId]
-			if not members then
-				return
-			end
+			for groupId, members in activeMembers do
+				if not members[entity] then
+					continue
+				end
 
-			members[entity] = nil
-
-			if next(members) == nil then
-				activeMembers[groupId] = nil
-				local groupCleanup = cleanups[groupId]
-				if groupCleanup then
-					groupCleanup()
-					cleanups[groupId] = nil
+				members[entity] = nil
+				if next(members) == nil then
+					activeMembers[groupId] = nil
+					local groupCleanup = cleanups[groupId]
+					if groupCleanup then
+						groupCleanup()
+						cleanups[groupId] = nil
+					end
 				end
 			end
 		end
@@ -573,38 +617,42 @@ end
 function Observer.onGroupEntered(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
-	return self:observe(function(entity, zone, _)
-		local groupId = State.entityToGroup[entity]
-		if not groupId then
+	return self:observe(function(entity, zone)
+		local groups = State.entityToGroups[entity]
+		if not groups then
 			return
 		end
 
-		local group = State.groups[groupId]
-		if not group then
-			return
-		end
+		for groupId, _ in groups do
+			if not State.groupToObservers[groupId] or not State.groupToObservers[groupId][self.id] then
+				continue
+			end
 
-		if not activeMembers[groupId] then
-			activeMembers[groupId] = {}
-		end
+			if not activeMembers[groupId] then
+				activeMembers[groupId] = {}
+			end
 
-		local isFirst = next(activeMembers[groupId]) == nil
-		activeMembers[groupId][entity] = true
+			local isFirst = next(activeMembers[groupId]) == nil
+			activeMembers[groupId][entity] = true
 
-		if isFirst then
-			callback(group, zone)
+			if isFirst then
+				local group = State.groups[groupId]
+				if group then
+					callback(group, zone)
+				end
+			end
 		end
 
 		return function()
-			local members = activeMembers[groupId]
-			if not members then
-				return
-			end
+			for groupId, members in activeMembers do
+				if not members[entity] then
+					continue
+				end
 
-			members[entity] = nil
-
-			if next(members) == nil then
-				activeMembers[groupId] = nil
+				members[entity] = nil
+				if next(members) == nil then
+					activeMembers[groupId] = nil
+				end
 			end
 		end
 	end)
@@ -623,34 +671,37 @@ end
 function Observer.onGroupExited(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
-	return self:observe(function(entity, zone, _)
-		local groupId = State.entityToGroup[entity]
-		if not groupId then
+	return self:observe(function(entity, zone)
+		local groups = State.entityToGroups[entity]
+		if not groups then
 			return
 		end
 
-		local group = State.groups[groupId]
-		if not group then
-			return
-		end
-
-		if not activeMembers[groupId] then
-			activeMembers[groupId] = {}
-		end
-
-		activeMembers[groupId][entity] = true
-
-		return function()
-			local members = activeMembers[groupId]
-			if not members then
-				return
+		for groupId, _ in groups do
+			if not State.groupToObservers[groupId] or not State.groupToObservers[groupId][self.id] then
+				continue
 			end
 
-			members[entity] = nil
+			if not activeMembers[groupId] then
+				activeMembers[groupId] = {}
+			end
+			activeMembers[groupId][entity] = true
+		end
 
-			if next(members) == nil then
-				activeMembers[groupId] = nil
-				callback(group, zone)
+		return function()
+			for groupId, members in activeMembers do
+				if not members[entity] then
+					continue
+				end
+
+				members[entity] = nil
+				if next(members) == nil then
+					activeMembers[groupId] = nil
+					local group = State.groups[groupId]
+					if group then
+						callback(group, zone)
+					end
+				end
 			end
 		end
 	end)
@@ -674,24 +725,24 @@ function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Ty
 
 	local id = self.id
 	State.observerEnabled[id] = enabled
-	State.isDirty = true
+	State.spatialVersion += 1
 
-	if enabled then
-		return self
+	if not enabled then
+		for groupId, observersMap in State.groupToObservers do
+			if not observersMap[id] then
+				continue
+			end
+
+			local group = State.groups[groupId]
+			if not group then
+				continue
+			end
+
+			disconnectObserverFromGroup(id, group)
+		end
 	end
 
-	for groupId, observersMap in State.groupToObservers do
-		if not observersMap[id] then
-			continue
-		end
-
-		local group = State.groups[groupId]
-		if not group then
-			continue
-		end
-
-		disconnectObserverFromGroup(id, group)
-	end
+	updateAllEntitiesForObserver(self.id)
 
 	return self
 end
@@ -719,7 +770,37 @@ end
 ]=]
 function Observer.setPriority(self: Types.InternalObserver, p: number): Types.Observer
 	State.observerPriorityMap[self.id] = p
-	State.isDirty = true
+	State.spatialVersion += 1
+	return self
+end
+
+--[=[ 
+	Updates the update frequency for this observer.
+
+	@method setUpdateRate
+	@within Observer
+	@param hz number
+	@return Observer
+]=]
+function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types.Observer
+	assert(hz >= 0, '[QuickZone] updateRate must be non-negative')
+	State.observerUpdateRate[self.id] = hz
+	updateAllEntitiesForObserver(self.id)
+	return self
+end
+
+--[=[ 
+	Updates the precision in studs for this observer.
+
+	@method setPrecision
+	@within Observer
+	@param n number
+	@return Observer
+]=]
+function Observer.setPrecision(self: Types.InternalObserver, n: number): Types.Observer
+	assert(n >= 0, '[QuickZone] precision must be non-negative')
+	State.observerPrecisionSq[self.id] = n ^ 2
+	updateAllEntitiesForObserver(self.id)
 	return self
 end
 
@@ -783,13 +864,7 @@ end
 	@return boolean
 ]=]
 function Observer.isEntityInside(self: Types.InternalObserver, entity: Types.Entity): boolean
-	local groupId = State.entityToGroup[entity]
-	if not groupId then
-		return false
-	end
-
-	local group = State.groups[groupId]
-	local data = group.entityData[entity]
+	local data = State.entityData[entity]
 	if not data then
 		return false
 	end
@@ -873,7 +948,29 @@ end
 	@return number
 ]=]
 function Observer.getPriority(self: Types.InternalObserver): number
-	return State.observerPriorityMap[self.id] or 0
+	return State.observerPriorityMap[self.id]
+end
+
+--[=[ 
+	Returns the current update frequency for this observer.
+
+	@method getUpdateRate
+	@within Observer
+	@return number
+]=]
+function Observer.getUpdateRate(self: Types.InternalObserver): number
+	return State.observerUpdateRate[self.id]
+end
+
+--[=[ 
+	Updates the precision for this observer.
+
+	@method getPrecision
+	@within Observer
+	@return number
+]=]
+function Observer.getPrecision(self: Types.InternalObserver): number
+	return math.sqrt(State.observerPrecisionSq[self.id])
 end
 
 --[=[ 
@@ -942,6 +1039,36 @@ function Observer.getGroups(self: Types.InternalObserver): { Types.Group }
 end
 
 --[=[ 
+	Fires when `destroy()` is called on the observer
+
+	```lua
+	local disconnect = myObserver:onDestroy(function()
+		print('Observer was destroyed!')
+	end)
+	```
+
+	@tag Event
+	@method onDestroy
+	@within Observer
+	@param callback () -> ()
+	@return () -> ()
+]=]
+function Observer.onDestroy(self: Types.InternalObserver, callback: () -> ()): () -> ()
+	if not self.onDestroyCallbacks then
+		self.onDestroyCallbacks = {}
+	end
+
+	table.insert(self.onDestroyCallbacks :: any, callback)
+
+	return function()
+		local idx = table.find(self.onDestroyCallbacks :: any, callback)
+		if idx then
+			table.remove(self.onDestroyCallbacks :: any, idx)
+		end
+	end
+end
+
+--[=[ 
 	Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.
 	
 	@tag Destructor
@@ -949,6 +1076,13 @@ end
 	@within Observer
 ]=]
 function Observer.destroy(self: Types.InternalObserver): ()
+	if self.onDestroyCallbacks then
+		for _, callback in self.onDestroyCallbacks do
+			task.spawn(callback)
+		end
+		table.clear(self.onDestroyCallbacks)
+	end
+
 	self:setEnabled(false)
 
 	local id = self.id
@@ -972,7 +1106,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerEnabled[id] = nil
 	State.observerSafety[id] = nil
 
-	State.isDirty = true
+	State.spatialVersion += 1
 	setmetatable(self :: any, nil)
 end
 

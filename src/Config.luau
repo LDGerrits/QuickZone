@@ -11,26 +11,24 @@ Config.Strategy = {
 	PIVOT = 5,
 }
 
--- Initial values of the scheduler
 Config.Scheduler = {
 	-- Maximum execution time (in seconds) per frame
 	-- 0.001 = 1ms (approx 6% of a frame at 60 FPS)
 	frameBudget = 1 / 1000,
+}
 
+Config.Observer = {
 	-- Update frequency (Hz).
-	-- 30 means every entity is checked ~30 times per second
 	updateRate = 30,
 
 	-- Minimum positional change (in studs) required to trigger a spatial query
-	-- Entities moving less than this distance are considered stationary
 	precision = 0.1,
 
-	-- If true, callbacks are fired via task.spawn (safe but slower)
-	-- If false, callbacks fire immediately (risky if not handled appropriately)
+	-- If true, callbacks are fired via task.spawn
+	-- If false, callbacks fire immediately
 	safety = true,
 }
 
--- Debug visualization
 Config.Debug = {
 	-- Static zones
 	staticActive = Color3.fromRGB(0, 204, 255),

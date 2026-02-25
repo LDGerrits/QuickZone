@@ -14,15 +14,15 @@ local isPointInZone = Geometry.isPointInZone
 
 local zoneAttachedObservers = State.zoneAttachedObservers
 local observerPriorityMap = State.observerPriorityMap
-local entityMetadata = State.entityMetadata
 local observerEnteredCallbacks = State.observerEnteredCallbacks
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
 local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
 local zoneIdToZoneObj = State.zoneIdToZoneObj
-local groupList = State.groupList
-local groupToObservers = State.groupToObservers
+local bucketList = State.bucketList
+local entityData = State.entityData
+local entityToObservers = State.entityToObservers
 
 local ctx_pos: Vector3
 local ctx_cCount: number = 0
@@ -33,8 +33,8 @@ local ctx_candidateList: { [number]: number } = table.create(16)
 local ctx_linkedObservers: { [number]: boolean }
 
 local frameBudget = Config.Scheduler.frameBudget
-local nextGroupIndex = 1 -- Round-robin pointer
-local groupLastProcessedIndex = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Types.Group]: number }
+local nextBucketIndex = 1 -- Round-robin pointer
+local bucketLastProcessedIndex = {} :: { [number]: number }
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -80,18 +80,18 @@ local function queryCallbackDynamic(zoneId: number)
 	end
 end
 
-local function fireCallback(callbacks, entity, zone, metadata, safety)
+local function fireCallback(callbacks, entity, zone, safety)
 	if not callbacks then
 		return
 	end
 
 	if safety then
 		for _, cb in callbacks do
-			task.spawn(cb, entity, zone, metadata)
+			task.spawn(cb, entity, zone)
 		end
 	else
 		for _, cb in callbacks do
-			cb(entity, zone, metadata)
+			cb(entity, zone)
 		end
 	end
 end
@@ -103,13 +103,13 @@ RunService.PostSimulation:Connect(function(dt: number)
 	if State.pendingDynamicRebuild then
 		State.dynamicRootNode = LinearBVH.build(State.dynamicCFrames, State.dynamicHalfSizes)
 		State.pendingDynamicRebuild = false
-		State.isDirty = true
+		State.spatialVersion += 1
 	end
 
 	if State.pendingStaticRebuild then
 		State.staticRootNode = LinearBVH.build(State.staticCFrames, State.staticHalfSizes)
 		State.pendingStaticRebuild = false
-		State.isDirty = true
+		State.spatialVersion += 1
 	end
 
 	if (os.clock() - start) > frameBudget then
@@ -125,34 +125,29 @@ RunService.PostSimulation:Connect(function(dt: number)
 		return
 	end
 
-	local numGroups = #groupList
-	if numGroups == 0 then
+	local numBuckets = #bucketList
+	if numBuckets == 0 then
 		debug.profileend()
 		return
 	end
 
 	-- Pointer may have gotten out of bounds
-	if nextGroupIndex > numGroups then
-		nextGroupIndex = 1
+	if nextBucketIndex > numBuckets then
+		nextBucketIndex = 1
 	end
 
-	local forceRefresh = State.isDirty
-	State.isDirty = false
+	local spatialVersion = State.spatialVersion
 
 	-- Round-robin scheduling to prevent starvation
-	for _ = 1, numGroups do
-		local group = groupList[nextGroupIndex] :: Types.InternalGroup
-		nextGroupIndex = (nextGroupIndex % numGroups) + 1
+	for _ = 1, numBuckets do
+		local rate = bucketList[nextBucketIndex]
+		nextBucketIndex = (nextBucketIndex % numBuckets) + 1
 
-		local list = group.entities
+		local list = State.buckets[rate]
 		local totalEntities = #list
 		if totalEntities == 0 then
 			continue
 		end
-
-		local groupConfig = group.config
-		local rate = groupConfig.updateRate
-		local precisionSq = groupConfig.precisionSq
 
 		local workQuota = math.ceil(totalEntities * rate * dt)
 		if workQuota < 1 then
@@ -163,26 +158,19 @@ RunService.PostSimulation:Connect(function(dt: number)
 		end
 
 		local processed = 0
-		local idx = groupLastProcessedIndex[group] or 1
+		local idx = bucketLastProcessedIndex[rate] or 1
 		if idx > totalEntities then
 			idx = 1
 		end
-
-		ctx_linkedObservers = groupToObservers[group.id]
-		if not ctx_linkedObservers then
-			continue
-		end
-
-		local entityData = group.entityData
 
 		local budgetCheckCountdown = BUDGET_CHECK
 
 		while processed < workQuota do
 			local entity = list[idx]
-			local d = entityData[entity] :: Types.EntityData?
+			local data = entityData[entity] :: Types.EntityData?
 
 			-- Race condition guard
-			if not d then
+			if not data then
 				idx += 1
 				if idx > totalEntities then
 					idx = 1
@@ -193,7 +181,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 			-- Strategy
 			local pos
-			local strategy = d.strategy
+			local strategy = data.strategy
 			if strategy == STRAT_POS then
 				pos = (entity :: BasePart).Position
 			elseif strategy == STRAT_WORLD then
@@ -207,18 +195,21 @@ RunService.PostSimulation:Connect(function(dt: number)
 			end
 
 			-- Threshold
-			local shouldCheck = forceRefresh or d.isDirty
+			local shouldCheck = data.lastSpatialVersion ~= spatialVersion
+
 			if not shouldCheck then
-				local lp = d.lastPosition
+				local lp = data.lastPosition
 				local dx, dy, dz = pos.X - lp.X, pos.Y - lp.Y, pos.Z - lp.Z
-				if (dx * dx + dy * dy + dz * dz) >= precisionSq then
+				if (dx * dx + dy * dy + dz * dz) >= data.precisionSq then
 					shouldCheck = true
 				end
 			end
 
 			if shouldCheck then
-				d.lastPosition = pos
-				d.isDirty = false
+				data.lastPosition = pos
+				data.lastSpatialVersion = spatialVersion
+
+				ctx_linkedObservers = entityToObservers[entity]
 
 				ctx_pos = pos
 				ctx_cCount = 0
@@ -232,7 +223,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 					queryPoint(staticRoot, pos, queryCallbackStatic)
 				end
 
-				local current = d.activeObserverMemberships
+				local current = data.activeObserverMemberships
 
 				-- Exits
 				for observerId, oldZoneId in current do
@@ -247,8 +238,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						if cbs then
 							local safety = observerSafety[observerId]
 							local z = zoneIdToZoneObj[oldZoneId]
-							local cd = entityMetadata[entity]
-							fireCallback(cbs, entity, z, cd, safety)
+							fireCallback(cbs, entity, z, safety)
 						end
 					end
 				end
@@ -265,8 +255,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						if cbs then
 							local safety = observerSafety[observerId]
 							local z = zoneIdToZoneObj[zoneIdx]
-							local cd = entityMetadata[entity]
-							fireCallback(cbs, entity, z, cd, safety)
+							fireCallback(cbs, entity, z, safety)
 						end
 					end
 					ctx_candidatePriority[observerId] = nil
@@ -291,7 +280,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 			end
 		end
 
-		groupLastProcessedIndex[group] = idx
+		bucketLastProcessedIndex[rate] = idx
 
 		if (os.clock() - start) > frameBudget then
 			break

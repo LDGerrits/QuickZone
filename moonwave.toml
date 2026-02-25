@@ -21,11 +21,11 @@ description = "Use the `observe` pattern for 100% reliable cleanup. There is no 
 
 [[home.features]]
 title = "Track Anything"
-description = "Track BaseParts, Models, Attachments, Bones, Cameras, or even pure Lua tables. If it has a position, QuickZone can track it."
+description = "Track BaseParts, Models, Attachments, Bones, Cameras, or even tables. If it has a position, QuickZone can track it."
 
 [[home.features]]
 title = "Shape Support"
-description = "Supports mathematical containment for Blocks, Balls, Cylinders, and Wedges without relying on physics collision meshes."
+description = "Supports mathematical containment for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes."
 
 [[home.features]]
 title = "Decoupled Logic"
