@@ -239,7 +239,6 @@ function Zone.fromParts(
 				isDynamic = isDynamic,
 				metadata = zones.metadata,
 			})
-
 			zones:add(newZone)
 		end
 	end
@@ -248,7 +247,8 @@ function Zone.fromParts(
 end
 
 --[=[
-	Creates a Zones object from all BaseParts that are direct children of the given Instance (shallow search).
+	Dynamically creates and manages a Zones object from all BaseParts that are 
+	direct children of the given Instance. Automatically updates as children are added/removed.
 	
 	@tag Constructor
 	@within Zone
@@ -264,12 +264,62 @@ function Zone.fromChildren(
 		observers: { Types.Observer }?,
 	}?
 ): Types.Zones
-	return Zone.fromParts(parent:GetChildren() :: any, config)
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
+	local metadata = if config and config.metadata ~= nil then config.metadata else nil
+
+	local zones = Zones.new({
+		isDynamic = isDynamic,
+		metadata = metadata,
+	}) :: Types.InternalZones
+
+	if config and config.observers then
+		for _, obs in config.observers do
+			zones:attach(obs)
+		end
+	end
+
+	local instanceToZone = {} :: { [Instance]: Types.Zone }
+
+	local function onAdded(child: Instance)
+		if child:IsA('BasePart') and not instanceToZone[child] then
+			local newZone = Zone.fromPart(child, {
+				isDynamic = isDynamic,
+				metadata = zones.metadata,
+			})
+			instanceToZone[child] = newZone
+			zones:add(newZone)
+		end
+	end
+
+	local function onRemoved(child: Instance)
+		local oldZone = instanceToZone[child]
+		if oldZone then
+			instanceToZone[child] = nil
+			oldZone:destroy()
+		end
+	end
+
+	local addedConn = parent.ChildAdded:Connect(onAdded)
+	local removedConn = parent.ChildRemoved:Connect(onRemoved)
+	for _, child in parent:GetChildren() do
+		onAdded(child)
+	end
+
+	zones:onDestroy(function()
+		addedConn:Disconnect()
+		removedConn:Disconnect()
+		for child, _ in instanceToZone do
+			onRemoved(child)
+		end
+		table.clear(instanceToZone)
+	end)
+
+	return zones
 end
 
 --[=[
-	Creates a Zones object from all BaseParts contained anywhere within the given Instance (deep search). 
-	Non-BasePart descendants are ignored.
+	Dynamically creates and manages a Zones object from all BaseParts contained 
+	anywhere within the given Instance. Automatically updates as descendants are added/removed.
 	
 	```lua
 	local mapZones = QuickZone.Zone.fromDescendants(workspace.HazardFolder, {
@@ -291,7 +341,57 @@ function Zone.fromDescendants(
 		observers: { Types.Observer }?,
 	}?
 ): Types.Zones
-	return Zone.fromParts(parent:GetDescendants() :: any, config)
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
+	local metadata = if config and config.metadata ~= nil then config.metadata else nil
+
+	local zones = Zones.new({
+		isDynamic = isDynamic,
+		metadata = metadata,
+	}) :: Types.InternalZones
+
+	if config and config.observers then
+		for _, obs in config.observers do
+			zones:attach(obs)
+		end
+	end
+
+	local instanceToZone = {} :: { [Instance]: Types.Zone }
+
+	local function onAdded(descendant: Instance)
+		if descendant:IsA('BasePart') and not instanceToZone[descendant] then
+			local newZone = Zone.fromPart(descendant, {
+				isDynamic = isDynamic,
+				metadata = zones.metadata,
+			})
+			instanceToZone[descendant] = newZone
+			zones:add(newZone)
+		end
+	end
+
+	local function onRemoved(descendant: Instance)
+		local oldZone = instanceToZone[descendant]
+		if oldZone then
+			instanceToZone[descendant] = nil
+			oldZone:destroy()
+		end
+	end
+
+	local addedConn = parent.DescendantAdded:Connect(onAdded)
+	local removedConn = parent.DescendantRemoving:Connect(onRemoved)
+	for _, descendant in parent:GetDescendants() do
+		onAdded(descendant)
+	end
+
+	zones:onDestroy(function()
+		addedConn:Disconnect()
+		removedConn:Disconnect()
+		for descendant, _ in instanceToZone do
+			onRemoved(descendant)
+		end
+		table.clear(instanceToZone)
+	end)
+
+	return zones
 end
 
 --[=[
