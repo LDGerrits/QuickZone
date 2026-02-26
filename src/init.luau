@@ -37,6 +37,33 @@ local QuickZone = {
 }
 
 --[=[ 
+    Enables or disables automatic stepping. If false, you must call `QuickZone:update(dt)` manually.
+
+    @method setAutoUpdate
+    @within QuickZone
+    @param enabled boolean
+    @return QuickZone
+]=]
+function QuickZone:setAutoUpdate(enabled: boolean): QuickZone
+	Scheduler.setAutoUpdate(enabled)
+	return QuickZone
+end
+
+--[=[ 
+    Manually processes the spatial queries and trigger callbacks.
+    This is only necessary if `setAutoUpdate` is set to false.
+
+    @method update
+    @within QuickZone
+    @param dt number -- Delta time
+    @return QuickZone
+]=]
+function QuickZone:update(dt: number): QuickZone
+	Scheduler.update(dt)
+	return QuickZone
+end
+
+--[=[ 
 	Sets the global execution budget for the Scheduler per frame in milliseconds.
 	
 	The Scheduler will 'dispatch' entity updates until this threshold is reached, 
@@ -58,6 +85,85 @@ function QuickZone:setFrameBudget(ms: number): QuickZone
 	local s = ms / 1000
 	Scheduler.setFrameBudget(s)
 	return QuickZone
+end
+
+--[=[ 
+	Returns an array of all Observers currently existing in the system.
+
+	@method getObservers
+	@within QuickZone
+	@return { Observer }
+]=]
+function QuickZone:getObservers(): { Types.Observer }
+	local result = {}
+	for _, observer in State.observerIdToObserverObj do
+		table.insert(result, observer)
+	end
+	return result
+end
+
+--[=[ 
+	Returns an array of all Groups (including PlayerGroups) currently 
+	registered in the system.
+
+	@method getGroups
+	@within QuickZone
+	@return { Group }
+]=]
+function QuickZone:getGroups(): { Types.Group }
+	local result = {}
+	for _, group in State.groups do
+		table.insert(result, group)
+	end
+	return result
+end
+
+--[=[ 
+	Returns an array containing every Zone currently registered in the system.
+	This includes both static and dynamic zones.
+
+	@method getZones
+	@within QuickZone
+	@return { Zone }
+]=]
+function QuickZone:getZones(): { Types.Zone }
+	local result = {}
+	for _, zone in State.zoneIdToZoneObj do
+		table.insert(result, zone)
+	end
+	return result
+end
+
+--[=[ 
+	Returns a flattened array of every Entity (Parts, Models, etc.) currently 
+	being tracked across all Groups.
+
+	@method getEntities
+	@within QuickZone
+	@return { Entity }
+]=]
+function QuickZone:getEntities(): { Types.Entity }
+	local result = {}
+	for _, group in State.groups do
+		local count = #group.entities
+		if count > 0 then
+			local currentSize = #result
+			table.move(group.entities, 1, count, currentSize + 1, result)
+		end
+	end
+	return result
+end
+
+--[=[ 
+	Returns the Player associated with the entity, if it exists.
+
+	@method getPlayerOfEntity
+	@within QuickZone
+	@param entity Entity
+	@return Player?
+]=]
+function QuickZone:getPlayerOfEntity(entity: Types.Entity): Player?
+	return State.entityToPlayer[entity]
 end
 
 --[=[ 
@@ -95,8 +201,8 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	return results
 end
 
---[=[ 
-	Finds all Observers whose assigned Zones contain the given point.
+--[=[
+	Performs a spatial query to find all observers containing the given point.
 
 	@method getObserversAtPoint
 	@within QuickZone
@@ -146,12 +252,12 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 end
 
 --[=[ 
-	Returns the Group that the specified entity currently belongs to.
+	Returns an array of all Groups that the specified entity is currently in.
 
-	@method getGroupOfEntity
+	@method getGroupsOfEntity
 	@within QuickZone
 	@param entity Entity -- The Part, Model, or Table entity.
-	@return Group?
+	@return { Group }
 ]=]
 function QuickZone:getGroupsOfEntity(entity: Types.Entity): { Types.Group }
 	local groupIds: { [number]: boolean } = State.entityToGroups[entity]
@@ -170,70 +276,126 @@ function QuickZone:getGroupsOfEntity(entity: Types.Entity): { Types.Group }
 end
 
 --[=[ 
-	Returns an array containing every Zone currently registered in the system.
-	This includes both static and dynamic zones.
+	Returns an array of all Groups that the specified player is currently in.
 
-	@method getZones
+	@method getGroupsOfPlayer
 	@within QuickZone
-	@return { Zone }
-]=]
-function QuickZone:getZones(): { Types.Zone }
-	local result = {}
-	for _, zone in State.zoneIdToZoneObj do
-		table.insert(result, zone)
-	end
-	return result
-end
-
---[=[ 
-	Returns an array of all Observers currently existing in the system.
-
-	@method getObservers
-	@within QuickZone
-	@return { Observer }
-]=]
-function QuickZone:getObservers(): { Types.Observer }
-	local result = {}
-	for _, observer in State.observerIdToObserverObj do
-		table.insert(result, observer)
-	end
-	return result
-end
-
---[=[ 
-	Returns an array of all Groups (including PlayerGroups) currently 
-	registered in the system.
-
-	@method getGroups
-	@within QuickZone
+	@param player Player
 	@return { Group }
 ]=]
-function QuickZone:getGroups(): { Types.Group }
-	local result = {}
-	for _, group in State.groups do
-		table.insert(result, group)
+function QuickZone:getGroupsOfPlayer(player: Player): { Types.Group }
+	local character = player.Character
+	if not character then
+		return {}
 	end
-	return result
+
+	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
+	if not hrp then
+		return {}
+	end
+
+	return self:getGroupsOfEntity(hrp)
 end
 
 --[=[ 
-	Returns a flattened array of every Entity (Parts, Models, etc.) currently 
-	being tracked across all Groups.
+	Returns an array of all Observers currently tracking the given entity.
 
-	@method getEntities
+	@method getObserversOfEntity
 	@within QuickZone
-	@return { Entity }
+	@param entity Entity
+	@return { Observer }
 ]=]
-function QuickZone:getEntities(): { Types.Entity }
-	local result = {}
-	for _, group in State.groups do
-		local count = #group.entities
-		if count > 0 then
-			local currentSize = #result
-			table.move(group.entities, 1, count, currentSize + 1, result)
+function QuickZone:getObserversOfEntity(entity: Types.Entity): { Types.Observer }
+	local activeObservers = State.entityToObservers[entity]
+	if not activeObservers then
+		return {}
+	end
+
+	local results = {}
+	for observerId, _ in activeObservers do
+		local observer = State.observerIdToObserverObj[observerId]
+		if observer then
+			table.insert(results, observer)
 		end
 	end
-	return result
+	return results
+end
+
+--[=[ 
+	Returns an array of all Observers currently tracking the given player.
+
+	@method getObserversOfPlayer
+	@within QuickZone
+	@param player Player
+	@return { Observer }
+]=]
+function QuickZone:getObserversOfPlayer(player: Player): { Types.Observer }
+	local character = player.Character
+	if not character then
+		return {}
+	end
+
+	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
+	if not hrp then
+		return {}
+	end
+
+	return self:getObserversOfEntity(hrp)
+end
+
+--[=[ 
+	Returns an array of all Zones the given entity is actively inside, 
+	based on its observer memberships.
+
+	@method getZonesOfEntity
+	@within QuickZone
+	@param entity Entity
+	@return { Zone }
+]=]
+function QuickZone:getZonesOfEntity(entity: Types.Entity): { Types.Zone }
+	local data = State.entityData[entity]
+	if not data or not data.activeObserverMemberships then
+		return {}
+	end
+
+	local results = {}
+	local seenZones = {} -- In case multiple observers track the entity in the same zone
+
+	for _, zoneId in data.activeObserverMemberships do
+		if seenZones[zoneId] then
+			continue
+		end
+		seenZones[zoneId] = true
+
+		local zone = State.zoneIdToZoneObj[zoneId]
+		if zone then
+			table.insert(results, zone)
+		end
+	end
+
+	return results
+end
+
+--[=[ 
+	Returns an array of all Zones the given player is actively inside.
+
+	@method getZonesOfPlayer
+	@within QuickZone
+	@param player Player
+	@return { Zone }
+]=]
+function QuickZone:getZonesOfPlayer(player: Player): { Types.Zone }
+	local character = player.Character
+	if not character then
+		return {}
+	end
+
+	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
+	if not hrp then
+		return {}
+	end
+
+	return self:getZonesOfEntity(hrp)
 end
 
 --[=[ 

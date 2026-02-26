@@ -1083,6 +1083,26 @@ function Observer.getEntitiesInside(self: Types.InternalObserver): { Types.Entit
 end
 
 --[=[ 
+	Returns a list of all players currently inside zones attached to this observer.
+
+	@method getPlayersInside
+	@within Observer
+	@return { Player }
+]=]
+function Observer.getPlayersInside(self: Types.InternalObserver): { Player }
+	local result = {}
+	local entities = State.observerTrackingEntities[self.id]
+
+	for entity in entities do
+		local player = State.entityToPlayer[entity]
+		if player and not table.find(result, player) then
+			table.insert(result, player)
+		end
+	end
+	return result
+end
+
+--[=[ 
 	Returns the list of Zones currently attached to this observer.
 
 	@method getZones
@@ -1126,6 +1146,195 @@ function Observer.getGroups(self: Types.InternalObserver): { Types.Group }
 	end
 
 	return result
+end
+
+--[=[ 
+	Returns the specific Zone this entity is currently tracked under for this Observer.
+
+	@method getEntityInZone
+	@within Observer
+	@param entity Entity -- The entity to get the zone for
+	@return Zone?
+]=]
+function Observer.getZoneOfEntity(self: Types.InternalObserver, entity: Types.Entity): Types.Zone?
+	local data = State.entityData[entity]
+	if not data then
+		return nil
+	end
+
+	local zoneId = data.activeObserverMemberships[self.id]
+	if zoneId then
+		return State.zoneIdToZoneObj[zoneId]
+	end
+	return nil
+end
+
+--[=[ 
+	Returns the specific Zone a player is currently tracked under for this Observer.
+
+	@method getPlayerInZone
+	@within Observer
+	@param player Player -- The player to get the zone for
+	@return Zone?
+]=]
+function Observer.getZoneOfPlayer(self: Types.InternalObserver, player: Player): Types.Zone?
+	local character = player.Character
+	if not character then
+		return nil
+	end
+
+	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
+	if not hrp then
+		return nil
+	end
+
+	return self:getZoneOfEntity(hrp)
+end
+
+--[=[ 
+	Iterates over all entities currently inside zones attached to this observer.
+	This provides a zero-allocation way to loop through entities, ideal for high-frequency 
+	checks.
+
+	```lua
+	for entity in observer:iterEntitiesInside() do
+		print(entity.Name .. " is inside!")
+	end
+	```
+
+	@method iterEntitiesInside
+	@within Observer
+	@return () -> Entity?
+]=]
+function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> Types.Entity?
+	local entities = State.observerTrackingEntities[self.id]
+	local entity = nil
+
+	return function()
+		entity = next(entities, entity)
+		return entity
+	end
+end
+
+--[=[ 
+	Iterates over all players currently inside zones attached to this observer.
+	Minimizes GC pressure for high-frequency polling.
+
+	@method iterPlayersInside
+	@within Observer
+	@return () -> Player?
+]=]
+function Observer.iterPlayersInside(self: Types.InternalObserver): () -> Player?
+	local entities = State.observerTrackingEntities[self.id]
+	local entity = nil
+
+	return function()
+		while true do
+			entity = next(entities, entity)
+
+			if not entity then
+				return nil
+			end
+
+			local player = State.entityToPlayer[entity]
+			if not player then
+				continue
+			end
+
+			return player
+		end
+	end
+end
+
+--[=[ 
+	Iterates over all tracked entities and returns both the Entity and the specific 
+	Zone they are currently in for this observer.
+
+	```lua
+	for entity, zone in observer:iterZonesOfEntities() do
+		print(entity.Name .. " is in " .. zone:getId())
+	end
+	```
+
+	@method iterZonesOfEntities
+	@within Observer
+	@return () -> (Entity?, Zone?)
+]=]
+function Observer.iterZonesOfEntities(self: Types.InternalObserver): () -> (Types.Entity?, Types.Zone?)
+	local entities = State.observerTrackingEntities[self.id]
+	local entity = nil
+
+	return function()
+		while true do
+			entity = next(entities, entity)
+
+			if not entity then
+				return nil
+			end
+
+			local data = State.entityData[entity]
+			if not data then
+				continue
+			end
+
+			local zoneId = data.activeObserverMemberships[self.id]
+			if not zoneId then
+				continue
+			end
+
+			local zone = State.zoneIdToZoneObj[zoneId]
+			if not zone then
+				continue
+			end
+
+			return entity, zone
+		end
+	end
+end
+
+--[=[ 
+	Iterates over all tracked players and returns both the Player and the specific 
+	Zone their primary entity is currently in for this observer.
+
+	@method iterZonesOfPlayers
+	@within Observer
+	@return () -> (Player?, Types.Zone?)
+]=]
+function Observer.iterZonesOfPlayers(self: Types.InternalObserver): () -> (Player?, Types.Zone?)
+	local entities = State.observerTrackingEntities[self.id]
+	local entity = nil
+
+	return function()
+		while true do
+			entity = next(entities, entity)
+
+			if not entity then
+				return nil
+			end
+
+			local player = State.entityToPlayer[entity]
+			if not player then
+				continue
+			end
+
+			local data = State.entityData[entity]
+			if not data then
+				continue
+			end
+
+			local zoneId = data.activeObserverMemberships[self.id]
+			if not zoneId then
+				continue
+			end
+
+			local zone = State.zoneIdToZoneObj[zoneId]
+			if not zone then
+				continue
+			end
+
+			return player, zone
+		end
+	end
 end
 
 --[=[ 

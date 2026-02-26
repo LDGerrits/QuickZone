@@ -38,6 +38,8 @@ local frameBudget = Config.Scheduler.frameBudget
 local nextBucketIndex = 1 -- Round-robin pointer
 local bucketLastProcessedIndex = {} :: { [number]: number }
 
+local autoUpdateConnection: RBXScriptConnection?
+
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
@@ -104,7 +106,9 @@ local function fireCallback(callbacks, entity, zone, safety)
 	end
 end
 
-RunService.PostSimulation:Connect(function(dt: number)
+local Scheduler = {}
+
+function Scheduler.update(dt: number)
 	debug.profilebegin('QuickZone_Scheduler')
 	local start = os.clock()
 
@@ -334,14 +338,27 @@ RunService.PostSimulation:Connect(function(dt: number)
 	end
 
 	debug.profileend()
-end)
+end
 
-local Scheduler = {}
+function Scheduler.setAutoUpdate(enabled: boolean)
+	if enabled then
+		if not autoUpdateConnection then
+			autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
+		end
+	else
+		if autoUpdateConnection then
+			autoUpdateConnection:Disconnect()
+			autoUpdateConnection = nil
+		end
+	end
+end
 
 function Scheduler.setFrameBudget(n: number)
 	assert(n > 0, '[QuickZone] frameBudget must be greater than 0')
 
 	frameBudget = n
 end
+
+Scheduler.setAutoUpdate(Config.Scheduler.autoUpdate)
 
 return Scheduler

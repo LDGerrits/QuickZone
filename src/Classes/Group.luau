@@ -353,6 +353,16 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 			elseif entity:IsA('Model') then
 				strat = entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
 			end
+
+			if not State.entityToPlayer[entity] then
+				local player
+				if entity:IsA('BasePart') then
+					player = Players:GetPlayerFromCharacter((entity :: any).Parent)
+				end
+				if player then
+					State.entityToPlayer[entity] = player
+				end
+			end
 		elseif typeof(entity) == 'table' then
 			if entity.Position then
 				strat = STRAT_POS
@@ -451,23 +461,29 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 	local activeObservers = State.entityToObservers[entity] or {}
 
 	for observerId, oldZoneId in data.activeObserverMemberships do
-		if not activeObservers[observerId] then
-			data.activeObserverMemberships[observerId] = nil
-			if State.observerTrackingEntities[observerId] then
-				State.observerTrackingEntities[observerId][entity] = nil
-			end
+		if activeObservers[observerId] then
+			continue
+		end
 
-			local cbs = State.observerExitedCallbacks[observerId]
-			if cbs then
-				local safety = State.observerSafety[observerId]
-				local z = State.zoneIdToZoneObj[oldZoneId]
-				for _, fn in cbs do
-					if safety then
-						task.spawn(fn, entity, z)
-					else
-						fn(entity, z)
-					end
-				end
+		data.activeObserverMemberships[observerId] = nil
+
+		if State.observerTrackingEntities[observerId] then
+			State.observerTrackingEntities[observerId][entity] = nil
+		end
+
+		local cbs = State.observerExitedCallbacks[observerId]
+		if not cbs then
+			continue
+		end
+
+		local safety = State.observerSafety[observerId]
+		local z = State.zoneIdToZoneObj[oldZoneId]
+
+		for _, fn in cbs do
+			if safety then
+				task.spawn(fn, entity, z)
+			else
+				fn(entity, z)
 			end
 		end
 	end
@@ -551,6 +567,24 @@ function Group.getEntities(self: Types.InternalGroup): { Types.Entity }
 	return result
 end
 
+--[=[ 
+	Returns a list of all Players currently represented in the group.
+
+	@method getPlayers
+	@within Group
+	@return { Player }
+]=]
+function Group.getPlayers(self: Types.InternalGroup): { Player }
+	local result = {}
+	for entity in self.entityIndices do
+		local player = State.entityToPlayer[entity]
+		if player then
+			table.insert(result, player)
+		end
+	end
+	return result
+end
+
 --[=[
 	Returns a list of all Observers currently watching the group.
 
@@ -579,6 +613,58 @@ function Group.getObservers(self: Types.InternalGroup): { Types.Observer }
 	end
 
 	return result
+end
+
+--[=[ 
+	Iterates over all entities currently belonging to the group.
+	Provides a zero-allocation way to loop through entities, ideal for high-frequency 
+	checks.
+
+	```lua
+	for entity in myGroup:iterEntities() do
+		print(entity.Name .. " is in the group!")
+	end
+	```
+
+	@method iterEntities
+	@within Group
+	@return () -> Entity?
+]=]
+function Group.iterEntities(self: Types.InternalGroup): () -> Types.Entity?
+	local entity = nil
+
+	return function()
+		entity = next(self.entityIndices, entity)
+		return entity
+	end
+end
+
+--[=[ 
+	Iterates over all players currently represented in the group.
+
+	@method iterPlayers
+	@within Group
+	@return () -> Player?
+]=]
+function Group.iterPlayers(self: Types.InternalGroup): () -> Player?
+	local entity = nil
+
+	return function()
+		while true do
+			entity = next(self.entityIndices, entity)
+
+			if not entity then
+				return nil
+			end
+
+			local player = State.entityToPlayer[entity]
+			if not player then
+				continue
+			end
+
+			return player
+		end
+	end
 end
 
 --[=[ 

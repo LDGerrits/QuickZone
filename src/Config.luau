@@ -12,6 +12,10 @@ Config.Strategy = {
 }
 
 Config.Scheduler = {
+	-- If true, the scheduler will automatically run every frame.
+	-- If false, you must call QuickZone:update manually.
+	autoUpdate = true,
+
 	-- Maximum execution time (in seconds) per frame
 	-- 0.001 = 1ms (approx 6% of a frame at 60 FPS)
 	frameBudget = 1 / 1000,
