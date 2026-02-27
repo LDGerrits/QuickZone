@@ -1,6 +1,6 @@
 --!strict
 
-local Types = require(script.Parent.Types)
+local Types = require(script.Parent.Parent.Types)
 
 local State = {}
 

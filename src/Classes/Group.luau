@@ -4,9 +4,9 @@ local CollectionService = game:GetService('CollectionService')
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
-local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+local State = require(script.Parent.Parent.Core.State)
 local updateProfile = require(script.Parent.Parent.Core.updateProfile)
 
 local STRAT_POS = Config.Strategy.POS

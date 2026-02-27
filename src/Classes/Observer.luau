@@ -4,12 +4,13 @@ local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
 local Config = require(script.Parent.Parent.Config)
-local Geometry = require(script.Parent.Parent.Core.Geometry)
-local LinearBVH = require(script.Parent.Parent.Core.LinearBVH)
+local State = require(script.Parent.Parent.Core.State)
 local updateProfile = require(script.Parent.Parent.Core.updateProfile)
-local State = require(script.Parent.Parent.State)
 local Types = require(script.Parent.Parent.Types)
+local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 
+local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
 local zoneAttachedObservers = State.zoneAttachedObservers
@@ -984,7 +985,7 @@ end
 function Observer.isPointInside(self: Types.InternalObserver, position: Vector3): boolean
 	local isInside = false
 
-	LinearBVH.queryPoint(State.dynamicTree, position, function(zoneId)
+	queryPoint(State.dynamicTree, position, function(zoneId)
 		if isInside then
 			return
 		end
@@ -1001,7 +1002,7 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 		return true
 	end
 
-	LinearBVH.queryPoint(State.staticTree, position, function(zoneId)
+	queryPoint(State.staticTree, position, function(zoneId)
 		if isInside then
 			return
 		end

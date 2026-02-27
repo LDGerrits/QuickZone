@@ -1,5 +1,7 @@
-local State = require(script.Parent.Parent.State)
+--!strict
+
 local Types = require(script.Parent.Parent.Types)
+local State = require(script.Parent.State)
 
 local function updateProfile(entity: Types.Entity)
 	local groups = State.entityToGroups[entity]

@@ -3,11 +3,11 @@
 
 local RunService = game:GetService('RunService')
 
-local Geometry = require(script.Parent.Geometry)
-local LinearBVH = require(script.Parent.LinearBVH)
-local State = require(script.Parent.Parent.State)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
+local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
+local State = require(script.Parent.State)
 
 local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape

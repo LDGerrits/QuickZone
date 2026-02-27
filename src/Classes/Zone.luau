@@ -1,9 +1,9 @@
 --!strict
 local CollectionService = game:GetService('CollectionService')
 
-local Geometry = require(script.Parent.Parent.Core.Geometry)
-local State = require(script.Parent.Parent.State)
+local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
+local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local Zones = require(script.Parent.Zones)
 
 local staticCFrames = State.staticCFrames

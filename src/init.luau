@@ -2,13 +2,14 @@
 
 local RunService = game:GetService('RunService')
 
-local Geometry = require(script.Core.Geometry)
-local LinearBVH = require(script.Core.LinearBVH)
 local Types = require(script.Types)
-local State = require(script.State)
 local Config = require(script.Config)
 local Scheduler = require(script.Core.Scheduler)
+local State = require(script.Core.State)
+local Geometry = require(script.Utils.Geometry)
+local LinearBVH = require(script.Utils.LinearBVH)
 
+local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
 local zoneIdToZoneObj = State.zoneIdToZoneObj
@@ -216,7 +217,7 @@ end
 function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	local results = {}
 
-	LinearBVH.queryPoint(State.dynamicTree, position, function(zoneId)
+	queryPoint(State.dynamicTree, position, function(zoneId)
 		if isPointInShape(position, dynamicCFrames[zoneId], dynamicHalfSizes[zoneId], dynamicTypes[zoneId]) then
 			local zone = zoneIdToZoneObj[zoneId]
 			if zone then
@@ -225,7 +226,7 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 		end
 	end)
 
-	LinearBVH.queryPoint(State.staticTree, position, function(zoneId)
+	queryPoint(State.staticTree, position, function(zoneId)
 		if isPointInShape(position, staticCFrames[zoneId], staticHalfSizes[zoneId], staticTypes[zoneId]) then
 			local zone = zoneIdToZoneObj[zoneId]
 			if zone then
@@ -268,13 +269,13 @@ function QuickZone:getObserversAtPoint(position: Vector3): { Observer }
 		end
 	end
 
-	LinearBVH.queryPoint(State.dynamicTree, position, function(zoneId)
+	queryPoint(State.dynamicTree, position, function(zoneId)
 		if isPointInShape(position, dynamicCFrames[zoneId], dynamicHalfSizes[zoneId], dynamicTypes[zoneId]) then
 			processValidZone(zoneId)
 		end
 	end)
 
-	LinearBVH.queryPoint(State.staticTree, position, function(zoneId)
+	queryPoint(State.staticTree, position, function(zoneId)
 		if isPointInShape(position, staticCFrames[zoneId], staticHalfSizes[zoneId], staticTypes[zoneId]) then
 			processValidZone(zoneId)
 		end
