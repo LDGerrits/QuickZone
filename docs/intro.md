@@ -17,7 +17,9 @@ Because it calculates if it is inside or not using geometric math instead of phy
 
 ## Core Features
 
-- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore (do note that QuickZone still supports Event-Driven Programming).
+- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEnter` and `onExit` events anymore (do note that QuickZone still supports Event-Driven Programming).
+
+- **ECS Support & Data-Oriented**: Built-in support for deterministic manual stepping and zero-allocation iterators, perfect for ECS systems.
 
 - **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even tables. If it has a position, QuickZone can track it.
 
@@ -74,14 +76,14 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^1.1.0
+ldgerrits/quickzone@^1.2.0
 ```
 
 ### Manual
 Download the latest .rbxm model file from the [Releases](https://github.com/LDGerrits/QuickZone/releases) tab and drag it into ReplicatedStorage.
 
 ## Quick Start
-The following example showcases a swim system. QuickZone supports two coding styles, so choose the one that fits your workflow.
+The following example showcases a swim system. QuickZone supports three coding styles, so choose the one that fits your architecture.
 
 ### Option A: The QuickZone Approach (Recommended)
 Best for clean, modern code. You define relationships in a configuration table (**Declarative**) and use a single function to manage the active state (**Lifecycle**).
@@ -128,7 +130,7 @@ Zone.fromTag('Water', {
 ```
 
 ### Option B: The Classic Approach (ZonePlus / SimpleZone Style)
-Best for familiarity or for migrating ZonePlus code to QuickZone. You manually 'wire' objects together (**Imperative**) and use standard events like `onEntered` to trigger one-off actions (**Event-Driven**).
+Best for familiarity or for migrating ZonePlus code to QuickZone. You manually 'wire' objects together (**Imperative**) and use standard events like `onEnter` to trigger one-off actions (**Event-Driven**).
 
 ```lua
 local QuickZone = require(game.ReplicatedStorage.QuickZone)
@@ -141,12 +143,12 @@ local swimObserver = Observer.new():setPriority(42):setUpdateRate(30):setPrecisi
 swimObserver:subscribe(myPlayer)
 
 -- Connect events
-swimObserver:onLocalPlayerEntered(function(zone)
+swimObserver:onLocalPlayerEnter(function(zone)
     print('Entered water zone:', zone:getId())
     -- Add swimming logic here
 end)
 
-swimObserver:onLocalPlayerExited(function(zone)
+swimObserver:onLocalPlayerExit(function(zone)
     print('Exited water zone:', zone:getId())
     -- Remove swimming logic here
 end)
@@ -155,4 +157,51 @@ end)
 -- The returned 'zones' object allows you to manage the entire collection at once.
 local zones = Zone.fromChildren(workspace.WaterParts)
 zones:attach(swimObserver)
+```
+
+### Option C: The ECS Approach (Data-Oriented)
+Best for Entity Component System libraries (Matter, Jecs, etc.) or high-frequency custom physics loops. You turn off auto-updating, update QuickZone manually, and use zero-allocation iterators to poll state.
+
+```lua
+local RunService = game:GetService("RunService")
+local jecs = require(game.ReplicatedStorage.jecs)
+local QuickZone = require(game.ReplicatedStorage.QuickZone)
+local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
+
+local world = jecs.World.new()
+
+QuickZone:setAutoUpdate(false) -- Must be disabled for determnistic order.
+
+local myPlayerGroup = QuickZone.Group.localPlayer()
+local swimObserver = QuickZone.Observer.new({ 
+    priority = 42,
+    groups = { myPlayerGroup } 
+})
+QuickZone.Zone.fromTag('Water', { observers = { swimObserver } })
+
+local function transformSystem(dt)
+    -- Move entities
+end
+
+local function spatialSystem(dt)
+    QuickZone:update(dt) -- Steps it deterministically once per frame.
+end
+
+local function swimSystem(dt)
+    for player, zone in swimObserver:iterZonesOfPlayers() do
+        local character = player.Character
+        local humanoid = character and character:FindFirstChild("Humanoid")
+        
+        if humanoid and humanoid:GetState() ~= Enum.HumanoidStateType.Swimming then
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
+            humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function(dt)
+    transformSystem(dt)
+    spatialUpdateSystem(dt)
+    swimSystem(dt)
+end)
 ```

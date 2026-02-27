@@ -12,7 +12,7 @@ Instead of using the physics engine, QuickZone performs geometric calculations. 
 
 ## What it offers
 
-- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore.
+- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEnter` and `onExit` events anymore.
 
 - **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even pure Lua tables. If it has a position, QuickZone can track it.
 

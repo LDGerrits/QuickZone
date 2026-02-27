@@ -515,7 +515,7 @@ end
 
 --[=[ 
 	Removes all entities from the group.
-	This fires 'onExited' events for every entity currently inside a zone.
+	This fires 'onExit' events for every entity currently inside a zone.
 
 	@method clear
 	@within Group

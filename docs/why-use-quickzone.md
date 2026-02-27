@@ -25,18 +25,22 @@ QuickZone, on the other hand, is Entity-Centric. It keeps a list of entities and
 ### 2. Expressive and Boilerplate-Free API
 Writing performant code shouldn't mean writing complicated code. QuickZone is designed to be highly ergonomic.
 
-- **CollectionService Integration**: Instead of writing boilerplate for loops to parse folders, you can use the built-in fromTag constructors. Tag your parts and bind them to your logic in a single line of code (e.g., Zone.fromTag('Lava') or Group.fromTag('Interactable')).
+- **CollectionService Integration**: Tag your parts and bind them to your logic in a single line of code (e.g., `Zone.fromTag('Lava')`).
 
 - **Declarative Configurations**: QuickZone lets you define behaviors, priorities, and relationships upfront in simple configuration tables, drastically reducing boilerplate and keeping your scripts clean.
 
+- **Lifecycle Cleanups**: The `observe` pattern brings modern state management to spatial tracking. Return a function when a player enters, and it runs automatically when they exit.
+
 ---
 
-### 3. Data-Oriented Design (DOD)
+### 3. Data-Oriented Design (DOD) & ECS Compatibility
 QuickZone focuses on how data is laid out in memory based on DOD principles.
 
 - **Contiguous Arrays**: Unlike standard OOP where data is scattered across the heap in different objects, QuickZone stores entity data in pre-allocated, contiguous arrays to improve CPU cache locality.
 
 - **Stable Memory**: By using flat arrays and object pooling, QuickZone generates almost no garbage during runtime. This prevents lag spikes caused by the GC.
+
+- **Zero-Allocation Iterators**: QuickZone provides generators like `iterZonesOfPlayers()` and `iterEntitiesInside()`. These generator functions super fast and allocate no memory, making QuickZone a perfect fit for Entity Component System systems.
 
 ---
 

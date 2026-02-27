@@ -17,7 +17,7 @@ includeReadme = false
 
 [[home.features]]
 title = "Lifecycle Management"
-description = "Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore."
+description = "Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEnter` and `onExit` events anymore."
 
 [[home.features]]
 title = "Track Anything"

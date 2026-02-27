@@ -224,7 +224,7 @@ function Observer.observe(self: Types.InternalObserver, callback: (Types.Entity,
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0 -- sessionId for each entity
 
-	local cleanupEnter = self:onEntered(function(entity, zone)
+	local cleanupEnter = self:onEnter(function(entity, zone)
 		nextId += 1
 		local myId = nextId
 		activeIds[entity] = myId
@@ -243,7 +243,7 @@ function Observer.observe(self: Types.InternalObserver, callback: (Types.Entity,
 		end
 	end)
 
-	local cleanupExit = self:onExited(function(entity, _)
+	local cleanupExit = self:onExit(function(entity, _)
 		activeIds[entity] = nil
 
 		local cleanup = cleanups[entity]
@@ -270,18 +270,18 @@ end
 	Fires when any entity from a subscribed group enters a zone attached to this observer.
 
 	```lua
-	local disconnect = observer:onEntered(function(entity, zone)
+	local disconnect = observer:onEnter(function(entity, zone)
 		print(entity.Name .. ' entered ' .. zone.id)
 	end)
 	```
 
 	@tag Event
-	@method onEntered
+	@method onEnter
 	@within Observer
 	@param callback (entity: Entity, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onEntered(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> ()): () -> ()
+function Observer.onEnter(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> ()): () -> ()
 	table.insert(State.observerEnteredCallbacks[self.id], callback)
 	return function()
 		local idx = table.find(State.observerEnteredCallbacks[self.id], callback)
@@ -295,12 +295,12 @@ end
 	Fires when an entity exits all zones attached to this observer.
 
 	@tag Event
-	@method onExited
+	@method onExit
 	@within Observer
 	@param callback (entity: Entity, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onExited(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> ()): () -> ()
+function Observer.onExit(self: Types.InternalObserver, callback: (Types.Entity, Types.Zone) -> ()): () -> ()
 	table.insert(State.observerExitedCallbacks[self.id], callback)
 	return function()
 		local idx = table.find(State.observerExitedCallbacks[self.id], callback)
@@ -334,7 +334,7 @@ function Observer.observePlayer(self: Types.InternalObserver, callback: (Player,
 	local activeIds = {} :: { [Player]: number }
 	local nextId = 0
 
-	local cleanupEnter = self:onPlayerEntered(function(player, zone)
+	local cleanupEnter = self:onPlayerEnter(function(player, zone)
 		nextId += 1
 		local myId = nextId
 		activeIds[player] = myId
@@ -353,7 +353,7 @@ function Observer.observePlayer(self: Types.InternalObserver, callback: (Player,
 		end
 	end)
 
-	local cleanupExit = self:onPlayerExited(function(player, _)
+	local cleanupExit = self:onPlayerExit(function(player, _)
 		activeIds[player] = nil
 
 		local cleanup = cleanups[player]
@@ -380,7 +380,7 @@ end
 	Specialized event for Player entities.
 
 	```lua
-	observer:onPlayerEntered(function(player, zone)
+	observer:onPlayerEnter(function(player, zone)
 		print(player.Name .. " entered safe zone " .. zone:getId())
 		
 		-- Play a sound
@@ -392,13 +392,13 @@ end
 	```
 
 	@tag Event
-	@method onPlayerEntered
+	@method onPlayerEnter
 	@within Observer
 	@param callback (player: Player, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onPlayerEntered(self: Types.InternalObserver, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onEntered(function(entity, zone)
+function Observer.onPlayerEnter(self: Types.InternalObserver, callback: (Player, Types.Zone) -> ()): () -> ()
+	return self:onEnter(function(entity, zone)
 		local player = State.entityToPlayer[entity]
 		if player then
 			callback(player, zone)
@@ -411,13 +411,13 @@ end
 	exits all zones attached to this observer.
 
 	@tag Event
-	@method onPlayerExited
+	@method onPlayerExit
 	@within Observer
 	@param callback (player: Player, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onPlayerExited(self: Types.InternalObserver, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onExited(function(entity, zone)
+function Observer.onPlayerExit(self: Types.InternalObserver, callback: (Player, Types.Zone) -> ()): () -> ()
+	return self:onExit(function(entity, zone)
 		local player = State.entityToPlayer[entity]
 		if player then
 			callback(player, zone)
@@ -449,7 +449,7 @@ function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Ty
 	local currentCleanup = nil :: (() -> ())?
 	local currentId = 0
 
-	local cleanupEnter = self:onLocalPlayerEntered(function(zone)
+	local cleanupEnter = self:onLocalPlayerEnter(function(zone)
 		currentId += 1
 		local myId = currentId
 
@@ -467,7 +467,7 @@ function Observer.observeLocalPlayer(self: Types.InternalObserver, callback: (Ty
 		end
 	end)
 
-	local cleanupExit = self:onLocalPlayerExited(function(_)
+	local cleanupExit = self:onLocalPlayerExit(function(_)
 		currentId = 0
 
 		if currentCleanup then
@@ -495,7 +495,7 @@ end
 	Specialized event for the LocalPlayer.
 
 	```lua
-	observer:onLocalPlayerEntered(function(zone)
+	observer:onLocalPlayerEnter(function(zone)
 		print("You entered zone " .. zone:getId())
 		
 		local char = player.Character
@@ -507,14 +507,14 @@ end
 
 	@client
 	@tag Event
-	@method onLocalPlayerEntered
+	@method onLocalPlayerEnter
 	@within Observer
 	@param callback (zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onLocalPlayerEntered(self: Types.InternalObserver, callback: (Types.Zone) -> ()): () -> ()
-	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerEntered can only be called on the Client.')
-	return self:onEntered(function(entity, zone)
+function Observer.onLocalPlayerEnter(self: Types.InternalObserver, callback: (Types.Zone) -> ()): () -> ()
+	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerEnter can only be called on the Client.')
+	return self:onEnter(function(entity, zone)
 		local player = State.entityToPlayer[entity]
 		if player == Players.LocalPlayer then
 			callback(zone)
@@ -528,14 +528,14 @@ end
 
 	@client
 	@tag Event
-	@method onLocalPlayerExited
+	@method onLocalPlayerExit
 	@within Observer
 	@param callback (zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onLocalPlayerExited(self: Types.InternalObserver, callback: (Types.Zone) -> ()): () -> ()
-	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerExited can only be called on the Client.')
-	return self:onExited(function(entity, zone)
+function Observer.onLocalPlayerExit(self: Types.InternalObserver, callback: (Types.Zone) -> ()): () -> ()
+	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerExit can only be called on the Client.')
+	return self:onExit(function(entity, zone)
 		local player = State.entityToPlayer[entity]
 		if player == Players.LocalPlayer then
 			callback(zone)
@@ -622,12 +622,12 @@ end
 	until the group has completely exited and re-entered.
 
 	@tag Event
-	@method onGroupEntered
+	@method onGroupEnter
 	@within Observer
 	@param callback (group: Group, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onGroupEntered(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
+function Observer.onGroupEnter(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
 	return self:observe(function(entity, zone)
@@ -676,12 +676,12 @@ end
 	this observer. This is useful for "cleared" states or stopping group-wide effects.
 
 	@tag Event
-	@method onGroupExited
+	@method onGroupExit
 	@within Observer
 	@param callback (group: Group, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onGroupExited(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
+function Observer.onGroupExit(self: Types.InternalObserver, callback: (Types.Group, Types.Zone) -> ()): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
 	return self:observe(function(entity, zone)
@@ -726,12 +726,12 @@ end
 	filter out all other entities.
 
 	@tag Event
-	@method onTransitioned
+	@method onTransition
 	@within Observer
 	@param callback (entity: Entity, newZone: Zone, oldZone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onTransitioned(
+function Observer.onTransition(
 	self: Types.InternalObserver,
 	callback: (Types.Entity, Types.Zone, Types.Zone) -> ()
 ): () -> ()
@@ -750,12 +750,12 @@ end
 	If `targetPlayer` is provided, the event will only fire for that specific player.
 	
 	@tag Event
-	@method onPlayerTransitioned
+	@method onPlayerTransition
 	@within Observer
 	@param callback (player: Player, newZone: Zone, oldZone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onPlayerTransitioned(
+function Observer.onPlayerTransition(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Zone) -> ()
 ): () -> ()
@@ -781,16 +781,16 @@ end
 	
 	@client
 	@tag Event
-	@method onLocalPlayerTransitioned
+	@method onLocalPlayerTransition
 	@within Observer
 	@param callback (newZone: Zone, oldZone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onLocalPlayerTransitioned(
+function Observer.onLocalPlayerTransition(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Zone) -> ()
 ): () -> ()
-	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerTransitioned can only be called on the Client.')
+	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerTransition can only be called on the Client.')
 
 	local wrapper = function(entity, newZone, oldZone)
 		local player = State.entityToPlayer[entity]
