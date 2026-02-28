@@ -31,23 +31,19 @@ export type Tree = {
 }
 
 export type QuickZone = {
-	-- Classes
 	Zone: ZoneClass,
 	Observer: ObserverClass,
 	Group: GroupClass,
 
-	-- State
 	setEnabled: (self: QuickZone, enabled: boolean) -> QuickZone,
 	rebuildTrees: (self: QuickZone) -> QuickZone,
 	update: (self: QuickZone, dt: number) -> QuickZone,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,
 
-	-- Entity management
 	removeEntity: (self: QuickZone, entity: Entity) -> QuickZone,
 	removePlayer: (self: QuickZone, player: Player) -> QuickZone,
 
-	-- Global queries
 	getZones: (self: QuickZone) -> { Zone },
 	getObservers: (self: QuickZone) -> { Observer },
 	getGroups: (self: QuickZone) -> { Group },
@@ -57,18 +53,14 @@ export type QuickZone = {
 	iterGroups: (self: QuickZone) -> () -> Group?,
 	iterEntities: (self: QuickZone) -> () -> Entity?,
 
-	-- Spatial queries
 	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
 	iterZonesAtPoint: (self: QuickZone, position: Vector3) -> () -> Zone?,
 
-	-- Entity queries
 	getPlayerOfEntity: (self: QuickZone, entity: Entity) -> Player?,
-
 	getZonesOfEntity: (self: QuickZone, entity: Entity) -> { Zone },
 	iterZonesOfEntity: (self: QuickZone, entity: Entity) -> () -> Zone?,
 	getGroupsOfEntity: (self: QuickZone, entity: Entity) -> { Group },
 	iterGroupsOfEntity: (self: QuickZone, entity: Entity) -> () -> Group?,
-
 	getZonesOfPlayer: (self: QuickZone, player: Player) -> { Zone },
 	iterZonesOfPlayer: (self: QuickZone, player: Player) -> () -> Zone?,
 	getGroupsOfPlayer: (self: QuickZone, player: Player) -> { Group },
@@ -106,6 +98,7 @@ export type ZoneClass = {
 export type Zone = {
 	attach: (self: Zone, observer: Observer) -> Zone,
 	detach: (self: Zone, observer: Observer) -> Zone,
+
 	syncToPart: (self: Zone) -> Zone,
 	setPart: (self: Zone, part: BasePart?) -> Zone,
 	setAutoSyncToPart: (self: Zone, autoSyncToPart: boolean) -> Zone,
@@ -115,6 +108,7 @@ export type Zone = {
 	setSize: (self: Zone, size: Vector3) -> Zone,
 	setShape: (self: Zone, shape: ShapeType) -> Zone,
 	setMetadata: (self: Zone, metadata: any?) -> Zone,
+
 	getMetadata: (self: Zone) -> any?,
 	getId: (self: Zone) -> number,
 	getPart: (self: Zone) -> BasePart?,
@@ -122,8 +116,10 @@ export type Zone = {
 	getCFrame: (self: Zone) -> CFrame,
 	getSize: (self: Zone) -> Vector3,
 	getShape: (self: Zone) -> ShapeType,
+
 	isDynamic: (self: Zone) -> boolean,
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
+
 	onDestroy: (self: Zone, callback: () -> ()) -> () -> (),
 	destroy: (self: Zone) -> (),
 }
@@ -141,6 +137,7 @@ export type InternalZone = Zone & {
 export type Zones = {
 	attach: (self: Zones, observer: Observer) -> Zones,
 	detach: (self: Zones, observer: Observer) -> Zones,
+
 	syncToParts: (self: Zones) -> Zones,
 	setAutoSyncToParts: (self: Zones, autoSyncToParts: boolean) -> Zones,
 	setDynamic: (self: Zones, dynamic: boolean) -> Zones,
@@ -151,6 +148,7 @@ export type Zones = {
 	setMetadata: (self: Zones, metadata: any?) -> Zones,
 	contains: (self: Zones, zone: Zone) -> boolean,
 	iterZones: (self: Zones) -> () -> Zone?,
+
 	onDestroy: (self: Zones, callback: () -> ()) -> () -> (),
 	destroy: (self: Zones) -> (),
 }
@@ -189,12 +187,11 @@ export type Observer = {
 	setPrecision: (self: Observer, n: number) -> Observer,
 	setEnabled: (self: Observer, enabled: boolean) -> Observer,
 	setSafety: (self: Observer, enabled: boolean) -> Observer,
+
 	isEnabled: (self: Observer) -> boolean,
 	isSafe: (self: Observer) -> boolean,
-	isPlayerInside: (self: Observer, player: Player) -> boolean,
-	isLocalPlayerInside: (self: Observer) -> boolean,
-	isEntityInside: (self: Observer, entity: Entity) -> boolean,
 	isPointInside: (self: Observer, position: Vector3) -> boolean,
+
 	getId: (self: Observer) -> number,
 	getPriority: (self: Observer) -> number,
 	getUpdateRate: (self: Observer) -> number,
@@ -205,15 +202,16 @@ export type Observer = {
 	getPlayersInside: (self: Observer) -> { Player },
 	getZoneOfEntity: (self: Observer, entity: Entity) -> Zone?,
 	getZoneOfPlayer: (self: Observer, player: Player) -> Zone?,
-	getZoneOfLocalPlayer: (self: Observer) -> Zone?,
-	getZonesOfEntities: (self: Observer, entity: Entity) -> { [Entity]: Zone },
-	getZonesOfPlayers: (self: Observer, player: Player) -> { [Player]: Zone },
+	getEntitiesInZone: (self: Observer, zone: Zone) -> { Entity },
+	getPlayersInZone: (self: Observer, zone: Zone) -> { Player },
+
 	iterZones: (self: Observer) -> () -> Zone?,
 	iterGroups: (self: Observer) -> () -> Group?,
-	iterEntitiesInside: (self: Observer) -> () -> Entity?,
-	iterPlayersInside: (self: Observer) -> () -> Player?,
-	iterZonesOfEntities: (self: Observer) -> () -> (Entity?, Zone?),
-	iterZonesOfPlayers: (self: Observer) -> () -> (Player?, Zone?),
+	iterEntitiesInside: (self: Observer) -> () -> (Entity?, Zone?),
+	iterPlayersInside: (self: Observer) -> () -> (Player?, Zone?),
+	iterEntitiesInZone: (self: Observer, zone: Zone) -> () -> Entity?,
+	iterPlayersInZone: (self: Observer, zone: Zone) -> () -> Player?,
+
 	observe: (self: Observer, callback: (Entity, Zone) -> (() -> ())?) -> () -> (),
 	observePlayer: (self: Observer, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
 	observeLocalPlayer: (self: Observer, callback: (Zone) -> (() -> ())?) -> () -> (),
@@ -229,6 +227,7 @@ export type Observer = {
 	onTransition: (self: Observer, callback: (Entity, Zone, Zone) -> ()) -> () -> (),
 	onPlayerTransition: (self: Observer, callback: (Player, Zone, Zone) -> ()) -> () -> (),
 	onLocalPlayerTransition: (self: Observer, callback: (Zone, Zone) -> ()) -> () -> (),
+
 	onDestroy: (self: Observer, callback: () -> ()) -> () -> (),
 	destroy: (self: Observer) -> (),
 }
@@ -259,12 +258,14 @@ export type Group = {
 	remove: (self: Group, entity: Entity) -> Group,
 	removeBulk: (self: Group, entities: { Entity }) -> Group,
 	clear: (self: Group) -> Group,
+
 	getId: (self: Group) -> number,
 	getEntities: (self: Group) -> { Entity },
 	contains: (self: Group, entity: Entity) -> boolean,
 	getPlayers: (self: Group) -> { Player },
 	iterEntities: (self: Group) -> () -> Entity?,
 	iterPlayers: (self: Group) -> () -> Player?,
+
 	onDestroy: (self: Group, callback: () -> ()) -> () -> (),
 	destroy: (self: Group) -> (),
 }
