@@ -15,7 +15,6 @@ local isPointInShape = Geometry.isPointInShape
 local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local entityData = State.entityData
-local entityToObservers = State.entityToObservers
 local observerIdToObserverObj = State.observerIdToObserverObj
 local groups = State.groups
 local entityToPlayer = State.entityToPlayer
@@ -27,8 +26,6 @@ local staticTypes = State.staticTypes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
-
-local foundIdsCache = {}
 
 local debugConnection: RBXScriptConnection?
 local debugFolder: Folder?
@@ -67,7 +64,7 @@ end
 
 --[=[ 
 	Manually processes the spatial queries and trigger callbacks.
-	This is only necessary if `setAutoUpdate` is set to false.
+	This is only necessary if you disabled automatic updating.
 
 	@method update
 	@within QuickZone
@@ -80,9 +77,25 @@ function QuickZone:update(dt: number): QuickZone
 end
 
 --[=[ 
-	Instantly forces the internal spatial trees to rebuild if any zones have been modified.
-	
-	The engine automatically calls this during `QuickZone:update(dt)`.
+	Sets the automatic sync rate for zones with references. 
+	This controls how often QuickZone checks the reference's position and updates the zone accordingly.
+
+	@method setAutoSyncRate
+	@within QuickZone
+	@param hz number -- Sync frequency in Hz. Set to 0 to disable auto-syncing.
+	@return QuickZone	
+]=]
+function QuickZone:setAutoSyncRate(hz: number): QuickZone
+	Scheduler.setAutoSyncRate(hz)
+	return QuickZone
+end
+
+--[=[ 
+	Instantly forces the internal trees to rebuild if any zones have been modified.
+
+	This is only necessary if you have made manual changes to zones or references
+	and want to ensure the changes take effect immediately. 
+	Otherwise, the Scheduler will automatically rebuild the trees on the next update step.
 
 	@method rebuildTrees
 	@within QuickZone

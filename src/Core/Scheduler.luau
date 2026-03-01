@@ -57,34 +57,6 @@ local STRAT_CFRAME = Config.Strategy.CFRAME
 
 local BUDGET_CHECK = 32
 
-local function processAutoSync(dt: number)
-	if autoSyncRate > 0 then
-		local syncInterval = 1 / autoSyncRate
-		autoSyncTimer += dt
-		if autoSyncTimer < syncInterval then
-			return
-		end
-		autoSyncTimer = 0
-	end
-
-	for id, zone in autoSyncZones do
-		local reference = zone.reference
-		if not reference then
-			continue
-		end
-
-		local newCF = reference:IsA('Attachment') and reference.WorldCFrame or reference.CFrame
-		local oldCF = dynamicCFrames[id]
-
-		if oldCF == newCF then
-			continue
-		end
-
-		dynamicCFrames[id] = newCF
-		State.pendingDynamicRebuild = true
-	end
-end
-
 local function processZoneHit(zoneId: number)
 	local observers = zoneAttachedObservers[zoneId]
 	if not observers then
@@ -149,7 +121,37 @@ local Scheduler = {}
 function Scheduler.update(dt: number)
 	local start = os.clock()
 
-	processAutoSync(dt)
+	if autoSyncRate > 0 then
+		local syncInterval = 1 / autoSyncRate
+		autoSyncTimer += dt
+
+		if autoSyncTimer >= syncInterval then
+			autoSyncTimer = 0
+			local needsRebuild = false
+
+			for id, zone in autoSyncZones do
+				local reference = zone.reference
+				if not reference then
+					continue
+				end
+
+				local newCF = reference:IsA('Attachment') and reference.WorldCFrame or reference.CFrame
+				local oldCF = dynamicCFrames[id]
+
+				if oldCF == newCF then
+					continue
+				end
+
+				dynamicCFrames[id] = newCF
+				needsRebuild = true
+			end
+
+			if needsRebuild then
+				State.pendingDynamicRebuild = true
+			end
+		end
+	end
+
 	Scheduler.rebuildTrees()
 
 	if (os.clock() - start) > frameBudget then
@@ -357,6 +359,14 @@ function Scheduler.setAutoUpdate(enabled: boolean)
 	end
 end
 
+function Scheduler.setAutoSyncRate(hz: number)
+	if hz <= 0 then
+		autoSyncRate = 0
+	else
+		autoSyncRate = hz
+	end
+end
+
 function Scheduler.setFrameBudget(n: number)
 	assert(n > 0, '[QuickZone] frameBudget must be greater than 0')
 
@@ -374,14 +384,6 @@ function Scheduler.rebuildTrees()
 		State.staticTree = LinearBVH.build(State.staticCFrames, State.staticHalfSizes)
 		State.pendingStaticRebuild = false
 		State.spatialVersion += 1
-	end
-end
-
-function Scheduler.setAutoSyncRate(hz: number)
-	if hz <= 0 then
-		autoSyncRate = 0
-	else
-		autoSyncRate = hz
 	end
 end
 
