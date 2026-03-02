@@ -18,7 +18,7 @@ local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local IS_CLIENT = RunService:IsClient()
 
-local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [Player]: () -> () })
+local function trackPlayer(group: Types.InternalGroup, player: Player, trackerStore: { [Player]: () -> () })
 	if trackerStore[player] then
 		return
 	end
@@ -28,7 +28,7 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 
 	local function cleanCharacter()
 		if currentHrp then
-			group:remove(currentHrp)
+			group:_remove(currentHrp)
 			currentHrp = nil
 		end
 		for _, c in charConns do
@@ -54,7 +54,7 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 			if hrp:IsA('BasePart') then
 				currentHrp = hrp
 				State.entityToPlayer[hrp] = player
-				group:add(hrp)
+				group:_add(hrp)
 
 				table.insert(
 					charConns,
@@ -106,31 +106,40 @@ Group.__index = Group
 
 	```lua
 	local myGroup = Group.new({
-		entities = { NPC1, NPC2, NPC3 } -- Add entities
+		entities = { NPC1, NPC2, NPC3 }, -- Add entities
+		autoClean = true, -- Entities in group are cleaned up when entities are destroyed
 	})
 	```
 
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?, entities: { Types.Entity }? }?
+	@param config { entities: { Types.Entity }?, autoClean: boolean? }?
 	@return Group
 ]=]
 function Group.new(config: {
 	entities: { Types.Entity }?,
+	autoClean: boolean?,
 }?): Types.Group
 	local id = State.nextGroupId
 	State.nextGroupId += 1
+
+	local autoClean = Config.Group.autoClean
+	if config and config.autoClean ~= nil then
+		autoClean = config.autoClean
+	end
 
 	local self: Types.InternalGroup = setmetatable({
 		id = id,
 		entities = {},
 		entityIndices = {},
+		autoClean = autoClean,
 	}, Group) :: any
 
 	State.groups[id] = self
 	State.groupToObservers[id] = {}
+	State.groupEntityCleanups[id] = {}
 
 	if config and config.entities then
-		self:addBulk(config.entities)
+		self:_addBulk(config.entities)
 	end
 
 	return self
@@ -144,21 +153,17 @@ end
 	@param tag string
 	@return Group
 ]=]
-function Group.fromTag(
-	tag: string,
-	config: {
-		entities: { Types.Entity }?,
-	}?
-): Types.Group
-	local group = Group.new(config)
+function Group.fromTag(tag: string): Types.Group
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup
+	group.isManaged = true
 
 	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
 
 	local function checkAncestry(instance: BasePart | Model | Attachment | Bone | Camera)
 		if instance:IsDescendantOf(workspace) then
-			group:add(instance)
+			group:_add(instance)
 		else
-			group:remove(instance)
+			group:_remove(instance)
 		end
 	end
 
@@ -192,7 +197,7 @@ function Group.fromTag(
 			conn:Disconnect()
 			watchingInstances[instance] = nil
 		end
-		group:remove(instance :: any)
+		group:_remove(instance :: any)
 	end
 
 	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
@@ -222,13 +227,11 @@ end
 	:::
 
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?, entities: { Types.Entity }? }?
 	@return Group
 ]=]
-function Group.players(config: {
-	entities: { Types.Entity }?,
-}?): Types.Group
-	local group = Group.new(config)
+function Group.players(): Types.Group
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup
+	group.isManaged = true
 
 	local trackerStore = {} :: { [Player]: () -> () }
 	local mainConnections = {} :: { RBXScriptConnection }
@@ -276,15 +279,13 @@ end
 
 	@client
 	@tag Constructor
-	@param config { updateRate: number?, precision: number?, entities: { Types.Entity }? }?
 	@return Group
 ]=]
-function Group.localPlayer(config: {
-	entities: { Types.Entity }?,
-}?): Types.Group
+function Group.localPlayer(): Types.Group
 	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
 
-	local group = Group.new(config)
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup
+	group.isManaged = true
 
 	local lp = Players.LocalPlayer
 	local trackers = {}
@@ -296,6 +297,49 @@ function Group.localPlayer(config: {
 	end)
 
 	return group
+end
+
+--[=[ 
+    Enables or disables automatic cleanup for Instances in this group.
+    When enabled, if an Instance is Destroyed() or parented to nil, it will be 
+    automatically removed from this group.
+
+    @method setAutoClean
+    @within Group
+    @param enabled boolean
+    @return Group
+]=]
+function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.Group
+	if self.isManaged then
+		warn(`[QuickZone] Cannot set autoClean on a Managed Group.`)
+		return self
+	end
+
+	if self.autoClean == enabled then
+		return self
+	end
+
+	self.autoClean = enabled
+	local cleanups = State.groupEntityCleanups[self.id]
+
+	if enabled then
+		for _, entity in self.entities do
+			if typeof(entity) == 'Instance' and not cleanups[entity] then
+				cleanups[entity] = (entity :: Instance).AncestryChanged:Connect(function(_, parent)
+					if not parent then
+						self:_remove(entity)
+					end
+				end)
+			end
+		end
+	else
+		for entity, conn in cleanups do
+			conn:Disconnect()
+			cleanups[entity] = nil
+		end
+	end
+
+	return self
 end
 
 --[=[ 
@@ -330,84 +374,11 @@ end
 	@return Group
 ]=]
 function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
-	if not State.entityToGroups[entity] then
-		State.entityToGroups[entity] = {}
-	end
-
-	if State.entityToGroups[entity][self.id] then
+	if self.isManaged then
+		warn(`[QuickZone] Cannot manually add to a Managed Group.`)
 		return self
 	end
-
-	State.entityToGroups[entity][self.id] = true
-
-	if not State.entityData[entity] then
-		local strat
-		if typeof(entity) == 'Instance' then
-			if entity:IsA('BasePart') then
-				strat = STRAT_POS
-			elseif entity:IsA('Attachment') or entity:IsA('Bone') then
-				strat = STRAT_WORLD
-			elseif entity:IsA('Camera') then
-				strat = STRAT_CFRAME
-			elseif entity:IsA('Model') then
-				strat = entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
-			end
-
-			if not State.entityToPlayer[entity] then
-				local player
-				if entity:IsA('BasePart') then
-					player = Players:GetPlayerFromCharacter((entity :: any).Parent)
-				end
-				if player then
-					State.entityToPlayer[entity] = player
-				end
-			end
-		elseif typeof(entity) == 'table' then
-			if entity.Position then
-				strat = STRAT_POS
-			elseif entity.CFrame then
-				strat = STRAT_CFRAME
-			elseif entity.WorldPosition then
-				strat = STRAT_WORLD
-			elseif entity.GetPivot then
-				strat = STRAT_PIVOT
-			end
-		end
-
-		if not strat then
-			warn(
-				string.format(
-					'[QuickZone] Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or an EntityTable.',
-					tostring(entity)
-				)
-			)
-			State.entityToGroups[entity][self.id] = nil
-			return self
-		end
-
-		State.entityData[entity] = {
-			strategy = strat,
-			lastPosition = Vector3.zero,
-			activeObserverMemberships = {},
-			precisionSq = DEFAULT_PRECISION_SQ,
-			updateRate = -1,
-			bucketIndex = 0,
-			dynamicVersion = 0,
-			staticVersion = 0,
-			logicVersion = 0,
-			needsStatic = false,
-			needsDynamic = false,
-		}
-	end
-
-	local idx = #self.entities + 1
-	self.entities[idx] = entity
-	self.entityIndices[entity] = idx
-
-	State.dirtyProfiles[entity] = true
-	State.dirtyTopology[entity] = true
-
-	return self
+	return self:_add(entity)
 end
 
 --[=[ 
@@ -424,10 +395,11 @@ end
 	@return Group
 ]=]
 function Group.addBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
-	for _, entity in entities do
-		self:add(entity)
+	if self.isManaged then
+		warn(`[QuickZone] Cannot manually addBulk from a Managed Group.`)
+		return self
 	end
-	return self
+	return self:_addBulk(entities)
 end
 
 --[=[ 
@@ -439,70 +411,11 @@ end
 	@return Group
 ]=]
 function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Group
-	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
+	if self.isManaged then
+		warn(`[QuickZone] Cannot manually remove from a Managed Group.`)
 		return self
 	end
-
-	State.entityToGroups[entity][self.id] = nil
-	local data = State.entityData[entity]
-
-	local idx = self.entityIndices[entity]
-	local lastIdx = #self.entities
-	local lastEntity = self.entities[lastIdx]
-
-	if idx == lastIdx then
-		self.entities[lastIdx] = nil
-		self.entityIndices[entity] = nil
-	else
-		self.entities[idx] = lastEntity
-		self.entityIndices[lastEntity] = idx
-		self.entities[lastIdx] = nil
-		self.entityIndices[entity] = nil
-	end
-
-	State.dirtyProfiles[entity] = true
-	State.dirtyTopology[entity] = true
-
-	local activeObservers = State.entityToObservers[entity] or {}
-
-	for observerId, oldZoneId in data.activeObserverMemberships do
-		if activeObservers[observerId] then
-			continue
-		end
-
-		data.activeObserverMemberships[observerId] = nil
-
-		if State.observerTrackingEntities[observerId] then
-			State.observerTrackingEntities[observerId][entity] = nil
-		end
-
-		local cbs = State.observerExitedCallbacks[observerId]
-		if not cbs then
-			continue
-		end
-
-		local safety = State.observerSafety[observerId]
-		local z = State.zoneIdToZoneObj[oldZoneId]
-
-		for _, fn in cbs do
-			if safety then
-				task.spawn(fn, entity, z)
-			else
-				fn(entity, z)
-			end
-		end
-	end
-
-	if next(State.entityToGroups[entity]) == nil then
-		State.entityData[entity] = nil
-		State.entityToGroups[entity] = nil
-		State.entityToObservers[entity] = nil
-		State.entityToPlayer[entity] = nil
-		State.dirtyProfiles[entity] = nil
-		State.dirtyTopology[entity] = nil
-	end
-
-	return self
+	return self:_remove(entity)
 end
 
 --[=[ 
@@ -514,10 +427,11 @@ end
 	@return Group
 ]=]
 function Group.removeBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
-	for _, entity in entities do
-		self:remove(entity)
+	if self.isManaged then
+		warn(`[QuickZone] Cannot manually removeBulk from a Managed Group.`)
+		return self
 	end
-	return self
+	return self:_removeBulk(entities)
 end
 
 --[=[ 
@@ -529,12 +443,11 @@ end
 	@return Group
 ]=]
 function Group.clear(self: Types.InternalGroup): Types.Group
-	-- Iterate backwards for safe removal
-	local entities = self.entities
-	for idx = #entities, 1, -1 do
-		self:remove(entities[idx])
+	if self.isManaged then
+		warn(`[QuickZone] Cannot clear from a Managed Group.`)
+		return self
 	end
-	return self
+	return self:_clear()
 end
 
 --[=[ 
@@ -691,13 +604,198 @@ function Group.destroy(self: Types.InternalGroup): ()
 	end
 
 	for idx = #self.entities, 1, -1 do
-		self:remove(self.entities[idx])
+		self:_remove(self.entities[idx])
 	end
 
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
 
 	setmetatable(self :: any, nil)
+end
+
+function Group._add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+	if not State.entityToGroups[entity] then
+		State.entityToGroups[entity] = {}
+	end
+
+	if State.entityToGroups[entity][self.id] then
+		return self
+	end
+
+	State.entityToGroups[entity][self.id] = true
+
+	if not State.entityData[entity] then
+		local strat
+		if typeof(entity) == 'Instance' then
+			if entity:IsA('BasePart') then
+				strat = STRAT_POS
+			elseif entity:IsA('Attachment') or entity:IsA('Bone') then
+				strat = STRAT_WORLD
+			elseif entity:IsA('Camera') then
+				strat = STRAT_CFRAME
+			elseif entity:IsA('Model') then
+				strat = entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
+			end
+
+			if not State.entityToPlayer[entity] then
+				local player
+				if entity:IsA('BasePart') then
+					player = Players:GetPlayerFromCharacter((entity :: any).Parent)
+				end
+				if player then
+					State.entityToPlayer[entity] = player
+				end
+			end
+		elseif typeof(entity) == 'table' then
+			if entity.Position then
+				strat = STRAT_POS
+			elseif entity.CFrame then
+				strat = STRAT_CFRAME
+			elseif entity.WorldPosition then
+				strat = STRAT_WORLD
+			elseif entity.GetPivot then
+				strat = STRAT_PIVOT
+			end
+		end
+
+		if not strat then
+			warn(
+				string.format(
+					'[QuickZone] Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or an EntityTable.',
+					tostring(entity)
+				)
+			)
+			State.entityToGroups[entity][self.id] = nil
+			return self
+		end
+
+		State.entityData[entity] = {
+			strategy = strat,
+			lastPosition = Vector3.zero,
+			activeObserverMemberships = {},
+			precisionSq = DEFAULT_PRECISION_SQ,
+			updateRate = -1,
+			bucketIndex = 0,
+			dynamicVersion = 0,
+			staticVersion = 0,
+			logicVersion = 0,
+			needsStatic = false,
+			needsDynamic = false,
+		}
+	end
+
+	local idx = #self.entities + 1
+	self.entities[idx] = entity
+	self.entityIndices[entity] = idx
+
+	State.dirtyProfiles[entity] = true
+	State.dirtyTopology[entity] = true
+
+	if self.autoClean and typeof(entity) == 'Instance' and not State.groupEntityCleanups[self.id][entity] then
+		State.groupEntityCleanups[self.id][entity] = (entity :: Instance).AncestryChanged:Connect(function(_, parent)
+			if not parent then
+				self:_remove(entity)
+			end
+		end)
+	end
+
+	return self
+end
+
+function Group._addBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+	for _, entity in entities do
+		self:_add(entity)
+	end
+	return self
+end
+
+function Group._remove(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
+		return self
+	end
+
+	local cleanupConn = State.groupEntityCleanups[self.id][entity]
+	if cleanupConn then
+		cleanupConn:Disconnect()
+		State.groupEntityCleanups[self.id][entity] = nil
+	end
+
+	State.entityToGroups[entity][self.id] = nil
+	local data = State.entityData[entity]
+
+	local idx = self.entityIndices[entity]
+	local lastIdx = #self.entities
+	local lastEntity = self.entities[lastIdx]
+
+	if idx == lastIdx then
+		self.entities[lastIdx] = nil
+		self.entityIndices[entity] = nil
+	else
+		self.entities[idx] = lastEntity
+		self.entityIndices[lastEntity] = idx
+		self.entities[lastIdx] = nil
+		self.entityIndices[entity] = nil
+	end
+
+	State.dirtyProfiles[entity] = true
+	State.dirtyTopology[entity] = true
+
+	local activeObservers = State.entityToObservers[entity] or {}
+
+	for observerId, oldZoneId in data.activeObserverMemberships do
+		if activeObservers[observerId] then
+			continue
+		end
+
+		data.activeObserverMemberships[observerId] = nil
+
+		if State.observerTrackingEntities[observerId] then
+			State.observerTrackingEntities[observerId][entity] = nil
+		end
+
+		local cbs = State.observerExitedCallbacks[observerId]
+		if not cbs then
+			continue
+		end
+
+		local safety = State.observerSafety[observerId]
+		local z = State.zoneIdToZoneObj[oldZoneId]
+
+		for _, fn in cbs do
+			if safety then
+				task.spawn(fn, entity, z)
+			else
+				fn(entity, z)
+			end
+		end
+	end
+
+	if next(State.entityToGroups[entity]) == nil then
+		State.entityData[entity] = nil
+		State.entityToGroups[entity] = nil
+		State.entityToObservers[entity] = nil
+		State.entityToPlayer[entity] = nil
+		State.dirtyProfiles[entity] = nil
+		State.dirtyTopology[entity] = nil
+	end
+
+	return self
+end
+
+function Group._removeBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+	for _, entity in entities do
+		self:_remove(entity)
+	end
+	return self
+end
+
+function Group._clear(self: Types.InternalGroup): Types.Group
+	-- Iterate backwards for safe removal
+	local entities = self.entities
+	for idx = #entities, 1, -1 do
+		self:_remove(entities[idx])
+	end
+	return self
 end
 
 return Group

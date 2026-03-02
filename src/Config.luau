@@ -11,6 +11,11 @@ Config.Strategy = {
 	PIVOT = 5,
 }
 
+Config.Group = {
+	-- Entities are automatically cleaned up for that group if destroyed
+	autoClean = true,
+}
+
 Config.Scheduler = {
 	-- If true, the scheduler will automatically run every frame.
 	-- If false, you must call QuickZone:update manually.

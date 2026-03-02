@@ -38,8 +38,6 @@ local entityData = State.entityData
 local entityToObservers = State.entityToObservers
 local entityToGroups = State.entityToGroups
 local groupToObservers = State.groupToObservers
-local bucketList = State.bucketList
-local buckets = State.buckets
 local dirtyProfiles = State.dirtyProfiles
 local dirtyTopology = State.dirtyTopology
 
@@ -59,6 +57,8 @@ local autoUpdateConnection: RBXScriptConnection?
 
 local nextBucketIndex = 1 -- Round-robin pointer
 local bucketLastProcessedIndex = {} :: { [number]: number }
+local bucketList = {} :: { number }
+local buckets = {} :: { [number]: { Types.Entity } }
 local BUDGET_CHECK = 32
 
 local STRAT_POS = Config.Strategy.POS

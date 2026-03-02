@@ -271,9 +271,16 @@ export type Group = {
 }
 
 export type InternalGroup = Group & {
+	_add: (self: Group, entity: Entity) -> Group,
+	_addBulk: (self: Group, entities: { Entity }) -> Group,
+	_remove: (self: Group, entity: Entity) -> Group,
+	_removeBulk: (self: Group, entities: { Entity }) -> Group,
+	_clear: (self: Group) -> Group,
 	id: number,
 	entities: { Entity },
 	entityIndices: { [Entity]: number },
+	isManaged: boolean?,
+	autoClean: boolean,
 	onDestroyCallbacks: { () -> () }?,
 }
 

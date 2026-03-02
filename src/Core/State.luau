@@ -26,15 +26,13 @@ State.logicVersion = 1
 
 State.groups = {} :: { [number]: Types.InternalGroup }
 State.groupToObservers = {} :: { [number]: { [number]: boolean } }
+State.groupEntityCleanups = {} :: { [number]: { [Types.Entity]: RBXScriptConnection } }
 State.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityData = {} :: { [Types.Entity]: Types.EntityData }
 State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityToPlayer = {} :: { [Types.Entity]: Player }
 State.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 State.dirtyTopology = {} :: { [Types.Entity]: boolean }
-
-State.buckets = {} :: { [number]: { Types.Entity } }
-State.bucketList = {} :: { number }
 
 State.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } }
 State.observerPriorityMap = {} :: { [number]: number }
