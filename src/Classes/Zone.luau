@@ -83,6 +83,23 @@ local function setupautoSync(zone: Types.InternalZone, reference: BasePart | Att
 	zone.syncConnections = connections
 end
 
+local function updateObserverZoneCount(observerId: number, isDynamic: boolean, delta: number)
+	local dict = isDynamic and State.observerDynamicCount or State.observerStaticCount
+	local current = dict[observerId] or 0
+	local newCount = current + delta
+	dict[observerId] = newCount
+
+	-- Only flag entities dirty if the observer's topology fundamentally changed
+	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
+		local tracked = State.observerTrackingEntities[observerId]
+		if tracked then
+			for entity, _ in tracked do
+				State.dirtyTopology[entity] = true
+			end
+		end
+	end
+end
+
 --[=[ 
 	Zones define physical areas in world space. They can be static or dynamic 
 	and support shapes like Blocks, Balls, and Cylinders.
@@ -146,7 +163,9 @@ local function newZoneInternal(
 		local attached = {}
 		State.zoneAttachedObservers[id] = attached
 		for _, observer in observers do
-			table.insert(attached, (observer :: Types.InternalObserver).id)
+			local observerId = (observer :: Types.InternalObserver).id
+			table.insert(attached, observerId)
+			updateObserverZoneCount(observerId, isDynamic, 1)
 		end
 	end
 
@@ -585,6 +604,7 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 
 	if not table.find(attached, observer.id) then
 		table.insert(attached, observer.id)
+		updateObserverZoneCount(observer.id, self.dynamic, 1)
 	end
 
 	if self.dynamic then
@@ -617,6 +637,7 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
+		updateObserverZoneCount(observer.id, self.dynamic, -1)
 	end
 
 	if #attached == 0 then
@@ -806,6 +827,14 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 
 	local id = self.id
 	self.dynamic = isDynamic
+
+	local attached = State.zoneAttachedObservers[id]
+	if attached then
+		for _, obsId in attached do
+			updateObserverZoneCount(obsId, not isDynamic, -1)
+			updateObserverZoneCount(obsId, isDynamic, 1)
+		end
+	end
 
 	if isDynamic then
 		dynamicCFrames[id] = staticCFrames[id]
@@ -1121,6 +1150,8 @@ function Zone.destroy(self: Types.InternalZone): ()
 	local attachedObservers = State.zoneAttachedObservers[id]
 	if attachedObservers then
 		for _, observerId in attachedObservers do
+			updateObserverZoneCount(observerId, self.dynamic, -1)
+
 			local trackedEntities = State.observerTrackingEntities[observerId]
 			if not trackedEntities then
 				continue

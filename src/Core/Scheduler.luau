@@ -12,7 +12,16 @@ local State = require(script.Parent.State)
 local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
+local staticCFrames = State.staticCFrames
+local staticHalfSizes = State.staticHalfSizes
+local staticTypes = State.staticTypes
+local dynamicCFrames = State.dynamicCFrames
+local dynamicHalfSizes = State.dynamicHalfSizes
+local dynamicTypes = State.dynamicTypes
+local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneAttachedObservers = State.zoneAttachedObservers
+local autoSyncZones = State.autoSyncZones
+
 local observerPriorityMap = State.observerPriorityMap
 local observerTrackingEntities = State.observerTrackingEntities
 local observerEnteredCallbacks = State.observerEnteredCallbacks
@@ -22,21 +31,17 @@ local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
 local observerPrecisionSq = State.observerPrecisionSq
 local observerUpdateRate = State.observerUpdateRate
-local bucketList = State.bucketList
-local buckets = State.buckets
+local observerStaticCount = State.observerStaticCount
+local observerDynamicCount = State.observerDynamicCount
+
 local entityData = State.entityData
 local entityToObservers = State.entityToObservers
-local groupToObservers = State.groupToObservers
 local entityToGroups = State.entityToGroups
+local groupToObservers = State.groupToObservers
+local bucketList = State.bucketList
+local buckets = State.buckets
 local dirtyProfiles = State.dirtyProfiles
-local zoneIdToZoneObj = State.zoneIdToZoneObj
-local autoSyncZones = State.autoSyncZones
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
+local dirtyTopology = State.dirtyTopology
 
 local ctx_pos: Vector3
 local ctx_cCount: number = 0
@@ -48,21 +53,20 @@ local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
 
 local frameBudget = Config.Scheduler.frameBudget
-local nextBucketIndex = 1 -- Round-robin pointer
-local bucketLastProcessedIndex = {} :: { [number]: number }
-
-local autoUpdateConnection: RBXScriptConnection?
 local autoSyncRate = Config.Scheduler.autoSyncRate
 local autoSyncTimer = 0
+local autoUpdateConnection: RBXScriptConnection?
+
+local nextBucketIndex = 1 -- Round-robin pointer
+local bucketLastProcessedIndex = {} :: { [number]: number }
+local BUDGET_CHECK = 32
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 
-local BUDGET_CHECK = 32
-
-local function routeEntity(entity: Types.Entity)
+local function processProfileChange(entity: Types.Entity)
 	local groups = entityToGroups[entity]
 	if not groups then
 		return
@@ -161,6 +165,34 @@ local function routeEntity(entity: Types.Entity)
 	end
 end
 
+local function processTopologyChange(entity: Types.Entity)
+	local data = entityData[entity]
+	if not data then
+		return
+	end
+
+	local needsStatic = false
+	local needsDynamic = false
+	local linkedObservers = entityToObservers[entity]
+
+	if linkedObservers then
+		for observerId, _ in linkedObservers do
+			if (observerStaticCount[observerId] or 0) > 0 then
+				needsStatic = true
+			end
+			if (observerDynamicCount[observerId] or 0) > 0 then
+				needsDynamic = true
+			end
+			if needsStatic and needsDynamic then
+				break
+			end
+		end
+	end
+
+	data.needsStatic = needsStatic
+	data.needsDynamic = needsDynamic
+end
+
 local function processZoneHit(zoneId: number)
 	local observers = zoneAttachedObservers[zoneId]
 	if not observers then
@@ -225,7 +257,16 @@ function Scheduler.update(dt: number)
 	for entity, _ in dirtyProfiles do
 		dirtyProfiles[entity] = nil
 		if entityData[entity] then
-			routeEntity(entity)
+			processProfileChange(entity)
+		end
+	end
+
+	-- Route entities of which the topology changed
+	-- Must be after profile change
+	for entity, _ in dirtyTopology do
+		dirtyTopology[entity] = nil
+		if entityData[entity] then
+			processTopologyChange(entity)
 		end
 	end
 
@@ -295,13 +336,8 @@ function Scheduler.update(dt: number)
 			continue
 		end
 
-		local workQuota = math.ceil(totalEntities * rate * dt)
-		if workQuota < 1 then
-			workQuota = 1
-		end
-		if workQuota > totalEntities then
-			workQuota = totalEntities
-		end
+		local rawQuota = math.ceil(totalEntities * rate * dt)
+		local workQuota = math.clamp(rawQuota, 1, totalEntities)
 
 		local processed = 0
 		local idx = bucketLastProcessedIndex[rate] or 1
@@ -324,15 +360,15 @@ function Scheduler.update(dt: number)
 				pos = (entity :: Attachment).WorldPosition
 			elseif strategy == STRAT_CFRAME then
 				pos = (entity :: BasePart).CFrame.Position
-			elseif strategy == STRAT_PRIM and (entity :: Model).PrimaryPart then
-				pos = ((entity :: Model).PrimaryPart :: BasePart).Position
+			elseif strategy == STRAT_PRIM then
+				local prim = (entity :: Model).PrimaryPart
+				pos = prim and prim.Position or (entity :: Model):GetPivot().Position
 			else
 				pos = (entity :: any):GetPivot().Position
 			end
 
-			-- TODO add tree skipping heuristic
-			local needsStatic = true -- data.needsStatic
-			local needsDynamic = true -- data.needsDynamic
+			local needsStatic = data.needsStatic
+			local needsDynamic = data.needsDynamic
 
 			local shouldCheck = (data.logicVersion ~= logicVersion)
 				or (needsDynamic and data.dynamicVersion ~= dynamicVersion)
@@ -340,7 +376,9 @@ function Scheduler.update(dt: number)
 
 			if not shouldCheck then
 				local lp = data.lastPosition
-				local dx, dy, dz = pos.X - lp.X, pos.Y - lp.Y, pos.Z - lp.Z
+				local dx = pos.X - lp.X
+				local dy = pos.Y - lp.Y
+				local dz = pos.Z - lp.Z
 				if (dx * dx + dy * dy + dz * dz) >= data.precisionSq then
 					shouldCheck = true
 				end

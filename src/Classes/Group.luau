@@ -8,8 +8,6 @@ local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
 
-local dirtyProfiles = State.dirtyProfiles
-
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
@@ -397,6 +395,8 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 			dynamicVersion = 0,
 			staticVersion = 0,
 			logicVersion = 0,
+			needsStatic = false,
+			needsDynamic = false,
 		}
 	end
 
@@ -404,7 +404,8 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 	self.entities[idx] = entity
 	self.entityIndices[entity] = idx
 
-	dirtyProfiles[entity] = true
+	State.dirtyProfiles[entity] = true
+	State.dirtyTopology[entity] = true
 
 	return self
 end
@@ -459,7 +460,8 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 		self.entityIndices[entity] = nil
 	end
 
-	dirtyProfiles[entity] = true
+	State.dirtyProfiles[entity] = true
+	State.dirtyTopology[entity] = true
 
 	local activeObservers = State.entityToObservers[entity] or {}
 

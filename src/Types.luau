@@ -315,6 +315,8 @@ export type EntityData = {
 	staticVersion: number,
 	dynamicVersion: number,
 	logicVersion: number,
+	needsStatic: boolean,
+	needsDynamic: boolean,
 }
 
 return nil

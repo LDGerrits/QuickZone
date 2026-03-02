@@ -31,6 +31,7 @@ State.entityData = {} :: { [Types.Entity]: Types.EntityData }
 State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityToPlayer = {} :: { [Types.Entity]: Player }
 State.dirtyProfiles = {} :: { [Types.Entity]: boolean }
+State.dirtyTopology = {} :: { [Types.Entity]: boolean }
 
 State.buckets = {} :: { [number]: { Types.Entity } }
 State.bucketList = {} :: { number }
@@ -44,6 +45,8 @@ State.observerEnabled = {} :: { [number]: boolean }
 State.observerSafety = {} :: { [number]: boolean }
 State.observerUpdateRate = {} :: { [number]: number }
 State.observerPrecisionSq = {} :: { [number]: number }
+State.observerDynamicCount = {} :: { [number]: number }
+State.observerStaticCount = {} :: { [number]: number }
 
 State.autoSyncZones = {} :: { [number]: Types.InternalZone }
 State.zoneAttachedObservers = {} :: { [number]: { number } }

@@ -137,6 +137,8 @@ function Observer.new(config: {
 	State.observerIdToObserverObj[id] = self
 	State.observerEnabled[id] = if config and config.enabled ~= nil then config.enabled else true
 	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Observer.safety
+	State.observerStaticCount[id] = 0
+	State.observerDynamicCount[id] = 0
 
 	if config and config.groups then
 		for _, group in config.groups do
@@ -1483,6 +1485,8 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerSafety[id] = nil
 	State.observerUpdateRate[id] = nil
 	State.observerPrecisionSq[id] = nil
+	State.observerStaticCount[id] = nil
+	State.observerDynamicCount[id] = nil
 
 	State.logicVersion += 1
 	setmetatable(self :: any, nil)
