@@ -20,12 +20,17 @@ local observerExitedCallbacks = State.observerExitedCallbacks
 local observerTransitionedCallbacks = State.observerTransitionedCallbacks
 local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
-local zoneIdToZoneObj = State.zoneIdToZoneObj
+local observerPrecisionSq = State.observerPrecisionSq
+local observerUpdateRate = State.observerUpdateRate
 local bucketList = State.bucketList
+local buckets = State.buckets
 local entityData = State.entityData
 local entityToObservers = State.entityToObservers
+local groupToObservers = State.groupToObservers
+local entityToGroups = State.entityToGroups
+local dirtyProfiles = State.dirtyProfiles
+local zoneIdToZoneObj = State.zoneIdToZoneObj
 local autoSyncZones = State.autoSyncZones
-
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
 local staticTypes = State.staticTypes
@@ -56,6 +61,105 @@ local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 
 local BUDGET_CHECK = 32
+
+local function routeEntity(entity: Types.Entity)
+	local groups = entityToGroups[entity]
+	if not groups then
+		return
+	end
+
+	-- Track linked observers for quick lookup in hot loop
+	local linkedObservers = entityToObservers[entity]
+	if linkedObservers then
+		table.clear(linkedObservers)
+	else
+		linkedObservers = {}
+	end
+
+	local minPrecSq = math.huge
+	local maxRate = 0
+
+	-- Find the highest settings across all subscribed observers
+	for groupId, _ in groups do
+		local observers = groupToObservers[groupId]
+		if not observers then
+			continue
+		end
+
+		for observerId, _ in observers do
+			linkedObservers[observerId] = true
+
+			local prec = observerPrecisionSq[observerId]
+			local rate = observerUpdateRate[observerId]
+
+			if prec < minPrecSq then
+				minPrecSq = prec
+			end
+			if rate > maxRate then
+				maxRate = rate
+			end
+		end
+	end
+
+	local data = entityData[entity]
+	local currentRate = data.updateRate
+
+	-- Swap buckets
+	if currentRate ~= maxRate then
+		-- Remove from old bucket
+		if currentRate and currentRate > 0 and buckets[currentRate] then
+			local oldBucket = buckets[currentRate]
+			local idx = data.bucketIndex
+			local maxEntities = #oldBucket
+			local lastEntity = oldBucket[maxEntities]
+
+			-- We swap and then pop to avoid shifting all entities down
+			if idx ~= maxEntities then
+				oldBucket[idx] = lastEntity
+				if entityData[lastEntity] then
+					entityData[lastEntity].bucketIndex = idx
+				end
+			end
+
+			oldBucket[maxEntities] = nil
+
+			if maxEntities == 1 then -- destroy empty bucket
+				buckets[currentRate] = nil
+				local listIdx = table.find(bucketList, currentRate)
+				if listIdx then
+					table.remove(bucketList, listIdx)
+				end
+			end
+		end
+
+		-- Add to new bucket
+		if maxRate > 0 then
+			if not buckets[maxRate] then
+				buckets[maxRate] = {}
+				table.insert(bucketList, maxRate)
+				table.sort(bucketList, function(a, b)
+					return a > b
+				end)
+			end
+
+			local newBucket = buckets[maxRate]
+			local newIdx = #newBucket + 1
+			newBucket[newIdx] = entity
+			data.bucketIndex = newIdx
+		else
+			data.bucketIndex = 0 -- Entity is not in a bucket, so no processing
+		end
+
+		data.updateRate = maxRate
+	end
+
+	if maxRate > 0 then
+		data.precisionSq = minPrecSq
+		entityToObservers[entity] = linkedObservers
+	else
+		entityToObservers[entity] = nil
+	end
+end
 
 local function processZoneHit(zoneId: number)
 	local observers = zoneAttachedObservers[zoneId]
@@ -101,10 +205,6 @@ local function queryCallbackDynamic(zoneId: number)
 end
 
 local function fireCallback(callbacks, entity, zone, safety)
-	if not callbacks then
-		return
-	end
-
 	if safety then
 		for _, cb in callbacks do
 			task.spawn(cb, entity, zone)
@@ -120,6 +220,14 @@ local Scheduler = {}
 
 function Scheduler.update(dt: number)
 	local start = os.clock()
+
+	-- Route entities that have changed groups or observers since the last update
+	for entity, _ in dirtyProfiles do
+		dirtyProfiles[entity] = nil
+		if entityData[entity] then
+			routeEntity(entity)
+		end
+	end
 
 	-- Auto-sync zone positions if enabled
 	if autoSyncRate > 0 then
@@ -181,7 +289,7 @@ function Scheduler.update(dt: number)
 		local rate = bucketList[nextBucketIndex]
 		nextBucketIndex = (nextBucketIndex % numBuckets) + 1
 
-		local list = State.buckets[rate]
+		local list = buckets[rate]
 		local totalEntities = #list
 		if totalEntities == 0 then
 			continue
@@ -390,13 +498,13 @@ end
 
 function Scheduler.rebuildTrees()
 	if State.pendingDynamicRebuild then
-		State.dynamicTree = LinearBVH.build(State.dynamicCFrames, State.dynamicHalfSizes)
+		State.dynamicTree = LinearBVH.build(dynamicCFrames, dynamicHalfSizes)
 		State.pendingDynamicRebuild = false
 		State.dynamicVersion += 1
 	end
 
 	if State.pendingStaticRebuild then
-		State.staticTree = LinearBVH.build(State.staticCFrames, State.staticHalfSizes)
+		State.staticTree = LinearBVH.build(staticCFrames, staticHalfSizes)
 		State.pendingStaticRebuild = false
 		State.staticVersion += 1
 	end

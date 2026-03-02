@@ -30,6 +30,7 @@ State.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityData = {} :: { [Types.Entity]: Types.EntityData }
 State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityToPlayer = {} :: { [Types.Entity]: Player }
+State.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 
 State.buckets = {} :: { [number]: { Types.Entity } }
 State.bucketList = {} :: { number }

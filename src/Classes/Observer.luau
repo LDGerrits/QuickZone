@@ -5,12 +5,12 @@ local RunService = game:GetService('RunService')
 
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
-local updateProfile = require(script.Parent.Parent.Core.updateProfile)
 local Types = require(script.Parent.Parent.Types)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 
 local isPointInShape = Geometry.isPointInShape
 
+local dirtyProfiles = State.dirtyProfiles
 local zoneAttachedObservers = State.zoneAttachedObservers
 
 local staticCFrames = State.staticCFrames
@@ -34,7 +34,7 @@ local function updateAllEntitiesForObserver(observerId: number)
 		end
 
 		for _, entity in group.entities do
-			updateProfile(entity)
+			dirtyProfiles[entity] = true
 		end
 	end
 end
@@ -48,7 +48,7 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 			continue
 		end
 
-		updateProfile(entity)
+		dirtyProfiles[entity] = true
 
 		local activeObservers = State.entityToObservers[entity] or {}
 		local oldZoneId = data.activeObserverMemberships[observerId]
@@ -168,7 +168,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	State.groupToObservers[groupId][self.id] = true
 
 	for _, entity in group.entities do
-		updateProfile(entity)
+		dirtyProfiles[entity] = true
 	end
 
 	return self

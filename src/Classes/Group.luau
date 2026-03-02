@@ -7,7 +7,8 @@ local RunService = game:GetService('RunService')
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
-local updateProfile = require(script.Parent.Parent.Core.updateProfile)
+
+local dirtyProfiles = State.dirtyProfiles
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -390,9 +391,9 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 			strategy = strat,
 			lastPosition = Vector3.zero,
 			activeObserverMemberships = {},
-			precisionSq = DEFAULT_PRECISION_SQ, -- Updated in updateProfile
-			updateRate = -1, -- Updated in updateProfile
-			bucketIndex = 0, -- Updated in updateProfile
+			precisionSq = DEFAULT_PRECISION_SQ,
+			updateRate = -1,
+			bucketIndex = 0,
 			dynamicVersion = 0,
 			staticVersion = 0,
 			logicVersion = 0,
@@ -403,7 +404,7 @@ function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 	self.entities[idx] = entity
 	self.entityIndices[entity] = idx
 
-	updateProfile(entity)
+	dirtyProfiles[entity] = true
 
 	return self
 end
@@ -458,7 +459,7 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 		self.entityIndices[entity] = nil
 	end
 
-	updateProfile(entity)
+	dirtyProfiles[entity] = true
 
 	local activeObservers = State.entityToObservers[entity] or {}
 
@@ -495,6 +496,8 @@ function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Gr
 		State.entityToGroups[entity] = nil
 		State.entityToObservers[entity] = nil
 		State.entityToPlayer[entity] = nil
+		State.dirtyProfiles[entity] = nil
+		State.dirtyTopology[entity] = nil
 	end
 
 	return self
