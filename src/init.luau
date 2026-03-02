@@ -50,6 +50,38 @@ local QuickZone = {
 }
 
 --[=[ 
+    Configure the QuickZone settings. 
+
+    ```lua
+    QuickZone:configure({
+        enabled = true,
+        autoSyncRate = 10,
+        frameBudget = 0.5,
+    })
+    ```
+
+    @method configure
+    @within QuickZone
+    @param config { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }
+    @return QuickZone
+]=]
+function QuickZone:configure(config: { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }): QuickZone
+	if config.enabled ~= nil then
+		self:setEnabled(config.enabled)
+	end
+
+	if config.autoSyncRate ~= nil then
+		self:setAutoSyncRate(config.autoSyncRate)
+	end
+
+	if config.frameBudget ~= nil then
+		self:setFrameBudget(config.frameBudget)
+	end
+
+	return self
+end
+
+--[=[ 
 	Enables or disables automatic updating. If false, you must call `QuickZone:update(dt)` manually.
 
 	@method setEnabled
@@ -97,11 +129,11 @@ end
 	and want to ensure the changes take effect immediately. 
 	Otherwise, the Scheduler will automatically rebuild the trees on the next update step.
 
-	@method rebuildTrees
+	@method rebuild
 	@within QuickZone
 	@return QuickZone
 ]=]
-function QuickZone:rebuildTrees(): QuickZone
+function QuickZone:rebuild(): QuickZone
 	Scheduler.rebuildTrees()
 	return self
 end

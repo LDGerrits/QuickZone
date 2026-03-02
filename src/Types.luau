@@ -35,8 +35,12 @@ export type QuickZone = {
 	Observer: ObserverClass,
 	Group: GroupClass,
 
+	configure: (
+		self: QuickZone,
+		config: { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }
+	) -> QuickZone,
 	setEnabled: (self: QuickZone, enabled: boolean) -> QuickZone,
-	rebuildTrees: (self: QuickZone) -> QuickZone,
+	rebuild: (self: QuickZone) -> QuickZone,
 	update: (self: QuickZone, dt: number) -> QuickZone,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,
