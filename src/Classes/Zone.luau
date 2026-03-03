@@ -203,7 +203,7 @@ end
 	:::
 
 	@tag Constructor
-	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Types.Observer }? }?
 	@return Zone
 ]=]
 function Zone.new(config: {
@@ -260,7 +260,7 @@ end
 
 	@tag Constructor
 	@param part BasePart -- The part to derive the zone from.
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Types.Observer }? }?
 	@return Zone
 ]=]
 function Zone.fromPart(
@@ -295,7 +295,7 @@ end
 	@tag Constructor
 	@within Zone
 	@param parts { BasePart }
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromParts(
@@ -344,7 +344,7 @@ end
 	@tag Constructor
 	@within Zone
 	@param parent Instance
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Types.Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromChildren(
@@ -424,7 +424,7 @@ end
 	@tag Constructor
 	@within Zone
 	@param parent Instance -- The container (Model, Folder, etc.) to search through.
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Types.Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Types.Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromDescendants(
@@ -497,7 +497,7 @@ end
 	@tag Constructor
 	@within Zone
 	@param tag string
-	@param config { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromTag(
@@ -976,6 +976,7 @@ end
 
 	@method setMetadata
 	@within Zone
+	@param metadata any?
 	@return Zone
 ]=]
 function Zone.setMetadata(self: Types.InternalZone, metadata: any?): Types.Zone

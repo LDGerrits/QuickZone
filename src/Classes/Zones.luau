@@ -13,13 +13,6 @@ local Types = require(script.Parent.Parent.Types)
 local Zones = {}
 Zones.__index = Zones
 
---[=[ 
-	Constructs a Zones object.
-
-	@tag Constructor
-	@param config { isDynamic: boolean?, metadata: any? }?
-	@return Zones
-]=]
 function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: any? }?): Types.Zones
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config then config.metadata else nil
@@ -238,11 +231,11 @@ function Zones.contains(self: Types.InternalZones, zone: Types.Zone): boolean
 end
 
 --[=[
-    Returns a zero-allocation iterator for all Zones within this group.
+	Returns a zero-allocation iterator for all Zones within this group.
 
-    @method iterZones
-    @within Zones
-    @return () -> Zone?
+	@method iterZones
+	@within Zones
+	@return () -> Zone?
 ]=]
 function Zones.iterZones(self: Types.InternalZones): () -> Types.Zone?
 	local currentZone = nil
