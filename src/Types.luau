@@ -77,25 +77,32 @@ export type ZoneClass = {
 			cframe: CFrame,
 			size: Vector3,
 			shape: ShapeType?,
-			reference: (BasePart | Attachment)?,
+			reference: (BasePart | Attachment | Bone)?,
 			isDynamic: boolean?,
 			metadata: any?,
+			autoSync: boolean?,
 			observers: { Observer }?,
 		}
 	) -> Zone,
-	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zone,
+	fromPart: (
+		part: BasePart,
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	) -> Zone,
 	fromParts: (
 		parts: { BasePart },
-		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	) -> Zones,
-	fromTag: (tag: string, config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?) -> Zones,
+	fromTag: (
+		tag: string,
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	) -> Zones,
 	fromDescendants: (
 		parent: Instance,
-		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	) -> Zones,
 	fromChildren: (
 		parent: Instance,
-		config: { isDynamic: boolean?, metadata: any?, observers: { Observer }? }?
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	) -> Zones,
 }
 
@@ -104,7 +111,7 @@ export type Zone = {
 	detach: (self: Zone, observer: Observer) -> Zone,
 
 	sync: (self: Zone) -> Zone,
-	setReference: (self: Zone, reference: (BasePart | Attachment)?) -> Zone,
+	setReference: (self: Zone, reference: (BasePart | Attachment | Bone)?) -> Zone,
 	setAutoSync: (self: Zone, autoSync: boolean) -> Zone,
 	setDynamic: (self: Zone, dynamic: boolean) -> Zone,
 	setCFrame: (self: Zone, cf: CFrame) -> Zone,
@@ -115,7 +122,7 @@ export type Zone = {
 
 	getMetadata: (self: Zone) -> any?,
 	getId: (self: Zone) -> number,
-	getPart: (self: Zone) -> BasePart?,
+	getReference: (self: Zone) -> (BasePart | Attachment | Bone)?,
 	getPosition: (self: Zone) -> Vector3,
 	getCFrame: (self: Zone) -> CFrame,
 	getSize: (self: Zone) -> Vector3,
@@ -130,7 +137,7 @@ export type Zone = {
 
 export type InternalZone = Zone & {
 	id: number,
-	reference: (BasePart | Attachment)?,
+	reference: (BasePart | Attachment | Bone)?,
 	dynamic: boolean,
 	metadata: any?,
 	autoSync: boolean,
@@ -244,16 +251,11 @@ export type InternalObserver = Observer & {
 export type GroupClass = {
 	new: (config: {
 		entities: { Entity }?,
+		autoClean: boolean?,
 	}?) -> Group,
-	fromTag: (tag: string, config: {
-		entities: { Entity }?,
-	}?) -> Group,
-	players: (config: {
-		entities: { Entity }?,
-	}?) -> Group,
-	localPlayer: (config: {
-		entities: { Entity }?,
-	}?) -> Group,
+	fromTag: (tag: string) -> Group,
+	players: () -> Group,
+	localPlayer: () -> Group,
 }
 
 export type Group = {
@@ -263,6 +265,7 @@ export type Group = {
 	removeBulk: (self: Group, entities: { Entity }) -> Group,
 	clear: (self: Group) -> Group,
 
+	setAutoClean: (self: Group, enabled: boolean) -> Group,
 	getId: (self: Group) -> number,
 	getEntities: (self: Group) -> { Entity },
 	contains: (self: Group, entity: Entity) -> boolean,
