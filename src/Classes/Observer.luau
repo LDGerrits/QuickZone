@@ -113,7 +113,7 @@ Observer.__index = Observer
 	:::
 
 	@tag Constructor
-	@param config { priority: number?, enabled: boolean?, safety: boolean?, groups: { Types.Group }?, }?
+	@param config { priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean?, groups: { Types.Group }?, }?
 	@return Observer
 ]=]
 function Observer.new(config: {
@@ -609,13 +609,15 @@ function Observer.observeGroup(
 				end
 
 				members[entity] = nil
-				if next(members) == nil then
-					activeMembers[groupId] = nil
-					local groupCleanup = cleanups[groupId]
-					if groupCleanup then
-						groupCleanup()
-						cleanups[groupId] = nil
-					end
+				if next(members) ~= nil then
+					continue
+				end
+
+				activeMembers[groupId] = nil
+				local groupCleanup = cleanups[groupId]
+				if groupCleanup then
+					groupCleanup()
+					cleanups[groupId] = nil
 				end
 			end
 		end
@@ -942,22 +944,25 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 		local node = nodes[index]
 		local min, max = node.min, node.max
 
-		if px >= min.X and px <= max.X and py >= min.Y and py <= max.Y and pz >= min.Z and pz <= max.Z then
-			local hitId = node.id
-			index += 1
-
-			if hitId > 0 then
-				local observers = zoneAttachedObservers[hitId]
-				if observers and table.find(observers, observerId) then
-					if
-						isPointInShape(position, dynamicCFrames[hitId], dynamicHalfSizes[hitId], dynamicTypes[hitId])
-					then
-						return true
-					end
-				end
-			end
-		else
+		if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
 			index = node.skipIndex
+			continue
+		end
+
+		local hitId = node.id
+		index += 1
+
+		if hitId == 0 then
+			continue
+		end
+
+		local observers = zoneAttachedObservers[hitId]
+		if not observers or not table.find(observers, observerId) then
+			continue
+		end
+
+		if isPointInShape(position, dynamicCFrames[hitId], dynamicHalfSizes[hitId], dynamicTypes[hitId]) then
+			return true
 		end
 	end
 
@@ -968,20 +973,25 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 		local node = nodes[index]
 		local min, max = node.min, node.max
 
-		if px >= min.X and px <= max.X and py >= min.Y and py <= max.Y and pz >= min.Z and pz <= max.Z then
-			local hitId = node.id
-			index += 1
-
-			if hitId > 0 then
-				local observers = zoneAttachedObservers[hitId]
-				if observers and table.find(observers, observerId) then
-					if isPointInShape(position, staticCFrames[hitId], staticHalfSizes[hitId], staticTypes[hitId]) then
-						return true
-					end
-				end
-			end
-		else
+		if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
 			index = node.skipIndex
+			continue
+		end
+
+		local hitId = node.id
+		index += 1
+
+		if hitId == 0 then
+			continue
+		end
+
+		local observers = zoneAttachedObservers[hitId]
+		if not observers or not table.find(observers, observerId) then
+			continue
+		end
+
+		if isPointInShape(position, staticCFrames[hitId], staticHalfSizes[hitId], staticTypes[hitId]) then
+			return true
 		end
 	end
 
@@ -1227,11 +1237,13 @@ function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
 				return nil
 			end
 
-			if table.find(attachedList, observerId) then
-				local zone = State.zoneIdToZoneObj[zoneId]
-				if zone then
-					return zone
-				end
+			if not table.find(attachedList, observerId) then
+				continue
+			end
+
+			local zone = State.zoneIdToZoneObj[zoneId]
+			if zone then
+				return zone
 			end
 		end
 	end
@@ -1257,11 +1269,13 @@ function Observer.iterGroups(self: Types.InternalObserver): () -> Types.Group?
 				return nil
 			end
 
-			if observersMap[observerId] then
-				local group = State.groups[groupId]
-				if group then
-					return group
-				end
+			if not observersMap[observerId] then
+				continue
+			end
+
+			local group = State.groups[groupId]
+			if group then
+				return group
 			end
 		end
 	end
@@ -1278,6 +1292,7 @@ end
 function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> (Types.Entity?, Types.Zone?)
 	local entities = State.observerTrackingEntities[self.id]
 	local entity = nil
+	local observerId = self.id
 
 	return function()
 		while true do
@@ -1287,12 +1302,16 @@ function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> (Types
 			end
 
 			local data = State.entityData[entity]
-			if data then
-				local zoneId = data.activeObserverMemberships[self.id]
-				if zoneId then
-					return entity, State.zoneIdToZoneObj[zoneId]
-				end
+			if not data then
+				continue
 			end
+
+			local zoneId = data.activeObserverMemberships[observerId]
+			if not zoneId then
+				continue
+			end
+
+			return entity, State.zoneIdToZoneObj[zoneId]
 		end
 	end
 end
@@ -1308,6 +1327,7 @@ end
 function Observer.iterPlayersInside(self: Types.InternalObserver): () -> Player?
 	local entities = State.observerTrackingEntities[self.id]
 	local entity = nil
+	local observerId = self.id
 
 	return function()
 		while true do
@@ -1317,14 +1337,18 @@ function Observer.iterPlayersInside(self: Types.InternalObserver): () -> Player?
 			end
 
 			local data = State.entityData[entity]
-			if data then
-				local zoneId = data.activeObserverMemberships[self.id]
-				if zoneId then
-					local player = State.entityToPlayer[entity]
-					if player then
-						return player, State.zoneIdToZoneObj[zoneId]
-					end
-				end
+			if not data then
+				continue
+			end
+
+			local zoneId = data.activeObserverMemberships[observerId]
+			if not zoneId then
+				continue
+			end
+
+			local player = State.entityToPlayer[entity]
+			if player then
+				return player, State.zoneIdToZoneObj[zoneId]
 			end
 		end
 	end
@@ -1349,6 +1373,7 @@ function Observer.iterEntitiesInZone(self: Types.InternalObserver, zone: Types.Z
 
 	local entity = nil
 	local targetZoneId = zone:getId()
+	local observerId = self.id
 
 	return function(): Types.Entity?
 		while true do
@@ -1358,9 +1383,12 @@ function Observer.iterEntitiesInZone(self: Types.InternalObserver, zone: Types.Z
 			end
 
 			local data = State.entityData[entity]
-			if data and data.activeObserverMemberships[self.id] == targetZoneId then
-				return entity
+
+			if not data or data.activeObserverMemberships[observerId] ~= targetZoneId then
+				continue
 			end
+
+			return entity
 		end
 	end
 end
@@ -1384,6 +1412,7 @@ function Observer.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zo
 
 	local entity = nil
 	local targetZoneId = zone:getId()
+	local observerId = self.id
 
 	return function(): Player?
 		while true do
@@ -1393,11 +1422,14 @@ function Observer.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zo
 			end
 
 			local data = State.entityData[entity]
-			if data and data.activeObserverMemberships[self.id] == targetZoneId then
-				local player = State.entityToPlayer[entity]
-				if player then
-					return player
-				end
+
+			if not data or data.activeObserverMemberships[observerId] ~= targetZoneId then
+				continue
+			end
+
+			local player = State.entityToPlayer[entity]
+			if player then
+				return player
 			end
 		end
 	end

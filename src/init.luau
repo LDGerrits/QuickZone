@@ -52,20 +52,20 @@ local QuickZone = {
 }
 
 --[=[ 
-    Configure the QuickZone settings. 
+	Configure the QuickZone settings. 
 
-    ```lua
-    QuickZone:configure({
-        enabled = true,
-        autoSyncRate = 10,
-        frameBudget = 0.5,
-    })
-    ```
+	```lua
+	QuickZone:configure({
+		enabled = true,
+		autoSyncRate = 10,
+		frameBudget = 0.5,
+	})
+	```
 
-    @method configure
-    @within QuickZone
-    @param config { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }
-    @return QuickZone
+	@method configure
+	@within QuickZone
+	@param config { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }
+	@return QuickZone
 ]=]
 function QuickZone:configure(config: { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }): QuickZone
 	if config.enabled ~= nil then
@@ -576,12 +576,15 @@ function QuickZone:iterZonesOfEntity(entity: Types.Entity): () -> Types.Zone?
 			end
 
 			local zoneId = memberships[observerId]
-			if not seenZones[zoneId] then
-				seenZones[zoneId] = true
-				local zone = zoneIdToZoneObj[zoneId]
-				if zone then
-					return zone
-				end
+			if seenZones[zoneId] then
+				continue
+			end
+
+			seenZones[zoneId] = true
+			local zone = zoneIdToZoneObj[zoneId]
+
+			if zone then
+				return zone
 			end
 		end
 	end
@@ -622,7 +625,7 @@ end
 	@param point Vector3
 	@return () -> Zone?
 ]=]
-function QuickZone:iterZonesAtPoint(point: Vector3): () -> Zone?
+function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 	local dynamicNodes = dynamicTree.nodes
 	local dynamicCount = dynamicTree.count or 0
 
@@ -639,18 +642,20 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Zone?
 			while index <= dynamicCount do
 				local node = dynamicNodes[index]
 				local min, max = node.min, node.max
-				if px >= min.X and px <= max.X and py >= min.Y and py <= max.Y and pz >= min.Z and pz <= max.Z then
-					index += 1
-					local hitId = node.id
-					if hitId > 0 then
-						if
-							isPointInShape(point, dynamicCFrames[hitId], dynamicHalfSizes[hitId], dynamicTypes[hitId])
-						then
-							return zoneIdToZoneObj[hitId]
-						end
-					end
-				else
+
+				if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
 					index = node.skipIndex
+					continue
+				end
+
+				index += 1
+				local hitId = node.id
+
+				if
+					hitId > 0
+					and isPointInShape(point, dynamicCFrames[hitId], dynamicHalfSizes[hitId], dynamicTypes[hitId])
+				then
+					return zoneIdToZoneObj[hitId]
 				end
 			end
 
@@ -662,16 +667,20 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Zone?
 			while index <= staticCount do
 				local node = staticNodes[index]
 				local min, max = node.min, node.max
-				if px >= min.X and px <= max.X and py >= min.Y and py <= max.Y and pz >= min.Z and pz <= max.Z then
-					index += 1
-					local hitId = node.id
-					if hitId > 0 then
-						if isPointInShape(point, staticCFrames[hitId], staticHalfSizes[hitId], staticTypes[hitId]) then
-							return zoneIdToZoneObj[hitId]
-						end
-					end
-				else
+
+				if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
 					index = node.skipIndex
+					continue
+				end
+
+				index += 1
+				local hitId = node.id
+
+				if
+					hitId > 0
+					and isPointInShape(point, staticCFrames[hitId], staticHalfSizes[hitId], staticTypes[hitId])
+				then
+					return zoneIdToZoneObj[hitId]
 				end
 			end
 		end
