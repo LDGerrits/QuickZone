@@ -42,7 +42,7 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 		cleanCharacter()
 
 		task.spawn(function()
-			local hrp = character:WaitForChild('HumanoidRootPart')
+			local hrp = character:WaitForChild('HumanoidRootPart', 5)
 
 			if not hrp or not player:IsDescendantOf(Players) then
 				return
@@ -59,10 +59,8 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 
 				table.insert(
 					charConns,
-					hrp.AncestryChanged:Connect(function(_, parent)
-						if not parent then
-							cleanCharacter()
-						end
+					hrp.Destroying:Connect(function()
+						cleanCharacter()
 					end)
 				)
 			end
@@ -71,8 +69,15 @@ local function trackPlayer(group: Types.Group, player: Player, trackerStore: { [
 
 	local addedConn = player.CharacterAdded:Connect(onCharAdded)
 
+	local removingConn = player.CharacterRemoving:Connect(function(character)
+		if currentHrp and currentHrp.Parent == character then
+			cleanCharacter()
+		end
+	end)
+
 	trackerStore[player] = function()
 		addedConn:Disconnect()
+		removingConn:Disconnect()
 		cleanCharacter()
 	end
 
