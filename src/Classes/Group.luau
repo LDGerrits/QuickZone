@@ -41,7 +41,7 @@ local function trackPlayer(group: Types.InternalGroup, player: Player, trackerSt
 		cleanCharacter()
 
 		task.spawn(function()
-			local hrp = character:WaitForChild('HumanoidRootPart')
+			local hrp = character:WaitForChild('HumanoidRootPart', 5)
 
 			if not hrp or not player:IsDescendantOf(Players) then
 				return
@@ -58,10 +58,8 @@ local function trackPlayer(group: Types.InternalGroup, player: Player, trackerSt
 
 				table.insert(
 					charConns,
-					hrp.AncestryChanged:Connect(function(_, parent)
-						if not parent then
-							cleanCharacter()
-						end
+					hrp.Destroying:Connect(function()
+						cleanCharacter()
 					end)
 				)
 			end
@@ -70,8 +68,15 @@ local function trackPlayer(group: Types.InternalGroup, player: Player, trackerSt
 
 	local addedConn = player.CharacterAdded:Connect(onCharAdded)
 
+	local removingConn = player.CharacterRemoving:Connect(function(character)
+		if currentHrp and currentHrp.Parent == character then
+			cleanCharacter()
+		end
+	end)
+
 	trackerStore[player] = function()
 		addedConn:Disconnect()
+		removingConn:Disconnect()
 		cleanCharacter()
 	end
 
@@ -739,10 +744,16 @@ function Group._remove(self: Types.InternalGroup, entity: Types.Entity): Types.G
 	State.dirtyProfiles[entity] = true
 	State.dirtyTopology[entity] = true
 
-	local activeObservers = State.entityToObservers[entity] or {}
-
 	for observerId, oldZoneId in data.activeObserverMemberships do
-		if activeObservers[observerId] then
+		local stillTracked = false
+		for remainingGroupId in State.entityToGroups[entity] do
+			if State.groupToObservers[remainingGroupId] and State.groupToObservers[remainingGroupId][observerId] then
+				stillTracked = true
+				break
+			end
+		end
+
+		if stillTracked then
 			continue
 		end
 
@@ -787,15 +798,6 @@ function Group._remove(self: Types.InternalGroup, entity: Types.Entity): Types.G
 			end
 
 			bucket[maxEntities] = nil
-
-			-- Destroy empty bucket
-			if maxEntities == 1 then
-				State.buckets[currentRate] = nil
-				local listIdx = table.find(State.bucketList, currentRate)
-				if listIdx then
-					table.remove(State.bucketList, listIdx)
-				end
-			end
 		end
 
 		State.entityData[entity] = nil

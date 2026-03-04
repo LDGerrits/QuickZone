@@ -129,14 +129,6 @@ local function processProfileChange(entity: Types.Entity)
 			end
 
 			oldBucket[maxEntities] = nil
-
-			if maxEntities == 1 then -- Destroy empty bucket
-				buckets[currentRate] = nil
-				local listIdx = table.find(bucketList, currentRate)
-				if listIdx then
-					table.remove(bucketList, listIdx)
-				end
-			end
 		end
 
 		-- Add to new bucket
