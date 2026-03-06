@@ -36,8 +36,8 @@ local debugVisuals = {} :: { [number]: BoxHandleAdornment }
 export type QuickZone = Types.QuickZone
 export type Zone = Types.Zone
 export type Zones = Types.Zones
-export type Observer = Types.Observer
-export type Group = Types.Group
+export type Observer<T> = Types.Observer<T>
+export type Group<T> = Types.Group<T>
 export type Entity = Types.Entity
 
 --[=[
@@ -141,6 +141,51 @@ function QuickZone:rebuild(): QuickZone
 end
 
 --[=[ 
+	Set a reference to an entity. If set, the callbacks will now pass the reference instead of the entity.
+	
+	```lua
+	QuickZone:setReference(id, transformComponent)
+
+	local entityGroup = QuickZone.Group.new({Entities = { entityId }})
+	local observer = QuickZone.Observer.new({Groups = {entityGroup}})
+
+	observer:onEnter(function(player, zone)
+		print(player.Name .. " entered!")
+	end)
+	```
+
+	@method setReference
+	@within QuickZone
+	@param reference any
+	@param entity Entity
+	@return QuickZone
+]=]
+function QuickZone:setReference(reference: any, entity: Entity?): QuickZone
+	if entity == nil then
+		local oldEntity = State.referenceToEntity[reference]
+		if oldEntity then
+			State.entityToReference[oldEntity] = nil
+		end
+		State.referenceToEntity[reference] = nil
+		return self
+	end
+
+	if reference == nil then
+		local oldReference = State.entityToReference[entity]
+		if oldReference then
+			State.referenceToEntity[oldReference] = nil
+		end
+		State.entityToReference[reference] = nil
+		return self
+	end
+
+	State.entityToReference[entity] = reference
+	State.referenceToEntity[reference] = entity
+
+	return self
+end
+
+--[=[ 
 	Sets the global execution budget for the Scheduler per frame in milliseconds.
 	
 	The Scheduler will 'dispatch' entity steps until this threshold is reached, 
@@ -224,12 +269,12 @@ end
 	@within QuickZone
 	@return { Observer }
 ]=]
-function QuickZone:getObservers(): { Types.Observer }
+function QuickZone:getObservers(): { Types.BaseObserver }
 	local result = {}
 	for _, observer in observerIdToObserverObj do
 		table.insert(result, observer)
 	end
-	return result
+	return (result :: any) :: { Types.BaseObserver }
 end
 
 --[=[ 
@@ -490,10 +535,10 @@ end
 	@within QuickZone
 	@return () -> Observer?
 ]=]
-function QuickZone:iterObservers(): () -> Types.Observer?
+function QuickZone:iterObservers(): () -> Types.BaseObserver?
 	local observerId = nil
 
-	return function(): Types.Observer?
+	return function(): Types.BaseObserver?
 		observerId = next(observerIdToObserverObj, observerId)
 		return observerId and observerIdToObserverObj[observerId] or nil
 	end

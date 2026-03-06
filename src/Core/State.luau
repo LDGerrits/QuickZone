@@ -24,13 +24,16 @@ State.staticVersion = 1
 State.dynamicVersion = 1
 State.logicVersion = 1
 
-State.groups = {} :: { [number]: Types.InternalGroup }
+State.groups = {} :: { [number]: Types.InternalGroup<any> }
 State.groupToObservers = {} :: { [number]: { [number]: boolean } }
-State.groupEntityCleanups = {} :: { [number]: { [Types.Entity]: RBXScriptConnection } }
+State.groupEntityCleanups = {} :: { [number]: { [any]: RBXScriptConnection } }
 State.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityData = {} :: { [Types.Entity]: Types.EntityData }
 State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityToPlayer = {} :: { [Types.Entity]: Player }
+State.entityToReference = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [Types.Entity]: any }
+State.referenceToEntity = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [any]: Types.Entity }
+
 State.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 State.dirtyTopology = {} :: { [Types.Entity]: boolean }
 State.bucketList = {} :: { number }
@@ -51,6 +54,6 @@ State.observerStaticCount = {} :: { [number]: number }
 State.autoSyncZones = {} :: { [number]: Types.InternalZone }
 State.zoneAttachedObservers = {} :: { [number]: { number } }
 State.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }
-State.observerIdToObserverObj = {} :: { [number]: Types.InternalObserver }
+State.observerIdToObserverObj = {} :: { [number]: Types.InternalObserver<any> }
 
 return State

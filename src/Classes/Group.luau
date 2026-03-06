@@ -18,7 +18,7 @@ local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local IS_CLIENT = RunService:IsClient()
 
-local function trackPlayer(group: Types.InternalGroup, player: Player, trackerStore: { [Player]: () -> () })
+local function trackPlayer(group: Types.InternalGroup<any>, player: Player, trackerStore: { [Player]: () -> () })
 	if trackerStore[player] then
 		return
 	end
@@ -117,13 +117,13 @@ Group.__index = Group
 	```
 
 	@tag Constructor
-	@param config { entities: { Types.Entity }?, autoClean: boolean? }?
+	@param config { entities: { T }?, autoClean: boolean? }?
 	@return Group
 ]=]
-function Group.new(config: {
-	entities: { Types.Entity }?,
+function Group.new<T>(config: {
+	entities: { T }?,
 	autoClean: boolean?,
-}?): Types.Group
+}?): Types.Group<T>
 	local id = State.nextGroupId
 	State.nextGroupId += 1
 
@@ -132,7 +132,7 @@ function Group.new(config: {
 		autoClean = config.autoClean
 	end
 
-	local self: Types.InternalGroup = setmetatable({
+	local self: Types.InternalGroup<T> = setmetatable({
 		id = id,
 		entities = {},
 		entityIndices = {},
@@ -158,8 +158,8 @@ end
 	@param tag string
 	@return Group
 ]=]
-function Group.fromTag(tag: string): Types.Group
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup
+function Group.fromTag(tag: string): Types.Group<Types.Entity>
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Types.Entity>
 	group.isManaged = true
 
 	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
@@ -234,8 +234,8 @@ end
 	@tag Constructor
 	@return Group
 ]=]
-function Group.players(): Types.Group
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup
+function Group.players(): Types.Group<Player>
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
 	local trackerStore = {} :: { [Player]: () -> () }
@@ -286,10 +286,10 @@ end
 	@tag Constructor
 	@return Group
 ]=]
-function Group.localPlayer(): Types.Group
+function Group.localPlayer(): Types.Group<Player>
 	assert(IS_CLIENT, '[QuickZone] QuickZone.LocalPlayerGroup can only be called on the Client.')
 
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
 	local lp = Players.LocalPlayer
@@ -314,7 +314,7 @@ end
 	@param enabled boolean
 	@return Group
 ]=]
-function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.Group
+function Group.setAutoClean(self: Types.InternalGroup<any>, enabled: boolean): Types.Group
 	if self.isManaged then
 		warn(`[QuickZone] Cannot set autoClean on a Managed Group.`)
 		return self
@@ -378,7 +378,7 @@ end
 	@param entity Entity -- The object to track.
 	@return Group
 ]=]
-function Group.add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+function Group.add(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually add to a Managed Group.`)
 		return self
@@ -399,7 +399,7 @@ end
 	@param entities { Entity } -- Array of entities to add.
 	@return Group
 ]=]
-function Group.addBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+function Group.addBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually addBulk from a Managed Group.`)
 		return self
@@ -415,7 +415,7 @@ end
 	@param entity Entity
 	@return Group
 ]=]
-function Group.remove(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+function Group.remove(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually remove from a Managed Group.`)
 		return self
@@ -431,7 +431,7 @@ end
 	@param entities { Entity }
 	@return Group
 ]=]
-function Group.removeBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+function Group.removeBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually removeBulk from a Managed Group.`)
 		return self
@@ -447,7 +447,7 @@ end
 	@within Group
 	@return Group
 ]=]
-function Group.clear(self: Types.InternalGroup): Types.Group
+function Group.clear(self: Types.InternalGroup<any>): Types.Group
 	if self.isManaged then
 		warn(`[QuickZone] Cannot clear from a Managed Group.`)
 		return self
@@ -463,7 +463,7 @@ end
 	@param entity Entity
 	@return boolean
 ]=]
-function Group.contains(self: Types.InternalGroup, entity: Types.Entity): boolean
+function Group.contains(self: Types.InternalGroup<any>, entity: Types.Entity): boolean
 	local groups = State.entityToGroups[entity]
 	return groups and groups[self.id] == true or false
 end
@@ -475,7 +475,7 @@ end
 	@within Group
 	@return number
 ]=]
-function Group.getId(self: Types.InternalGroup): number
+function Group.getId(self: Types.InternalGroup<any>): number
 	return self.id
 end
 
@@ -486,7 +486,7 @@ end
 	@within Group
 	@return { Entity }
 ]=]
-function Group.getEntities(self: Types.InternalGroup): { Types.Entity }
+function Group.getEntities(self: Types.InternalGroup<any>): { Types.Entity }
 	local result = table.create(#self.entities)
 	table.move(self.entities, 1, #self.entities, 1, result)
 	return result
@@ -499,7 +499,7 @@ end
 	@within Group
 	@return { Player }
 ]=]
-function Group.getPlayers(self: Types.InternalGroup): { Player }
+function Group.getPlayers(self: Types.InternalGroup<any>): { Player }
 	local result = {}
 	for entity in self.entityIndices do
 		local player = State.entityToPlayer[entity]
@@ -525,7 +525,7 @@ end
 	@within Group
 	@return () -> Entity?
 ]=]
-function Group.iterEntities(self: Types.InternalGroup): () -> Types.Entity?
+function Group.iterEntities(self: Types.InternalGroup<any>): () -> Types.Entity?
 	local entity = nil
 
 	return function()
@@ -541,7 +541,7 @@ end
 	@within Group
 	@return () -> Player?
 ]=]
-function Group.iterPlayers(self: Types.InternalGroup): () -> Player?
+function Group.iterPlayers(self: Types.InternalGroup<any>): () -> Player?
 	local entity = nil
 
 	return function()
@@ -577,7 +577,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Group.onDestroy(self: Types.InternalGroup, callback: () -> ()): () -> ()
+function Group.onDestroy(self: Types.InternalGroup<any>, callback: () -> ()): () -> ()
 	if not self.onDestroyCallbacks then
 		self.onDestroyCallbacks = {}
 	end
@@ -600,7 +600,7 @@ end
 	@method destroy
 	@within Group
 ]=]
-function Group.destroy(self: Types.InternalGroup): ()
+function Group.destroy(self: Types.InternalGroup<any>): ()
 	if self.onDestroyCallbacks then
 		for _, callback in self.onDestroyCallbacks do
 			task.spawn(callback)
@@ -618,7 +618,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	setmetatable(self :: any, nil)
 end
 
-function Group._add(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+function Group._add(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
 	if not State.entityToGroups[entity] then
 		State.entityToGroups[entity] = {}
 	end
@@ -707,14 +707,14 @@ function Group._add(self: Types.InternalGroup, entity: Types.Entity): Types.Grou
 	return self
 end
 
-function Group._addBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+function Group._addBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
 	for _, entity in entities do
 		self:_add(entity)
 	end
 	return self
 end
 
-function Group._remove(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+function Group._remove(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
 	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
 		return self
 	end
@@ -811,14 +811,14 @@ function Group._remove(self: Types.InternalGroup, entity: Types.Entity): Types.G
 	return self
 end
 
-function Group._removeBulk(self: Types.InternalGroup, entities: { Types.Entity }): Types.Group
+function Group._removeBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
 	for _, entity in entities do
 		self:_remove(entity)
 	end
 	return self
 end
 
-function Group._clear(self: Types.InternalGroup): Types.Group
+function Group._clear(self: Types.InternalGroup<any>): Types.Group
 	-- Iterate backwards for safe removal
 	local entities = self.entities
 	for idx = #entities, 1, -1 do
