@@ -30,7 +30,6 @@ State.groupEntityCleanups = {} :: { [number]: { [any]: RBXScriptConnection } }
 State.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 State.entityData = {} :: { [Types.Entity]: Types.EntityData }
 State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
-State.entityToPlayer = {} :: { [Types.Entity]: Player }
 State.entityToReference = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [Types.Entity]: any }
 State.referenceToEntity = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [any]: Types.Entity }
 
@@ -41,9 +40,9 @@ State.buckets = {} :: { [number]: { Types.Entity } }
 
 State.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } }
 State.observerPriorityMap = {} :: { [number]: number }
-State.observerEnteredCallbacks = {} :: { [number]: { (Types.Entity, Types.Zone) -> () } }
-State.observerExitedCallbacks = {} :: { [number]: { (Types.Entity, Types.Zone) -> () } }
-State.observerTransitionedCallbacks = {} :: { [number]: { (Types.Entity, Types.Zone, Types.Zone) -> () } }
+State.observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } }
+State.observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } }
+State.observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Zone) -> () } }
 State.observerEnabled = {} :: { [number]: boolean }
 State.observerSafety = {} :: { [number]: boolean }
 State.observerUpdateRate = {} :: { [number]: number }

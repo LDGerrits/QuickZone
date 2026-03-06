@@ -29,6 +29,8 @@ local function trackPlayer(group: Types.InternalGroup<any>, player: Player, trac
 	local function cleanCharacter()
 		if currentHrp then
 			group:_remove(currentHrp)
+			State.entityToReference[currentHrp] = nil
+			State.referenceToEntity[player] = nil
 			currentHrp = nil
 		end
 		for _, c in charConns do
@@ -53,8 +55,11 @@ local function trackPlayer(group: Types.InternalGroup<any>, player: Player, trac
 
 			if hrp:IsA('BasePart') then
 				currentHrp = hrp
-				State.entityToPlayer[hrp] = player
-				group:_add(hrp)
+
+				State.entityToReference[hrp] = player
+				State.referenceToEntity[player] = hrp
+
+				group:_add(player)
 
 				table.insert(
 					charConns,
@@ -314,7 +319,7 @@ end
 	@param enabled boolean
 	@return Group
 ]=]
-function Group.setAutoClean(self: Types.InternalGroup<any>, enabled: boolean): Types.Group
+function Group.setAutoClean(self: Types.InternalGroup<any>, enabled: boolean): Types.Group<any>
 	if self.isManaged then
 		warn(`[QuickZone] Cannot set autoClean on a Managed Group.`)
 		return self
@@ -375,10 +380,10 @@ end
 
 	@method add
 	@within Group
-	@param entity Entity -- The object to track.
+	@param entity any -- The object to track.
 	@return Group
 ]=]
-function Group.add(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
+function Group.add(self: Types.InternalGroup<any>, entity: any): Types.Group<any>
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually add to a Managed Group.`)
 		return self
@@ -396,10 +401,10 @@ end
 
 	@method addBulk
 	@within Group
-	@param entities { Entity } -- Array of entities to add.
+	@param entities { any } -- Array of entities to add.
 	@return Group
 ]=]
-function Group.addBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
+function Group.addBulk(self: Types.InternalGroup<any>, entities: { any }): Types.Group<any>
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually addBulk from a Managed Group.`)
 		return self
@@ -412,10 +417,10 @@ end
 
 	@method remove
 	@within Group
-	@param entity Entity
+	@param entity any
 	@return Group
 ]=]
-function Group.remove(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
+function Group.remove(self: Types.InternalGroup<any>, entity: any): Types.Group<any>
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually remove from a Managed Group.`)
 		return self
@@ -428,10 +433,10 @@ end
 	
 	@method removeBulk
 	@within Group
-	@param entities { Entity }
+	@param entities { any }
 	@return Group
 ]=]
-function Group.removeBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
+function Group.removeBulk(self: Types.InternalGroup<any>, entities: { any }): Types.Group<any>
 	if self.isManaged then
 		warn(`[QuickZone] Cannot manually removeBulk from a Managed Group.`)
 		return self
@@ -447,7 +452,7 @@ end
 	@within Group
 	@return Group
 ]=]
-function Group.clear(self: Types.InternalGroup<any>): Types.Group
+function Group.clear(self: Types.InternalGroup<any>): Types.Group<any>
 	if self.isManaged then
 		warn(`[QuickZone] Cannot clear from a Managed Group.`)
 		return self
@@ -460,10 +465,11 @@ end
 
 	@method contains
 	@within Group
-	@param entity Entity
+	@param entity any
 	@return boolean
 ]=]
-function Group.contains(self: Types.InternalGroup<any>, entity: Types.Entity): boolean
+function Group.contains(self: Types.InternalGroup<any>, entity: any): boolean
+	entity = State.referenceToEntity[entity] or entity
 	local groups = State.entityToGroups[entity]
 	return groups and groups[self.id] == true or false
 end
@@ -484,11 +490,13 @@ end
 
 	@method getEntities
 	@within Group
-	@return { Entity }
+	@return { any }
 ]=]
-function Group.getEntities(self: Types.InternalGroup<any>): { Types.Entity }
+function Group.getEntities(self: Types.InternalGroup<any>): { any }
 	local result = table.create(#self.entities)
-	table.move(self.entities, 1, #self.entities, 1, result)
+	for i, entity in ipairs(self.entities) do
+		result[i] = State.entityToReference[entity] or entity
+	end
 	return result
 end
 
@@ -502,9 +510,9 @@ end
 function Group.getPlayers(self: Types.InternalGroup<any>): { Player }
 	local result = {}
 	for entity in self.entityIndices do
-		local player = State.entityToPlayer[entity]
-		if player then
-			table.insert(result, player)
+		local ref = State.entityToReference[entity] or entity
+		if typeof(ref) == 'Instance' and ref:IsA('Player') then
+			table.insert(result, ref)
 		end
 	end
 	return result
@@ -523,13 +531,16 @@ end
 
 	@method iterEntities
 	@within Group
-	@return () -> Entity?
+	@return () -> any?
 ]=]
-function Group.iterEntities(self: Types.InternalGroup<any>): () -> Types.Entity?
+function Group.iterEntities(self: Types.InternalGroup<any>): () -> any?
 	local entity = nil
 
 	return function()
 		entity = next(self.entityIndices, entity)
+		if entity then
+			return State.entityToReference[entity] or entity
+		end
 		return entity
 	end
 end
@@ -552,12 +563,10 @@ function Group.iterPlayers(self: Types.InternalGroup<any>): () -> Player?
 				return nil
 			end
 
-			local player = State.entityToPlayer[entity]
-			if not player then
-				continue
+			local ref = State.entityToReference[entity] or entity
+			if typeof(ref) == 'Instance' and ref:IsA('Player') then
+				return ref
 			end
-
-			return player
 		end
 	end
 end
@@ -618,7 +627,9 @@ function Group.destroy(self: Types.InternalGroup<any>): ()
 	setmetatable(self :: any, nil)
 end
 
-function Group._add(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
+function Group._add(self: Types.InternalGroup<any>, entity: any): Types.Group<any>
+	entity = State.referenceToEntity[entity] or entity
+
 	if not State.entityToGroups[entity] then
 		State.entityToGroups[entity] = {}
 	end
@@ -641,16 +652,6 @@ function Group._add(self: Types.InternalGroup<any>, entity: Types.Entity): Types
 			elseif entity:IsA('Model') then
 				strat = entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
 			end
-
-			if not State.entityToPlayer[entity] then
-				local player
-				if entity:IsA('BasePart') then
-					player = Players:GetPlayerFromCharacter((entity :: any).Parent)
-				end
-				if player then
-					State.entityToPlayer[entity] = player
-				end
-			end
 		elseif typeof(entity) == 'table' then
 			if entity.Position then
 				strat = STRAT_POS
@@ -666,7 +667,7 @@ function Group._add(self: Types.InternalGroup<any>, entity: Types.Entity): Types
 		if not strat then
 			warn(
 				string.format(
-					'[QuickZone] Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or an EntityTable.',
+					'[QuickZone] Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, an EntityTable, or a reference to such an object.',
 					tostring(entity)
 				)
 			)
@@ -707,14 +708,16 @@ function Group._add(self: Types.InternalGroup<any>, entity: Types.Entity): Types
 	return self
 end
 
-function Group._addBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
+function Group._addBulk(self: Types.InternalGroup<any>, entities: { any }): Types.Group<any>
 	for _, entity in entities do
 		self:_add(entity)
 	end
 	return self
 end
 
-function Group._remove(self: Types.InternalGroup<any>, entity: Types.Entity): Types.Group
+function Group._remove(self: Types.InternalGroup<any>, entity: any): Types.Group<any>
+	entity = State.referenceToEntity[entity] or entity
+
 	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
 		return self
 	end
@@ -730,11 +733,11 @@ function Group._remove(self: Types.InternalGroup<any>, entity: Types.Entity): Ty
 
 	local idx = self.entityIndices[entity]
 	local lastIdx = #self.entities
-	local lastEntity = self.entities[lastIdx]
 	if idx == lastIdx then
 		self.entities[lastIdx] = nil
 		self.entityIndices[entity] = nil
 	else
+		local lastEntity = self.entities[lastIdx]
 		self.entities[idx] = lastEntity
 		self.entityIndices[lastEntity] = idx
 		self.entities[lastIdx] = nil
@@ -770,12 +773,13 @@ function Group._remove(self: Types.InternalGroup<any>, entity: Types.Entity): Ty
 
 		local safety = State.observerSafety[observerId]
 		local z = State.zoneIdToZoneObj[oldZoneId]
+		local ref = State.entityToReference[entity] or entity
 
 		for _, fn in cbs do
 			if safety then
-				task.spawn(fn, entity, z)
+				task.spawn(fn, ref, z)
 			else
-				fn(entity, z)
+				fn(ref, z)
 			end
 		end
 	end
@@ -803,7 +807,6 @@ function Group._remove(self: Types.InternalGroup<any>, entity: Types.Entity): Ty
 		State.entityData[entity] = nil
 		State.entityToGroups[entity] = nil
 		State.entityToObservers[entity] = nil
-		State.entityToPlayer[entity] = nil
 		State.dirtyProfiles[entity] = nil
 		State.dirtyTopology[entity] = nil
 	end
@@ -811,14 +814,14 @@ function Group._remove(self: Types.InternalGroup<any>, entity: Types.Entity): Ty
 	return self
 end
 
-function Group._removeBulk(self: Types.InternalGroup<any>, entities: { Types.Entity }): Types.Group
+function Group._removeBulk(self: Types.InternalGroup<any>, entities: { any }): Types.Group<any>
 	for _, entity in entities do
 		self:_remove(entity)
 	end
 	return self
 end
 
-function Group._clear(self: Types.InternalGroup<any>): Types.Group
+function Group._clear(self: Types.InternalGroup<any>): Types.Group<any>
 	-- Iterate backwards for safe removal
 	local entities = self.entities
 	for idx = #entities, 1, -1 do

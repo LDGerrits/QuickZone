@@ -34,6 +34,7 @@ local observerUpdateRate = State.observerUpdateRate
 local observerStaticCount = State.observerStaticCount
 local observerDynamicCount = State.observerDynamicCount
 
+local entityToReference = State.entityToReference
 local entityData = State.entityData
 local entityToObservers = State.entityToObservers
 local entityToGroups = State.entityToGroups
@@ -418,7 +419,8 @@ function Scheduler.update(dt: number)
 
 					local safety = observerSafety[observerId]
 					local z = zoneIdToZoneObj[oldZoneId]
-					fireCallback(cbs, entity, z, safety)
+					local ref = entityToReference[entity] or entity
+					fireCallback(cbs, ref, z, safety)
 				end
 
 				-- Entries & Transitions
@@ -449,22 +451,24 @@ function Scheduler.update(dt: number)
 						end
 
 						local z = zoneIdToZoneObj[zoneIdx]
-						fireCallback(cbs, entity, z, safety)
+						local ref = entityToReference[entity] or entity
+						fireCallback(cbs, ref, z, safety)
 					else -- Transition
 						local cbs = observerTransitionedCallbacks[observerId]
 						if not cbs then
 							continue
 						end
 
+						local ref = entityToReference[entity] or entity
 						local newZoneObj = zoneIdToZoneObj[zoneIdx]
 						local oldZoneObj = zoneIdToZoneObj[currentZoneId]
 						if safety then
 							for _, cb in cbs do
-								task.spawn(cb, entity, newZoneObj, oldZoneObj)
+								task.spawn(cb, ref, newZoneObj, oldZoneObj)
 							end
 						else
 							for _, cb in cbs do
-								cb(entity, newZoneObj, oldZoneObj)
+								cb(ref, newZoneObj, oldZoneObj)
 							end
 						end
 					end

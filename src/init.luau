@@ -17,8 +17,9 @@ local zoneIdToZoneObj = State.zoneIdToZoneObj
 local entityData = State.entityData
 local observerIdToObserverObj = State.observerIdToObserverObj
 local groups = State.groups
-local entityToPlayer = State.entityToPlayer
 local entityToGroups = State.entityToGroups
+local entityToReference = State.entityToReference
+local referenceToEntity = State.referenceToEntity
 
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
@@ -93,7 +94,7 @@ end
 ]=]
 function QuickZone:setEnabled(enabled: boolean): QuickZone
 	Scheduler.setAutoUpdate(enabled)
-	return QuickZone
+	return self
 end
 
 --[=[ 
@@ -107,7 +108,7 @@ end
 ]=]
 function QuickZone:update(dt: number): QuickZone
 	Scheduler.update(dt)
-	return QuickZone
+	return self
 end
 
 --[=[ 
@@ -121,7 +122,7 @@ end
 ]=]
 function QuickZone:setAutoSyncRate(hz: number): QuickZone
 	Scheduler.setAutoSyncRate(hz)
-	return QuickZone
+	return self
 end
 
 --[=[ 
@@ -144,13 +145,13 @@ end
 	Set a reference to an entity. If set, the callbacks will now pass the reference instead of the entity.
 	
 	```lua
-	QuickZone:setReference(id, transformComponent)
+	QuickZone:setReference(numberId, transformComponent)
 
-	local entityGroup = QuickZone.Group.new({Entities = { entityId }})
-	local observer = QuickZone.Observer.new({Groups = {entityGroup}})
+	local entityGroup = QuickZone.Group.new({ Entities = { entityId } })
+	local observer = QuickZone.Observer.new({ Groups = {entityGroup} })
 
-	observer:onEnter(function(player, zone)
-		print(player.Name .. " entered!")
+	observer:onEnter(function(numberId, zone)
+		print(tostring(numberId) .. " entered!")
 	end)
 	```
 
@@ -162,25 +163,25 @@ end
 ]=]
 function QuickZone:setReference(reference: any, entity: Entity?): QuickZone
 	if entity == nil then
-		local oldEntity = State.referenceToEntity[reference]
+		local oldEntity = referenceToEntity[reference]
 		if oldEntity then
-			State.entityToReference[oldEntity] = nil
+			entityToReference[oldEntity] = nil
 		end
-		State.referenceToEntity[reference] = nil
+		referenceToEntity[reference] = nil
 		return self
 	end
 
 	if reference == nil then
-		local oldReference = State.entityToReference[entity]
+		local oldReference = entityToReference[entity]
 		if oldReference then
-			State.referenceToEntity[oldReference] = nil
+			referenceToEntity[oldReference] = nil
 		end
-		State.entityToReference[reference] = nil
+		entityToReference[reference] = nil
 		return self
 	end
 
-	State.entityToReference[entity] = reference
-	State.referenceToEntity[reference] = entity
+	entityToReference[entity] = reference
+	referenceToEntity[reference] = entity
 
 	return self
 end
@@ -206,20 +207,22 @@ end
 function QuickZone:setFrameBudget(ms: number): QuickZone
 	local s = ms / 1000
 	Scheduler.setFrameBudget(s)
-	return QuickZone
+	return self
 end
 
 --[=[
-	Instantly and safely removes the entity from the QuickZone engine. 
+	Instantly and safely removes the entity from QuickZone. 
 	It will be removed from all Groups, resolving any active Observers 
 	and firing their `onExit` events.
 
 	@method removeEntity
 	@within QuickZone
-	@param entity Entity
+	@param entity any
 	@return QuickZone
 ]=]
-function QuickZone:removeEntity(entity: Types.Entity): QuickZone
+function QuickZone:removeEntity(entity: any): QuickZone
+	entity = referenceToEntity[entity] or entity
+
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
 		return self
@@ -241,25 +244,49 @@ function QuickZone:removeEntity(entity: Types.Entity): QuickZone
 end
 
 --[=[
-	Safely removes a player's character from the QuickZone engine.
+	Returns the physical Entity associated with the reference.
 
-	@method removePlayer
+	@method getEntityOfReference
 	@within QuickZone
-	@param player Player
-	@return QuickZone
+	@param reference any
+	@return Entity?
 ]=]
-function QuickZone:removePlayer(player: Player): QuickZone
-	local character = player.Character
-	if not character then
-		return self
+function QuickZone:getEntityOfReference(reference: any): Types.Entity?
+	local entity = referenceToEntity[reference]
+	if entity then
+		return entity
 	end
 
-	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
-	if not hrp then
-		return self
+	entity = reference
+	if typeof(entity) == 'Instance' then
+		if
+			entity:IsA('BasePart')
+			or entity:IsA('Attachment')
+			or entity:IsA('Bone')
+			or entity:IsA('Camera')
+			or entity:IsA('Model')
+		then
+			return entity
+		end
+	elseif typeof(entity) == 'table' then
+		if entity.Position or entity.CFrame or entity.WorldPosition or entity.GetPivot then
+			return entity
+		end
 	end
 
-	return self:removeEntity(hrp)
+	return nil
+end
+
+--[=[
+	Returns the reference associated with the Entity.
+
+	@method getReferenceOfEntity
+	@within QuickZone
+	@param reference any
+	@return any
+]=]
+function QuickZone:getReferenceOfEntity(entity: any): any
+	return entityToReference[entity] or entity
 end
 
 --[=[ 
@@ -310,35 +337,23 @@ function QuickZone:getZones(): { Types.Zone }
 end
 
 --[=[ 
-	Returns a flattened array of every Entity (Parts, Models, etc.) currently 
+	Returns a flattened array of every entity currently 
 	being tracked across all Groups.
 
 	@method getEntities
 	@within QuickZone
-	@return { Entity }
+	@return { any }
 ]=]
-function QuickZone:getEntities(): { Types.Entity }
+function QuickZone:getEntities(): { any }
 	local result = {}
 	local count = 0
 
 	for entity in entityData do
 		count += 1
-		result[count] = entity
+		result[count] = entityToReference[entity] or entity
 	end
 
 	return result
-end
-
---[=[ 
-	Returns the Player associated with the entity, if it exists.
-
-	@method getPlayerOfEntity
-	@within QuickZone
-	@param entity Entity
-	@return Player?
-]=]
-function QuickZone:getPlayerOfEntity(entity: Types.Entity): Player?
-	return entityToPlayer[entity]
 end
 
 --[=[ 
@@ -382,10 +397,11 @@ end
 
 	@method getZonesOfEntity
 	@within QuickZone
-	@param entity Entity
+	@param entity any
 	@return { Zone }
 ]=]
-function QuickZone:getZonesOfEntity(entity: Types.Entity): { Types.Zone }
+function QuickZone:getZonesOfEntity(entity: any): { Types.Zone }
+	entity = referenceToEntity[entity] or entity
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
 		return {}
@@ -410,36 +426,15 @@ function QuickZone:getZonesOfEntity(entity: Types.Entity): { Types.Zone }
 end
 
 --[=[ 
-	Returns an array of all Zones the given player is actively inside.
-
-	@method getZonesOfPlayer
-	@within QuickZone
-	@param player Player
-	@return { Zone }
-]=]
-function QuickZone:getZonesOfPlayer(player: Player): { Types.Zone }
-	local character = player.Character
-	if not character then
-		return {}
-	end
-
-	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
-	if not hrp then
-		return {}
-	end
-
-	return self:getZonesOfEntity(hrp)
-end
-
---[=[ 
 	Returns an array of all Groups that the specified entity is currently in.
 
 	@method getGroupsOfEntity
 	@within QuickZone
-	@param entity Entity
+	@param entity any
 	@return { Group }
 ]=]
-function QuickZone:getGroupsOfEntity(entity: Types.Entity): { Types.Group }
+function QuickZone:getGroupsOfEntity(entity: any): { Types.Group }
+	entity = referenceToEntity[entity] or entity
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
 		return {}
@@ -457,28 +452,6 @@ function QuickZone:getGroupsOfEntity(entity: Types.Entity): { Types.Group }
 	end
 
 	return results
-end
-
---[=[ 
-	Returns an array of all Groups that the specified player is currently in.
-
-	@method getGroupsOfPlayer
-	@within QuickZone
-	@param player Player
-	@return { Group }
-]=]
-function QuickZone:getGroupsOfPlayer(player: Player): { Types.Group }
-	local character = player.Character
-	if not character then
-		return {}
-	end
-
-	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
-	if not hrp then
-		return {}
-	end
-
-	return self:getGroupsOfEntity(hrp)
 end
 
 --[=[
@@ -517,13 +490,16 @@ end
 
 	@method iterEntities
 	@within QuickZone
-	@return () -> Entity?
+	@return () -> any?
 ]=]
-function QuickZone:iterEntities(): () -> Types.Entity?
+function QuickZone:iterEntities(): () -> any?
 	local entity = nil
 
-	return function(): Types.Entity?
+	return function(): any?
 		entity = next(entityData, entity)
+		if entity then
+			return entityToReference[entity] or entity
+		end
 		return entity
 	end
 end
@@ -549,10 +525,12 @@ end
 
 	@method iterGroupsOfEntity
 	@within QuickZone
-	@param entity Entity
+	@param entity any
 	@return () -> Group?
 ]=]
-function QuickZone:iterGroupsOfEntity(entity: Types.Entity): () -> Types.Group?
+function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
+	entity = referenceToEntity[entity] or entity
+
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
 		return function()
@@ -568,40 +546,16 @@ function QuickZone:iterGroupsOfEntity(entity: Types.Entity): () -> Types.Group?
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all Groups that the specified player is currently in.
-
-	@method iterGroupsOfPlayer
-	@within QuickZone
-	@param player Player
-	@return () -> Group?
-]=]
-function QuickZone:iterGroupsOfPlayer(player: Player): () -> Types.Group?
-	local character = player.Character
-	if not character then
-		return function()
-			return nil
-		end
-	end
-
-	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
-	if not hrp then
-		return function()
-			return nil
-		end
-	end
-
-	return self:iterGroupsOfEntity(hrp)
-end
-
---[=[ 
 	Returns an iterator for all unique Zones the given entity is actively inside.
 
 	@method iterZonesOfEntity
 	@within QuickZone
-	@param entity Entity
+	@param entity any
 	@return () -> Zone?
 ]=]
-function QuickZone:iterZonesOfEntity(entity: Types.Entity): () -> Types.Zone?
+function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
+	entity = referenceToEntity[entity] or entity
+
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
 		return function()
@@ -633,32 +587,6 @@ function QuickZone:iterZonesOfEntity(entity: Types.Entity): () -> Types.Zone?
 			end
 		end
 	end
-end
-
---[=[ 
-	Returns an iterator for all unique Zones the given player is actively inside.
-
-	@method iterZonesOfPlayer
-	@within QuickZone
-	@param player Player
-	@return () -> Zone?
-]=]
-function QuickZone:iterZonesOfPlayer(player: Player): () -> Types.Zone?
-	local character = player.Character
-	if not character then
-		return function()
-			return nil
-		end
-	end
-
-	local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart?
-	if not hrp then
-		return function()
-			return nil
-		end
-	end
-
-	return self:iterZonesOfEntity(hrp)
 end
 
 --[=[
