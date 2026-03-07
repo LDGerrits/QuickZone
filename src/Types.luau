@@ -30,61 +30,61 @@ export type Tree = {
 	count: number,
 }
 
-export type Observer<T = Entity> = {
-	subscribe: (self: Observer<T>, group: Group<T>) -> Observer<T>,
-	unsubscribe: (self: Observer<T>, group: Group<T>) -> Observer<T>,
-	setPriority: (self: Observer<T>, n: number) -> Observer<T>,
-	setUpdateRate: (self: Observer<T>, hz: number) -> Observer<T>,
-	setPrecision: (self: Observer<T>, n: number) -> Observer<T>,
-	setEnabled: (self: Observer<T>, enabled: boolean) -> Observer<T>,
-	setSafety: (self: Observer<T>, enabled: boolean) -> Observer<T>,
+export type Observer<T = Entity, M = any> = {
+	subscribe: (self: Observer<T, M>, group: Group<T>) -> Observer<T, M>,
+	unsubscribe: (self: Observer<T, M>, group: Group<T>) -> Observer<T, M>,
+	setPriority: (self: Observer<T, M>, n: number) -> Observer<T, M>,
+	setUpdateRate: (self: Observer<T, M>, hz: number) -> Observer<T, M>,
+	setPrecision: (self: Observer<T, M>, n: number) -> Observer<T, M>,
+	setEnabled: (self: Observer<T, M>, enabled: boolean) -> Observer<T, M>,
+	setSafety: (self: Observer<T, M>, enabled: boolean) -> Observer<T, M>,
 
-	isEnabled: (self: Observer<T>) -> boolean,
-	isSafe: (self: Observer<T>) -> boolean,
-	isPointInside: (self: Observer<T>, position: Vector3) -> boolean,
+	isEnabled: (self: Observer<T, M>) -> boolean,
+	isSafe: (self: Observer<T, M>) -> boolean,
+	isPointInside: (self: Observer<T, M>, position: Vector3) -> boolean,
 
-	getId: (self: Observer<T>) -> number,
-	getPriority: (self: Observer<T>) -> number,
-	getUpdateRate: (self: Observer<T>) -> number,
-	getPrecision: (self: Observer<T>) -> number,
-	getZones: (self: Observer<T>) -> { Zone },
-	getGroups: (self: Observer<T>) -> { Group<T> },
-	getEntitiesInside: (self: Observer<T>) -> { T },
-	getPlayersInside: (self: Observer<T>) -> { Player },
-	getZoneOfEntity: (self: Observer<T>, entity: T) -> Zone?,
-	getZoneOfPlayer: (self: Observer<T>, player: Player) -> Zone?,
-	getEntitiesInZone: (self: Observer<T>, zone: Zone) -> { T },
-	getPlayersInZone: (self: Observer<T>, zone: Zone) -> { Player },
+	getId: (self: Observer<T, M>) -> number,
+	getPriority: (self: Observer<T, M>) -> number,
+	getUpdateRate: (self: Observer<T, M>) -> number,
+	getPrecision: (self: Observer<T, M>) -> number,
+	getZones: (self: Observer<T, M>) -> { Zone<M> },
+	getGroups: (self: Observer<T, M>) -> { Group<T> },
+	getEntitiesInside: (self: Observer<T, M>) -> { T },
+	getPlayersInside: (self: Observer<T, M>) -> { Player },
+	getZoneOfEntity: (self: Observer<T, M>, entity: T) -> Zone<M>?,
+	getZoneOfPlayer: (self: Observer<T, M>, player: Player) -> Zone<M>?,
+	getEntitiesInZone: (self: Observer<T, M>, zone: Zone<M>) -> { T },
+	getPlayersInZone: (self: Observer<T, M>, zone: Zone<M>) -> { Player },
 
-	iterZones: (self: Observer<T>) -> () -> Zone?,
-	iterGroups: (self: Observer<T>) -> () -> Group<T>?,
-	iterEntitiesInside: (self: Observer<T>) -> () -> (T?, Zone?),
-	iterPlayersInside: (self: Observer<T>) -> () -> (Player?, Zone?),
-	iterEntitiesInZone: (self: Observer<T>, zone: Zone) -> () -> T?,
-	iterPlayersInZone: (self: Observer<T>, zone: Zone) -> () -> Player?,
+	iterZones: (self: Observer<T, M>) -> () -> Zone<M>?,
+	iterGroups: (self: Observer<T, M>) -> () -> Group<T>?,
+	iterEntitiesInside: (self: Observer<T, M>) -> () -> (T?, Zone<M>?),
+	iterPlayersInside: (self: Observer<T, M>) -> () -> (Player?, Zone<M>?),
+	iterEntitiesInZone: (self: Observer<T, M>, zone: Zone<M>) -> () -> T?,
+	iterPlayersInZone: (self: Observer<T, M>, zone: Zone<M>) -> () -> Player?,
 
-	observe: (self: Observer<T>, callback: (T, Zone) -> (() -> ())?) -> () -> (),
-	observePlayer: (self: Observer<T>, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
-	observeLocalPlayer: (self: Observer<T>, callback: (Zone) -> (() -> ())?) -> () -> (),
-	observeGroup: (self: Observer<T>, callback: (Group<T>, Zone) -> (() -> ())?) -> () -> (),
-	onEnter: (self: Observer<T>, callback: (T, Zone) -> ()) -> () -> (),
-	onExit: (self: Observer<T>, callback: (T, Zone) -> ()) -> () -> (),
-	onPlayerEnter: (self: Observer<T>, callback: (Player, Zone) -> ()) -> () -> (),
-	onPlayerExit: (self: Observer<T>, callback: (Player, Zone) -> ()) -> () -> (),
-	onLocalPlayerEnter: (self: Observer<T>, callback: (Zone) -> ()) -> () -> (),
-	onLocalPlayerExit: (self: Observer<T>, callback: (Zone) -> ()) -> () -> (),
-	onGroupEnter: (self: Observer<T>, callback: (Group<T>, Zone) -> ()) -> () -> (),
-	onGroupExit: (self: Observer<T>, callback: (Group<T>, Zone) -> ()) -> () -> (),
-	onTransition: (self: Observer<T>, callback: (T, Zone, Zone) -> ()) -> () -> (),
-	onPlayerTransition: (self: Observer<T>, callback: (Player, Zone, Zone) -> ()) -> () -> (),
-	onLocalPlayerTransition: (self: Observer<T>, callback: (Zone, Zone) -> ()) -> () -> (),
+	observe: (self: Observer<T, M>, callback: (T, Zone<M>) -> (() -> ())?) -> () -> (),
+	observePlayer: (self: Observer<T, M>, callback: (Player, Zone<M>) -> (() -> ())?) -> () -> (),
+	observeLocalPlayer: (self: Observer<T, M>, callback: (Zone<M>) -> (() -> ())?) -> () -> (),
+	observeGroup: (self: Observer<T, M>, callback: (Group<T>, Zone<M>) -> (() -> ())?) -> () -> (),
+	onEnter: (self: Observer<T, M>, callback: (T, Zone<M>) -> ()) -> () -> (),
+	onExit: (self: Observer<T, M>, callback: (T, Zone<M>) -> ()) -> () -> (),
+	onPlayerEnter: (self: Observer<T, M>, callback: (Player, Zone<M>) -> ()) -> () -> (),
+	onPlayerExit: (self: Observer<T, M>, callback: (Player, Zone<M>) -> ()) -> () -> (),
+	onLocalPlayerEnter: (self: Observer<T, M>, callback: (Zone<M>) -> ()) -> () -> (),
+	onLocalPlayerExit: (self: Observer<T, M>, callback: (Zone<M>) -> ()) -> () -> (),
+	onGroupEnter: (self: Observer<T, M>, callback: (Group<T>, Zone<M>) -> ()) -> () -> (),
+	onGroupExit: (self: Observer<T, M>, callback: (Group<T>, Zone<M>) -> ()) -> () -> (),
+	onTransition: (self: Observer<T, M>, callback: (T, Zone<M>, Zone<M>) -> ()) -> () -> (),
+	onPlayerTransition: (self: Observer<T, M>, callback: (Player, Zone<M>, Zone<M>) -> ()) -> () -> (),
+	onLocalPlayerTransition: (self: Observer<T, M>, callback: (Zone<M>, Zone<M>) -> ()) -> () -> (),
 
-	onDestroy: (self: Observer<T>, callback: () -> ()) -> () -> (),
-	destroy: (self: Observer<T>) -> (),
+	onDestroy: (self: Observer<T, M>, callback: () -> ()) -> () -> (),
+	destroy: (self: Observer<T, M>) -> (),
 }
 
 export type ObserverClass = {
-	new: <T>(
+	new: <T, M>(
 		config: {
 			groups: { Group<T> }?,
 			priority: number?,
@@ -93,10 +93,10 @@ export type ObserverClass = {
 			enabled: boolean?,
 			safety: boolean?,
 		}?
-	) -> Observer<T>,
+	) -> Observer<T, M>,
 }
 
-export type InternalObserver<T = Entity> = Observer<T> & {
+export type InternalObserver<T = Entity, M = any> = Observer<T, M> & {
 	id: number,
 	onDestroyCallbacks: { () -> () }?,
 }
@@ -120,126 +120,126 @@ export type QuickZone = {
 
 	getEntityOfReference: (self: QuickZone, reference: any) -> Entity?,
 	getReferenceOfEntity: (self: QuickZone, entity: Entity) -> any,
-	getZones: (self: QuickZone) -> { Zone },
-	getObservers: (self: QuickZone) -> { Observer<any> },
+	getZones: (self: QuickZone) -> { Zone<any> },
+	getObservers: (self: QuickZone) -> { Observer<any, any> },
 	getGroups: (self: QuickZone) -> { Group<any> },
 	getEntities: (self: QuickZone) -> { any },
-	iterZones: (self: QuickZone) -> () -> Zone?,
-	iterObservers: (self: QuickZone) -> () -> Observer<any>?,
+	iterZones: (self: QuickZone) -> () -> Zone<any>?,
+	iterObservers: (self: QuickZone) -> () -> Observer<any, any>?,
 	iterGroups: (self: QuickZone) -> () -> Group<any>?,
 	iterEntities: (self: QuickZone) -> () -> any?,
-	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone },
-	iterZonesAtPoint: (self: QuickZone, position: Vector3) -> () -> Zone?,
-	getZonesOfEntity: (self: QuickZone, entity: any) -> { Zone },
-	iterZonesOfEntity: (self: QuickZone, entity: any) -> () -> Zone?,
+	getZonesAtPoint: (self: QuickZone, position: Vector3) -> { Zone<any> },
+	iterZonesAtPoint: (self: QuickZone, position: Vector3) -> () -> Zone<any>?,
+	getZonesOfEntity: (self: QuickZone, entity: any) -> { Zone<any> },
+	iterZonesOfEntity: (self: QuickZone, entity: any) -> () -> Zone<any>?,
 	getGroupsOfEntity: (self: QuickZone, entity: any) -> { Group<any> },
 	iterGroupsOfEntity: (self: QuickZone, entity: any) -> () -> Group<any>?,
 }
 
 export type ZoneClass = {
-	new: (
+	new: <M>(
 		config: {
 			cframe: CFrame,
 			size: Vector3,
 			shape: ShapeType?,
 			reference: (BasePart | Attachment | Bone)?,
 			isDynamic: boolean?,
-			metadata: any?,
+			metadata: M?,
 			autoSync: boolean?,
-			observers: { Observer<any> }?,
+			observers: { Observer<any, M> }?,
 		}
-	) -> Zone,
-	fromPart: (
+	) -> Zone<M>,
+	fromPart: <M>(
 		part: BasePart,
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer<any> }? }?
-	) -> Zone,
-	fromParts: (
+		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
+	) -> Zone<M>,
+	fromParts: <M>(
 		parts: { BasePart },
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer<any> }? }?
-	) -> Zones,
-	fromTag: (
+		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
+	) -> Zones<M>,
+	fromTag: <M>(
 		tag: string,
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer<any> }? }?
-	) -> Zones,
-	fromDescendants: (
+		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
+	) -> Zones<M>,
+	fromDescendants: <M>(
 		parent: Instance,
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer<any> }? }?
-	) -> Zones,
-	fromChildren: (
+		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
+	) -> Zones<M>,
+	fromChildren: <M>(
 		parent: Instance,
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer<any> }? }?
-	) -> Zones,
+		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
+	) -> Zones<M>,
 }
 
-export type Zone = {
-	attach: (self: Zone, observer: any) -> Zone,
-	detach: (self: Zone, observer: any) -> Zone,
+export type Zone<M = any> = {
+	attach: (self: Zone<M>, observer: any) -> Zone<M>,
+	detach: (self: Zone<M>, observer: any) -> Zone<M>,
 
-	sync: (self: Zone) -> Zone,
-	setReference: (self: Zone, reference: (BasePart | Attachment | Bone)?) -> Zone,
-	setAutoSync: (self: Zone, autoSync: boolean) -> Zone,
-	setDynamic: (self: Zone, dynamic: boolean) -> Zone,
-	setCFrame: (self: Zone, cf: CFrame) -> Zone,
-	setPosition: (self: Zone, pos: Vector3) -> Zone,
-	setSize: (self: Zone, size: Vector3) -> Zone,
-	setShape: (self: Zone, shape: ShapeType) -> Zone,
-	setMetadata: (self: Zone, metadata: any?) -> Zone,
+	sync: (self: Zone<M>) -> Zone<M>,
+	setReference: (self: Zone<M>, reference: (BasePart | Attachment | Bone)?) -> Zone<M>,
+	setAutoSync: (self: Zone<M>, autoSync: boolean) -> Zone<M>,
+	setDynamic: (self: Zone<M>, dynamic: boolean) -> Zone<M>,
+	setCFrame: (self: Zone<M>, cf: CFrame) -> Zone<M>,
+	setPosition: (self: Zone<M>, pos: Vector3) -> Zone<M>,
+	setSize: (self: Zone<M>, size: Vector3) -> Zone<M>,
+	setShape: (self: Zone<M>, shape: ShapeType) -> Zone<M>,
+	setMetadata: (self: Zone<M>, metadata: M?) -> Zone<M>,
 
-	getMetadata: (self: Zone) -> any?,
-	getId: (self: Zone) -> number,
-	getReference: (self: Zone) -> (BasePart | Attachment | Bone)?,
-	getPosition: (self: Zone) -> Vector3,
-	getCFrame: (self: Zone) -> CFrame,
-	getSize: (self: Zone) -> Vector3,
-	getShape: (self: Zone) -> ShapeType,
+	getMetadata: (self: Zone<M>) -> M?,
+	getId: (self: Zone<M>) -> number,
+	getReference: (self: Zone<M>) -> (BasePart | Attachment | Bone)?,
+	getPosition: (self: Zone<M>) -> Vector3,
+	getCFrame: (self: Zone<M>) -> CFrame,
+	getSize: (self: Zone<M>) -> Vector3,
+	getShape: (self: Zone<M>) -> ShapeType,
 
-	isDynamic: (self: Zone) -> boolean,
-	isPointInside: (self: Zone, point: Vector3) -> boolean,
+	isDynamic: (self: Zone<M>) -> boolean,
+	isPointInside: (self: Zone<M>, point: Vector3) -> boolean,
 
-	onDestroy: (self: Zone, callback: () -> ()) -> () -> (),
-	destroy: (self: Zone) -> (),
+	onDestroy: (self: Zone<M>, callback: () -> ()) -> () -> (),
+	destroy: (self: Zone<M>) -> (),
 }
 
-export type InternalZone = Zone & {
+export type InternalZone<M = any> = Zone<M> & {
 	id: number,
 	reference: (BasePart | Attachment | Bone)?,
 	dynamic: boolean,
-	metadata: any?,
+	metadata: M?,
 	autoSync: boolean,
 	syncConnections: { RBXScriptConnection }?,
 	onDestroyCallbacks: { () -> () }?,
 }
 
-export type Zones = {
-	attach: (self: Zones, observer: Observer<any>) -> Zones,
-	detach: (self: Zones, observer: Observer<any>) -> Zones,
+export type Zones<M = any> = {
+	attach: (self: Zones<M>, observer: Observer<any, M>) -> Zones<M>,
+	detach: (self: Zones<M>, observer: Observer<any, M>) -> Zones<M>,
 
-	sync: (self: Zones) -> Zones,
-	setAutoSync: (self: Zones, autoSync: boolean) -> Zones,
-	setDynamic: (self: Zones, dynamic: boolean) -> Zones,
-	getZones: (self: Zones) -> { Zone },
-	getMetadata: (self: Zones) -> any?,
-	isDynamic: (self: Zones) -> boolean,
-	isPointInside: (self: Zones, point: Vector3) -> boolean,
-	setMetadata: (self: Zones, metadata: any?) -> Zones,
-	contains: (self: Zones, zone: Zone) -> boolean,
-	iterZones: (self: Zones) -> () -> Zone?,
+	sync: (self: Zones<M>) -> Zones<M>,
+	setAutoSync: (self: Zones<M>, autoSync: boolean) -> Zones<M>,
+	setDynamic: (self: Zones<M>, dynamic: boolean) -> Zones<M>,
+	getZones: (self: Zones<M>) -> { Zone<M> },
+	getMetadata: (self: Zones<M>) -> M?,
+	isDynamic: (self: Zones<M>) -> boolean,
+	isPointInside: (self: Zones<M>, point: Vector3) -> boolean,
+	setMetadata: (self: Zones<M>, metadata: M?) -> Zones<M>,
+	contains: (self: Zones<M>, zone: Zone<M>) -> boolean,
+	iterZones: (self: Zones<M>) -> () -> Zone<M>?,
 
-	onDestroy: (self: Zones, callback: () -> ()) -> () -> (),
-	destroy: (self: Zones) -> (),
+	onDestroy: (self: Zones<M>, callback: () -> ()) -> () -> (),
+	destroy: (self: Zones<M>) -> (),
 }
 
-export type InternalZones = Zones & {
+export type InternalZones<M = any> = Zones<M> & {
 	autoSync: boolean?,
 	dynamic: boolean,
-	metadata: any?,
-	zones: { [Zone]: boolean },
-	observers: { [Observer<any>]: boolean },
+	metadata: M?,
+	zones: { [Zone<M>]: boolean },
+	observers: { [Observer<any, M>]: boolean },
 	onDestroyCallbacks: { () -> () }?,
-	onDestroyObserverCleanups: { [Observer<any>]: () -> () },
-	onDestroyZoneCleanups: { [Zone]: () -> () },
-	add: (self: InternalZones, zone: Zone) -> (),
-	remove: (self: InternalZones, zone: Zone) -> (),
+	onDestroyObserverCleanups: { [Observer<any, M>]: () -> () },
+	onDestroyZoneCleanups: { [Zone<M>]: () -> () },
+	add: (self: InternalZones<M>, zone: Zone<M>) -> (),
+	remove: (self: InternalZones<M>, zone: Zone<M>) -> (),
 }
 
 export type GroupClass = {

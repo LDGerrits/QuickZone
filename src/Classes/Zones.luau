@@ -13,19 +13,19 @@ local Types = require(script.Parent.Parent.Types)
 local Zones = {}
 Zones.__index = Zones
 
-function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: any? }?): Types.Zones
+function Zones.new<M>(config: { isDynamic: boolean?, autoSync: boolean?, metadata: M? }?): Types.Zones<M>
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
-	local self: Types.InternalZones = setmetatable({
+	local self: Types.InternalZones<M> = setmetatable({
 		dynamic = isDynamic,
 		metadata = metadata,
 		autoSync = autoSync,
-		zones = {} :: { [Types.Zone]: boolean },
-		observers = {} :: { [Types.Observer<any>]: boolean },
-		onDestroyObserverCleanups = {} :: { [Types.Observer<any>]: () -> () },
-		onDestroyZoneCleanups = {} :: { [Types.Zone]: () -> () },
+		zones = {} :: { [Types.Zone<M>]: boolean },
+		observers = {} :: { [Types.Observer<any, M>]: boolean },
+		onDestroyObserverCleanups = {} :: { [Types.Observer<any, M>]: () -> () },
+		onDestroyZoneCleanups = {} :: { [Types.Zone<M>]: () -> () },
 	}, Zones) :: any
 
 	return self
@@ -39,7 +39,7 @@ end
 	@param observer Observer
 	@return Zones
 ]=]
-function Zones.attach(self: Types.InternalZones, observer: Types.InternalObserver<any>): Types.Zones
+function Zones.attach(self: Types.InternalZones<any>, observer: Types.InternalObserver<any, any>): Types.Zones<any>
 	if self.observers[observer] then
 		return self
 	end
@@ -64,7 +64,7 @@ end
 	@param observer Observer
 	@return Zones
 ]=]
-function Zones.detach(self: Types.InternalZones, observer: Types.InternalObserver<any>): Types.Zones
+function Zones.detach(self: Types.InternalZones<any>, observer: Types.InternalObserver<any, any>): Types.Zones<any>
 	if not self.observers[observer] then
 		return self
 	end
@@ -89,7 +89,7 @@ end
 	@within Zones
 	@return Zones
 ]=]
-function Zones.sync(self: Types.InternalZones): Types.Zones
+function Zones.sync(self: Types.InternalZones<any>): Types.Zones<any>
 	if not self.dynamic then
 		return self
 	end
@@ -106,7 +106,7 @@ end
 	@within Zones
 	@return { Zone }
 ]=]
-function Zones.getZones(self: Types.InternalZones): { Types.Zone }
+function Zones.getZones(self: Types.InternalZones<any>): { Types.Zone<any> }
 	local result = {}
 	for zone, _ in self.zones do
 		table.insert(result, zone)
@@ -121,7 +121,7 @@ end
 	@within Zones
 	@return boolean
 ]=]
-function Zones.isDynamic(self: Types.InternalZones): boolean
+function Zones.isDynamic(self: Types.InternalZones<any>): boolean
 	return self.dynamic
 end
 
@@ -133,7 +133,7 @@ end
 	@param point Vector3
 	@return boolean
 ]=]
-function Zones.isPointInside(self: Types.InternalZones, point: Vector3): boolean
+function Zones.isPointInside(self: Types.InternalZones<any>, point: Vector3): boolean
 	for zone, _ in self.zones do
 		if zone:isPointInside(point) then
 			return true
@@ -151,7 +151,7 @@ end
 	@param autoSync boolean
 	@return Zones
 ]=]
-function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
+function Zones.setAutoSync(self: Types.InternalZones<any>, autoSync: boolean): Types.Zones<any>
 	if self.autoSync == autoSync then
 		return self
 	end
@@ -177,7 +177,7 @@ end
 	@param isDynamic boolean
 	@return Zones
 ]=]
-function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
+function Zones.setDynamic(self: Types.InternalZones<any>, isDynamic: boolean): Types.Zones<any>
 	if self.dynamic == isDynamic then
 		return self
 	end
@@ -199,7 +199,7 @@ end
 	@param metadata any
 	@return Zones
 ]=]
-function Zones.setMetadata(self: Types.InternalZones, metadata: any): Types.Zones
+function Zones.setMetadata(self: Types.InternalZones<any>, metadata: any): Types.Zones<any>
 	self.metadata = metadata
 	for zone, _ in self.zones do
 		zone:setMetadata(metadata)
@@ -214,7 +214,7 @@ end
 	@within Zones
 	@return any
 ]=]
-function Zones.getMetadata(self: Types.InternalZones): any?
+function Zones.getMetadata(self: Types.InternalZones<any>): any?
 	return self.metadata
 end
 
@@ -226,7 +226,7 @@ end
 	@param zone Zone
 	@return boolean
 ]=]
-function Zones.contains(self: Types.InternalZones, zone: Types.Zone): boolean
+function Zones.contains(self: Types.InternalZones<any>, zone: Types.Zone<any>): boolean
 	return self.zones[zone] == true
 end
 
@@ -237,9 +237,9 @@ end
 	@within Zones
 	@return () -> Zone?
 ]=]
-function Zones.iterZones(self: Types.InternalZones): () -> Types.Zone?
+function Zones.iterZones(self: Types.InternalZones<any>): () -> Types.Zone<any>?
 	local currentZone = nil
-	return function(): Types.Zone?
+	return function(): Types.Zone<any>?
 		currentZone = next(self.zones, currentZone)
 		return currentZone
 	end
@@ -254,7 +254,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Zones.onDestroy(self: Types.InternalZones, callback: () -> ()): () -> ()
+function Zones.onDestroy(self: Types.InternalZones<any>, callback: () -> ()): () -> ()
 	if not self.onDestroyCallbacks then
 		self.onDestroyCallbacks = {}
 	end
@@ -280,7 +280,7 @@ end
 	@method destroy
 	@within Zones
 ]=]
-function Zones.destroy(self: Types.InternalZones)
+function Zones.destroy(self: Types.InternalZones<any>)
 	if self.onDestroyCallbacks then
 		for _, callback in self.onDestroyCallbacks do
 			task.spawn(callback)
@@ -306,7 +306,7 @@ function Zones.destroy(self: Types.InternalZones)
 end
 
 -- private
-function Zones.add(self: Types.InternalZones, zone: Types.Zone)
+function Zones.add(self: Types.InternalZones<any>, zone: Types.Zone<any>)
 	if self.zones[zone] then
 		return
 	end
@@ -335,7 +335,7 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 end
 
 -- private
-function Zones.remove(self: Types.InternalZones, zone: Types.Zone)
+function Zones.remove(self: Types.InternalZones<any>, zone: Types.Zone<any>)
 	if not self.zones[zone] then
 		return
 	end

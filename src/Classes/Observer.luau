@@ -117,18 +117,18 @@ Observer.__index = Observer
 	@param config { priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean?, groups: { Types.Group }?, }?
 	@return Observer
 ]=]
-function Observer.new<T>(config: {
+function Observer.new<T, M>(config: {
 	groups: { Types.Group<any> }?,
 	priority: number?,
 	updateRate: number?,
 	precision: number?,
 	enabled: boolean?,
 	safety: boolean?,
-}?): Types.Observer<T>
+}?): Types.Observer<T, M>
 	local id = State.nextObserverId
 	State.nextObserverId += 1
 
-	local self: Types.InternalObserver<T> = setmetatable({
+	local self: Types.InternalObserver<T, M> = setmetatable({
 		id = id,
 	}, Observer) :: any
 
@@ -168,7 +168,10 @@ end
 	@param group Group -- The group to monitor.
 	@return Observer
 ]=]
-function Observer.subscribe(self: Types.InternalObserver<any>, group: Types.InternalGroup<any>): Types.Observer<any>
+function Observer.subscribe(
+	self: Types.InternalObserver<any, any>,
+	group: Types.InternalGroup<any>
+): Types.Observer<any, any>
 	local groupId = group.id
 	if not State.groupToObservers[groupId] then
 		State.groupToObservers[groupId] = {}
@@ -191,7 +194,10 @@ end
 	@param group Group -- The group to stop monitoring.
 	@return Observer
 ]=]
-function Observer.unsubscribe(self: Types.InternalObserver<any>, group: Types.InternalGroup<any>): Types.Observer<any>
+function Observer.unsubscribe(
+	self: Types.InternalObserver<any, any>,
+	group: Types.InternalGroup<any>
+): Types.Observer<any, any>
 	local groupId = group.id
 
 	if State.groupToObservers[groupId] then
@@ -226,7 +232,10 @@ end
 	@param callback (entity: any, zone: Zone) -> (() -> ())?
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.observe(self: Types.InternalObserver<any>, callback: (any, Types.Zone) -> (() -> ())?): () -> ()
+function Observer.observe(
+	self: Types.InternalObserver<any, any>,
+	callback: (any, Types.Zone<any>) -> (() -> ())?
+): () -> ()
 	local cleanups = {} :: { [any]: () -> () }
 	local activeIds = {} :: { [any]: number }
 	local nextId = 0 -- sessionId for each entity
@@ -288,7 +297,7 @@ end
 	@param callback (entity: any, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onEnter(self: Types.InternalObserver<any>, callback: (any, Types.Zone) -> ()): () -> ()
+function Observer.onEnter(self: Types.InternalObserver<any, any>, callback: (any, Types.Zone<any>) -> ()): () -> ()
 	table.insert(State.observerEnteredCallbacks[self.id], callback)
 	return function()
 		local idx = table.find(State.observerEnteredCallbacks[self.id], callback)
@@ -307,7 +316,7 @@ end
 	@param callback (entity: any, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onExit(self: Types.InternalObserver<any>, callback: (any, Types.Zone) -> ()): () -> ()
+function Observer.onExit(self: Types.InternalObserver<any, any>, callback: (any, Types.Zone<any>) -> ()): () -> ()
 	table.insert(State.observerExitedCallbacks[self.id], callback)
 	return function()
 		local idx = table.find(State.observerExitedCallbacks[self.id], callback)
@@ -337,8 +346,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.observePlayer(
-	self: Types.InternalObserver<any>,
-	callback: (Player, Types.Zone) -> (() -> ())?
+	self: Types.InternalObserver<any, any>,
+	callback: (Player, Types.Zone<any>) -> (() -> ())?
 ): () -> ()
 	local cleanups = {} :: { [Player]: () -> () }
 	local activeIds = {} :: { [Player]: number }
@@ -407,7 +416,10 @@ end
 	@param callback (player: Player, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onPlayerEnter(self: Types.InternalObserver<any>, callback: (Player, Types.Zone) -> ()): () -> ()
+function Observer.onPlayerEnter(
+	self: Types.InternalObserver<any, any>,
+	callback: (Player, Types.Zone<any>) -> ()
+): () -> ()
 	return self:onEnter(function(entity, zone)
 		if typeof(entity) == 'Instance' and entity:IsA('Player') then
 			callback(entity, zone)
@@ -425,7 +437,10 @@ end
 	@param callback (player: Player, zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onPlayerExit(self: Types.InternalObserver<any>, callback: (Player, Types.Zone) -> ()): () -> ()
+function Observer.onPlayerExit(
+	self: Types.InternalObserver<any, any>,
+	callback: (Player, Types.Zone<any>) -> ()
+): () -> ()
 	return self:onExit(function(entity, zone)
 		if typeof(entity) == 'Instance' and entity:IsA('Player') then
 			callback(entity, zone)
@@ -451,7 +466,10 @@ end
 	@param callback (zone: Zone) -> (() -> ())?
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.observeLocalPlayer(self: Types.InternalObserver<any>, callback: (Types.Zone) -> (() -> ())?): () -> ()
+function Observer.observeLocalPlayer(
+	self: Types.InternalObserver<any, any>,
+	callback: (Types.Zone<any>) -> (() -> ())?
+): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:observeLocalPlayer can only be called on the Client.')
 
 	local currentCleanup = nil :: (() -> ())?
@@ -520,7 +538,10 @@ end
 	@param callback (zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onLocalPlayerEnter(self: Types.InternalObserver<any>, callback: (Types.Zone) -> ()): () -> ()
+function Observer.onLocalPlayerEnter(
+	self: Types.InternalObserver<any, any>,
+	callback: (Types.Zone<any>) -> ()
+): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerEnter can only be called on the Client.')
 	return self:onEnter(function(entity, zone)
 		if entity == Players.LocalPlayer then
@@ -540,7 +561,7 @@ end
 	@param callback (zone: Zone) -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onLocalPlayerExit(self: Types.InternalObserver<any>, callback: (Types.Zone) -> ()): () -> ()
+function Observer.onLocalPlayerExit(self: Types.InternalObserver<any, any>, callback: (Types.Zone<any>) -> ()): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerExit can only be called on the Client.')
 	return self:onExit(function(entity, zone)
 		if entity == Players.LocalPlayer then
@@ -569,8 +590,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.observeGroup(
-	self: Types.InternalObserver<any>,
-	callback: (Types.Group<any>, Types.Zone) -> (() -> ())?
+	self: Types.InternalObserver<any, any>,
+	callback: (Types.Group<any>, Types.Zone<any>) -> (() -> ())?
 ): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 	local cleanups = {} :: { [number]: () -> () }
@@ -638,8 +659,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onGroupEnter(
-	self: Types.InternalObserver<any>,
-	callback: (Types.Group<any>, Types.Zone) -> ()
+	self: Types.InternalObserver<any, any>,
+	callback: (Types.Group<any>, Types.Zone<any>) -> ()
 ): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
@@ -697,8 +718,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onGroupExit(
-	self: Types.InternalObserver<any>,
-	callback: (Types.Group<any>, Types.Zone) -> ()
+	self: Types.InternalObserver<any, any>,
+	callback: (Types.Group<any>, Types.Zone<any>) -> ()
 ): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
@@ -752,8 +773,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onTransition(
-	self: Types.InternalObserver<any>,
-	callback: (any, Types.Zone, Types.Zone) -> ()
+	self: Types.InternalObserver<any, any>,
+	callback: (any, Types.Zone<any>, Types.Zone<any>) -> ()
 ): () -> ()
 	table.insert(State.observerTransitionedCallbacks[self.id], callback)
 
@@ -776,8 +797,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerTransition(
-	self: Types.InternalObserver<any>,
-	callback: (Player, Types.Zone, Types.Zone) -> ()
+	self: Types.InternalObserver<any, any>,
+	callback: (Player, Types.Zone<any>, Types.Zone<any>) -> ()
 ): () -> ()
 	local wrapper = function(entity, newZone, oldZone)
 		if typeof(entity) == 'Instance' and entity:IsA('Player') then
@@ -806,8 +827,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onLocalPlayerTransition(
-	self: Types.InternalObserver<any>,
-	callback: (Types.Zone, Types.Zone) -> ()
+	self: Types.InternalObserver<any, any>,
+	callback: (Types.Zone<any>, Types.Zone<any>) -> ()
 ): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerTransition can only be called on the Client.')
 
@@ -836,7 +857,7 @@ end
 	@param enabled boolean
 	@return Observer
 ]=]
-function Observer.setEnabled(self: Types.InternalObserver<any>, enabled: boolean): Types.Observer<any>
+function Observer.setEnabled(self: Types.InternalObserver<any, any>, enabled: boolean): Types.Observer<any, any>
 	local wasEnabled = self:isEnabled()
 
 	if wasEnabled == enabled then
@@ -875,7 +896,7 @@ end
 	@param enabled boolean
 	@return Observer
 ]=]
-function Observer.setSafety(self: Types.InternalObserver<any>, enabled: boolean): Types.Observer<any>
+function Observer.setSafety(self: Types.InternalObserver<any, any>, enabled: boolean): Types.Observer<any, any>
 	State.observerSafety[self.id] = enabled
 	return self
 end
@@ -888,7 +909,7 @@ end
 	@param p number
 	@return Observer
 ]=]
-function Observer.setPriority(self: Types.InternalObserver<any>, p: number): Types.Observer<any>
+function Observer.setPriority(self: Types.InternalObserver<any, any>, p: number): Types.Observer<any, any>
 	State.observerPriorityMap[self.id] = p
 	State.logicVersion += 1
 	return self
@@ -902,7 +923,7 @@ end
 	@param hz number
 	@return Observer
 ]=]
-function Observer.setUpdateRate(self: Types.InternalObserver<any>, hz: number): Types.Observer<any>
+function Observer.setUpdateRate(self: Types.InternalObserver<any, any>, hz: number): Types.Observer<any, any>
 	assert(hz >= 0, '[QuickZone] updateRate must be non-negative')
 	State.observerUpdateRate[self.id] = hz
 	updateAllEntitiesForObserver(self.id)
@@ -917,7 +938,7 @@ end
 	@param n number
 	@return Observer
 ]=]
-function Observer.setPrecision(self: Types.InternalObserver<any>, n: number): Types.Observer<any>
+function Observer.setPrecision(self: Types.InternalObserver<any, any>, n: number): Types.Observer<any, any>
 	assert(n >= 0, '[QuickZone] precision must be non-negative')
 	State.observerPrecisionSq[self.id] = n ^ 2
 	updateAllEntitiesForObserver(self.id)
@@ -931,7 +952,7 @@ end
 	@within Observer
 	@return boolean
 ]=]
-function Observer.isEnabled(self: Types.InternalObserver<any>): boolean
+function Observer.isEnabled(self: Types.InternalObserver<any, any>): boolean
 	return State.observerEnabled[self.id] ~= false
 end
 
@@ -943,7 +964,7 @@ end
 	@param position Vector3
 	@return boolean
 ]=]
-function Observer.isPointInside(self: Types.InternalObserver<any>, position: Vector3): boolean
+function Observer.isPointInside(self: Types.InternalObserver<any, any>, position: Vector3): boolean
 	local px, py, pz = position.X, position.Y, position.Z
 	local observerId = self.id
 
@@ -1015,7 +1036,7 @@ end
 	@within Observer
 	@return boolean
 ]=]
-function Observer.isSafe(self: Types.InternalObserver<any>): boolean
+function Observer.isSafe(self: Types.InternalObserver<any, any>): boolean
 	return State.observerSafety[self.id]
 end
 
@@ -1026,7 +1047,7 @@ end
 	@within Observer
 	@return number
 ]=]
-function Observer.getId(self: Types.InternalObserver<any>): number
+function Observer.getId(self: Types.InternalObserver<any, any>): number
 	return self.id
 end
 
@@ -1037,7 +1058,7 @@ end
 	@within Observer
 	@return number
 ]=]
-function Observer.getPriority(self: Types.InternalObserver<any>): number
+function Observer.getPriority(self: Types.InternalObserver<any, any>): number
 	return State.observerPriorityMap[self.id]
 end
 
@@ -1048,7 +1069,7 @@ end
 	@within Observer
 	@return number
 ]=]
-function Observer.getUpdateRate(self: Types.InternalObserver<any>): number
+function Observer.getUpdateRate(self: Types.InternalObserver<any, any>): number
 	return State.observerUpdateRate[self.id]
 end
 
@@ -1059,7 +1080,7 @@ end
 	@within Observer
 	@return number
 ]=]
-function Observer.getPrecision(self: Types.InternalObserver<any>): number
+function Observer.getPrecision(self: Types.InternalObserver<any, any>): number
 	return math.sqrt(State.observerPrecisionSq[self.id])
 end
 
@@ -1070,7 +1091,7 @@ end
 	@within Observer
 	@return { any }
 ]=]
-function Observer.getEntitiesInside(self: Types.InternalObserver<any>): { any }
+function Observer.getEntitiesInside(self: Types.InternalObserver<any, any>): { any }
 	local entities = State.observerTrackingEntities[self.id]
 	if not entities then
 		return {}
@@ -1090,7 +1111,7 @@ end
 	@within Observer
 	@return { Player }
 ]=]
-function Observer.getPlayersInside(self: Types.InternalObserver<any>): { Player }
+function Observer.getPlayersInside(self: Types.InternalObserver<any, any>): { Player }
 	local result = {}
 	local entities = State.observerTrackingEntities[self.id]
 
@@ -1112,7 +1133,7 @@ end
 	@within Observer
 	@return { Zone }
 ]=]
-function Observer.getZones(self: Types.InternalObserver<any>): { Types.Zone }
+function Observer.getZones(self: Types.InternalObserver<any, any>): { Types.Zone<any> }
 	local results = {}
 	for zoneId, attachedList in State.zoneAttachedObservers do
 		if not table.find(attachedList, self.id) then
@@ -1134,7 +1155,7 @@ end
 	@within Observer
 	@return { Group }
 ]=]
-function Observer.getGroups(self: Types.InternalObserver<any>): { Types.Group<any> }
+function Observer.getGroups(self: Types.InternalObserver<any, any>): { Types.Group<any> }
 	local result = {}
 
 	for groupId, observersMap in State.groupToObservers do
@@ -1159,7 +1180,7 @@ end
 	@param entity Entity -- The entity to get the zone for
 	@return Zone?
 ]=]
-function Observer.getZoneOfEntity(self: Types.InternalObserver<any>, entity: any): Types.Zone?
+function Observer.getZoneOfEntity(self: Types.InternalObserver<any, any>, entity: any): Types.Zone<any>?
 	entity = State.referenceToEntity[entity] or entity
 
 	local data = State.entityData[entity]
@@ -1182,7 +1203,7 @@ end
 	@param player Player -- The player to get the zone for
 	@return Zone?
 ]=]
-function Observer.getZoneOfPlayer(self: Types.InternalObserver<any>, player: Player): Types.Zone?
+function Observer.getZoneOfPlayer(self: Types.InternalObserver<any, any>, player: Player): Types.Zone<any>?
 	return self:getZoneOfEntity(player)
 end
 
@@ -1194,7 +1215,7 @@ end
 	@param zone Zone
 	@return { any }
 ]=]
-function Observer.getEntitiesInZone(self: Types.InternalObserver<any>, zone: Types.Zone): { any }
+function Observer.getEntitiesInZone(self: Types.InternalObserver<any, any>, zone: Types.Zone<any>): { any }
 	local results = {}
 
 	for entity in self:iterEntitiesInZone(zone) do
@@ -1212,7 +1233,7 @@ end
 	@param zone Zone
 	@return { Player }
 ]=]
-function Observer.getPlayersInZone(self: Types.InternalObserver<any>, zone: Types.Zone): { Player }
+function Observer.getPlayersInZone(self: Types.InternalObserver<any, any>, zone: Types.Zone<any>): { Player }
 	local results = {}
 
 	for player in self:iterPlayersInZone(zone) do
@@ -1229,12 +1250,12 @@ end
 	@within Observer
 	@return () -> Zone?
 ]=]
-function Observer.iterZones(self: Types.InternalObserver<any>): () -> Types.Zone?
+function Observer.iterZones(self: Types.InternalObserver<any, any>): () -> Types.Zone<any>?
 	local zoneId = nil
 	local attachedList = nil
 	local observerId = self.id
 
-	return function(): Types.Zone?
+	return function(): Types.Zone<any>?
 		while true do
 			zoneId, attachedList = next(zoneAttachedObservers, zoneId)
 
@@ -1261,7 +1282,7 @@ end
 	@within Observer
 	@return () -> Group?
 ]=]
-function Observer.iterGroups(self: Types.InternalObserver<any>): () -> Types.Group<any>?
+function Observer.iterGroups(self: Types.InternalObserver<any, any>): () -> Types.Group<any>?
 	local groupId = nil
 	local observersMap = nil
 	local observerId = self.id
@@ -1294,7 +1315,7 @@ end
 	@within Observer
 	@return () -> (Entity?, Zone?)
 ]=]
-function Observer.iterEntitiesInside(self: Types.InternalObserver<any>): () -> (any?, Types.Zone?)
+function Observer.iterEntitiesInside(self: Types.InternalObserver<any, any>): () -> (any?, Types.Zone<any>?)
 	local entities = State.observerTrackingEntities[self.id]
 	local entity = nil
 	local observerId = self.id
@@ -1330,7 +1351,7 @@ end
 	@within Observer
 	@return () -> (Player?, Zone?)
 ]=]
-function Observer.iterPlayersInside(self: Types.InternalObserver<any>): () -> Player?
+function Observer.iterPlayersInside(self: Types.InternalObserver<any, any>): () -> Player?
 	local entities = State.observerTrackingEntities[self.id]
 	local entity = nil
 	local observerId = self.id
@@ -1369,7 +1390,7 @@ end
 	@param zone Zone
 	@return () -> Entity?
 ]=]
-function Observer.iterEntitiesInZone(self: Types.InternalObserver<any>, zone: Types.Zone): () -> Types.Entity?
+function Observer.iterEntitiesInZone(self: Types.InternalObserver<any, any>, zone: Types.Zone<any>): () -> Types.Entity?
 	local entities = State.observerTrackingEntities[self.id]
 	if not entities then
 		return function()
@@ -1408,7 +1429,7 @@ end
 	@param zone Zone
 	@return () -> Player?
 ]=]
-function Observer.iterPlayersInZone(self: Types.InternalObserver<any>, zone: Types.Zone): () -> Player?
+function Observer.iterPlayersInZone(self: Types.InternalObserver<any, any>, zone: Types.Zone<any>): () -> Player?
 	local entities = State.observerTrackingEntities[self.id]
 	if not entities then
 		return function()
@@ -1456,7 +1477,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onDestroy(self: Types.InternalObserver<any>, callback: () -> ()): () -> ()
+function Observer.onDestroy(self: Types.InternalObserver<any, any>, callback: () -> ()): () -> ()
 	if not self.onDestroyCallbacks then
 		self.onDestroyCallbacks = {}
 	end
@@ -1478,7 +1499,7 @@ end
 	@method destroy
 	@within Observer
 ]=]
-function Observer.destroy(self: Types.InternalObserver<any>): ()
+function Observer.destroy(self: Types.InternalObserver<any, any>): ()
 	if self.onDestroyCallbacks then
 		for _, callback in self.onDestroyCallbacks do
 			task.spawn(callback)

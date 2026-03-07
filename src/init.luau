@@ -35,9 +35,9 @@ local debugFolder: Folder?
 local debugVisuals = {} :: { [number]: BoxHandleAdornment }
 
 export type QuickZone = Types.QuickZone
-export type Zone = Types.Zone
-export type Zones = Types.Zones
-export type Observer<T> = Types.Observer<T>
+export type Zone<M> = Types.Zone<M>
+export type Zones<M> = Types.Zones<M>
+export type Observer<T, M> = Types.Observer<T, M>
 export type Group<T> = Types.Group<T>
 export type Entity = Types.Entity
 
@@ -296,12 +296,12 @@ end
 	@within QuickZone
 	@return { Observer }
 ]=]
-function QuickZone:getObservers(): { Types.Observer<any> }
+function QuickZone:getObservers(): { Types.Observer<any, any> }
 	local result = {}
 	for _, observer in observerIdToObserverObj do
 		table.insert(result, observer)
 	end
-	return (result :: any) :: { Types.Observer<any> }
+	return (result :: any) :: { Types.Observer<any, any> }
 end
 
 --[=[ 
@@ -328,7 +328,7 @@ end
 	@within QuickZone
 	@return { Zone }
 ]=]
-function QuickZone:getZones(): { Types.Zone }
+function QuickZone:getZones(): { Types.Zone<any> }
 	local result = {}
 	for _, zone in zoneIdToZoneObj do
 		table.insert(result, zone)
@@ -364,7 +364,7 @@ end
 	@param position Vector3 -- The world position to check.
 	@return { Zone }
 ]=]
-function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
+function QuickZone:getZonesAtPoint(position: Vector3): { Types.Zone<any> }
 	local results = {}
 	local count = 0
 
@@ -400,7 +400,7 @@ end
 	@param entity any
 	@return { Zone }
 ]=]
-function QuickZone:getZonesOfEntity(entity: any): { Types.Zone }
+function QuickZone:getZonesOfEntity(entity: any): { Types.Zone<any> }
 	entity = referenceToEntity[entity] or entity
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
@@ -476,10 +476,10 @@ end
 	@within QuickZone
 	@return () -> Zone?
 ]=]
-function QuickZone:iterZones(): () -> Types.Zone?
+function QuickZone:iterZones(): () -> Types.Zone<any>?
 	local zoneId = nil
 
-	return function(): Types.Zone?
+	return function(): Types.Zone<any>?
 		zoneId = next(zoneIdToZoneObj, zoneId)
 		return zoneId and zoneIdToZoneObj[zoneId] or nil
 	end
@@ -511,10 +511,10 @@ end
 	@within QuickZone
 	@return () -> Observer?
 ]=]
-function QuickZone:iterObservers(): () -> Types.Observer<any>?
+function QuickZone:iterObservers(): () -> Types.Observer<any, any>?
 	local observerId = nil
 
-	return function(): Types.Observer<any>?
+	return function(): Types.Observer<any, any>?
 		observerId = next(observerIdToObserverObj, observerId)
 		return observerId and observerIdToObserverObj[observerId] or nil
 	end
@@ -553,7 +553,7 @@ end
 	@param entity any
 	@return () -> Zone?
 ]=]
-function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
+function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone<any>?
 	entity = referenceToEntity[entity] or entity
 
 	local data = entityData[entity]
@@ -567,7 +567,7 @@ function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
 	local seenZones = {}
 	local observerId = nil
 
-	return function(): Types.Zone?
+	return function(): Types.Zone<any>?
 		while true do
 			observerId = next(memberships, observerId)
 			if not observerId then
@@ -598,7 +598,7 @@ end
 	@param point Vector3
 	@return () -> Zone?
 ]=]
-function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
+function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone<any>?
 	local dynamicNodes = dynamicTree.nodes
 	local dynamicCount = dynamicTree.count or 0
 
@@ -610,7 +610,7 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 	local index = 1
 	local checkingDynamic = true
 
-	return function(): Types.Zone?
+	return function(): Types.Zone<any>?
 		if checkingDynamic then
 			while index <= dynamicCount do
 				local node = dynamicNodes[index]
