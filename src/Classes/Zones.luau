@@ -31,14 +31,6 @@ function Zones.new<M>(config: { isDynamic: boolean?, autoSync: boolean?, metadat
 	return self
 end
 
---[=[ 
-	Attaches an Observer to all underlying zones.
-
-	@method attach
-	@within Zones
-	@param observer Observer
-	@return Zones
-]=]
 function Zones.attach(self: Types.InternalZones<any>, observer: Types.InternalObserver<any, any>): Types.Zones<any>
 	if self.observers[observer] then
 		return self
@@ -50,20 +42,12 @@ function Zones.attach(self: Types.InternalZones<any>, observer: Types.InternalOb
 	end)
 
 	for zone, _ in self.zones do
-		zone:attach(observer)
+		(zone :: Types.InternalZone<any>):attach(observer)
 	end
 
 	return self
 end
 
---[=[ 
-	Detaches an Observer from all underlying zones.
-
-	@method detach
-	@within Zones
-	@param observer Observer
-	@return Zones
-]=]
 function Zones.detach(self: Types.InternalZones<any>, observer: Types.InternalObserver<any, any>): Types.Zones<any>
 	if not self.observers[observer] then
 		return self
@@ -77,7 +61,7 @@ function Zones.detach(self: Types.InternalZones<any>, observer: Types.InternalOb
 	end
 
 	for zone, _ in self.zones do
-		zone:detach(observer)
+		(zone :: Types.InternalZone<any>):detach(observer)
 	end
 	return self
 end
@@ -330,7 +314,7 @@ function Zones.add(self: Types.InternalZones<any>, zone: Types.Zone<any>)
 	end)
 
 	for observer, _ in self.observers do
-		zone:attach(observer)
+		(zone :: Types.InternalZone<any>):attach(observer)
 	end
 end
 
@@ -348,7 +332,7 @@ function Zones.remove(self: Types.InternalZones<any>, zone: Types.Zone<any>)
 	end
 
 	for observer, _ in self.observers do
-		zone:detach(observer)
+		(zone :: Types.InternalZone<any>):detach(observer)
 	end
 end
 

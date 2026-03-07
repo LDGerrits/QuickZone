@@ -119,6 +119,7 @@ Observer.__index = Observer
 ]=]
 function Observer.new<T, M>(config: {
 	groups: { Types.Group<any> }?,
+	zones: { Types.Zone<any> | Types.Zones<any> }?,
 	priority: number?,
 	updateRate: number?,
 	precision: number?,
@@ -149,6 +150,12 @@ function Observer.new<T, M>(config: {
 	if config and config.groups then
 		for _, group in config.groups do
 			self:subscribe(group)
+		end
+	end
+
+	if config and config.zones then
+		for _, zone in config.zones do
+			self:attach(zone)
 		end
 	end
 
@@ -206,6 +213,51 @@ function Observer.unsubscribe(
 
 	disconnectObserverFromGroup(self.id, group)
 
+	return self
+end
+
+--[=[ 
+	Adds a Zone or Zones collection to this observer.
+
+	```lua
+	-- You are also able to chain calls
+	observer:attach(zones)
+		:attach(zone1)
+		:attach(zone2)
+	```
+	
+	@method attach
+	@within Observer
+	@param target Zone | Zones
+	@return Observer
+]=]
+function Observer.attach(
+	self: Types.InternalObserver<any, any>,
+	zone: Types.Zone<any> | Types.Zones<any>
+): Types.Observer<any, any>
+	local internalZone = zone :: any
+	if internalZone.attach then
+		internalZone:attach(self)
+	end
+	return self
+end
+
+--[=[ 
+	Removes a Zone or Zones collection from this observer.
+	
+	@method detach
+	@within Observer
+	@param target Zone | Zones
+	@return Observer
+]=]
+function Observer.detach(
+	self: Types.InternalObserver<any, any>,
+	zone: Types.Zone<any> | Types.Zones<any>
+): Types.Observer<any, any>
+	local internalZone = zone :: any
+	if internalZone.detach then
+		internalZone:detach(self)
+	end
 	return self
 end
 
