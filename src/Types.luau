@@ -84,16 +84,24 @@ export type Observer<T = Entity, M = any> = {
 }
 
 export type ObserverClass = {
-	new: <T, M>(
+	new: (<T>(
 		config: {
-			groups: { Group<T> }?,
+			groups: { Group<T> },
 			priority: number?,
 			updateRate: number?,
 			precision: number?,
 			enabled: boolean?,
 			safety: boolean?,
-		}?
-	) -> Observer<T, M>,
+		}
+	) -> Observer<T, any>) & ((
+		config: {
+			priority: number?,
+			updateRate: number?,
+			precision: number?,
+			enabled: boolean?,
+			safety: boolean?,
+		}
+	) -> Observer<Entity, any>) & (() -> Observer<Entity, any>),
 }
 
 export type InternalObserver<T = Entity, M = any> = Observer<T, M> & {
@@ -137,38 +145,68 @@ export type QuickZone = {
 }
 
 export type ZoneClass = {
-	new: <M>(
+	new: (<M>(
 		config: {
 			cframe: CFrame,
 			size: Vector3,
 			shape: ShapeType?,
 			reference: (BasePart | Attachment | Bone)?,
 			isDynamic: boolean?,
-			metadata: M?,
+			metadata: M,
 			autoSync: boolean?,
 			observers: { Observer<any, M> }?,
 		}
-	) -> Zone<M>,
-	fromPart: <M>(
+	) -> Zone<M>) & ((
+		config: {
+			cframe: CFrame,
+			size: Vector3,
+			shape: ShapeType?,
+			reference: (BasePart | Attachment | Bone)?,
+			isDynamic: boolean?,
+			autoSync: boolean?,
+			observers: { Observer<any, any> }?,
+		}
+	) -> Zone<any>),
+
+	fromPart: (<M>(
 		part: BasePart,
-		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
-	) -> Zone<M>,
-	fromParts: <M>(
+		config: { isDynamic: boolean?, metadata: M, autoSync: boolean?, observers: { Observer<any, M> }? }
+	) -> Zone<M>) & ((
+		part: BasePart,
+		config: { isDynamic: boolean?, autoSync: boolean?, observers: { Observer<any, any> }? }?
+	) -> Zone<any>),
+
+	fromParts: (<M>(
 		parts: { BasePart },
-		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
-	) -> Zones<M>,
-	fromTag: <M>(
+		config: { isDynamic: boolean?, metadata: M, autoSync: boolean?, observers: { Observer<any, M> }? }
+	) -> Zones<M>) & ((
+		parts: { BasePart },
+		config: { isDynamic: boolean?, autoSync: boolean?, observers: { Observer<any, any> }? }?
+	) -> Zones<any>),
+
+	fromTag: (<M>(
 		tag: string,
-		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
-	) -> Zones<M>,
-	fromDescendants: <M>(
+		config: { isDynamic: boolean?, metadata: M, autoSync: boolean?, observers: { Observer<any, M> }? }
+	) -> Zones<M>) & ((
+		tag: string,
+		config: { isDynamic: boolean?, autoSync: boolean?, observers: { Observer<any, any> }? }?
+	) -> Zones<any>),
+
+	fromDescendants: (<M>(
 		parent: Instance,
-		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
-	) -> Zones<M>,
-	fromChildren: <M>(
+		config: { isDynamic: boolean?, metadata: M, autoSync: boolean?, observers: { Observer<any, M> }? }
+	) -> Zones<M>) & ((
 		parent: Instance,
-		config: { isDynamic: boolean?, metadata: M?, autoSync: boolean?, observers: { Observer<any, M> }? }?
-	) -> Zones<M>,
+		config: { isDynamic: boolean?, autoSync: boolean?, observers: { Observer<any, any> }? }?
+	) -> Zones<any>),
+
+	fromChildren: (<M>(
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: M, autoSync: boolean?, observers: { Observer<any, M> }? }
+	) -> Zones<M>) & ((
+		parent: Instance,
+		config: { isDynamic: boolean?, autoSync: boolean?, observers: { Observer<any, any> }? }?
+	) -> Zones<any>),
 }
 
 export type Zone<M = any> = {
