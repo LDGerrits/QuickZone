@@ -39,7 +39,7 @@ local function getShapeEnumValue(part: BasePart): number
 	return Enum.PartType.Block.Value
 end
 
-local function clearautoSync(zone: Types.InternalZone)
+local function clearAutoSync(zone: Types.InternalZone)
 	State.autoSyncZones[zone.id] = nil
 	if zone.syncConnections then
 		for _, conn in zone.syncConnections do
@@ -49,7 +49,7 @@ local function clearautoSync(zone: Types.InternalZone)
 	end
 end
 
-local function setupautoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
+local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
 	State.autoSyncZones[zone.id] = zone
 
 	local connections = zone.syncConnections or {}
@@ -682,12 +682,12 @@ function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zo
 		end
 
 		if self.reference then
-			setupautoSync(self, self.reference)
+			setupAutoSync(self, self.reference)
 		else
 			warn('[QuickZone] Cannot autoSync a Zone without a tracked reference.')
 		end
 	else
-		clearautoSync(self)
+		clearAutoSync(self)
 	end
 
 	return self
@@ -706,9 +706,9 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 	self.reference = reference
 
 	if self.autoSync then
-		clearautoSync(self)
+		clearAutoSync(self)
 		if reference then
-			setupautoSync(self, reference)
+			setupAutoSync(self, reference)
 		end
 	end
 
@@ -1152,7 +1152,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 		table.clear(self.onDestroyCallbacks)
 	end
 
-	clearautoSync(self)
+	clearAutoSync(self)
 
 	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler
 	local id = self.id
