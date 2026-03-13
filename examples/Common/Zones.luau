@@ -12,10 +12,10 @@ local Zone = QuickZone.Zone
 ]=]
 local Zones = {
 	Lava = Zone.fromTag('Lava', {
-		metadata = { PresetName = 'Lava', Damage = 50, TickRate = 0, HazardName = 'Scorching Lava' },
+		metadata = { Name = 'Lava', Damage = 50 },
 	}),
 	ToxicGas = Zone.fromTag('ToxicGas', {
-		metadata = { PresetName = 'ToxicGas', Damage = 2, TickRate = 0.1, HazardName = 'Toxic Gas' },
+		metadata = { Name = 'ToxicGas', Damage = 10 },
 	}),
 }
 

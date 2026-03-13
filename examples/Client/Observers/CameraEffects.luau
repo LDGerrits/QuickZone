@@ -44,16 +44,16 @@ SharedZones.Lava:attach(cameraEffectsObserver)
 SharedZones.ToxicGas:attach(cameraEffectsObserver)
 
 cameraEffectsObserver:observe(function(entity, initialZone)
-	local presetName = initialZone:getMetadata().PresetName
-	applyProps(PRESETS[presetName] or DEFAULTS)
+	local name = initialZone:getMetadata().Name
+	applyProps(PRESETS[name] or DEFAULTS)
 
 	local disconnectTransition = cameraEffectsObserver:onTransition(function(transitioningEntity, newZone)
 		if transitioningEntity ~= entity then
 			return
 		end
 
-		local newPresetName = newZone:getMetadata().PresetName
-		applyProps(PRESETS[newPresetName] or DEFAULTS)
+		local newName = newZone:getMetadata().Name
+		applyProps(PRESETS[newName] or DEFAULTS)
 	end)
 
 	return function()

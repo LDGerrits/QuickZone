@@ -1,4 +1,5 @@
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local RunService = game:GetService('RunService')
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local SharedGroups = require(ReplicatedStorage.Common.Groups)
@@ -13,74 +14,26 @@ local hazardObserver = QuickZone.Observer.new({
 SharedZones.Lava:attach(hazardObserver)
 SharedZones.ToxicGas:attach(hazardObserver)
 
-hazardObserver:observePlayer(function(player, zone)
-	local metadata = zone:getMetadata() or {}
-	local dmg = metadata.Damage or 10
-	local tickRate = metadata and metadata.TickRate or 1
-	local hazardName = metadata and metadata.HazardName or 'Unknown Hazard'
-	local active = true
+RunService.Heartbeat:Connect(function(dt)
+	for player, zone in hazardObserver:iterPlayersInside() do
+		local character = player.Character
+		local humanoid = character and character:FindFirstChild('Humanoid')
 
-	local character = player.Character
-	local humanoid = character and character:FindFirstChild('Humanoid')
-	if not humanoid then
-		return
-	end
-
-	local deathConn = humanoid.Died:Connect(function()
-		active = false
-		print(player.Name .. ' died to ' .. hazardName .. '!')
-	end)
-
-	local currentThread = nil
-	local function applyCurrentHazard()
-		if currentThread then
-			task.cancel(currentThread)
-			currentThread = nil
+		if not humanoid or humanoid.Health <= 0 then
+			continue
 		end
 
-		if tickRate <= 0 then
-			humanoid:TakeDamage(dmg)
-		else
-			currentThread = task.spawn(function()
-				while active and humanoid.Health > 0 do
-					humanoid:TakeDamage(dmg)
-					task.wait(tickRate)
-				end
-			end)
-		end
-	end
-
-	applyCurrentHazard()
-	print(player.Name .. ' stepped into ' .. hazardName .. '!')
-
-	local transitionCleanup = hazardObserver:onPlayerTransition(function(newPlayer, newZone)
-		if player ~= newPlayer then
-			return
-		end
-		if not active then
-			return
+		local metadata = zone:getMetadata() or {}
+		local dps = metadata.Damage
+		if not dps then
+			continue
 		end
 
-		metadata = newZone:getMetadata() or {}
-		dmg = metadata.Damage or 10
-		tickRate = metadata.TickRate or 1
-		hazardName = metadata.HazardName or 'Unknown Hazard'
+		humanoid:TakeDamage(dps * dt)
 
-		print(player.Name .. ' transitioned into ' .. hazardName .. '!')
-		applyCurrentHazard()
-	end)
-
-	return function()
-		active = false
-
-		deathConn:Disconnect()
-		transitionCleanup()
-		if currentThread then
-			task.cancel(currentThread)
-		end
-
-		if humanoid.Health > 0 then
-			print(player.Name .. ' escaped the ' .. hazardName .. '!')
+		if humanoid.Health <= 0 then
+			local hazardName = metadata.Name or 'Unknown Hazard'
+			print(player.Name .. ' melted in the ' .. hazardName .. '!')
 		end
 	end
 end)
