@@ -72,9 +72,6 @@ local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
 local STRAT_PIVOT = Config.Strategy.PIVOT
-local STRAT_POS_LOWER = Config.Strategy.POS_LOWER
-local STRAT_CFRAME_LOWER = Config.Strategy.CFRAME_LOWER
-local STRAT_TRANSFORM_LOWER = Config.Strategy.TRANSFORM_LOWER
 
 local function processProfileChange(entity: Types.Entity)
 	local groups = entityToGroups[entity]
@@ -364,12 +361,6 @@ function Scheduler.update(dt: number)
 			elseif strategy == STRAT_PRIM then
 				local prim = (entity :: Model).PrimaryPart
 				pos = prim and prim.Position or (entity :: Model):GetPivot().Position
-			elseif strategy == STRAT_TRANSFORM_LOWER then
-				pos = (entity :: any).transform.Position
-			elseif strategy == STRAT_CFRAME_LOWER then
-				pos = (entity :: any).cframe.Position
-			elseif strategy == STRAT_POS_LOWER then
-				pos = (entity :: any).position
 			elseif strategy == STRAT_PIVOT then
 				pos = (entity :: any):GetPivot().Position
 			end
@@ -404,6 +395,8 @@ function Scheduler.update(dt: number)
 				ctx_cCount = 0
 				ctx_highestWin = -math.huge
 
+				local ref = entityToReference[entity] or entity
+
 				if needsDynamic then
 					queryPoint(dynamicTree, pos, queryCallbackDynamic)
 				end
@@ -433,7 +426,6 @@ function Scheduler.update(dt: number)
 
 					local safety = observerSafety[observerId]
 					local z = zoneIdToZoneObj[oldZoneId]
-					local ref = entityToReference[entity] or entity
 					fireCallback(cbs, ref, z, safety)
 				end
 
@@ -442,6 +434,10 @@ function Scheduler.update(dt: number)
 					local observerId = ctx_candidateList[i]
 					local pri = ctx_candidatePriority[observerId]
 					local zoneIdx = ctx_candidateIndex[observerId]
+
+					ctx_candidatePriority[observerId] = nil
+					ctx_candidateIndex[observerId] = nil
+					ctx_candidateList[i] = nil
 
 					if pri < ctx_highestWin then
 						continue
@@ -465,7 +461,6 @@ function Scheduler.update(dt: number)
 						end
 
 						local z = zoneIdToZoneObj[zoneIdx]
-						local ref = entityToReference[entity] or entity
 						fireCallback(cbs, ref, z, safety)
 					else -- Transition
 						local cbs = observerTransitionedCallbacks[observerId]
@@ -473,7 +468,6 @@ function Scheduler.update(dt: number)
 							continue
 						end
 
-						local ref = entityToReference[entity] or entity
 						local newZoneObj = zoneIdToZoneObj[zoneIdx]
 						if safety then
 							for _, cb in cbs do
@@ -486,10 +480,6 @@ function Scheduler.update(dt: number)
 						end
 					end
 				end
-
-				table.clear(ctx_candidatePriority)
-				table.clear(ctx_candidateIndex)
-				table.clear(ctx_candidateList)
 			end
 
 			idx += 1

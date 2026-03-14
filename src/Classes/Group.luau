@@ -14,9 +14,6 @@ local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
 local STRAT_PIVOT = Config.Strategy.PIVOT
-local STRAT_POS_LOWER = Config.Strategy.POS_LOWER
-local STRAT_CFRAME_LOWER = Config.Strategy.CFRAME_LOWER
-local STRAT_TRANSFORM_LOWER = Config.Strategy.TRANSFORM_LOWER
 
 local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
@@ -659,16 +656,10 @@ function Group._add(self: Types.InternalGroup<any>, entity: any): Types.Group<an
 		elseif typeof(entity) == 'table' then
 			if entity.Position then
 				strat = STRAT_POS
-			elseif entity.position then
-				strat = STRAT_POS_LOWER
 			elseif entity.CFrame then
 				strat = STRAT_CFRAME
-			elseif entity.cframe then
-				strat = STRAT_CFRAME_LOWER
 			elseif entity.Transform then
 				strat = STRAT_TRANSFORM
-			elseif entity.transform then
-				strat = STRAT_TRANSFORM_LOWER
 			elseif entity.WorldPosition then
 				strat = STRAT_WORLD
 			elseif entity.GetPivot then
