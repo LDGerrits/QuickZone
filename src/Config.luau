@@ -8,13 +8,27 @@ Config.Strategy = {
 	PRIM = 2,
 	WORLD = 3,
 	CFRAME = 4,
-	PIVOT = 5,
+	TRANSFORM = 5,
+	PIVOT = 6,
+}
+
+Config.Group = {
+	-- Entities are automatically cleaned up for that group if destroyed
+	autoClean = true,
 }
 
 Config.Scheduler = {
+	-- If true, the scheduler will automatically run every frame.
+	-- If false, you must call QuickZone:update manually.
+	autoUpdate = true,
+
 	-- Maximum execution time (in seconds) per frame
 	-- 0.001 = 1ms (approx 6% of a frame at 60 FPS)
 	frameBudget = 1 / 1000,
+
+	-- How often (in Hz) to automatically sync zone positions to their references.
+	-- Only applies to zones with autoSync enabled.
+	autoSyncRate = 30,
 }
 
 Config.Observer = {

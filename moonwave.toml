@@ -16,28 +16,40 @@ enabled = true
 includeReadme = false
 
 [[home.features]]
-title = "Lifecycle Management"
-description = "Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore."
+title = "Endless Scale"
+description = "The number of zones has zero impact on performance. Maintain 60 FPS even with over a million zones in your game."
 
 [[home.features]]
 title = "Track Anything"
-description = "Track BaseParts, Models, Attachments, Bones, Cameras, or even tables. If it has a position, QuickZone can track it."
-
-[[home.features]]
-title = "Shape Support"
-description = "Supports mathematical containment for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes."
-
-[[home.features]]
-title = "Decoupled Logic"
-description = "Decouple game logic from spatial instances. Bind behaviors to categories of entities (Players, NPCs, Projectiles) for a clean, scalable architecture."
+description = "Track BaseParts, Models, Attachments, Bones, Cameras, or even custom tables. If it has a position, QuickZone can track it."
 
 [[home.features]]
 title = "Budgeted Scheduler"
-description = "Remove lag spikes by setting a hard frame budget (e.g., 1ms). Workload is smeared across frames to maintain a flat and predictable performance profile."
+description = "Set a hard frame budget (e.g., 1ms) to completely eliminate lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile."
+
+[[home.features]]
+title = "Shape Support"
+description = "Support for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes."
+
+[[home.features]]
+title = "Lifecycle Management"
+description = "Use the `observe` pattern for 100% reliable cleanup. Say goodbye to juggling `onEnter` and `onExit` events (though classic event-driven programming is still supported)."
+
+[[home.features]]
+title = "ECS & Data-Oriented"
+description = "Built-in support for zero-allocation iterators and deterministic manual stepping, making it a perfect fit for ECS architectures."
+
+[[home.features]]
+title = "Decoupled Architecture"
+description = "Separate game logic from spatial instances. Bind behaviors directly to categories of entities (Players, NPCs, Projectiles) for a clean, scalable codebase."
 
 [[home.features]]
 title = "Zero-Allocation Runtime"
-description = " By using contiguous arrays and object pooling, QuickZone reduces GC pressure, avoiding memory-related stutters."
+description = "By utilizing contiguous arrays and object pooling, QuickZone produces close to zero GC pressure, avoiding memory-related stutters."
+
+[[home.features]]
+title = "No Dependencies"
+description = "QuickZone is a standalone, lightweight library that does not rely on any other external packages."
 
 organizationName = "LDGerrits"
 projectName = "QuickZone"

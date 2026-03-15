@@ -1,15 +1,6 @@
 --!native
+--!optimize 2
 --!strict
-
-local State = require(script.Parent.Parent.State)
-
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
@@ -80,18 +71,7 @@ function Geometry.positionToMortonCode(
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end
 
-function Geometry.isPointInZone(point: Vector3, zoneId: number, isDynamic: boolean): boolean
-	local cframe, halfSize, shapeType
-	if isDynamic then
-		cframe = dynamicCFrames[zoneId]
-		halfSize = dynamicHalfSizes[zoneId]
-		shapeType = dynamicTypes[zoneId]
-	else
-		cframe = staticCFrames[zoneId]
-		halfSize = staticHalfSizes[zoneId]
-		shapeType = staticTypes[zoneId]
-	end
-
+function Geometry.isPointInShape(point: Vector3, cframe: CFrame, halfSize: Vector3, shapeType: number): boolean
 	if shapeType == BLOCK_SHAPE_VALUE then
 		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
 		return vector.min(localPoint, halfSize) == localPoint

@@ -13,41 +13,54 @@ local QuickZone = require(game:GetService('ReplicatedStorage').QuickZone)
 local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
 ```
 
-### The Two Workflows
+## The Three Approaches
 
-QuickZone offers two ways to structure your code: **Declarative** (Configuration-based) and **Imperative** (Chain-based).
+QuickZone is unopinionated. Depending on your project's architecture, you can interact with the spatial data in three distinct ways:
 
-#### Style A: Declarative
-Define your object's properties and its relationships in the constructors.
+### 1. The Lifecycle Approach (Recommended)
+This uses the `observe` method. It is the most robust way to manage persistent states (like UI, music, or attributes). You define an entry behavior and return a cleanup function for exit.
 
 ```lua
-local localPlayerGroup = Group.localPlayer()
-
-local observer = Observer.new({
-	groups = { localPlayerGroup }, -- Immediately subscribes to these groups
-	priority = 1,
-})
-
-Zone.fromPart(workspace.SafeZone, {
-	observers = { observer } -- Immediately attaches to these observers
-})
+observer:observePlayer(function(player, zone)
+    -- Logic here runs when entering
+    return function()
+        -- Logic here runs when exiting
+    end
+end)
 ```
 
-#### Style B: Imperative
-Create objects first, then link them together. You can do this at any point in their lifecycles.
+### 2. The Event-Driven Approach (Classic)
+Standard `onEnter` and `onExit` signals. This is best for one-off actions.
 
 ```lua
-local localPlayerGroup = Group.localPlayer()
-local observer = Observer.new({ priority = 1 })
-local zone = Zone.fromPart(workspace.SafeZone)
+observer:onPlayerEnter(function(player, zone)
+    print(player.Name .. " entered " .. zone:getId())
+end)
+```
 
--- Link them manually
-observer:subscribe(localPlayerGroup)
-zone:attach(observer)
+### 3. The Polling Approach (Data-Oriented / ECS)
+Ideal for ECS frameworks or continuous logic. Instead of waiting for events, your systems poll the state every frame using zero-allocation iterators. You should disable the internal scheduler to step the update method manually for perfect determinism.
+
+```lua
+QuickZone:setAutoUpdate(false) -- Disable auto-loop
+
+local function spatialSystem(dt)
+    QuickZone:update(dt) -- Steps it deterministically once per frame.
+end
+
+local function observerSystem(dt)
+	for player, zone in observer:iterPlayersInside() do 
+		-- Process spatial data frame-by-frame with zero GC pressure
+	end
+end
+
+RunService.Heartbeat:Connect(function(dt)
+    spatialSystem(dt)
+    observerSystem(dt)
+end)
 ```
 
 ## 1. Zones
-
 Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
 
 ### Bulk Creation
@@ -100,14 +113,39 @@ QuickZone batches tree rebuilds once per frame. By adding a zone to the smaller 
 :::
 
 ### Updating Zones
-If you create a zone manually or want to sync a dynamic zone to a new reference, use `:syncToPart()`.
+Dynamic zones need to know when their physical reference moves. You can let QuickZone handle this automatically or control it manually.
+
+You can quickly create a dynamic zone from an existing physical part. If you set autoSync = true, QuickZone will automatically update the zone's position in the spatial tree every frame to match the part.
+
+```lua
+local truckZone = Zone.fromPart(workspace.Truck.Hitbox, { 
+    isDynamic = true,
+    autoSync = true,
+    observers = { vehicleObserver }
+})
+```
+Because Zone.fromPart requires an object with a physical volume (like a BasePart), you cannot use it for abstract references like an Attachment or a Bone. Instead, you manually create the zone with a specific size and declaratively set its reference and autoSync.
+
+```lua
+local trainZone = Zone.new({
+    cframe = train.CabinAttachment.WorldCFrame,
+    size = Vector3.new(15, 10, 30),
+    shape = 'Block',
+    reference = train.CabinAttachment,
+    autoSync = true, -- QuickZone automatically moves the dynamic zone with the attachment every frame!
+    metadata = { route = 'North Express' }
+})
+```
+
+#### Manual Syncing
+If you prefer strict control over when spatial updates happen, leave autoSync off and update the zone manually.
 
 ```lua
 -- Manually move a dynamic zone
 dynamicZone:setPosition(Vector3.new(0, 50, 0))
 
--- Sync a dynamic zone to its associated part's current CFrame, Size, and Shape
-dynamicZone:syncToPart()
+-- Sync a dynamic zone to references's current CFrame, Size, and Shape
+dynamicZone:sync()
 ```
 
 ## 2. Groups
@@ -223,33 +261,33 @@ For logic that happens exactly once on entry or exit (e.g., playing a sound effe
 
 ```lua
 -- Individual entity events
-observer:onEntered(function(entity, zone)
+observer:onEnter(function(entity, zone)
 	print(entity.Name .. ' entered ' .. zone:getId())
 end)
-observer:onExited(function(entity, zone)
+observer:onExit(function(entity, zone)
 	print(entity.Name .. ' exited ' .. zone:getId())
 end)
 
 -- Transition event (Fires when swapping between overlapping zones within the same observer)
-observer:onTransitioned(function(entity, newZone, oldZone)
+observer:onTransition(function(entity, newZone)
     print(entity.Name .. ' seamlessly moved to a new zone without leaving the area!')
 end)
 
 -- Group-level events
-observer:onGroupEntered(function(group, zone)
+observer:onGroupEnter(function(group, zone)
 	print('The first member of group ' .. group:getId() .. ' entered!')
 end)
-observer:onGroupExited(function(group, zone)
+observer:onGroupExit(function(group, zone)
 	print('The last member of group ' .. group:getId() .. ' left!')
 end)
 
 -- Convenient player events
-observer:onPlayerEntered(function(player, zone) ... end)
-observer:onPlayerExited(function(player, zone) ... end)
-observer:onPlayerTransitioned(function(player, newZone, oldZone) ... end)
-observer:onLocalPlayerEntered(function(zone) ... end)
-observer:onLocalPlayerExited(function(zone) ... end)
-observer:onLocalPlayerTransitioned(function(newZone, oldZone) ... end)
+observer:onPlayerEnter(function(player, zone) ... end)
+observer:onPlayerExit(function(player, zone) ... end)
+observer:onPlayerTransition(function(player, newZone) ... end)
+observer:onLocalPlayerEnter(function(zone) ... end)
+observer:onLocalPlayerExit(function(zone) ... end)
+observer:onLocalPlayerTransition(function(newZone) ... end)
 ```
 
 ### Handling Overlapping Zones (Transitions vs. Priorities)
@@ -259,7 +297,7 @@ Observers use a priority system to handle overlapping zones. An entity 'belongs'
 #### Pattern 1: The Data-Driven Pattern (Single Observer + Transitions)
 **Best for**: Systems that share the exact same logic, but use different values (e.g., all Environmental Hazards, all Healing Zones, all XP Zones).
 
-If a player walks from a Lava zone into an overlapping SuperLava zone attached to the same observer, they never actually "left" the observer's overall coverage area. Therefore, onExited and onEntered will not fire. Instead, the engine fires an onTransitioned event.
+If a player walks from a Lava zone into an overlapping SuperLava zone attached to the same observer, they never actually "left" the observer's overall coverage area. Therefore, onExit and onEnter will not fire. Instead, the engine fires an onTransition event.
 
 This allows you to update metadata instantly!
 
@@ -268,7 +306,7 @@ hazardObserver:observePlayer(function(player, initialZone)
     local currentDamage = initialZone:getMetadata().Damage or 10
     local active = true
 
-    local disconnectTransition = hazardObserver:onPlayerTransitioned(function(transitioningPlayer, newZone, oldZone)
+    local disconnectTransition = hazardObserver:onPlayerTransition(function(transitioningPlayer, newZone)
         if transitioningPlayer ~= player then return end
         
         currentDamage = newZone:getMetadata().Damage or 10
@@ -299,17 +337,17 @@ local lowPriority = Observer.new({ priority = 0 })
 local highPriority = Observer.new({ priority = 10 })
 
 -- If a player is inside Zone A (Low) and Zone B (High) simultaneously:
--- 1. highPriority:onEntered() fires for Zone B.
--- 2. lowPriority:onExited() fires for Zone A.
+-- 1. highPriority:onEnter() fires for Zone B.
+-- 2. lowPriority:onExit() fires for Zone A.
 ```
 
 ### Observer State
 Observers can be toggled to pause logic without destroying the configuration.
 
 ```lua
-observer:setEnabled(false) -- Fires 'onExited' for everyone inside
+observer:setEnabled(false) -- Fires 'onExit' for everyone inside
 task.wait(5)
-observer:setEnabled(true)  -- Fires 'onEntered' if they are still there
+observer:setEnabled(true)  -- Fires 'onEnter' if they are still there
 ```
 
 ---
@@ -332,7 +370,7 @@ Perform instant checks without using the Observer/Group pattern.
 local zones = QuickZone:getZonesAtPoint(Vector3.new(10, 5, 0))
 
 -- Get the group an entity belongs to
-local group = QuickZone:getGroupOfEntity(workspace.Part)
+local group = QuickZone:getGroupsOfEntity(workspace.Part)
 ```
 
 ---

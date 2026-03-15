@@ -1,0 +1,22 @@
+{
+    "name": "examples",
+    "tree": {
+        "$className": "DataModel",
+         "ReplicatedFirst": {
+            "$path": "examples/Client"
+        },
+        "ReplicatedStorage": {
+            "QuickZone": {
+                "$path": "src"
+            },
+            "Common": {
+                "$path": "examples/Common"
+            }
+        },
+        "ServerScriptService": {
+            "Server": {
+                "$path": "examples/Server"
+            }
+        }
+    }
+}

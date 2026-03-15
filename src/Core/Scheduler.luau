@@ -1,18 +1,28 @@
 --!native
+--!optimize 2
 --!strict
 
 local RunService = game:GetService('RunService')
 
-local Geometry = require(script.Parent.Geometry)
-local LinearBVH = require(script.Parent.LinearBVH)
-local State = require(script.Parent.Parent.State)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
+local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
+local State = require(script.Parent.State)
 
 local queryPoint = LinearBVH.queryPoint
-local isPointInZone = Geometry.isPointInZone
+local isPointInShape = Geometry.isPointInShape
 
+local staticCFrames = State.staticCFrames
+local staticHalfSizes = State.staticHalfSizes
+local staticTypes = State.staticTypes
+local dynamicCFrames = State.dynamicCFrames
+local dynamicHalfSizes = State.dynamicHalfSizes
+local dynamicTypes = State.dynamicTypes
+local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneAttachedObservers = State.zoneAttachedObservers
+local autoSyncZones = State.autoSyncZones
+
 local observerPriorityMap = State.observerPriorityMap
 local observerTrackingEntities = State.observerTrackingEntities
 local observerEnteredCallbacks = State.observerEnteredCallbacks
@@ -20,10 +30,21 @@ local observerExitedCallbacks = State.observerExitedCallbacks
 local observerTransitionedCallbacks = State.observerTransitionedCallbacks
 local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
-local zoneIdToZoneObj = State.zoneIdToZoneObj
-local bucketList = State.bucketList
+local observerPrecisionSq = State.observerPrecisionSq
+local observerUpdateRate = State.observerUpdateRate
+local observerStaticCount = State.observerStaticCount
+local observerDynamicCount = State.observerDynamicCount
+
+local entityToReference = State.entityToReference
 local entityData = State.entityData
 local entityToObservers = State.entityToObservers
+local entityToGroups = State.entityToGroups
+local groupToObservers = State.groupToObservers
+local dirtyProfiles = State.dirtyProfiles
+local dirtyTopology = State.dirtyTopology
+
+local staticTree = State.staticTree
+local dynamicTree = State.dynamicTree
 
 local ctx_pos: Vector3
 local ctx_cCount: number = 0
@@ -35,15 +56,141 @@ local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
 
 local frameBudget = Config.Scheduler.frameBudget
+local autoSyncRate = Config.Scheduler.autoSyncRate
+local autoSyncTimer = 0
+local autoUpdateConnection: RBXScriptConnection?
+
+local bucketList = State.bucketList
+local buckets = State.buckets
 local nextBucketIndex = 1 -- Round-robin pointer
 local bucketLastProcessedIndex = {} :: { [number]: number }
+local BUDGET_CHECK = 32
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
 local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
+local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
+local STRAT_PIVOT = Config.Strategy.PIVOT
 
-local BUDGET_CHECK = 32
+local function processProfileChange(entity: Types.Entity)
+	local groups = entityToGroups[entity]
+	if not groups then
+		return
+	end
+
+	-- Track linked observers for quick lookup in hot loop
+	local linkedObservers = entityToObservers[entity]
+	if linkedObservers then
+		table.clear(linkedObservers)
+	else
+		linkedObservers = {}
+	end
+
+	local minPrecSq = math.huge
+	local maxRate = 0
+
+	-- Find the highest settings across all subscribed observers
+	for groupId, _ in groups do
+		local observers = groupToObservers[groupId]
+		if not observers then
+			continue
+		end
+
+		for observerId, _ in observers do
+			linkedObservers[observerId] = true
+
+			local prec = observerPrecisionSq[observerId]
+			local rate = observerUpdateRate[observerId]
+
+			if prec < minPrecSq then
+				minPrecSq = prec
+			end
+			if rate > maxRate then
+				maxRate = rate
+			end
+		end
+	end
+
+	local data = entityData[entity]
+	local currentRate = data.updateRate
+
+	-- Swap buckets
+	if currentRate ~= maxRate then
+		-- Remove from old bucket
+		if currentRate and currentRate > 0 and buckets[currentRate] then
+			local oldBucket = buckets[currentRate]
+			local idx = data.bucketIndex
+			local maxEntities = #oldBucket
+			local lastEntity = oldBucket[maxEntities]
+
+			-- We swap and then pop to avoid shifting all entities down
+			if idx ~= maxEntities then
+				oldBucket[idx] = lastEntity
+				if entityData[lastEntity] then
+					entityData[lastEntity].bucketIndex = idx
+				end
+			end
+
+			oldBucket[maxEntities] = nil
+		end
+
+		-- Add to new bucket
+		if maxRate > 0 then
+			if not buckets[maxRate] then
+				buckets[maxRate] = {}
+				table.insert(bucketList, maxRate)
+				table.sort(bucketList, function(a, b)
+					return a > b
+				end)
+			end
+
+			local newBucket = buckets[maxRate]
+			local newIdx = #newBucket + 1
+			newBucket[newIdx] = entity
+			data.bucketIndex = newIdx
+		else
+			data.bucketIndex = 0 -- Entity is not in a bucket, so no processing
+		end
+
+		data.updateRate = maxRate
+	end
+
+	if maxRate > 0 then
+		data.precisionSq = minPrecSq
+		entityToObservers[entity] = linkedObservers
+	else
+		entityToObservers[entity] = nil
+	end
+end
+
+local function processTopologyChange(entity: Types.Entity)
+	local data = entityData[entity]
+	if not data then
+		return
+	end
+
+	local needsStatic = false
+	local needsDynamic = false
+	local linkedObservers = entityToObservers[entity]
+
+	if linkedObservers then
+		for observerId, _ in linkedObservers do
+			if (observerStaticCount[observerId] or 0) > 0 then
+				needsStatic = true
+			end
+			if (observerDynamicCount[observerId] or 0) > 0 then
+				needsDynamic = true
+			end
+			if needsStatic and needsDynamic then
+				break
+			end
+		end
+	end
+
+	data.needsStatic = needsStatic
+	data.needsDynamic = needsDynamic
+end
 
 local function processZoneHit(zoneId: number)
 	local observers = zoneAttachedObservers[zoneId]
@@ -77,22 +224,18 @@ local function processZoneHit(zoneId: number)
 end
 
 local function queryCallbackStatic(zoneId: number)
-	if isPointInZone(ctx_pos, zoneId, false) then
+	if isPointInShape(ctx_pos, staticCFrames[zoneId], staticHalfSizes[zoneId], staticTypes[zoneId]) then
 		processZoneHit(zoneId)
 	end
 end
 
 local function queryCallbackDynamic(zoneId: number)
-	if isPointInZone(ctx_pos, zoneId, true) then
+	if isPointInShape(ctx_pos, dynamicCFrames[zoneId], dynamicHalfSizes[zoneId], dynamicTypes[zoneId]) then
 		processZoneHit(zoneId)
 	end
 end
 
 local function fireCallback(callbacks, entity, zone, safety)
-	if not callbacks then
-		return
-	end
-
 	if safety then
 		for _, cb in callbacks do
 			task.spawn(cb, entity, zone)
@@ -104,38 +247,68 @@ local function fireCallback(callbacks, entity, zone, safety)
 	end
 end
 
-RunService.PostSimulation:Connect(function(dt: number)
-	debug.profilebegin('QuickZone_Scheduler')
+local Scheduler = {}
+
+function Scheduler.update(dt: number)
 	local start = os.clock()
 
-	if State.pendingDynamicRebuild then
-		State.dynamicRootNode = LinearBVH.build(State.dynamicCFrames, State.dynamicHalfSizes)
-		State.pendingDynamicRebuild = false
-		State.spatialVersion += 1
+	-- Route entities that have changed groups or observers since the last update
+	for entity, _ in dirtyProfiles do
+		dirtyProfiles[entity] = nil
+		if entityData[entity] then
+			processProfileChange(entity)
+		end
 	end
 
-	if State.pendingStaticRebuild then
-		State.staticRootNode = LinearBVH.build(State.staticCFrames, State.staticHalfSizes)
-		State.pendingStaticRebuild = false
-		State.spatialVersion += 1
+	-- Route entities of which the topology changed
+	-- Must be after profile change
+	for entity, _ in dirtyTopology do
+		dirtyTopology[entity] = nil
+		if entityData[entity] then
+			processTopologyChange(entity)
+		end
 	end
+
+	-- Auto-sync zone positions if enabled
+	if autoSyncRate > 0 then
+		local syncInterval = 1 / autoSyncRate
+		autoSyncTimer += dt
+
+		if autoSyncTimer >= syncInterval then
+			autoSyncTimer = 0
+			local needsRebuild = false
+
+			for id, zone in autoSyncZones do
+				local reference = zone.reference
+				if not reference then
+					continue
+				end
+
+				local newCF = reference:IsA('Attachment') and reference.WorldCFrame or reference.CFrame
+				local oldCF = dynamicCFrames[id]
+
+				if oldCF == newCF then
+					continue
+				end
+
+				dynamicCFrames[id] = newCF
+				needsRebuild = true
+			end
+
+			if needsRebuild then
+				State.pendingDynamicRebuild = true
+			end
+		end
+	end
+
+	Scheduler.rebuildTrees()
 
 	if (os.clock() - start) > frameBudget then
-		debug.profileend()
-		return
-	end
-
-	local staticRoot = State.staticRootNode
-	local dynamicRoot = State.dynamicRootNode
-
-	if not staticRoot and not dynamicRoot then
-		debug.profileend()
 		return
 	end
 
 	local numBuckets = #bucketList
 	if numBuckets == 0 then
-		debug.profileend()
 		return
 	end
 
@@ -144,26 +317,23 @@ RunService.PostSimulation:Connect(function(dt: number)
 		nextBucketIndex = 1
 	end
 
-	local spatialVersion = State.spatialVersion
+	local dynamicVersion = State.dynamicVersion
+	local staticVersion = State.staticVersion
+	local logicVersion = State.logicVersion
 
 	-- Round-robin scheduling to prevent starvation
 	for _ = 1, numBuckets do
 		local rate = bucketList[nextBucketIndex]
 		nextBucketIndex = (nextBucketIndex % numBuckets) + 1
 
-		local list = State.buckets[rate]
+		local list = buckets[rate]
 		local totalEntities = #list
 		if totalEntities == 0 then
 			continue
 		end
 
-		local workQuota = math.ceil(totalEntities * rate * dt)
-		if workQuota < 1 then
-			workQuota = 1
-		end
-		if workQuota > totalEntities then
-			workQuota = totalEntities
-		end
+		local rawQuota = math.ceil(totalEntities * rate * dt)
+		local workQuota = math.clamp(rawQuota, 1, totalEntities)
 
 		local processed = 0
 		local idx = bucketLastProcessedIndex[rate] or 1
@@ -175,17 +345,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 		while processed < workQuota do
 			local entity = list[idx]
-			local data = entityData[entity] :: Types.EntityData?
-
-			-- Race condition guard
-			if not data then
-				idx += 1
-				if idx > totalEntities then
-					idx = 1
-				end
-				processed += 1
-				continue
-			end
+			local data = entityData[entity] :: Types.EntityData
 
 			-- Strategy
 			local pos
@@ -196,18 +356,27 @@ RunService.PostSimulation:Connect(function(dt: number)
 				pos = (entity :: Attachment).WorldPosition
 			elseif strategy == STRAT_CFRAME then
 				pos = (entity :: BasePart).CFrame.Position
-			elseif strategy == STRAT_PRIM and (entity :: Model).PrimaryPart then
-				pos = ((entity :: Model).PrimaryPart :: BasePart).Position
-			else
+			elseif strategy == STRAT_TRANSFORM then
+				pos = (entity :: any).Transform.Position
+			elseif strategy == STRAT_PRIM then
+				local prim = (entity :: Model).PrimaryPart
+				pos = prim and prim.Position or (entity :: Model):GetPivot().Position
+			elseif strategy == STRAT_PIVOT then
 				pos = (entity :: any):GetPivot().Position
 			end
 
-			-- Threshold
-			local shouldCheck = data.lastSpatialVersion ~= spatialVersion
+			local needsStatic = data.needsStatic
+			local needsDynamic = data.needsDynamic
+
+			local shouldCheck = (data.logicVersion ~= logicVersion)
+				or (needsDynamic and data.dynamicVersion ~= dynamicVersion)
+				or (needsStatic and data.staticVersion ~= staticVersion)
 
 			if not shouldCheck then
 				local lp = data.lastPosition
-				local dx, dy, dz = pos.X - lp.X, pos.Y - lp.Y, pos.Z - lp.Z
+				local dx = pos.X - lp.X
+				local dy = pos.Y - lp.Y
+				local dz = pos.Z - lp.Z
 				if (dx * dx + dy * dy + dz * dz) >= data.precisionSq then
 					shouldCheck = true
 				end
@@ -215,7 +384,9 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 			if shouldCheck then
 				data.lastPosition = pos
-				data.lastSpatialVersion = spatialVersion
+				data.dynamicVersion = dynamicVersion
+				data.logicVersion = logicVersion
+				data.staticVersion = staticVersion
 
 				ctx_linkedObservers = entityToObservers[entity]
 				ctx_currentMemberships = data.activeObserverMemberships
@@ -224,12 +395,14 @@ RunService.PostSimulation:Connect(function(dt: number)
 				ctx_cCount = 0
 				ctx_highestWin = -math.huge
 
-				if dynamicRoot then
-					queryPoint(dynamicRoot, pos, queryCallbackDynamic)
+				local ref = entityToReference[entity] or entity
+
+				if needsDynamic then
+					queryPoint(dynamicTree, pos, queryCallbackDynamic)
 				end
 
-				if staticRoot then
-					queryPoint(staticRoot, pos, queryCallbackStatic)
+				if needsStatic then
+					queryPoint(staticTree, pos, queryCallbackStatic)
 				end
 
 				local current = data.activeObserverMemberships
@@ -253,7 +426,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 
 					local safety = observerSafety[observerId]
 					local z = zoneIdToZoneObj[oldZoneId]
-					fireCallback(cbs, entity, z, safety)
+					fireCallback(cbs, ref, z, safety)
 				end
 
 				-- Entries & Transitions
@@ -288,7 +461,7 @@ RunService.PostSimulation:Connect(function(dt: number)
 						end
 
 						local z = zoneIdToZoneObj[zoneIdx]
-						fireCallback(cbs, entity, z, safety)
+						fireCallback(cbs, ref, z, safety)
 					else -- Transition
 						local cbs = observerTransitionedCallbacks[observerId]
 						if not cbs then
@@ -296,14 +469,13 @@ RunService.PostSimulation:Connect(function(dt: number)
 						end
 
 						local newZoneObj = zoneIdToZoneObj[zoneIdx]
-						local oldZoneObj = zoneIdToZoneObj[currentZoneId]
 						if safety then
 							for _, cb in cbs do
-								task.spawn(cb, entity, newZoneObj, oldZoneObj)
+								task.spawn(cb, ref, newZoneObj)
 							end
 						else
 							for _, cb in cbs do
-								cb(entity, newZoneObj, oldZoneObj)
+								cb(ref, newZoneObj)
 							end
 						end
 					end
@@ -332,16 +504,49 @@ RunService.PostSimulation:Connect(function(dt: number)
 			break
 		end
 	end
+end
 
-	debug.profileend()
-end)
+function Scheduler.setAutoUpdate(enabled: boolean)
+	if enabled then
+		if not autoUpdateConnection then
+			autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
+		end
+	else
+		if autoUpdateConnection then
+			autoUpdateConnection:Disconnect()
+			autoUpdateConnection = nil
+		end
+	end
+end
 
-local Scheduler = {}
+function Scheduler.setAutoSyncRate(hz: number)
+	if hz <= 0 then
+		autoSyncRate = 0
+	else
+		autoSyncRate = hz
+	end
+end
 
 function Scheduler.setFrameBudget(n: number)
 	assert(n > 0, '[QuickZone] frameBudget must be greater than 0')
 
 	frameBudget = n
 end
+
+function Scheduler.rebuildTrees()
+	if State.pendingDynamicRebuild then
+		LinearBVH.build(dynamicTree, dynamicCFrames, dynamicHalfSizes)
+		State.pendingDynamicRebuild = false
+		State.dynamicVersion += 1
+	end
+
+	if State.pendingStaticRebuild then
+		LinearBVH.build(staticTree, staticCFrames, staticHalfSizes)
+		State.pendingStaticRebuild = false
+		State.staticVersion += 1
+	end
+end
+
+Scheduler.setAutoUpdate(Config.Scheduler.autoUpdate)
 
 return Scheduler

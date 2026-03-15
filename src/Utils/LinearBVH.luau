@@ -1,4 +1,5 @@
 --!native
+--!optimize 2
 --!strict
 
 local Geometry = require(script.Parent.Geometry)
@@ -20,14 +21,10 @@ type ListEntity = {
 local LinearBVH = {}
 LinearBVH.__index = LinearBVH
 
-local listCache = table.create(2000)
-local objMinCache = table.create(2000)
-local objMaxCache = table.create(2000)
-local traversalStack = table.create(64)
-local treePools = {} :: { [any]: {
-	nodeCache: { Types.Node },
-	nodeCount: number,
-} }
+local listCache = {} :: { ListEntity }
+local entryPool = {} :: { ListEntity }
+local objMinCache = {} :: { [number]: Vector3 }
+local objMaxCache = {} :: { [number]: Vector3 }
 
 local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: number): number
 	if endIndex == beginIndex + 1 then
@@ -58,61 +55,49 @@ local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: n
 	return left + 1
 end
 
-local function createSubTree(
+local function buildFlatTree(
 	list: { ListEntity },
 	boundsMin: { Vector3 },
 	boundsMax: { Vector3 },
 	beginIndex: number,
 	endIndex: number,
-	pool: {
-		nodeCache: { Types.Node },
-		nodeCount: number,
-	}
-): Types.Node
-	pool.nodeCount += 1
-	local node = pool.nodeCache[pool.nodeCount]
+	tree: Types.Tree,
+	currentIndex: number
+): (number, Vector3, Vector3)
+	local node = tree.nodes[currentIndex]
 	if not node then
 		node = {} :: Types.Node
-		pool.nodeCache[pool.nodeCount] = node
+		tree.nodes[currentIndex] = node
 	end
 
-	if beginIndex == endIndex then
+	if beginIndex == endIndex then -- Leaf node
 		local id = list[beginIndex].id
-		node.min = boundsMin[id]
-		node.max = boundsMax[id]
-		node.id = id
-		node.left = nil
-		node.right = nil
-	else
-		local mid = getSplitPos(list, beginIndex, endIndex)
-		local left = createSubTree(list, boundsMin, boundsMax, beginIndex, mid - 1, pool)
-		local right = createSubTree(list, boundsMin, boundsMax, mid, endIndex, pool)
-		local min, max = unionBounds(left.min, left.max, right.min, right.max)
+		local min, max = boundsMin[id], boundsMax[id]
 
 		node.min = min
 		node.max = max
-		node.id = -1
-		node.left = left
-		node.right = right
-	end
+		node.id = id
+		node.skipIndex = currentIndex + 1
 
-	return node
+		return currentIndex + 1, min, max
+	else -- Branch node
+		local mid = getSplitPos(list, beginIndex, endIndex)
+		node.id = -1
+
+		local rightIndex, lMin, lMax =
+			buildFlatTree(list, boundsMin, boundsMax, beginIndex, mid - 1, tree, currentIndex + 1)
+		local nextIndex, rMin, rMax = buildFlatTree(list, boundsMin, boundsMax, mid, endIndex, tree, rightIndex)
+
+		local min, max = unionBounds(lMin, lMax, rMin, rMax)
+		node.min = min
+		node.max = max
+		node.skipIndex = nextIndex -- If the point is not in this branch, we skip both subtrees
+
+		return nextIndex, min, max
+	end
 end
 
-function LinearBVH.build(cframes: { [number]: CFrame }, halfSizes: { [number]: Vector3 }): Types.Node?
-	-- Pool per unique list reference (static and dynamic) to allow reuse.
-	-- We don't need to clear the cache, since we track count separately.
-	local pool = treePools[cframes]
-	if not pool then
-		pool = {
-			nodeCache = table.create(4000),
-			nodeCount = 0,
-		}
-		treePools[cframes] = pool
-	end
-	pool.nodeCount = 0
-
-	table.clear(traversalStack)
+function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSizes: { [number]: Vector3 }): ()
 	table.clear(objMinCache)
 	table.clear(objMaxCache)
 
@@ -134,17 +119,35 @@ function LinearBVH.build(cframes: { [number]: CFrame }, halfSizes: { [number]: V
 
 		count += 1
 
-		local cachedEntry = listCache[count]
-		if cachedEntry then
-			cachedEntry.id = id
-			cachedEntry.mortonCode = 0
-		else
-			listCache[count] = { id = id, mortonCode = 0 }
+		local entry = listCache[count]
+		if not entry then
+			local poolSize = #entryPool
+			if poolSize > 0 then
+				entry = entryPool[poolSize]
+				entryPool[poolSize] = nil
+			else
+				entry = { id = 0, mortonCode = 0 }
+			end
+			listCache[count] = entry
 		end
+
+		entry.id = id
 	end
 
 	if count == 0 then
-		return nil
+		tree.count = 0
+		return
+	end
+
+	-- Push unused entries from the tail into the pool
+	local cacheSize = #listCache
+	if cacheSize > count then
+		local poolSize = #entryPool
+		for i = count + 1, cacheSize do
+			poolSize += 1
+			entryPool[poolSize] = listCache[i]
+			listCache[i] = nil
+		end
 	end
 
 	-- Add padding to avoid edge cases with flat scenes
@@ -158,53 +161,32 @@ function LinearBVH.build(cframes: { [number]: CFrame }, halfSizes: { [number]: V
 		entry.mortonCode = positionToMortonCode(pos, sceneMin, scaleX, scaleY, scaleZ)
 	end
 
-	-- Remove unused cached entries at tail
-	for i = count + 1, #listCache do
-		listCache[i] = nil
-	end
-
 	table.sort(listCache, function(a, b)
 		return a.mortonCode < b.mortonCode
 	end)
 
-	return createSubTree(listCache, objMinCache, objMaxCache, 1, count, pool)
+	local nextAvailableIndex = buildFlatTree(listCache, objMinCache, objMaxCache, 1, count, tree, 1)
+
+	tree.count = nextAvailableIndex - 1
 end
 
-function LinearBVH.queryPoint(root: Types.Node?, point: Vector3, callback: (id: number) -> ())
-	if not root then
-		return
-	end
-
+function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, callback: (id: number) -> ())
+	local nodes = tree.nodes
+	local count = tree.count
 	local px, py, pz = point.X, point.Y, point.Z
-	local rootMin, rootMax = root.min, root.max
-	if px < rootMin.X or px > rootMax.X or py < rootMin.Y or py > rootMax.Y or pz < rootMin.Z or pz > rootMax.Z then
-		return
-	end
 
-	local stackPtr = 1
-	traversalStack[1] = root
-
-	while stackPtr > 0 do
-		local node = traversalStack[stackPtr]
-		stackPtr -= 1
-
+	local index = 1
+	while index <= count do
+		local node = nodes[index]
 		local min, max = node.min, node.max
-		if
-			point.X >= min.X
-			and point.X <= max.X
-			and point.Y >= min.Y
-			and point.Y <= max.Y
-			and point.Z >= min.Z
-			and point.Z <= max.Z
-		then
-			if node.id > 0 then
-				callback(node.id)
-			else
-				stackPtr += 1
-				traversalStack[stackPtr] = node.left :: Types.Node
-				stackPtr += 1
-				traversalStack[stackPtr] = node.right :: Types.Node
+		if px >= min.X and px <= max.X and py >= min.Y and py <= max.Y and pz >= min.Z and pz <= max.Z then
+			index += 1
+			local nodeId = node.id
+			if nodeId > 0 then
+				callback(nodeId)
 			end
+		else
+			index = node.skipIndex -- Skip branch
 		end
 	end
 end

@@ -5,29 +5,33 @@ sidebar_position: 1
 # Introduction
 
 ## Overview
-QuickZone is a lightweight spatial library for Roblox that replaces expensive physics queries with fast, math-based entity tracking at scale. Instead of the physics engine, it uses geometric math while providing a predictable, budgeted, and flexible solution for zone detection, making it possible to track thousands of entities across hundreds of zones with very little impact on your frame rate.
+By bypassing the physics engine in favor of pure geometric math, QuickZone is a predictable, budgeted and flexible solution for spatial tracking that has near-zero impact on your frame rate or memory.
 
 :::info Point-Based Detection
 QuickZone uses point-based detection. It checks if a specific point (e.g., the center of a Part, the position of an Attachment, or the Pivot of a Model) is inside a zone's boundary.
-
-Because it calculates if it is inside or not using geometric math instead of physics-based volume intersections, it is significantly faster than other zone detection libraries.
 :::
 
 ---
 
 ## Core Features
 
-- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. There is no need for juggling `onEntered` and `onExited` events anymore (do note that QuickZone still supports Event-Driven Programming).
+- **Endless Scale**: The number of zones has zero impact on performance. Maintain 60 FPS even with over a million zones in your game.
 
-- **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even tables. If it has a position, QuickZone can track it.
+- **Track Anything**: Track BaseParts, Models, Attachments, Bones, Cameras, or even custom tables. If it has a position, QuickZone can track it.
 
-- **Shape Support**: Supports mathematical containment for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes.
+- **Budgeted Scheduler**: Set a hard frame budget (e.g., 1ms) to completely eliminate lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile.
 
-- **Decoupled Architecture**: Separate game logic from spatial instances. Bind behaviors to categories of entities (Players, NPCs, Projectiles) for a clean, scalable architecture.
+- **Shape Support**: Support for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes.
 
-- **Budgeted Scheduler**: Remove lag spikes by setting a hard frame budget (e.g., 1ms). Workload is smeared across frames to maintain a flat and predictable performance profile.
+- **Lifecycle Management**: Use the `observe` pattern for 100% reliable cleanup. Say goodbye to juggling `onEnter` and `onExit` events (though classic event-driven programming is still supported).
 
-- **Zero-Allocation Runtime**: By using contiguous arrays and object pooling, QuickZone reduces GC pressure, avoiding memory-related stutters.
+- **ECS & Data-Oriented**: Built-in support for zero-allocation iterators and deterministic manual stepping, making it a perfect fit for ECS architectures.
+
+- **Decoupled Architecture**: Separate game logic from spatial instances. Bind behaviors directly to categories of entities (Players, NPCs, Projectiles) for a clean, scalable codebase.
+
+- **Zero-Allocation Runtime**: By utilizing contiguous arrays and object pooling, QuickZone produces close to zero GC pressure, avoiding memory-related stutters.
+
+- **No Dependencies**: QuickZone is a standalone, lightweight library that does not rely on any other external packages.
 
 ---
 
@@ -74,85 +78,151 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^1.1.0
+ldgerrits/quickzone@^1.2.0
 ```
 
 ### Manual
 Download the latest .rbxm model file from the [Releases](https://github.com/LDGerrits/QuickZone/releases) tab and drag it into ReplicatedStorage.
 
 ## Quick Start
-The following example showcases a swim system. QuickZone supports two coding styles, so choose the one that fits your workflow.
+The following example showcases an anti-gravity system. QuickZone supports three coding styles, so choose the one that fits your architecture.
 
-### Option A: The QuickZone Approach (Recommended)
+### Option A: The Lifecycle Approach (Recommended)
 Best for clean, modern code. You define relationships in a configuration table (**Declarative**) and use a single function to manage the active state (**Lifecycle**).
 
 ```lua
 local QuickZone = require(game.ReplicatedStorage.QuickZone)
 local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
 
--- Create a LocalPlayerGroup that automatically tracks the client's character (including respawns)
+-- Create a group that automatically tracks the client's character (including respawns)
 local myPlayer = Group.localPlayer()
 
--- Create an observer subscribed to that group. 
--- Priority 42 ensures this logic overrides lower-priority overlaps.
-local swimObserver = Observer.new({ 
-    priority = 42,
-    updateRate = 30,
-    precision = 0.1,
+-- Create an observer subscribed to the group.
+local gravityObserver = Observer.new({ 
     groups = { myPlayer } 
 })
 
 -- Define behavior
-swimObserver:observeLocalPlayer(function()
-    local character = Players.LocalPlayer.Character
-    if not character then return end
-
-    local humanoid = character:FindFirstChild('Humanoid')
-    if not humanoid then return end
+gravityObserver:observe(function(player, zone)
+    local character = player.Character
+    local hrp = character and character:FindFirstChild('HumanoidRootPart')
+    if not hrp then return end
     
-    -- On Enter
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
-    humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+    -- Get the zone's gravity multiplier using metadata.
+    local meta = zone:getMetadata()
+    local multiplier = meta and meta.GravityMultiplier or 1
+    
+    -- Create the Anti-Gravity force on enter
+    local force = Instance.new('BodyForce')
+    force.Name = 'AntiGravityForce'
+    force.Force = Vector3.new(0, hrp.AssemblyMass * workspace.Gravity * (1- multiplier), 0)
+    force.Parent = hrp
 
-    -- Return cleanup (On Exit)
+    -- Automatically destroy the force when the player exits the zone
     return function() 
-        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        force:Destroy()
     end
 end)
 
--- Find all current and future instances with the 'Water' tag and wrap them in a Zones object.
--- By passing the observer in the config, all created zones are attached automatically.
-Zone.fromTag('Water', { 
-    observers = { swimObserver } 
+-- Find all current and future instances with the 'Water' tag.
+Zone.fromTag('AntiGravity', { 
+    observers = { gravityObserver },
+    metadata = { GravityMultiplier = 0.4 }
 })
 ```
 
-### Option B: The Classic Approach (ZonePlus / SimpleZone Style)
-Best for familiarity or for migrating ZonePlus code to QuickZone. You manually 'wire' objects together (**Imperative**) and use standard events like `onEntered` to trigger one-off actions (**Event-Driven**).
+### Option B: The Event-Driven Approach (ZonePlus / SimpleZone Style)
+Best for familiarity or for migrating ZonePlus code to QuickZone. You manually 'wire' objects together (**Imperative**) and use standard events like `onEnter` to trigger one-off actions (**Event-Driven**).
 
 ```lua
 local QuickZone = require(game.ReplicatedStorage.QuickZone)
 local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
+local localPlayer = game:GetService('Players').LocalPlayer
 
 local myPlayer = Group.localPlayer()
-local swimObserver = Observer.new():setPriority(42):setUpdateRate(30):setPrecision(0.1)
+local gravityObserver = Observer.new()
 
 -- Subscribe the logic to the group
-swimObserver:subscribe(myPlayer)
+gravityObserver:subscribe(myPlayer)
 
 -- Connect events
-swimObserver:onLocalPlayerEntered(function(zone)
-    print('Entered water zone:', zone:getId())
-    -- Add swimming logic here
+gravityObserver:onLocalPlayerEnter(function(zone)
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild('HumanoidRootPart')
+    if not hrp then return end
+
+    local ref = zone:getReference() -- This returns the zone's part
+    local multiplier = ref and ref:GetAttribute("GravityMultiplier") or 1 -- You can use attributes!
+
+    local force = Instance.new('BodyForce')
+    force.Name = 'AntiGravityForce'
+    force.Force = Vector3.new(0, hrp.AssemblyMass * workspace.Gravity * (1- multiplier), 0)
+    force.Parent = hrp
 end)
 
-swimObserver:onLocalPlayerExited(function(zone)
-    print('Exited water zone:', zone:getId())
-    -- Remove swimming logic here
+gravityObserver:onLocalPlayerExit(function(zone)
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild('HumanoidRootPart')
+
+    if hrp and hrp:FindFirstChild('AntiGravityForce') then
+        hrp.AntiGravityForce:Destroy()
+    end
 end)
 
--- Create a Zones object from a folder of parts.
--- The returned 'zones' object allows you to manage the entire collection at once.
-local zones = Zone.fromChildren(workspace.WaterParts)
-zones:attach(swimObserver)
+local zones = Zone.fromChildren(workspace.AntiGravityParts)
+zones:attach(gravityObserver)
+```
+
+### Option C: The Polling Approach (Data-Oriented / ECS)
+Use iterators to poll state for continuous logic. To enhance ECS workflows, you can also turn off auto-updating and update QuickZone manually. It is even possible to manually link entities to a reference like an Id or an object.
+
+```lua
+local Players = game:GetService('Players')
+local RunService = game:GetService("RunService")
+local QuickZone = require(game.ReplicatedStorage.QuickZone)
+local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observer
+
+-- Disable auto-update for deterministic, manual stepping (optional)
+QuickZone:setEnabled(false)
+
+local playerGroup = Group.new()
+local gravityObserver = Observer.new({ groups = { playerGroup } })
+Zone.fromTag('AntiGravity', { 
+    observers = { gravityObserver },
+    metadata = { GravityMultiplier = 0.4 }
+})
+
+local localPlayer = Players.LocalPlayer
+local characterModel = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+
+-- Track this Model's physical position, but return the local player in queries
+QuickZone:setReference(localPlayer, characterModel)
+
+-- Add the local player to the spatial group (QuickZone tracks the mapped model automatically)
+playerGroup:add(localPlayer)
+
+-- Process all spatial movement and LBVH tree updates in a specific order (only needed if :setEnabled(false))
+local function spatialSystem(dt)
+    QuickZone:update(dt) 
+end
+
+local function gravitySystem(dt)
+    -- Instead of creating a BodyForce, we apply continuous math statelessly.
+    for player, zone in gravityObserver:iterEntitiesInside() do
+        local character = localPlayer.Character
+        local hrp = character and character:FindFirstChild('HumanoidRootPart')
+        if not hrp then continue end
+
+        local meta = zone:getMetadata()
+        local multiplier = meta and meta.GravityMultiplier or 1
+        
+        local upwardForce = hrp.AssemblyMass * workspace.Gravity * (1- multiplier)
+        hrp:ApplyImpulse(Vector3.new(0, upwardForce * dt, 0))
+    end
+end
+
+RunService.Heartbeat:Connect(function(dt)
+    spatialSystem(dt)
+    gravitySystem(dt)
+end)
 ```
