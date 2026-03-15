@@ -12,8 +12,8 @@ Zones manages multiple individual `Zone` objects as a single, unified entity.
 This allows you to create complex shapes and structures by combining multiple zones together. 
 You can attach observers to a `Zones` instance, and they will be automatically attached to all contained zones. 
 When a zone is added or removed from the `Zones` instance, observers will be updated accordingly."><link data-rh="true" rel="canonical" href="https://LDGerrits.github.io/QuickZone/api/Zones"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Zones" hreflang="en"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Zones" hreflang="x-default"><link rel="stylesheet" href="/QuickZone/assets/css/styles.5cbed574.css">
-<script src="/QuickZone/assets/js/runtime~main.8d33d79d.js" defer="defer"></script>
-<script src="/QuickZone/assets/js/main.31d42c8c.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/runtime~main.0c037408.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/main.14a5abd7.js" defer="defer"></script>
 </head>
 <body class="navigation-with-keyboard">
 <script>!function(){function t(t){document.documentElement.setAttribute("data-theme",t)}var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();null!==e?t(e):window.matchMedia("(prefers-color-scheme: dark)").matches?t("dark"):(window.matchMedia("(prefers-color-scheme: light)").matches,t("light"))}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div role="region" aria-label="Skip to main content"><a class="skipToContent_fXgn" href="#__docusaurus_skipToContent_fallback">Skip to main content</a></div><nav aria-label="Main" class="navbar navbar--fixed-top"><div class="navbar__inner"><div class="navbar__items"><button aria-label="Toggle navigation bar" aria-expanded="false" class="navbar__toggle clean-btn" type="button"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="2" d="M4 7h22M4 15h22M4 23h22"></path></svg></button><a class="navbar__brand" href="/QuickZone/"><b class="navbar__title text--truncate">QuickZone</b></a><a class="navbar__item navbar__link" href="/QuickZone/docs/intro">Docs</a><a aria-current="page" class="navbar__item navbar__link navbar__link--active" href="/QuickZone/api/">API</a></div><div class="navbar__items navbar__items--right"><a href="https://github.com/LDgerrits/QuickZone" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">GitHub<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></svg></a><div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP toggleButtonDisabled_aARS" type="button" disabled="" title="Switch between dark and light mode (currently light mode)" aria-label="Switch between dark and light mode (currently light mode)" aria-live="polite" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" class="lightToggleIcon_pyhR"><path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path></svg><svg viewBox="0 0 24 24" width="24" height="24" class="darkToggleIcon_wfgR"><path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path></svg></button></div><div class="navbarSearchContainer_Bca1"><div class="navbar__search"><span aria-label="expand searchbar" role="button" class="search-icon" tabindex="0"></span><input id="search_input_react" type="search" placeholder="Loading..." aria-label="Search" class="navbar__search-input search-bar" disabled=""></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="main-wrapper mainWrapper_z2l0 docPageContainer_wNNk"><div class="docPage_Dpn1"><div class="docSidebarContainer_o_re"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/QuickZone">​Quick​Zone</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Zone">​Zone</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Observer">​Observer</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="/QuickZone/api/Group">​Group</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" href="/QuickZone/api/Zones">​Zones</a></li></ul></nav></div></div><main class="docMainContainer_HJE1"><div class="container padding-vert--lg"><div class="row"><div class="col docItemCol_MU3C"><div class="docItemContainer_Wv98"><article><div class="member_J0w1 markdown"><div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_oUs_"><button type="button" class="clean-btn tocCollapsibleButton_TO0P">On this page</button></div><header><h1 class="docTitle_mZRt" style="text-decoration:none"><span style="display:inline-block">Zones</span></h1><div class="luaClassTags_EipM"></div><div>
@@ -23,36 +23,55 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
   You can attach observers to a <code>Zones</code> instance, and they will be automatically attached to all contained zones.
   When a zone is added or removed from the <code>Zones</code> instance, observers will be updated accordingly.
 </p>
-</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="new"><code style="text-decoration:none">new</code><a href="#new" class="hash-link" aria-label="Direct link to new" title="Direct link to new">​</a></h3><span class="docTag__6UZ" style="border-color:#ff793f;color:#ff793f">Constructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L22"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->.</code><code class="green_DgR4">new</code><code>(</code><code>config<!-- -->: </code><code class="purple_ieR2">{</code><div class="inset_uKQm"><code>isDynamic<!-- -->: </code><code class="blue_P4bS">boolean?</code><code class="purple_ieR2">,</code></div><div class="inset_uKQm"><code>metadata<!-- -->: </code><code class="blue_P4bS">any?</code></div><code class="purple_ieR2">}</code><code class="blue_P4bS">?</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
-<p>Constructs a Zones object.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="attach"><code style="text-decoration:none">attach</code><a href="#attach" class="hash-link" aria-label="Direct link to attach" title="Direct link to attach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L46"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">attach</code><code>(</code><code>observer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
+</div></header><h2 class="anchor anchorWithStickyNavbar_LWe7" id="functions">Functions<a href="#functions" class="hash-link" aria-label="Direct link to Functions" title="Direct link to Functions">​</a></h2><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="attach"><code style="text-decoration:none">attach</code><a href="#attach" class="hash-link" aria-label="Direct link to attach" title="Direct link to attach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L42"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">attach</code><code>(</code><code>observer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
 <p>Attaches an Observer to all underlying zones.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="detach"><code style="text-decoration:none">detach</code><a href="#detach" class="hash-link" aria-label="Direct link to detach" title="Direct link to detach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L71"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">detach</code><code>(</code><code>observer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="detach"><code style="text-decoration:none">detach</code><a href="#detach" class="hash-link" aria-label="Direct link to detach" title="Direct link to detach">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L67"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">detach</code><code>(</code><code>observer<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
 <p>Detaches an Observer from all underlying zones.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="syncToParts"><code style="text-decoration:none">syncToParts</code><a href="#syncToParts" class="hash-link" aria-label="Direct link to syncToParts" title="Direct link to syncToParts">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L97"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">syncToParts</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
-<p>
-  Forces all dynamic underlying zones to recalculate their spatial geometry
-  based on the current physical CFrame, Size and Shape of their attached BaseParts.
-</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getZones"><code style="text-decoration:none">getZones</code><a href="#getZones" class="hash-link" aria-label="Direct link to getZones" title="Direct link to getZones">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L114"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">getZones</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">}</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="sync"><code style="text-decoration:none">sync</code><a href="#sync" class="hash-link" aria-label="Direct link to sync" title="Direct link to sync">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L92"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">sync</code><code>(</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
+<p>Forces all dynamic underlying zones to recalculate their spatial geometry.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getZones"><code style="text-decoration:none">getZones</code><a href="#getZones" class="hash-link" aria-label="Direct link to getZones" title="Direct link to getZones">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L109"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">getZones</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code class="purple_ieR2">}</code></div><div>
 <p>Returns an array of all individual Zone objects currently managed.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getObservers"><code style="text-decoration:none">getObservers</code><a href="#getObservers" class="hash-link" aria-label="Direct link to getObservers" title="Direct link to getObservers">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L129"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">getObservers</code><code>(</code><code>) → </code><code class="purple_ieR2">{</code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Observer">Observer</a></code><code class="purple_ieR2">}</code></div><div>
-<p>Returns an array of all Observers currently attached.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isDynamic"><code style="text-decoration:none">isDynamic</code><a href="#isDynamic" class="hash-link" aria-label="Direct link to isDynamic" title="Direct link to isDynamic">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L144"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">isDynamic</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isDynamic"><code style="text-decoration:none">isDynamic</code><a href="#isDynamic" class="hash-link" aria-label="Direct link to isDynamic" title="Direct link to isDynamic">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L124"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">isDynamic</code><code>(</code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Returns whether Zones is set to dynamic.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPointInside"><code style="text-decoration:none">isPointInside</code><a href="#isPointInside" class="hash-link" aria-label="Direct link to isPointInside" title="Direct link to isPointInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L156"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">isPointInside</code><code>(</code><code>point<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="isPointInside"><code style="text-decoration:none">isPointInside</code><a href="#isPointInside" class="hash-link" aria-label="Direct link to isPointInside" title="Direct link to isPointInside">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L136"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">isPointInside</code><code>(</code><code>point<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="https://developer.roblox.com/en-us/api-reference/datatype/Vector3" target="_blank" rel="noopener noreferrer">Vector3<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" x="0px" y="0px" viewBox="0 0 100 100" width="15" height="15" class="icon outbound" style="color:gray;vertical-align:middle;margin-left:2px"><path fill="currentColor" d="M18.8,85.1h56l0,0c2.2,0,4-1.8,4-4v-32h-8v28h-48v-48h28v-8h-32l0,0c-2.2,0-4,1.8-4,4v56C14.8,83.3,16.6,85.1,18.8,85.1z"></path> <polygon fill="currentColor" points="45.7,48.7 51.3,54.3 77.2,28.5 77.2,37.2 85.2,37.2 85.2,14.9 62.8,14.9 62.8,22.9 71.5,22.9"></polygon></svg></a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if a given Vector3 point resides inside of the underlying zones.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setMetadata"><code style="text-decoration:none">setMetadata</code><a href="#setMetadata" class="hash-link" aria-label="Direct link to setMetadata" title="Direct link to setMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L173"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">setMetadata</code><code>(</code><code>metadata<!-- -->: </code><code class="blue_P4bS">any</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setAutoSync"><code style="text-decoration:none">setAutoSync</code><a href="#setAutoSync" class="hash-link" aria-label="Direct link to setAutoSync" title="Direct link to setAutoSync">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L154"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">setAutoSync</code><code>(</code><code>autoSync<!-- -->: </code><code class="blue_P4bS">boolean</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
+<p>
+  Enables or disables automatic polling and syncing to the tracked BaseParts for all underlying zones.
+  If any zones are currently static, they will automatically be set to dynamic.
+</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setDynamic"><code style="text-decoration:none">setDynamic</code><a href="#setDynamic" class="hash-link" aria-label="Direct link to setDynamic" title="Direct link to setDynamic">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L180"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">setDynamic</code><code>(</code><code>isDynamic<!-- -->: </code><code class="blue_P4bS">boolean</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
+<p>Promotes or demotes all underlying zones between the Static and Dynamic trees.</p>
+
+  
+    
+    
+      <div class="admonition admonition-info alert alert--info">
+        <div class="admonition-heading">
+          <h5><span class="admonition-icon"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16">
+                <path d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"></path>
+              </svg></span><span class="admonition-title">Performance</span></h5>
+        </div>
+        <div class="admonition-content">
+          <p>Changing a zone's dynamic state forces both the static and dynamic trees to rebuild.</p>
+        </div>
+      </div>
+    
+  
+
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="setMetadata"><code style="text-decoration:none">setMetadata</code><a href="#setMetadata" class="hash-link" aria-label="Direct link to setMetadata" title="Direct link to setMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L202"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">setMetadata</code><code>(</code><code>metadata<!-- -->: </code><code class="blue_P4bS">any</code><code>) → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zones">Zones</a></code></div><div>
 <p>Sets metadata to all underlying zones.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getMetadata"><code style="text-decoration:none">getMetadata</code><a href="#getMetadata" class="hash-link" aria-label="Direct link to getMetadata" title="Direct link to getMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L188"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">getMetadata</code><code>(</code><code>) → </code><code class="blue_P4bS">any</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="getMetadata"><code style="text-decoration:none">getMetadata</code><a href="#getMetadata" class="hash-link" aria-label="Direct link to getMetadata" title="Direct link to getMetadata">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L217"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">getMetadata</code><code>(</code><code>) → </code><code class="blue_P4bS">any</code></div><div>
 <p>Returns the metadata.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="contains"><code style="text-decoration:none">contains</code><a href="#contains" class="hash-link" aria-label="Direct link to contains" title="Direct link to contains">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L200"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">contains</code><code>(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="contains"><code style="text-decoration:none">contains</code><a href="#contains" class="hash-link" aria-label="Direct link to contains" title="Direct link to contains">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L229"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">contains</code><code>(</code><code>zone<!-- -->: </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone</a></code><code>) → </code><code class="blue_P4bS">boolean</code></div><div>
 <p>Checks if a specific Zone object is managed by this Zones collection.</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onDestroy"><code style="text-decoration:none">onDestroy</code><a href="#onDestroy" class="hash-link" aria-label="Direct link to onDestroy" title="Direct link to onDestroy">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L213"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">onDestroy</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="iterZones"><code style="text-decoration:none">iterZones</code><a href="#iterZones" class="hash-link" aria-label="Direct link to iterZones" title="Direct link to iterZones">​</a></h3><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L240"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">iterZones</code><code>(</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="blue_P4bS"><a style="text-decoration:underline;color:inherit" href="/QuickZone/api/Zone">Zone?</a></code></div><div>
+<p>Returns a zero-allocation iterator for all Zones within this group.</p>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="onDestroy"><code style="text-decoration:none">onDestroy</code><a href="#onDestroy" class="hash-link" aria-label="Direct link to onDestroy" title="Direct link to onDestroy">​</a></h3><span class="docTag__6UZ" style="border-color:#ff5252;color:#ff5252">Event</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L257"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">onDestroy</code><code>(</code><code>callback<!-- -->: </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code>) → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><code class="purple_ieR2"> → </code><code class="purple_ieR2">(</code><code class="purple_ieR2">)</code><span class="inlineDescription_G7Er">-- <span>
 <p>Disconnect function</p>
 </span></span></div><div>
 <p>Fires when <code>destroy()</code> is called on zones</p>
-</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="destroy"><code style="text-decoration:none">destroy</code><a href="#destroy" class="hash-link" aria-label="Direct link to destroy" title="Direct link to destroy">​</a></h3><span class="docTag__6UZ" style="border-color:#dc0073;color:#dc0073">Destructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L239"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">destroy</code><code>(</code><code>) → </code><code>(</code><code>)</code></div><div>
+</div><div class="divider_rE5g"></div><h3 class="anchor anchorWithStickyNavbar_LWe7" id="destroy"><code style="text-decoration:none">destroy</code><a href="#destroy" class="hash-link" aria-label="Direct link to destroy" title="Direct link to destroy">​</a></h3><span class="docTag__6UZ" style="border-color:#dc0073;color:#dc0073">Destructor</span><div class="repositoryDetailsContainer_BPdw"><a class="sourceButton_sEho" href="https://github.com/LDgerrits/QuickZone/blob/main/src/Classes/Zones.luau#L283"><div class="sourceButtonText_Vh0m">&lt;/&gt;</div></a></div><div class="memberString_GwaU"><code>Zones<!-- -->:</code><code class="green_DgR4">destroy</code><code>(</code><code>) → </code><code>(</code><code>)</code></div><div>
 <p>Cleans up the zones, removes them from the LBVH tree, and detaches all observers.</p>
 
   
@@ -74,31 +93,6 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
 </div></div></article></div><details><summary>Show raw api</summary><pre style="max-width:100%;white-space:pre-wrap">{
     &quot;functions&quot;: [
         {
-            &quot;name&quot;: &quot;new&quot;,
-            &quot;desc&quot;: &quot; \nConstructs a Zones object.&quot;,
-            &quot;params&quot;: [
-                {
-                    &quot;name&quot;: &quot;config&quot;,
-                    &quot;desc&quot;: &quot;&quot;,
-                    &quot;lua_type&quot;: &quot;{ isDynamic: boolean?, metadata: any? }?&quot;
-                }
-            ],
-            &quot;returns&quot;: [
-                {
-                    &quot;desc&quot;: &quot;&quot;,
-                    &quot;lua_type&quot;: &quot;Zones&quot;
-                }
-            ],
-            &quot;function_type&quot;: &quot;static&quot;,
-            &quot;tags&quot;: [
-                &quot;Constructor&quot;
-            ],
-            &quot;source&quot;: {
-                &quot;line&quot;: 22,
-                &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
-            }
-        },
-        {
             &quot;name&quot;: &quot;attach&quot;,
             &quot;desc&quot;: &quot; \nAttaches an Observer to all underlying zones.&quot;,
             &quot;params&quot;: [
@@ -116,7 +110,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 46,
+                &quot;line&quot;: 42,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -138,13 +132,13 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 71,
+                &quot;line&quot;: 67,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
         {
-            &quot;name&quot;: &quot;syncToParts&quot;,
-            &quot;desc&quot;: &quot; \nForces all dynamic underlying zones to recalculate their spatial geometry \nbased on the current physical CFrame, Size and Shape of their attached BaseParts.&quot;,
+            &quot;name&quot;: &quot;sync&quot;,
+            &quot;desc&quot;: &quot; \nForces all dynamic underlying zones to recalculate their spatial geometry.&quot;,
             &quot;params&quot;: [],
             &quot;returns&quot;: [
                 {
@@ -154,7 +148,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 97,
+                &quot;line&quot;: 92,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -170,23 +164,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 114,
-                &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
-            }
-        },
-        {
-            &quot;name&quot;: &quot;getObservers&quot;,
-            &quot;desc&quot;: &quot; \nReturns an array of all Observers currently attached.&quot;,
-            &quot;params&quot;: [],
-            &quot;returns&quot;: [
-                {
-                    &quot;desc&quot;: &quot;&quot;,
-                    &quot;lua_type&quot;: &quot;{ Observer }&quot;
-                }
-            ],
-            &quot;function_type&quot;: &quot;method&quot;,
-            &quot;source&quot;: {
-                &quot;line&quot;: 129,
+                &quot;line&quot;: 109,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -202,7 +180,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 144,
+                &quot;line&quot;: 124,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -224,7 +202,51 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 156,
+                &quot;line&quot;: 136,
+                &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;setAutoSync&quot;,
+            &quot;desc&quot;: &quot; \nEnables or disables automatic polling and syncing to the tracked BaseParts for all underlying zones.\nIf any zones are currently static, they will automatically be set to dynamic.&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;autoSync&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;boolean&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zones&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 154,
+                &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;setDynamic&quot;,
+            &quot;desc&quot;: &quot; \nPromotes or demotes all underlying zones between the Static and Dynamic trees.\n\n:::info Performance\nChanging a zone&#x27;s dynamic state forces both the static and dynamic trees to rebuild. \n:::&quot;,
+            &quot;params&quot;: [
+                {
+                    &quot;name&quot;: &quot;isDynamic&quot;,
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;boolean&quot;
+                }
+            ],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;Zones&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 180,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -246,7 +268,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 173,
+                &quot;line&quot;: 202,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -262,7 +284,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 188,
+                &quot;line&quot;: 217,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -284,7 +306,23 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
             ],
             &quot;function_type&quot;: &quot;method&quot;,
             &quot;source&quot;: {
-                &quot;line&quot;: 200,
+                &quot;line&quot;: 229,
+                &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
+            }
+        },
+        {
+            &quot;name&quot;: &quot;iterZones&quot;,
+            &quot;desc&quot;: &quot;Returns a zero-allocation iterator for all Zones within this group.&quot;,
+            &quot;params&quot;: [],
+            &quot;returns&quot;: [
+                {
+                    &quot;desc&quot;: &quot;&quot;,
+                    &quot;lua_type&quot;: &quot;() -&gt; Zone?&quot;
+                }
+            ],
+            &quot;function_type&quot;: &quot;method&quot;,
+            &quot;source&quot;: {
+                &quot;line&quot;: 240,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -309,7 +347,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
                 &quot;Event&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 213,
+                &quot;line&quot;: 257,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         },
@@ -323,7 +361,7 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
                 &quot;Destructor&quot;
             ],
             &quot;source&quot;: {
-                &quot;line&quot;: 239,
+                &quot;line&quot;: 283,
                 &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
             }
         }
@@ -333,9 +371,9 @@ When a zone is added or removed from the `Zones` instance, observers will be upd
     &quot;name&quot;: &quot;Zones&quot;,
     &quot;desc&quot;: &quot; \nZones manages multiple individual `Zone` objects as a single, unified entity. \nThis allows you to create complex shapes and structures by combining multiple zones together. \nYou can attach observers to a `Zones` instance, and they will be automatically attached to all contained zones. \nWhen a zone is added or removed from the `Zones` instance, observers will be updated accordingly.&quot;,
     &quot;source&quot;: {
-        &quot;line&quot;: 12,
+        &quot;line&quot;: 13,
         &quot;path&quot;: &quot;src/Classes/Zones.luau&quot;
     }
-}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#attach" class="table-of-contents__link toc-highlight">:attach</a></li><li><a href="#contains" class="table-of-contents__link toc-highlight">:contains</a></li><li><a href="#destroy" class="table-of-contents__link toc-highlight">:destroy</a></li><li><a href="#detach" class="table-of-contents__link toc-highlight">:detach</a></li><li><a href="#getMetadata" class="table-of-contents__link toc-highlight">:getMetadata</a></li><li><a href="#getObservers" class="table-of-contents__link toc-highlight">:getObservers</a></li><li><a href="#getZones" class="table-of-contents__link toc-highlight">:getZones</a></li><li><a href="#isDynamic" class="table-of-contents__link toc-highlight">:isDynamic</a></li><li><a href="#isPointInside" class="table-of-contents__link toc-highlight">:isPointInside</a></li><li><a href="#onDestroy" class="table-of-contents__link toc-highlight">:onDestroy</a></li><li><a href="#setMetadata" class="table-of-contents__link toc-highlight">:setMetadata</a></li><li><a href="#syncToParts" class="table-of-contents__link toc-highlight">:syncToParts</a></li><li><a href="#new" class="table-of-contents__link toc-highlight">.new</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 LDGerrits. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
+}</pre></details></div><div class="col col--3"><div class="tableOfContents_bqdL thin-scrollbar"><ul class="table-of-contents table-of-contents__left-border"><li><a href="#functions" class="table-of-contents__link toc-highlight">Functions</a><ul><li><a href="#attach" class="table-of-contents__link toc-highlight">:attach</a></li><li><a href="#contains" class="table-of-contents__link toc-highlight">:contains</a></li><li><a href="#destroy" class="table-of-contents__link toc-highlight">:destroy</a></li><li><a href="#detach" class="table-of-contents__link toc-highlight">:detach</a></li><li><a href="#getMetadata" class="table-of-contents__link toc-highlight">:getMetadata</a></li><li><a href="#getZones" class="table-of-contents__link toc-highlight">:getZones</a></li><li><a href="#isDynamic" class="table-of-contents__link toc-highlight">:isDynamic</a></li><li><a href="#isPointInside" class="table-of-contents__link toc-highlight">:isPointInside</a></li><li><a href="#iterZones" class="table-of-contents__link toc-highlight">:iterZones</a></li><li><a href="#onDestroy" class="table-of-contents__link toc-highlight">:onDestroy</a></li><li><a href="#setAutoSync" class="table-of-contents__link toc-highlight">:setAutoSync</a></li><li><a href="#setDynamic" class="table-of-contents__link toc-highlight">:setDynamic</a></li><li><a href="#setMetadata" class="table-of-contents__link toc-highlight">:setMetadata</a></li><li><a href="#sync" class="table-of-contents__link toc-highlight">:sync</a></li></ul></li></ul></div></div></div></div></main></div></div><footer class="footer footer--dark"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Copyright © 2026 LDGerrits. Built with Moonwave and Docusaurus.</div></div></div></footer></div>
 </body>
 </html>
