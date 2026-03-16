@@ -315,9 +315,6 @@ export type EntityTable = {
 	CFrame: CFrame?,
 	Transform: CFrame?,
 	GetPivot: ((self: any) -> CFrame)?,
-	position: Vector3?,
-	cframe: Vector3?,
-	transform: Vector3?,
 	[any]: any,
 }
 
