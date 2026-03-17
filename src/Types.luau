@@ -302,9 +302,6 @@ export type Entity = BasePart | Model | Camera | Attachment | Bone | EntityTable
 	.CFrame CFrame?
 	.Transform: CFrame?
 	.GetPivot (() -> CFrame)?
-	.position: Vector3?
-	.cframe: Vector3?
-	.transform: Vector3?
 
 	A custom table that mimics the spatial properties of a Roblox Instance. 
 	QuickZone will automatically detect which property to use to track this entity.
