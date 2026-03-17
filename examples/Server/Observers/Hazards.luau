@@ -33,7 +33,7 @@ RunService.Heartbeat:Connect(function(dt)
 
 		if humanoid.Health <= 0 then
 			local hazardName = metadata.Name or 'Unknown Hazard'
-			print(player.Name .. ' melted in the ' .. hazardName .. '!')
+			print(player.Name .. ' died in the ' .. hazardName .. '!')
 		end
 	end
 end)

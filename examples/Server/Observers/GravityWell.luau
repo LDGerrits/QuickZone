@@ -17,7 +17,7 @@ QuickZone.Zone.fromPart(gravityWell, {
 	autoSync = true,
 })
 
-gravityWellObserver:observePlayer(function(player)
+gravityWellObserver:observe(function(player)
 	local character = player.Character
 	local hrp = character and character:FindFirstChild('HumanoidRootPart')
 	local humanoid = character and character:FindFirstChild('Humanoid')

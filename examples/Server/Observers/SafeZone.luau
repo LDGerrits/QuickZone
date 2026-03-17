@@ -14,7 +14,7 @@ QuickZone.Zone.fromPart(safeZonePart, {
 	observers = { safeObserver },
 })
 
-safeObserver:observePlayer(function(player)
+safeObserver:observe(function(player)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChild('Humanoid')
 

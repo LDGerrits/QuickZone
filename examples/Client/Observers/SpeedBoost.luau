@@ -6,7 +6,6 @@ local SharedGroups = require(ReplicatedStorage.Common.Groups)
 local SharedZones = require(ReplicatedStorage.Common.Zones)
 
 local camera = workspace.CurrentCamera
-local localPlayer = game:GetService('Players').LocalPlayer
 
 local speedBoostObserver = QuickZone.Observer.new({
 	groups = { SharedGroups.LocalPlayer },
@@ -29,7 +28,7 @@ local function getBoostData(zone)
 	return { WalkSpeed = 32, FOV = 90 }
 end
 
-speedBoostObserver:observeLocalPlayer(function(initialZone)
+speedBoostObserver:observe(function(localPlayer, initialZone)
 	local character = localPlayer.Character
 	local humanoid = character and character:FindFirstChild('Humanoid')
 	if not humanoid then
