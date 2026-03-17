@@ -231,14 +231,14 @@ function Observer.observe(self: Types.InternalObserver<any>, callback: (any, Typ
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0
 
-	local cleanupEnter = self:onEnter(function(entity, zone)
-		entity = State.referenceToEntity[entity] or entity
+	local cleanupEnter = self:onEnter(function(reference, zone)
+		local entity = State.referenceToEntity[reference] or reference
 
 		nextId += 1
 		local observerId = nextId
 		activeIds[entity] = observerId
 
-		local cleanup = callback(entity, zone)
+		local cleanup = callback(reference, zone)
 
 		if activeIds[entity] ~= observerId then
 			if type(cleanup) == 'function' then
@@ -252,8 +252,8 @@ function Observer.observe(self: Types.InternalObserver<any>, callback: (any, Typ
 		end
 	end)
 
-	local cleanupExit = self:onExit(function(entity, _)
-		entity = State.referenceToEntity[entity] or entity
+	local cleanupExit = self:onExit(function(reference, _)
+		local entity = State.referenceToEntity[reference] or reference
 
 		activeIds[entity] = nil
 
@@ -348,11 +348,10 @@ function Observer.observePlayer(
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0
 
-	local cleanupEnter = self:onEnter(function(entity, zone)
-		entity = State.referenceToEntity[entity] or entity
-		local player = State.entityToReference[entity] or entity
+	local cleanupEnter = self:onEnter(function(reference, zone)
+		local entity = State.referenceToEntity[reference] or reference
 
-		if not (typeof(player) == 'Instance' and player:IsA('Player')) then
+		if not (typeof(reference) == 'Instance' and reference:IsA('Player')) then
 			return
 		end
 
@@ -360,7 +359,7 @@ function Observer.observePlayer(
 		local observerId = nextId
 		activeIds[entity] = observerId
 
-		local cleanup = callback(player, zone)
+		local cleanup = callback(reference, zone)
 
 		if activeIds[entity] ~= observerId then
 			if type(cleanup) == 'function' then
@@ -374,8 +373,8 @@ function Observer.observePlayer(
 		end
 	end)
 
-	local cleanupExit = self:onExit(function(entity, _)
-		entity = State.referenceToEntity[entity] or entity
+	local cleanupExit = self:onExit(function(reference, _)
+		local entity = State.referenceToEntity[reference] or reference
 
 		if not activeIds[entity] then
 			return
@@ -425,9 +424,9 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerEnter(self: Types.InternalObserver<any>, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onEnter(function(entity, zone)
-		if typeof(entity) == 'Instance' and entity:IsA('Player') then
-			callback(entity, zone)
+	return self:onEnter(function(reference, zone)
+		if typeof(reference) == 'Instance' and reference:IsA('Player') then
+			callback(reference, zone)
 		end
 	end)
 end
@@ -443,9 +442,9 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerExit(self: Types.InternalObserver<any>, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onExit(function(entity, zone)
-		if typeof(entity) == 'Instance' and entity:IsA('Player') then
-			callback(entity, zone)
+	return self:onExit(function(reference, zone)
+		if typeof(reference) == 'Instance' and reference:IsA('Player') then
+			callback(reference, zone)
 		end
 	end)
 end
@@ -475,11 +474,10 @@ function Observer.observeLocalPlayer(self: Types.InternalObserver<any>, callback
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0
 
-	local cleanupEnter = self:onEnter(function(entity, zone)
-		entity = State.referenceToEntity[entity] or entity
-		local player = State.entityToReference[entity] or entity
+	local cleanupEnter = self:onEnter(function(reference, zone)
+		local entity = State.referenceToEntity[reference] or reference
 
-		if player ~= Players.LocalPlayer then
+		if reference ~= Players.LocalPlayer then
 			return
 		end
 
@@ -501,8 +499,8 @@ function Observer.observeLocalPlayer(self: Types.InternalObserver<any>, callback
 		end
 	end)
 
-	local cleanupExit = self:onExit(function(entity, _)
-		entity = State.referenceToEntity[entity] or entity
+	local cleanupExit = self:onExit(function(reference, _)
+		local entity = State.referenceToEntity[reference] or reference
 
 		if not activeIds[entity] then
 			return
@@ -553,8 +551,8 @@ end
 ]=]
 function Observer.onLocalPlayerEnter(self: Types.InternalObserver<any>, callback: (Types.Zone) -> ()): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerEnter can only be called on the Client.')
-	return self:onEnter(function(entity, zone)
-		if entity == Players.LocalPlayer then
+	return self:onEnter(function(reference, zone)
+		if reference == Players.LocalPlayer then
 			callback(zone)
 		end
 	end)
@@ -573,8 +571,8 @@ end
 ]=]
 function Observer.onLocalPlayerExit(self: Types.InternalObserver<any>, callback: (Types.Zone) -> ()): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerExit can only be called on the Client.')
-	return self:onExit(function(entity, zone)
-		if entity == Players.LocalPlayer then
+	return self:onExit(function(reference, zone)
+		if reference == Players.LocalPlayer then
 			callback(zone)
 		end
 	end)
@@ -606,8 +604,8 @@ function Observer.observeGroup(
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 	local cleanups = {} :: { [number]: () -> () }
 
-	return self:observe(function(entity, zone)
-		entity = State.referenceToEntity[entity] or entity
+	return self:observe(function(reference, zone)
+		local entity = State.referenceToEntity[reference] or reference
 
 		local groups = State.entityToGroups[entity]
 		if not groups then
@@ -674,8 +672,8 @@ function Observer.onGroupEnter(
 ): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
-	return self:observe(function(entity, zone)
-		entity = State.referenceToEntity[entity] or entity
+	return self:observe(function(reference, zone)
+		local entity = State.referenceToEntity[reference] or reference
 
 		local groups = State.entityToGroups[entity]
 		if not groups then
@@ -733,8 +731,8 @@ function Observer.onGroupExit(
 ): () -> ()
 	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
 
-	return self:observe(function(entity, zone)
-		entity = State.referenceToEntity[entity] or entity
+	return self:observe(function(reference, zone)
+		local entity = State.referenceToEntity[reference] or reference
 
 		local groups = State.entityToGroups[entity]
 		if not groups then
@@ -803,8 +801,8 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerTransition(self: Types.InternalObserver<any>, callback: (Player, Types.Zone) -> ()): () -> ()
-	return self:onTransition(function(entity, newZone)
-		local player = State.entityToReference[entity] or entity
+	return self:onTransition(function(reference, newZone)
+		local player = State.entityToReference[reference] or reference
 		if typeof(player) == 'Instance' and player:IsA('Player') then
 			callback(player, newZone)
 		end
@@ -824,8 +822,8 @@ end
 function Observer.onLocalPlayerTransition(self: Types.InternalObserver<any>, callback: (Types.Zone) -> ()): () -> ()
 	assert(IS_CLIENT, '[QuickZone] Observer:onLocalPlayerTransition can only be called on the Client.')
 
-	return self:onTransition(function(entity, newZone)
-		local player = State.entityToReference[entity] or entity
+	return self:onTransition(function(reference, newZone)
+		local player = State.entityToReference[reference] or reference
 		if player == Players.LocalPlayer then
 			callback(newZone)
 		end
