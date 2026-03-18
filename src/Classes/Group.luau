@@ -502,24 +502,6 @@ function Group.getEntities(self: Types.InternalGroup<any>): { any }
 end
 
 --[=[ 
-	Returns a list of all Players currently represented in the group.
-
-	@method getPlayers
-	@within Group
-	@return { Player }
-]=]
-function Group.getPlayers(self: Types.InternalGroup<any>): { Player }
-	local result = {}
-	for entity in self.entityIndices do
-		local ref = State.entityToReference[entity] or entity
-		if typeof(ref) == 'Instance' and ref:IsA('Player') then
-			table.insert(result, ref)
-		end
-	end
-	return result
-end
-
---[=[ 
 	Iterates over all entities currently belonging to the group.
 	Provides a zero-allocation way to loop through entities, ideal for high-frequency 
 	checks.
@@ -543,32 +525,6 @@ function Group.iterEntities(self: Types.InternalGroup<any>): () -> any?
 			return State.entityToReference[entity] or entity
 		end
 		return entity
-	end
-end
-
---[=[ 
-	Iterates over all players currently represented in the group.
-
-	@method iterPlayers
-	@within Group
-	@return () -> Player?
-]=]
-function Group.iterPlayers(self: Types.InternalGroup<any>): () -> Player?
-	local entity = nil
-
-	return function()
-		while true do
-			entity = next(self.entityIndices, entity)
-
-			if not entity then
-				return nil
-			end
-
-			local ref = State.entityToReference[entity] or entity
-			if typeof(ref) == 'Instance' and ref:IsA('Player') then
-				return ref
-			end
-		end
 	end
 end
 

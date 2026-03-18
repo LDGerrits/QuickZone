@@ -263,10 +263,7 @@ export type Group<T = Entity> = {
 	getId: (self: Group<T>) -> number,
 	getEntities: (self: Group<T>) -> { T },
 	contains: (self: Group<T>, entity: T) -> boolean,
-	getPlayers: (self: Group<T>) -> { Player },
 	iterEntities: (self: Group<T>) -> () -> T?,
-	iterPlayers: (self: Group<T>) -> () -> Player?,
-
 	onDestroy: (self: Group<T>, callback: () -> ()) -> () -> (),
 	destroy: (self: Group<T>) -> (),
 }
