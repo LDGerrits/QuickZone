@@ -1,4 +1,5 @@
 --!strict
+
 local CollectionService = game:GetService('CollectionService')
 
 local State = require(script.Parent.Parent.Core.State)

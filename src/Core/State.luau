@@ -2,57 +2,57 @@
 
 local Types = require(script.Parent.Parent.Types)
 
-local State = {}
+local State = {
+	nextZoneId = 1,
+	nextObserverId = 1,
+	nextGroupId = 1,
 
-State.nextZoneId = 1
-State.nextObserverId = 1
-State.nextGroupId = 1
+	staticCFrames = {} :: { [number]: CFrame },
+	staticHalfSizes = {} :: { [number]: Vector3 },
+	staticTypes = {} :: { [number]: number },
 
-State.staticCFrames = {} :: { [number]: CFrame }
-State.staticHalfSizes = {} :: { [number]: Vector3 }
-State.staticTypes = {} :: { [number]: number }
+	dynamicCFrames = {} :: { [number]: CFrame },
+	dynamicHalfSizes = {} :: { [number]: Vector3 },
+	dynamicTypes = {} :: { [number]: number },
 
-State.dynamicCFrames = {} :: { [number]: CFrame }
-State.dynamicHalfSizes = {} :: { [number]: Vector3 }
-State.dynamicTypes = {} :: { [number]: number }
+	staticTree = { nodes = {}, count = 0 } :: Types.Tree,
+	dynamicTree = { nodes = {}, count = 0 } :: Types.Tree,
+	pendingStaticRebuild = false,
+	pendingDynamicRebuild = false,
+	staticVersion = 1,
+	dynamicVersion = 1,
+	logicVersion = 1,
 
-State.staticTree = { nodes = {}, count = 0 } :: Types.Tree
-State.dynamicTree = { nodes = {}, count = 0 } :: Types.Tree
-State.pendingStaticRebuild = false
-State.pendingDynamicRebuild = false
-State.staticVersion = 1
-State.dynamicVersion = 1
-State.logicVersion = 1
+	groups = {} :: { [number]: Types.InternalGroup<any> },
+	groupToObservers = {} :: { [number]: { [number]: boolean } },
+	groupEntityCleanups = {} :: { [number]: { [any]: RBXScriptConnection } },
+	entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } },
+	entityData = {} :: { [Types.Entity]: Types.EntityData },
+	entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } },
+	entityToReference = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [Types.Entity]: any },
+	referenceToEntity = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [any]: Types.Entity },
 
-State.groups = {} :: { [number]: Types.InternalGroup<any> }
-State.groupToObservers = {} :: { [number]: { [number]: boolean } }
-State.groupEntityCleanups = {} :: { [number]: { [any]: RBXScriptConnection } }
-State.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
-State.entityData = {} :: { [Types.Entity]: Types.EntityData }
-State.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
-State.entityToReference = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [Types.Entity]: any }
-State.referenceToEntity = (setmetatable({}, { __mode = 'kv' }) :: any) :: { [any]: Types.Entity }
+	dirtyProfiles = {} :: { [Types.Entity]: boolean },
+	dirtyTopology = {} :: { [Types.Entity]: boolean },
+	bucketList = {} :: { number },
+	buckets = {} :: { [number]: { Types.Entity } },
 
-State.dirtyProfiles = {} :: { [Types.Entity]: boolean }
-State.dirtyTopology = {} :: { [Types.Entity]: boolean }
-State.bucketList = {} :: { number }
-State.buckets = {} :: { [number]: { Types.Entity } }
+	observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } },
+	observerPriorityMap = {} :: { [number]: number },
+	observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } },
+	observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } },
+	observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } },
+	observerEnabled = {} :: { [number]: boolean },
+	observerSafety = {} :: { [number]: boolean },
+	observerUpdateRate = {} :: { [number]: number },
+	observerPrecisionSq = {} :: { [number]: number },
+	observerDynamicCount = {} :: { [number]: number },
+	observerStaticCount = {} :: { [number]: number },
 
-State.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } }
-State.observerPriorityMap = {} :: { [number]: number }
-State.observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } }
-State.observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } }
-State.observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } }
-State.observerEnabled = {} :: { [number]: boolean }
-State.observerSafety = {} :: { [number]: boolean }
-State.observerUpdateRate = {} :: { [number]: number }
-State.observerPrecisionSq = {} :: { [number]: number }
-State.observerDynamicCount = {} :: { [number]: number }
-State.observerStaticCount = {} :: { [number]: number }
-
-State.autoSyncZones = {} :: { [number]: Types.InternalZone }
-State.zoneAttachedObservers = {} :: { [number]: { number } }
-State.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }
-State.observerIdToObserverObj = {} :: { [number]: Types.InternalObserver<any> }
+	autoSyncZones = {} :: { [number]: Types.InternalZone },
+	zoneAttachedObservers = {} :: { [number]: { number } },
+	zoneIdToZoneObj = {} :: { [number]: Types.InternalZone },
+	observerIdToObserverObj = {} :: { [number]: Types.InternalObserver<any> },
+}
 
 return State

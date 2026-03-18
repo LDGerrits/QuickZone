@@ -19,7 +19,6 @@ type ListEntity = {
 }
 
 local LinearBVH = {}
-LinearBVH.__index = LinearBVH
 
 local listCache = {} :: { ListEntity }
 local entryPool = {} :: { ListEntity }
