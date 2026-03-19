@@ -9,10 +9,9 @@ local camera = workspace.CurrentCamera
 
 local speedBoostObserver = QuickZone.Observer.new({
 	groups = { SharedGroups.LocalPlayer },
+	zones = { SharedZones.SpeedBoost },
 	updateRate = 20,
 })
-
-SharedZones.SpeedBoost:attach(speedBoostObserver)
 
 local DEFAULT_SPEED = 16
 local DEFAULT_FOV = 70

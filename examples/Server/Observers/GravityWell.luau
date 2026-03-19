@@ -6,15 +6,15 @@ local SharedGroups = require(ReplicatedStorage.Common.Groups)
 
 local gravityWell = workspace:WaitForChild('GravityWell')
 
-local gravityWellObserver = QuickZone.Observer.new({
-	groups = { SharedGroups.Players },
-	updateRate = 20,
+local gravityWellZone = QuickZone.Zone.fromPart(gravityWell, {
+	isDynamic = true,
+	autoSync = true,
 })
 
-QuickZone.Zone.fromPart(gravityWell, {
-	isDynamic = true,
-	observers = { gravityWellObserver },
-	autoSync = true,
+local gravityWellObserver = QuickZone.Observer.new({
+	groups = { SharedGroups.Players },
+	zones = { gravityWellZone },
+	updateRate = 20,
 })
 
 gravityWellObserver:observe(function(player)

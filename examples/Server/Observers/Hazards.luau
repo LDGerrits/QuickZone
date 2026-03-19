@@ -7,12 +7,10 @@ local SharedZones = require(ReplicatedStorage.Common.Zones)
 
 local hazardObserver = QuickZone.Observer.new({
 	groups = { SharedGroups.Players },
+	zones = { SharedZones.Lava, SharedZones.ToxicGas },
 	updateRate = 20,
 	priority = 0,
 })
-
-SharedZones.Lava:attach(hazardObserver)
-SharedZones.ToxicGas:attach(hazardObserver)
 
 RunService.Heartbeat:Connect(function(dt)
 	for player, zone in hazardObserver:iterPlayersInside() do

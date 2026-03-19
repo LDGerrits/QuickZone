@@ -10,9 +10,8 @@ local localPlayer = game:GetService('Players').LocalPlayer
 local antiGravityObserver = QuickZone.Observer.new({
 	updateRate = 20,
 	groups = { SharedGroups.LocalPlayer },
+	zones = { SharedZones.AntiGravity },
 })
-
-SharedZones.AntiGravity:attach(antiGravityObserver)
 
 RunService.PreSimulation:Connect(function(dt)
 	local zone = antiGravityObserver:getZoneOfPlayer(localPlayer)

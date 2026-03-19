@@ -37,11 +37,9 @@ local cameraGroup = QuickZone.Group.new({ entities = { camera } })
 
 local cameraEffectsObserver = QuickZone.Observer.new({
 	groups = { cameraGroup },
+	zones = { SharedZones.Lava, SharedZones.ToxicGas },
 	updateRate = 60,
 })
-
-SharedZones.Lava:attach(cameraEffectsObserver)
-SharedZones.ToxicGas:attach(cameraEffectsObserver)
 
 cameraEffectsObserver:observe(function(entity, initialZone)
 	local name = initialZone:getMetadata().Name

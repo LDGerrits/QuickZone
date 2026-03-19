@@ -4,14 +4,13 @@ local SharedGroups = require(ReplicatedStorage.Common.Groups)
 
 local safeZonePart = workspace:WaitForChild('SafeZone')
 
+local safeZone = QuickZone.Zone.fromPart(safeZonePart)
+
 local safeObserver = QuickZone.Observer.new({
 	groups = { SharedGroups.Players },
+	zones = { safeZone },
 	updateRate = 10,
 	priority = 100, -- Higher priority than the HazardsObserver, so a player is always safe here from hazards!
-})
-
-QuickZone.Zone.fromPart(safeZonePart, {
-	observers = { safeObserver },
 })
 
 safeObserver:observe(function(player)
