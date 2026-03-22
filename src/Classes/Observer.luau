@@ -160,6 +160,31 @@ function Observer.new<T>(config: {
 		end
 	end
 
+	task.defer(function()
+		if not State.observerIdToObserverObj[id] then
+			return
+		end
+
+		if not self:isEnabled() then
+			return
+		end
+
+		local hasZones = #self:getZones() > 0
+		local hasGroups = #self:getGroups() > 0
+
+		if not hasZones then
+			warn(
+				`[QuickZone] Observer {id} has no attached zones. It will not detect spatial queries until a zone is attached.`
+			)
+		end
+
+		if not hasGroups then
+			warn(
+				`[QuickZone] Observer {id} has no subscribed groups. It will not track any entities until a group is subscribed.`
+			)
+		end
+	end)
+
 	return self
 end
 
