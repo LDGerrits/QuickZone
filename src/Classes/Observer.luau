@@ -1416,7 +1416,7 @@ end
 	@within Observer
 	@return () -> (Player?, Zone?)
 ]=]
-function Observer.iterPlayersInside(self: Types.InternalObserver): () -> Player?
+function Observer.iterPlayersInside(self: Types.InternalObserver): () -> (Player?, Types.Zone?)
 	local entities = State.observerTrackingEntities[self.id]
 	local entity = nil
 	local observerId = self.id
