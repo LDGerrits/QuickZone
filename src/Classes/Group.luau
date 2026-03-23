@@ -2,13 +2,12 @@
 
 local CollectionService = game:GetService('CollectionService')
 local Players = game:GetService('Players')
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local RunService = game:GetService('RunService')
 
-local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
+local Log = require(script.Parent.Parent.Utils.Log)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM

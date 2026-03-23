@@ -1,14 +1,13 @@
 --!strict
 
 local Players = game:GetService('Players')
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local RunService = game:GetService('RunService')
 
-local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local Log = require(script.Parent.Parent.Utils.Log)
 
 local isPointInShape = Geometry.isPointInShape
 

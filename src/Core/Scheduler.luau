@@ -2,14 +2,13 @@
 --!optimize 2
 --!strict
 
-local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local RunService = game:GetService('RunService')
 
-local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
+local Log = require(script.Parent.Parent.Utils.Log)
 local State = require(script.Parent.State)
 
 local queryPoint = LinearBVH.queryPoint
