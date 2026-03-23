@@ -78,7 +78,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^1.2.1
+ldgerrits/quickzone@^1.3.0
 ```
 
 ### Manual
@@ -97,9 +97,15 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 -- Create a group that automatically tracks the client's character (including respawns)
 local myPlayer = Group.localPlayer()
 
--- Create an observer subscribed to the group.
+-- Find all current and future instances with the 'Water' tag.
+local zones = Zone.fromTag('AntiGravity', {
+    metadata = { GravityMultiplier = 0.4 }
+})
+
+-- Create an observer subscribed to the group and attached to the zones.
 local gravityObserver = Observer.new({ 
-    groups = { myPlayer } 
+    groups = { myPlayer },
+    zones = { zones }
 })
 
 -- Define behavior
@@ -123,12 +129,6 @@ gravityObserver:observe(function(player, zone)
         force:Destroy()
     end
 end)
-
--- Find all current and future instances with the 'Water' tag.
-Zone.fromTag('AntiGravity', { 
-    observers = { gravityObserver },
-    metadata = { GravityMultiplier = 0.4 }
-})
 ```
 
 ### Option B: The Event-Driven Approach (ZonePlus / SimpleZone Style)
@@ -140,10 +140,8 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 local localPlayer = game:GetService('Players').LocalPlayer
 
 local myPlayer = Group.localPlayer()
-local gravityObserver = Observer.new()
-
--- Subscribe the logic to the group
-gravityObserver:subscribe(myPlayer)
+local zones = Zone.fromChildren(workspace.AntiGravityParts)
+local gravityObserver = Observer.new():subscribe(myPlayer):attach(zones)
 
 -- Connect events
 gravityObserver:onLocalPlayerEnter(function(zone)
@@ -168,9 +166,6 @@ gravityObserver:onLocalPlayerExit(function(zone)
         hrp.AntiGravityForce:Destroy()
     end
 end)
-
-local zones = Zone.fromChildren(workspace.AntiGravityParts)
-zones:attach(gravityObserver)
 ```
 
 ### Option C: The Polling Approach (Data-Oriented / ECS)
@@ -185,13 +180,6 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 -- Disable auto-update for deterministic, manual stepping (optional)
 QuickZone:setEnabled(false)
 
-local playerGroup = Group.new()
-local gravityObserver = Observer.new({ groups = { playerGroup } })
-Zone.fromTag('AntiGravity', { 
-    observers = { gravityObserver },
-    metadata = { GravityMultiplier = 0.4 }
-})
-
 local localPlayer = Players.LocalPlayer
 local characterModel = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 
@@ -199,7 +187,14 @@ local characterModel = localPlayer.Character or localPlayer.CharacterAdded:Wait(
 QuickZone:setReference(localPlayer, characterModel)
 
 -- Add the local player to the spatial group (QuickZone tracks the mapped model automatically)
-playerGroup:add(localPlayer)
+local playerGroup = Group.new():add(localPlayer)
+local zones = Zone.fromTag('AntiGravity', {
+    metadata = { GravityMultiplier = 0.4 }
+})
+local gravityObserver = Observer.new({ 
+    groups = { playerGroup },
+    zones = { zones }
+})
 
 -- Process all spatial movement and LBVH tree updates in a specific order (only needed if :setEnabled(false))
 local function spatialSystem(dt)

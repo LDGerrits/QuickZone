@@ -69,8 +69,7 @@ The easiest way to create zones is using the bulk constructors. The `fromParts`,
 ```lua
 -- Create zones from a CollectionService tag
 local lavaZones = Zone.fromTag('Lava', {
-	metadata = { damage = 10 },
-	observers = { damageObserver },
+	metadata = { damage = 10 }
 })
 
 -- Create zones from an array of parts
@@ -81,9 +80,6 @@ local hazardZones = Zone.fromDescendants(workspace.TrapModel)
 
 -- Create zones from only the direct children of a Folder (Shallow search)
 local flatZones = Zone.fromChildren(workspace.FlatFolder)
-
--- You can attach an observer to the entire collection at once
-safeZones:attach(invincibilityObserver)
 ```
 
 ### Manual Creation
@@ -104,8 +100,7 @@ For maximum perfomance, use `isDynamic = true` for zones attached to moving plat
 ```lua
 local trainZone = Zone.fromPart(workspace.TrainCarriage, { 
 	isDynamic = true,
-	metadata = { route = 'North' },
-	observers = { trainObserver }
+	metadata = { route = 'North' }
 })
 ```
 :::info Performance Optimization: Static vs. Dynamic
@@ -120,8 +115,7 @@ You can quickly create a dynamic zone from an existing physical part. If you set
 ```lua
 local truckZone = Zone.fromPart(workspace.Truck.Hitbox, { 
     isDynamic = true,
-    autoSync = true,
-    observers = { vehicleObserver }
+    autoSync = true
 })
 ```
 Because Zone.fromPart requires an object with a physical volume (like a BasePart), you cannot use it for abstract references like an Attachment or a Bone. Instead, you manually create the zone with a specific size and declaratively set its reference and autoSync.
@@ -205,7 +199,7 @@ local observer = Observer.new({
 })
 
 observer:subscribe(allPlayers)
-healingZones:attach(observer)
+observer:attach(healingZones)
 ```
 
 ### Lifecycle Management
