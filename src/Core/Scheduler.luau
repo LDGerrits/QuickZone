@@ -13,7 +13,10 @@ local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local State = require(script.Parent.State)
 
 local queryPoint = LinearBVH.queryPoint
+local queryBox = LinearBVH.queryBox
 local isPointInShape = Geometry.isPointInShape
+local getObjectBounds = Geometry.getObjectBounds
+local isBoxInShape = Geometry.isBoxInShape
 
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
@@ -56,6 +59,8 @@ local ctx_candidateIndex: { [number]: number } = table.create(16)
 local ctx_candidateList: { [number]: number } = table.create(16)
 local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
+local ctx_boxCFrame: CFrame
+local ctx_boxHalfSize: Vector3
 
 local frameBudget = Config.Scheduler.frameBudget
 local autoSyncRate = Config.Scheduler.autoSyncRate
@@ -91,9 +96,15 @@ local function processProfileChange(entity: Types.Entity)
 
 	local minPrecSq = math.huge
 	local maxRate = 0
+	local hasVolume = false
 
 	-- Find the highest settings across all subscribed observers
 	for groupId, _ in groups do
+		local group = State.groups[groupId]
+		if group and group.hasVolume then
+			hasVolume = true
+		end
+
 		local observers = groupToObservers[groupId]
 		if not observers then
 			continue
@@ -115,6 +126,42 @@ local function processProfileChange(entity: Types.Entity)
 	end
 
 	local data = entityData[entity]
+
+	if hasVolume then
+		local ref = entityToReference[entity] or entity
+
+		if typeof(ref) == 'Instance' and ref:IsA('Player') then
+			-- TODO This needs to be done more intelligently
+			data.halfSize = Vector3.new(1, 2.5, 0.5)
+			data.pivotOffset = CFrame.new(0, 0.5, 0)
+		elseif typeof(entity) == 'Instance' then
+			if entity:IsA('BasePart') then
+				data.halfSize = entity.Size * 0.5
+				data.pivotOffset = nil
+			elseif entity:IsA('Model') then
+				local boundsCF, boundsSize = entity:GetBoundingBox()
+				local pivotCF = entity:GetPivot()
+				data.halfSize = boundsSize * 0.5
+				data.pivotOffset = pivotCF:ToObjectSpace(boundsCF)
+			else
+				data.halfSize = nil
+				data.pivotOffset = nil
+			end
+		elseif typeof(entity) == 'table' then
+			local entityTable = entity :: Types.EntityTable
+			if entityTable.Size then
+				data.halfSize = entityTable.Size * 0.5
+				data.pivotOffset = nil
+			else
+				data.halfSize = nil
+				data.pivotOffset = nil
+			end
+		end
+	else
+		data.halfSize = nil
+		data.pivotOffset = nil
+	end
+
 	local currentRate = data.updateRate
 
 	-- Swap buckets
@@ -228,14 +275,42 @@ local function processZoneHit(zoneId: number)
 	end
 end
 
-local function queryCallbackStatic(zoneId: number)
+local function queryPointCallbackStatic(zoneId: number)
 	if isPointInShape(ctx_pos, staticCFrames[zoneId], staticHalfSizes[zoneId], staticTypes[zoneId]) then
 		processZoneHit(zoneId)
 	end
 end
 
-local function queryCallbackDynamic(zoneId: number)
+local function queryPointCallbackDynamic(zoneId: number)
 	if isPointInShape(ctx_pos, dynamicCFrames[zoneId], dynamicHalfSizes[zoneId], dynamicTypes[zoneId]) then
+		processZoneHit(zoneId)
+	end
+end
+
+local function queryBoxCallbackStatic(zoneId: number)
+	if
+		isBoxInShape(
+			ctx_boxCFrame,
+			ctx_boxHalfSize,
+			staticCFrames[zoneId],
+			staticHalfSizes[zoneId],
+			staticTypes[zoneId]
+		)
+	then
+		processZoneHit(zoneId)
+	end
+end
+
+local function queryBoxCallbackDynamic(zoneId: number)
+	if
+		isBoxInShape(
+			ctx_boxCFrame,
+			ctx_boxHalfSize,
+			dynamicCFrames[zoneId],
+			dynamicHalfSizes[zoneId],
+			dynamicTypes[zoneId]
+		)
+	then
 		processZoneHit(zoneId)
 	end
 end
@@ -357,22 +432,49 @@ function Scheduler.update(dt: number)
 			local entity = list[idx]
 			local data = entityData[entity] :: Types.EntityData
 
-			-- Strategy
-			local position
 			local strategy = data.strategy
-			if strategy == STRAT_POS then
-				position = (entity :: BasePart).Position
-			elseif strategy == STRAT_WORLD then
-				position = (entity :: Attachment).WorldPosition
-			elseif strategy == STRAT_CFRAME then
-				position = (entity :: BasePart).CFrame.Position
-			elseif strategy == STRAT_TRANSFORM then
-				position = (entity :: any).Transform.Position
-			elseif strategy == STRAT_PRIM then
-				local prim = (entity :: Model).PrimaryPart
-				position = prim and prim.Position or (entity :: Model):GetPivot().Position
-			elseif strategy == STRAT_PIVOT then
-				position = (entity :: any):GetPivot().Position
+			local halfSize = data.halfSize
+
+			local position: Vector3
+			local cframe: CFrame?
+
+			if halfSize then -- volume
+				if strategy == STRAT_POS or strategy == STRAT_CFRAME then
+					local rawCF = (entity :: any).CFrame
+					cframe = rawCF or CFrame.new((entity :: any).Position)
+				elseif strategy == STRAT_WORLD then
+					local rawCF = (entity :: any).WorldCFrame
+					cframe = rawCF or CFrame.new((entity :: any).WorldPosition)
+				elseif strategy == STRAT_TRANSFORM then
+					cframe = (entity :: any).Transform
+				elseif strategy == STRAT_PRIM then
+					local prim = (entity :: any).PrimaryPart
+					cframe = prim and prim.CFrame or (entity :: any):GetPivot()
+				elseif strategy == STRAT_PIVOT then
+					cframe = (entity :: any):GetPivot()
+				end
+
+				local offset = data.pivotOffset
+				if offset then
+					cframe = (cframe :: CFrame) * offset
+				end
+
+				position = (cframe :: CFrame).Position
+			else -- point
+				if strategy == STRAT_POS then
+					position = (entity :: BasePart).Position
+				elseif strategy == STRAT_WORLD then
+					position = (entity :: Attachment).WorldPosition
+				elseif strategy == STRAT_CFRAME then
+					position = (entity :: BasePart).CFrame.Position
+				elseif strategy == STRAT_TRANSFORM then
+					position = (entity :: any).Transform.Position
+				elseif strategy == STRAT_PRIM then
+					local prim = (entity :: Model).PrimaryPart
+					position = prim and prim.Position or (entity :: Model):GetPivot().Position
+				elseif strategy == STRAT_PIVOT then
+					position = (entity :: any):GetPivot().Position
+				end
 			end
 
 			local needsStatic = data.needsStatic
@@ -405,12 +507,24 @@ function Scheduler.update(dt: number)
 				ctx_cCount = 0
 				ctx_highestWin = -math.huge
 
-				if needsDynamic then
-					queryPoint(dynamicTree, position, queryCallbackDynamic)
-				end
+				if halfSize and cframe then -- volume
+					ctx_boxCFrame = cframe
+					ctx_boxHalfSize = halfSize
+					local bMin, bMax = getObjectBounds(cframe, halfSize)
 
-				if needsStatic then
-					queryPoint(staticTree, position, queryCallbackStatic)
+					if needsDynamic then
+						queryBox(dynamicTree, bMin, bMax, queryBoxCallbackDynamic)
+					end
+					if needsStatic then
+						queryBox(staticTree, bMin, bMax, queryBoxCallbackStatic)
+					end
+				else -- point
+					if needsDynamic then
+						queryPoint(dynamicTree, position, queryPointCallbackDynamic)
+					end
+					if needsStatic then
+						queryPoint(staticTree, position, queryPointCallbackStatic)
+					end
 				end
 
 				local current = data.activeObserverMemberships

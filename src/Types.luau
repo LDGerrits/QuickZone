@@ -25,6 +25,7 @@ export type EntityTable = {
 	CFrame: CFrame?,
 	Transform: CFrame?,
 	GetPivot: ((self: any) -> CFrame)?,
+	Size: Vector3?,
 }
 
 --[=[
@@ -68,6 +69,8 @@ export type EntityData = {
 	logicVersion: number,
 	needsStatic: boolean,
 	needsDynamic: boolean,
+	halfSize: Vector3?,
+	pivotOffset: CFrame?,
 }
 
 export type Group<T = any> = {
@@ -96,6 +99,7 @@ export type InternalGroup<T = any> = Group<T> & {
 	entities: { T },
 	entityIndices: { [any]: number },
 	isManaged: boolean?,
+	hasVolume: boolean?,
 	autoClean: boolean,
 	onDestroyCallbacks: { () -> () }?,
 }

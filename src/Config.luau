@@ -15,6 +15,9 @@ Config.Strategy = {
 Config.Group = {
 	-- Entities are automatically cleaned up for that group if destroyed
 	autoClean = true,
+
+	-- Entities will use volume instead of a single point for spatial queries
+	hasVolume = false,
 }
 
 Config.Scheduler = {

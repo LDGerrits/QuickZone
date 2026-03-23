@@ -125,12 +125,13 @@ Group.__index = Group
 	```
 
 	@tag Constructor
-	@param config { entities: { T }?, autoClean: boolean? }?
+	@param config { entities: { T }?, autoClean: boolean?, hasVolume: boolean? }?
 	@return Group
 ]=]
 function Group.new<T>(config: {
 	entities: { T }?,
 	autoClean: boolean?,
+	hasVolume: boolean?,
 }?): Types.Group<T>
 	local id = State.nextGroupId
 	State.nextGroupId += 1
@@ -140,11 +141,17 @@ function Group.new<T>(config: {
 		autoClean = config.autoClean
 	end
 
+	local hasVolume = Config.Group.hasVolume
+	if config and config.hasVolume ~= nil then
+		hasVolume = config.hasVolume
+	end
+
 	local self: Types.InternalGroup<T> = setmetatable({
 		id = id,
 		entities = {},
 		entityIndices = {},
 		autoClean = autoClean,
+		hasVolume = hasVolume,
 	}, Group) :: any
 
 	State.groups[id] = self
@@ -164,10 +171,16 @@ end
 
 	@tag Constructor
 	@param tag string
+	@param config { hasVolume: boolean? }?
 	@return Group
 ]=]
-function Group.fromTag(tag: string): Types.Group<Types.Entity>
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Types.Entity>
+function Group.fromTag(tag: string, config: { hasVolume: boolean? }): Types.Group<Types.Entity>
+	local hasVolume = Config.Group.hasVolume
+	if config and config.hasVolume ~= nil then
+		hasVolume = config.hasVolume
+	end
+
+	local group = Group.new({ autoClean = false, hasVolume = hasVolume }) :: Types.InternalGroup<Types.Entity>
 	group.isManaged = true
 
 	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
@@ -240,10 +253,16 @@ end
 	:::
 
 	@tag Constructor
+	@param config { hasVolume: boolean? }?
 	@return Group
 ]=]
-function Group.players(): Types.Group<Player>
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
+function Group.players(config: { hasVolume: boolean? }): Types.Group<Player>
+	local hasVolume = Config.Group.hasVolume
+	if config and config.hasVolume ~= nil then
+		hasVolume = config.hasVolume
+	end
+
+	local group = Group.new({ autoClean = false, hasVolume = hasVolume }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
 	local trackerStore = {} :: { [Player]: () -> () }
@@ -292,14 +311,20 @@ end
 
 	@client
 	@tag Constructor
+	@param config { hasVolume: boolean? }?
 	@return Group
 ]=]
-function Group.localPlayer(): Types.Group<Player>
+function Group.localPlayer(config: { hasVolume: boolean? }): Types.Group<Player>
 	if not IS_CLIENT then
 		Log.fatal('Group.localPlayer() can only be called on the Client.', nil)
 	end
 
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
+	local hasVolume = Config.Group.hasVolume
+	if config and config.hasVolume ~= nil then
+		hasVolume = config.hasVolume
+	end
+
+	local group = Group.new({ autoClean = false, hasVolume = hasVolume }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
 	local lp = Players.LocalPlayer
@@ -352,6 +377,29 @@ function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.
 			conn:Disconnect()
 			cleanups[entity] = nil
 		end
+	end
+
+	return self
+end
+
+--[=[ 
+	Enables or disables volumetric hitboxes for all entities in this group.
+	When enabled, QuickZone will calculate boundaries and perform full volume-to-volume intersection checks.
+
+	@method setVolume
+	@within Group
+	@param hasVolume boolean
+	@return Group
+]=]
+function Group.setVolume(self: Types.InternalGroup, hasVolume: boolean): Types.Group
+	if self.hasVolume == hasVolume then
+		return self
+	end
+
+	self.hasVolume = hasVolume
+
+	for _, entity in self.entities do
+		State.dirtyProfiles[entity] = true
 	end
 
 	return self
