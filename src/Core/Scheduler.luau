@@ -508,7 +508,7 @@ function Scheduler.update(dt: number)
 	end
 end
 
-function Scheduler.setAutoUpdate(enabled: boolean)
+function Scheduler.setEnabled(enabled: boolean)
 	if enabled then
 		if not autoUpdateConnection then
 			autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
@@ -551,6 +551,6 @@ function Scheduler.rebuildTrees()
 	end
 end
 
-Scheduler.setAutoUpdate(Config.Scheduler.autoUpdate)
+Scheduler.setEnabled(Config.Scheduler.enabled)
 
 return Scheduler

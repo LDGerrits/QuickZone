@@ -42,7 +42,7 @@ end)
 Ideal for ECS frameworks or continuous logic. Instead of waiting for events, your systems poll the state every frame using zero-allocation iterators. You should disable the internal scheduler to step the update method manually for perfect determinism.
 
 ```lua
-QuickZone:setAutoUpdate(false) -- Disable auto-loop
+QuickZone:setEnabled(false) -- Disable auto-loop
 
 local function spatialSystem(dt)
     QuickZone:update(dt) -- Steps it deterministically once per frame.

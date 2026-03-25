@@ -93,7 +93,7 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:setEnabled(enabled: boolean): QuickZone
-	Scheduler.setAutoUpdate(enabled)
+	Scheduler.setEnabled(enabled)
 	return self
 end
 
