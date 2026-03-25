@@ -145,7 +145,7 @@ end
 	Set a reference to an entity. If set, the callbacks will now pass the reference instead of the entity.
 	
 	```lua
-	QuickZone:setReference(numberId, transformComponent)
+	QuickZone:setReference(transformComponent, numberId)
 
 	local entityGroup = QuickZone.Group.new({ Entities = { entityId } })
 	local observer = QuickZone.Observer.new({ Groups = {entityGroup} })

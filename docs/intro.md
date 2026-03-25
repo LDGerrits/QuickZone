@@ -193,7 +193,7 @@ local localPlayer = Players.LocalPlayer
 local characterModel = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 
 -- Track this Model's physical position, but return the local player in queries
-QuickZone:setReference(localPlayer, characterModel)
+QuickZone:setReference(characterModel, localPlayer)
 
 -- Add the local player to the spatial group (QuickZone tracks the mapped model automatically)
 local playerGroup = Group.new():add(localPlayer)
