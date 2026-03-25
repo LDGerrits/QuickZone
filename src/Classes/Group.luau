@@ -179,7 +179,7 @@ end
 	@param tag string
 	@return Group
 ]=]
-function Group.tag(tag: string): Types.Group<Types.Entity>
+function Group.fromTag(tag: string): Types.Group<Types.Entity>
 	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Types.Entity>
 	group.isManaged = true
 
@@ -746,12 +746,12 @@ function Group._remove(self: Types.InternalGroup, entity: any): Types.Group
 			continue
 		end
 
-		local safe = State.observerSafe[observerId]
+		local safety = State.observerSafety[observerId]
 		local z = State.zoneIdToZoneObj[oldZoneId]
 		local ref = State.entityToReference[entity] or entity
 
 		for _, fn in cbs do
-			if safe then
+			if safety then
 				task.spawn(fn, ref, z)
 			else
 				fn(ref, z)

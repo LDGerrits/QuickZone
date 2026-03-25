@@ -103,7 +103,7 @@ export type GroupClass = {
 		entities: { T }?,
 		autoClean: boolean?,
 	}?) -> Group<T>,
-	tag: (tag: string) -> Group<Entity>,
+	fromTag: (tag: string) -> Group<Entity>,
 	players: () -> Group<Player>,
 	localPlayer: () -> Group<Player>,
 }
@@ -188,16 +188,25 @@ export type ZoneClass = {
 			size: Vector3,
 			shape: ShapeType?,
 			reference: (Attachment | BasePart | Bone)?,
-			dynamic: boolean?,
+			isDynamic: boolean?,
 			metadata: any?,
 			autoSync: boolean?,
 		}
 	) -> Zone,
-	part: (part: BasePart, config: { dynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zone,
-	parts: (parts: { BasePart }, config: { dynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zones,
-	tag: (tag: string, config: { dynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zones,
-	descendants: (parent: Instance, config: { dynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zones,
-	children: (parent: Instance, config: { dynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zones,
+	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zone,
+	fromParts: (
+		parts: { BasePart },
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	) -> Zones,
+	fromTag: (tag: string, config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zones,
+	fromDescendants: (
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	) -> Zones,
+	fromChildren: (
+		parent: Instance,
+		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	) -> Zones,
 }
 
 export type Observer<T = any> = {
@@ -210,7 +219,7 @@ export type Observer<T = any> = {
 	setUpdateRate: (self: Observer<T>, hz: number) -> Observer<T>,
 	setPrecision: (self: Observer<T>, n: number) -> Observer<T>,
 	setEnabled: (self: Observer<T>, enabled: boolean) -> Observer<T>,
-	setSafe: (self: Observer<T>, enabled: boolean) -> Observer<T>,
+	setSafety: (self: Observer<T>, enabled: boolean) -> Observer<T>,
 
 	isEnabled: (self: Observer<T>) -> boolean,
 	isSafe: (self: Observer<T>) -> boolean,
@@ -265,7 +274,7 @@ export type ObserverClass = {
 			updateRate: number?,
 			precision: number?,
 			enabled: boolean?,
-			safe: boolean?,
+			safety: boolean?,
 		}?
 	) -> Observer<T>,
 }

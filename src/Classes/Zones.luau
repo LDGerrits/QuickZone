@@ -13,13 +13,13 @@ local Types = require(script.Parent.Parent.Types)
 local Zones = {}
 Zones.__index = Zones
 
-function Zones.new(config: { dynamic: boolean?, autoSync: boolean?, metadata: any? }?): Types.Zones
-	local dynamic = if config and config.dynamic ~= nil then config.dynamic else false
+function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: any? }?): Types.Zones
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local self: Types.InternalZones = setmetatable({
-		dynamic = dynamic,
+		dynamic = isDynamic,
 		metadata = metadata,
 		autoSync = autoSync,
 		zones = {} :: { [Types.Zone]: boolean },
@@ -118,11 +118,11 @@ end
 --[=[ 
 	Returns whether Zones is set to dynamic.
 
-	@method dynamic
+	@method isDynamic
 	@within Zones
 	@return boolean
 ]=]
-function Zones.dynamic(self: Types.InternalZones): boolean
+function Zones.isDynamic(self: Types.InternalZones): boolean
 	return self.dynamic
 end
 
@@ -175,18 +175,18 @@ end
 
 	@method setDynamic
 	@within Zones
-	@param dynamic boolean
+	@param isDynamic boolean
 	@return Zones
 ]=]
-function Zones.setDynamic(self: Types.InternalZones, dynamic: boolean): Types.Zones
-	if self.dynamic == dynamic then
+function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
+	if self.dynamic == isDynamic then
 		return self
 	end
 
-	self.dynamic = dynamic
+	self.dynamic = isDynamic
 
 	for zone, _ in self.zones do
-		zone:setDynamic(dynamic)
+		zone:setDynamic(isDynamic)
 	end
 
 	return self

@@ -48,7 +48,7 @@ local function updateAllEntitiesForObserver(observerId: number)
 end
 
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
-	local safe = State.observerSafe[observerId]
+	local safety = State.observerSafety[observerId]
 
 	for _, entity in group.entities do
 		local data = State.entityData[entity]
@@ -79,7 +79,7 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 		local z = State.zoneIdToZoneObj[oldZoneId]
 		local ref = State.entityToReference[entity] or entity
 		for _, fn in cbs do
-			if safe then
+			if safety then
 				task.spawn(fn, ref, z)
 			else
 				fn(ref, z)
@@ -109,7 +109,7 @@ Observer.__index = Observer
 		updateRate = 20, -- Check at 20Hz
 		precision = 0.5, -- Ignore movement smaller than 0.5 studs
 		enabled = false, -- Observer will not start processing spatial checks
-		safe = false, -- Do not wrap callbacks in task.spawn
+		safety = false, -- Do not wrap callbacks in task.spawn
 	})
 	```
 
@@ -118,12 +118,12 @@ Observer.__index = Observer
 	higher priority observers take complete control.
 	:::
 
-	:::warning Safe 
+	:::warning Safety 
 	If set to unsafe, you are not allowed to yield in the callbacks anymore. If you do, QuickZone will throw errors.
 	:::
 
 	@tag Constructor
-	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safe: boolean? }?
+	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
 ]=]
 function Observer.new<T>(config: {
@@ -133,7 +133,7 @@ function Observer.new<T>(config: {
 	updateRate: number?,
 	precision: number?,
 	enabled: boolean?,
-	safe: boolean?,
+	safety: boolean?,
 }?): Types.Observer
 	local id = State.nextObserverId
 	State.nextObserverId += 1
@@ -152,7 +152,7 @@ function Observer.new<T>(config: {
 	State.observerTrackingEntities[id] = {}
 	State.observerIdToObserverObj[id] = self
 	State.observerEnabled[id] = if config and config.enabled ~= nil then config.enabled else true
-	State.observerSafe[id] = if config and config.safe ~= nil then config.safe else Config.Observer.safe
+	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Observer.safety
 	State.observerStaticCount[id] = 0
 	State.observerDynamicCount[id] = 0
 
@@ -953,17 +953,17 @@ end
 --[=[
 	Whether to wrap callbacks in task.spawn (safe) or not (unsafe).
 
-	:::warning Safe 
+	:::warning Safety 
 	If set to unsafe, you are not allowed to yield in the callbacks anymore. If you do, QuickZone will throw errors.
 	:::
 
-	@method setSafe
+	@method setSafety
 	@within Observer
 	@param enabled boolean
 	@return Observer
 ]=]
-function Observer.setSafe(self: Types.InternalObserver, enabled: boolean): Types.Observer
-	State.observerSafe[self.id] = enabled
+function Observer.setSafety(self: Types.InternalObserver, enabled: boolean): Types.Observer
+	State.observerSafety[self.id] = enabled
 	return self
 end
 
@@ -1109,7 +1109,7 @@ end
 	@return boolean
 ]=]
 function Observer.isSafe(self: Types.InternalObserver): boolean
-	return State.observerSafe[self.id]
+	return State.observerSafety[self.id]
 end
 
 --[=[ 
@@ -1604,7 +1604,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerTrackingEntities[id] = nil
 	State.observerIdToObserverObj[id] = nil
 	State.observerEnabled[id] = nil
-	State.observerSafe[id] = nil
+	State.observerSafety[id] = nil
 	State.observerUpdateRate[id] = nil
 	State.observerPrecisionSq[id] = nil
 	State.observerStaticCount[id] = nil

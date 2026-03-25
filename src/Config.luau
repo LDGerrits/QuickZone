@@ -40,7 +40,7 @@ Config.Observer = {
 
 	-- If true, callbacks are fired via task.spawn
 	-- If false, callbacks fire immediately
-	safe = true,
+	safety = true,
 }
 
 Config.Debug = {

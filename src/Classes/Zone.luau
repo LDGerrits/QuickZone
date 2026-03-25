@@ -85,8 +85,8 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 	zone.syncConnections = connections
 end
 
-local function updateObserverZoneCount(observerId: number, dynamic: boolean, delta: number)
-	local dict = dynamic and State.observerDynamicCount or State.observerStaticCount
+local function updateObserverZoneCount(observerId: number, isDynamic: boolean, delta: number)
+	local dict = isDynamic and State.observerDynamicCount or State.observerStaticCount
 	local current = dict[observerId] or 0
 	local newCount = current + delta
 	dict[observerId] = newCount
@@ -118,7 +118,7 @@ end
 
 	:::caution Performance
 	If a zone moves (e.g., attached to a moving platform) or changes size, 
-	you should make the zone dynamic by setting `dynamic` to `true`. 
+	you should make the zone dynamic by setting `isDynamic` to `true`. 
 
 	Static zones are optimized into a large, pre-calculated tree. Updating a 
 	static zone forces a full recalculation of that tree, which is expensive. 
@@ -135,7 +135,7 @@ local function newZoneInternal(
 	size: Vector3,
 	shapeType: number,
 	reference: (BasePart | Attachment | Bone)?,
-	dynamic: boolean,
+	isDynamic: boolean,
 	metadata: any?,
 	autoSync: boolean
 ): Types.Zone
@@ -143,7 +143,7 @@ local function newZoneInternal(
 	State.nextZoneId += 1
 
 	local halfSize = size * 0.5
-	if dynamic then
+	if isDynamic then
 		State.dynamicCFrames[id] = cframe
 		State.dynamicHalfSizes[id] = halfSize
 		State.dynamicTypes[id] = shapeType
@@ -158,7 +158,7 @@ local function newZoneInternal(
 	local self: Types.InternalZone = setmetatable({
 		id = id,
 		reference = reference,
-		dynamic = dynamic,
+		dynamic = isDynamic,
 		metadata = metadata,
 		autoSync = false,
 	}, Zone) :: any
@@ -179,14 +179,14 @@ end
 		cframe = CFrame.new(0, 10, 0),
 		size = Vector3.new(10, 10, 10),
 		shape = 'Block',
-		dynamic = false,
+		isDynamic = false,
 		metadata = { Name = "Lobby" },
 		observers = { observer1, observer2 }
 	})
 	```
 
 	:::caution Dynamic Zones
-	If a zone moves, set `dynamic` to `true` for maximum performance. 
+	If a zone moves, set `isDynamic` to `true` for maximum performance. 
 	:::
 
 	:::caution Rebuild Request
@@ -194,7 +194,7 @@ end
 	:::
 
 	@tag Constructor
-	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, dynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zone
 ]=]
 function Zone.new(config: {
@@ -202,7 +202,7 @@ function Zone.new(config: {
 	size: Vector3,
 	shape: Types.ShapeType?,
 	reference: (BasePart | Attachment | Bone)?,
-	dynamic: boolean?,
+	isDynamic: boolean?,
 	metadata: any?,
 	autoSync: boolean?,
 }): Types.Zone
@@ -222,7 +222,7 @@ function Zone.new(config: {
 		config.size,
 		shapeType,
 		config.reference,
-		config.dynamic or false,
+		config.isDynamic or false,
 		config.metadata,
 		config.autoSync or false
 	)
@@ -234,13 +234,13 @@ end
 
 	```lua
 	local part = workspace.ZonePart
-	local zone = QuickZone.Zone.part(part, { 
+	local zone = QuickZone.Zone.fromPart(part, { 
 		observers = { safeObserver, healingObserver } 
 	})
 	```
 
 	:::caution Dynamic Zones
-	If a zone moves, set `dynamic` to `true` for maximum performance. 
+	If a zone moves, set `isDynamic` to `true` for maximum performance. 
 	:::
 
 	:::caution Rebuild Request
@@ -249,13 +249,13 @@ end
 
 	@tag Constructor
 	@param part BasePart -- The part to derive the zone from.
-	@param config { dynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zone
 ]=]
-function Zone.part(
+function Zone.fromPart(
 	part: BasePart,
 	config: {
-		dynamic: boolean?,
+		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
 	}?
@@ -269,11 +269,11 @@ function Zone.part(
 		shapeId = Enum.PartType.CornerWedge.Value
 	end
 
-	local dynamic = config and config.dynamic or false
+	local isDynamic = config and config.isDynamic or false
 	local metadata = config and config.metadata
 	local autoSync = config and config.autoSync or false
 
-	return newZoneInternal(part.CFrame, part.Size, shapeId, part, dynamic, metadata, autoSync)
+	return newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata, autoSync)
 end
 
 --[=[
@@ -282,31 +282,31 @@ end
 	@tag Constructor
 	@within Zone
 	@param parts { BasePart }
-	@param config { dynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.parts(
+function Zone.fromParts(
 	parts: { BasePart },
 	config: {
-		dynamic: boolean?,
+		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
 	}?
 ): Types.Zones
-	local dynamic = if config and config.dynamic ~= nil then config.dynamic else false
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local zones = Zones.new({
-		dynamic = dynamic,
+		isDynamic = isDynamic,
 		metadata = metadata,
 		autoSync = autoSync,
 	}) :: Types.InternalZones
 
 	for _, part in parts do
 		if part:IsA('BasePart') then
-			local newZone = Zone.part(part, {
-				dynamic = dynamic,
+			local newZone = Zone.fromPart(part, {
+				isDynamic = isDynamic,
 				metadata = zones.metadata,
 				autoSync = autoSync,
 			})
@@ -324,23 +324,23 @@ end
 	@tag Constructor
 	@within Zone
 	@param parent Instance
-	@param config { dynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.children(
+function Zone.fromChildren(
 	parent: Instance,
 	config: {
-		dynamic: boolean?,
+		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
 	}?
 ): Types.Zones
-	local dynamic = if config and config.dynamic ~= nil then config.dynamic else false
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local zones = Zones.new({
-		dynamic = dynamic,
+		isDynamic = isDynamic,
 		metadata = metadata,
 		autoSync = autoSync,
 	}) :: Types.InternalZones
@@ -349,8 +349,8 @@ function Zone.children(
 
 	local function onAdded(child: Instance)
 		if child:IsA('BasePart') and not instanceToZone[child] then
-			local newZone = Zone.part(child, {
-				dynamic = dynamic,
+			local newZone = Zone.fromPart(child, {
+				isDynamic = isDynamic,
 				metadata = zones.metadata,
 			})
 			instanceToZone[child] = newZone
@@ -389,7 +389,7 @@ end
 	anywhere within the given Instance. Automatically updates as descendants are added/removed.
 	
 	```lua
-	local mapZones = QuickZone.Zone.descendants(workspace.HazardFolder, {
+	local mapZones = QuickZone.Zone.fromDescendants(workspace.HazardFolder, {
 		observers = { hazardObserver }
 	})
 	```
@@ -397,23 +397,23 @@ end
 	@tag Constructor
 	@within Zone
 	@param parent Instance -- The container (Model, Folder, etc.) to search through.
-	@param config { dynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.descendants(
+function Zone.fromDescendants(
 	parent: Instance,
 	config: {
-		dynamic: boolean?,
+		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
 	}?
 ): Types.Zones
-	local dynamic = if config and config.dynamic ~= nil then config.dynamic else false
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local zones = Zones.new({
-		dynamic = dynamic,
+		isDynamic = isDynamic,
 		metadata = metadata,
 		autoSync = autoSync,
 	}) :: Types.InternalZones
@@ -422,8 +422,8 @@ function Zone.descendants(
 
 	local function onAdded(descendant: Instance)
 		if descendant:IsA('BasePart') and not instanceToZone[descendant] then
-			local newZone = Zone.part(descendant, {
-				dynamic = dynamic,
+			local newZone = Zone.fromPart(descendant, {
+				isDynamic = isDynamic,
 				metadata = zones.metadata,
 			})
 			instanceToZone[descendant] = newZone
@@ -463,24 +463,24 @@ end
 	@tag Constructor
 	@within Zone
 	@param tag string
-	@param config { dynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.tag(
+function Zone.fromTag(
 	tag: string,
 	config: {
-		dynamic: boolean?,
+		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
 	}?
 ): Types.Zones
 	-- Create Zones
-	local dynamic = if config and config.dynamic ~= nil then config.dynamic else false
+	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local zones = Zones.new({
-		dynamic = dynamic,
+		isDynamic = isDynamic,
 		metadata = metadata,
 		autoSync = autoSync,
 	}) :: Types.InternalZones
@@ -493,8 +493,8 @@ function Zone.tag(
 		local inWorkspace = instance:IsDescendantOf(workspace)
 		if inWorkspace and not instanceToZone[instance] then
 			if instance:IsA('BasePart') then
-				local newZone = Zone.part(instance, {
-					dynamic = dynamic,
+				local newZone = Zone.fromPart(instance, {
+					isDynamic = isDynamic,
 					metadata = zones.metadata,
 				})
 				instanceToZone[instance] = newZone
@@ -760,26 +760,26 @@ end
 
 	@method setDynamic
 	@within Zone
-	@param dynamic boolean
+	@param isDynamic boolean
 	@return Zone
 ]=]
-function Zone.setDynamic(self: Types.InternalZone, dynamic: boolean): Types.Zone
-	if self.dynamic == dynamic then
+function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
+	if self.dynamic == isDynamic then
 		return self
 	end
 
 	local id = self.id
-	self.dynamic = dynamic
+	self.dynamic = isDynamic
 
 	local attached = State.zoneAttachedObservers[id]
 	if attached then
 		for _, obsId in attached do
-			updateObserverZoneCount(obsId, not dynamic, -1)
-			updateObserverZoneCount(obsId, dynamic, 1)
+			updateObserverZoneCount(obsId, not isDynamic, -1)
+			updateObserverZoneCount(obsId, isDynamic, 1)
 		end
 	end
 
-	if dynamic then
+	if isDynamic then
 		dynamicCFrames[id] = staticCFrames[id]
 		dynamicHalfSizes[id] = staticHalfSizes[id]
 		dynamicTypes[id] = staticTypes[id]
@@ -1030,11 +1030,11 @@ end
 --[=[ 
 	Returns whether the zone is currently registered as a dynamic object.
 	
-	@method dynamic
+	@method isDynamic
 	@within Zone
 	@return boolean
 ]=]
-function Zone.dynamic(self: Types.InternalZone): boolean
+function Zone.isDynamic(self: Types.InternalZone): boolean
 	return self.dynamic
 end
 
@@ -1116,10 +1116,10 @@ function Zone.destroy(self: Types.InternalZone): ()
 					continue
 				end
 
-				local safe = State.observerSafe[observerId]
+				local safety = State.observerSafety[observerId]
 				local ref = State.entityToReference[entity] or entity
 				for _, fn in cbs do
-					if safe then
+					if safety then
 						task.spawn(fn, ref, self)
 					else
 						fn(ref, self)

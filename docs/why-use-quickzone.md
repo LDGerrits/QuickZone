@@ -25,7 +25,7 @@ QuickZone, on the other hand, is Entity-Centric. It keeps a list of entities and
 ### 2. Expressive and Boilerplate-Free API
 Writing performant code shouldn't mean writing complicated code. QuickZone is designed to be highly ergonomic.
 
-- **CollectionService Integration**: Tag your parts and bind them to your logic in a single line of code (e.g., `Zone.tag('Lava')`).
+- **CollectionService Integration**: Tag your parts and bind them to your logic in a single line of code (e.g., `Zone.fromTag('Lava')`).
 
 - **Declarative Configurations**: QuickZone lets you define behaviors, priorities, and relationships upfront in simple configuration tables, drastically reducing boilerplate and keeping your scripts clean.
 

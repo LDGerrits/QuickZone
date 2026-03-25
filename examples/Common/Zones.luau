@@ -11,17 +11,17 @@ local Zone = QuickZone.Zone
 	For single-purpose zones, just create the Zone locally inside its respective script.
 ]=]
 local Zones = {
-	Lava = Zone.tag('Lava', {
+	Lava = Zone.fromTag('Lava', {
 		metadata = { Name = 'Lava', Damage = 50 },
 	}),
-	ToxicGas = Zone.tag('ToxicGas', {
+	ToxicGas = Zone.fromTag('ToxicGas', {
 		metadata = { Name = 'ToxicGas', Damage = 10 },
 	}),
 }
 
 if RunService:IsClient() then
-	Zones.SpeedBoost = Zone.children(workspace:WaitForChild('SpeedBoosts'))
-	Zones.AntiGravity = Zone.children(workspace:WaitForChild('AntiGravZones'))
+	Zones.SpeedBoost = Zone.fromChildren(workspace:WaitForChild('SpeedBoosts'))
+	Zones.AntiGravity = Zone.fromChildren(workspace:WaitForChild('AntiGravZones'))
 end
 
 return Zones

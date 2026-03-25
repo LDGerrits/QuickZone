@@ -87,7 +87,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^2.0.0
+ldgerrits/quickzone@^1.3.12
 ```
 
 ### Manual
@@ -107,7 +107,7 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 local myPlayer = Group.localPlayer()
 
 -- Find all current and future instances with the 'Water' tag.
-local zones = Zone.tag('AntiGravity', {
+local zones = Zone.fromTag('AntiGravity', {
     metadata = { GravityMultiplier = 0.4 }
 })
 
@@ -149,7 +149,7 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 local localPlayer = game:GetService('Players').LocalPlayer
 
 local myPlayer = Group.localPlayer()
-local zones = Zone.children(workspace.AntiGravityParts)
+local zones = Zone.fromChildren(workspace.AntiGravityParts)
 local gravityObserver = Observer.new():subscribe(myPlayer):attach(zones)
 
 -- Connect events
@@ -197,7 +197,7 @@ QuickZone:setReference(localPlayer, characterModel)
 
 -- Add the local player to the spatial group (QuickZone tracks the mapped model automatically)
 local playerGroup = Group.new():add(localPlayer)
-local zones = Zone.tag('AntiGravity', {
+local zones = Zone.fromTag('AntiGravity', {
     metadata = { GravityMultiplier = 0.4 }
 })
 local gravityObserver = Observer.new({ 

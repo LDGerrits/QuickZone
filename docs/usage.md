@@ -42,7 +42,7 @@ end)
 Ideal for ECS frameworks or continuous logic. Instead of waiting for events, your systems poll the state every frame using zero-allocation iterators. You should disable the internal scheduler to step the update method manually for perfect determinism.
 
 ```lua
-QuickZone:setEnabled(false) -- Disable auto-loop
+QuickZone:setAutoUpdate(false) -- Disable auto-loop
 
 local function spatialSystem(dt)
     QuickZone:update(dt) -- Steps it deterministically once per frame.
@@ -64,22 +64,22 @@ end)
 Zones represent physical areas in the world. They are mathematical boundaries that can be static (fixed in space) or dynamic (following a part). They can be created from existing parts or defined manually with a CFrame and Size.
 
 ### Bulk Creation
-The easiest way to create zones is using the bulk constructors. The `parts`, `descendants`, `children`, and `tag` return a Zones collection object, which acts as a logical unit allowing you to manage multiple zones at once.
+The easiest way to create zones is using the bulk constructors. The `fromParts`, `fromDescendants`, `fromChildren`, and `fromTag` return a Zones collection object, which acts as a logical unit allowing you to manage multiple zones at once.
 
 ```lua
 -- Create zones from a CollectionService tag
-local lavaZones = Zone.tag('Lava', {
+local lavaZones = Zone.fromTag('Lava', {
 	metadata = { damage = 10 }
 })
 
 -- Create zones from an array of parts
-local safeZones = Zone.parts(workspace.SafeZones:GetChildren())
+local safeZones = Zone.fromParts(workspace.SafeZones:GetChildren())
 
 -- Create zones from all BaseParts inside a Model or Folder (Deep search)
-local hazardZones = Zone.descendants(workspace.TrapModel)
+local hazardZones = Zone.fromDescendants(workspace.TrapModel)
 
 -- Create zones from only the direct children of a Folder (Shallow search)
-local flatZones = Zone.children(workspace.FlatFolder)
+local flatZones = Zone.fromChildren(workspace.FlatFolder)
 ```
 
 ### Manual Creation
@@ -90,16 +90,16 @@ local zone = Zone.new({
 	cframe = CFrame.new(0, 10, 0),
 	size = Vector3.new(10, 10, 10),
 	shape = 'Block',
-	dynamic = true,
+	isDynamic = true,
 	metadata = { Name = 'Lobby' }
 })
 ```
 
 ### Single & Dynamic Creation
-For maximum perfomance, use `dynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
+For maximum perfomance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
 ```lua
-local trainZone = Zone.part(workspace.TrainCarriage, { 
-	dynamic = true,
+local trainZone = Zone.fromPart(workspace.TrainCarriage, { 
+	isDynamic = true,
 	metadata = { route = 'North' }
 })
 ```
@@ -113,12 +113,12 @@ Dynamic zones need to know when their physical reference moves. You can let Quic
 You can quickly create a dynamic zone from an existing physical part. If you set autoSync = true, QuickZone will automatically update the zone's position in the spatial tree every frame to match the part.
 
 ```lua
-local truckZone = Zone.part(workspace.Truck.Hitbox, { 
-    dynamic = true,
+local truckZone = Zone.fromPart(workspace.Truck.Hitbox, { 
+    isDynamic = true,
     autoSync = true
 })
 ```
-Because Zone.part requires an object with a physical volume (like a BasePart), you cannot use it for abstract references like an Attachment or a Bone. Instead, you manually create the zone with a specific size and declaratively set its reference and autoSync.
+Because Zone.fromPart requires an object with a physical volume (like a BasePart), you cannot use it for abstract references like an Attachment or a Bone. Instead, you manually create the zone with a specific size and declaratively set its reference and autoSync.
 
 ```lua
 local trainZone = Zone.new({

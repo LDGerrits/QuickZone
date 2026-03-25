@@ -6,8 +6,8 @@ local SharedGroups = require(ReplicatedStorage.Common.Groups)
 
 local gravityWell = workspace:WaitForChild('GravityWell')
 
-local gravityWellZone = QuickZone.Zone.part(gravityWell, {
-	dynamic = true,
+local gravityWellZone = QuickZone.Zone.fromPart(gravityWell, {
+	isDynamic = true,
 	autoSync = true,
 })
 
