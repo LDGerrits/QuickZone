@@ -122,6 +122,10 @@ Observer.__index = Observer
 	If set to unsafe, you are not allowed to yield in the callbacks anymore. If you do, QuickZone will throw errors.
 	:::
 
+	:::note Dynamic Instantiation
+	QuickZone will warn you if an Observer is created without groups or zones. To suppress this warning when building observers dynamically, explicitly pass an empty table (`zones = {}`) or instantiate the observer as disabled (`enabled = false`).
+	:::
+
 	@tag Constructor
 	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
@@ -171,8 +175,12 @@ function Observer.new<T>(config: {
 		end
 	end
 
-	local missingZones = not hasAttachedMap[id]
-	local missingGroups = not hasSubscribedMap[id]
+	-- If a user passes a table, the warning is suppressed
+	local explicitlyPassedZones = config and config.zones ~= nil
+	local explicitlyPassedGroups = config and config.groups ~= nil
+
+	local missingZones = not explicitlyPassedZones and not hasAttachedMap[id]
+	local missingGroups = not explicitlyPassedGroups and not hasSubscribedMap[id]
 
 	if missingZones or missingGroups then
 		local creationTrace = debug.traceback('', 2)
