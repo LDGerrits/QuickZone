@@ -1,3 +1,4 @@
+-- QuickZone v1.3.15 • LDGerrits
 --!strict
 
 local RunService = game:GetService('RunService')
@@ -45,8 +46,6 @@ export type Entity = Types.Entity
 	An unopinionated, physics-free spatial library for Roblox. Maintain 60 FPS with over a million zones.
 
 	@class QuickZone
-	@version 1.3.15
-	@author LDGerrits
 ]=]
 local QuickZone = {
 	Zone = require(script.Classes.Zone) :: Types.ZoneClass,
