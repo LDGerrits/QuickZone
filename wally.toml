@@ -1,7 +1,7 @@
 [package]
 name = "ldgerrits/quickzone"
-description = "An agnostic, physics-free spatial library for Roblox. Maintain 60 FPS with over a million zones."
-version = "1.3.16"
+description = "A high-performance, physics-free spatial query library for Roblox. Maintain 60 FPS with 1M+ zones with near-zero performance impact."
+version = "1.3.17"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 license = "MIT"

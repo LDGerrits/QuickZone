@@ -1,6 +1,6 @@
 <div align="center">
 	<h1>QuickZone</h1>
-	<p>An agnostic, physics-free spatial library for Roblox. Maintain 60 FPS with over a million zones.</p>
+	<p>A high-performance, physics-free spatial query library for Roblox. Maintain 60 FPS with 1M+ zones.</p>
 	<a href="https://LDGerrits.github.io/QuickZone/"><strong>View docs</strong></a>
 </div>
 <!--moonwave-hide-before-this-line-->

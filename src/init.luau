@@ -1,9 +1,9 @@
 --!strict
---v1.3.16 • LDGerrits
+--v1.3.17 • LDGerrits
 --[=[
 	@class QuickZone
 
-	An agnostic, physics-free spatial library for Roblox. Maintain 60 FPS with over a million zones.
+	A high-performance, physics-free spatial query library for Roblox. Maintain 60 FPS with 1M+ zones with near-zero performance impact.
 ]=]
 
 local RunService = game:GetService('RunService')
