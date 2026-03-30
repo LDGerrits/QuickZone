@@ -1,5 +1,10 @@
--- QuickZone v1.3.15 • LDGerrits
 --!strict
+--v1.3.16 • LDGerrits
+--[=[
+	@class QuickZone
+
+	An agnostic, physics-free spatial library for Roblox. Maintain 60 FPS with over a million zones.
+]=]
 
 local RunService = game:GetService('RunService')
 
@@ -42,11 +47,6 @@ export type Observer<T> = Types.Observer<T>
 export type Group<T> = Types.Group<T>
 export type Entity = Types.Entity
 
---[=[
-	An unopinionated, physics-free spatial library for Roblox. Maintain 60 FPS with over a million zones.
-
-	@class QuickZone
-]=]
 local QuickZone = {
 	Zone = require(script.Classes.Zone) :: Types.ZoneClass,
 	Observer = require(script.Classes.Observer) :: Types.ObserverClass,

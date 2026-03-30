@@ -30,10 +30,7 @@ end
 
 function Log.nonFatal(message: string, trace: string?, ...: any)
 	local formattedString = formatLog(message, trace, ...)
-
-	task.spawn(function()
-		error(formattedString, 0)
-	end)
+	task.spawn(error, formattedString, 0)
 end
 
 return Log

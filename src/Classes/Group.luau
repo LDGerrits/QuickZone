@@ -1,4 +1,13 @@
 --!strict
+--[=[ 
+	@class Group
+
+	Groups represent a collection of entities that should be tracked by the system.
+
+	:::info Observer
+	Every entity must be in a group to be observed.
+	:::
+]=]
 
 local CollectionService = game:GetService('CollectionService')
 local Players = game:GetService('Players')
@@ -41,7 +50,7 @@ local function trackPlayer(group: Types.InternalGroup, player: Player, trackerSt
 		end
 
 		if currentHrp then
-			group:_remove(player)
+			group:_remove(currentHrp)
 			State.entityToReference[currentHrp] = nil
 			State.referenceToEntity[player] = nil
 			currentHrp = nil
@@ -70,7 +79,7 @@ local function trackPlayer(group: Types.InternalGroup, player: Player, trackerSt
 
 			State.entityToReference[hrp] = player
 			State.referenceToEntity[player] = hrp
-			group:_add(player)
+			group:_add(currentHrp)
 
 			-- Listen for the HRP streaming out or getting destroyed
 			hrpConn = hrp.AncestryChanged:Connect(function(_, parent)
@@ -122,15 +131,6 @@ local function untrackPlayer(player: Player, trackerStore: { [Player]: () -> () 
 	end
 end
 
---[=[ 
-	Groups represent a collection of entities that should be tracked by the system.
-
-	:::info Observer
-	Every entity must be in a group to be observed.
-	:::
-
-	@class Group
-]=]
 local Group = {}
 Group.__index = Group
 
@@ -605,12 +605,13 @@ function Group.destroy(self: Types.InternalGroup): ()
 
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
+	State.groupEntityCleanups[self.id] = nil
 
 	setmetatable(self :: any, nil)
 end
 
-function Group._add(self: Types.InternalGroup, entity: any): Types.Group
-	entity = State.referenceToEntity[entity] or entity
+function Group._add(self: Types.InternalGroup, reference: any): Types.Group
+	local entity: Types.Entity = State.referenceToEntity[reference] or reference
 
 	if not State.entityToGroups[entity] then
 		State.entityToGroups[entity] = {}
@@ -691,15 +692,15 @@ function Group._add(self: Types.InternalGroup, entity: any): Types.Group
 	return self
 end
 
-function Group._addBulk(self: Types.InternalGroup, entities: { any }): Types.Group
-	for _, entity in entities do
-		self:_add(entity)
+function Group._addBulk(self: Types.InternalGroup, references: { any }): Types.Group
+	for _, reference in references do
+		self:_add(reference)
 	end
 	return self
 end
 
-function Group._remove(self: Types.InternalGroup, entity: any): Types.Group
-	entity = State.referenceToEntity[entity] or entity
+function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
+	local entity: Types.Entity = State.referenceToEntity[reference] or reference
 
 	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
 		return self
@@ -757,12 +758,11 @@ function Group._remove(self: Types.InternalGroup, entity: any): Types.Group
 		local safety = State.observerSafety[observerId]
 		local z = State.zoneIdToZoneObj[oldZoneId]
 		local ref = State.entityToReference[entity] or entity
-
 		for _, fn in cbs do
 			if safety then
-				task.spawn(fn, ref, z)
+				task.spawn(fn, ref, z, entity)
 			else
-				fn(ref, z)
+				fn(ref, z, entity)
 			end
 		end
 	end

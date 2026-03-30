@@ -15,7 +15,7 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 
 ## The Three Approaches
 
-QuickZone is unopinionated. Depending on your project's architecture, you can interact with the spatial data in three distinct ways:
+QuickZone is agnostic. Depending on your project's architecture, you can interact with the spatial data in three distinct ways:
 
 ### 1. The Lifecycle Approach (Recommended)
 This uses the `observe` method. It is the most robust way to manage persistent states (like UI, music, or attributes). You define an entry behavior and return a cleanup function for exit.

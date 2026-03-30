@@ -1,4 +1,21 @@
 --!strict
+--[=[
+	@class Zone
+	
+	Zones define physical areas in world space. They can be static or dynamic 
+	and support shapes like Blocks, Balls, and Cylinders.
+	
+	Zones themselves are 'passive', meaning they must be attached to an Observer before any detection occurs.
+
+	:::caution Performance
+	If a zone moves (e.g., attached to a moving platform) or changes size, 
+	you should make the zone dynamic by setting `isDynamic` to `true`. 
+
+	Static zones are optimized into a large, pre-calculated tree. Updating a 
+	static zone forces a full recalculation of that tree, which is expensive. 
+	Dynamic zones are handled separately and are much cheaper to update.
+	:::
+]=]
 
 local CollectionService = game:GetService('CollectionService')
 
@@ -110,23 +127,6 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 	end
 end
 
---[=[ 
-	Zones define physical areas in world space. They can be static or dynamic 
-	and support shapes like Blocks, Balls, and Cylinders.
-	
-	Zones themselves are 'passive', meaning they must be attached to an Observer before any detection occurs.
-
-	:::caution Performance
-	If a zone moves (e.g., attached to a moving platform) or changes size, 
-	you should make the zone dynamic by setting `isDynamic` to `true`. 
-
-	Static zones are optimized into a large, pre-calculated tree. Updating a 
-	static zone forces a full recalculation of that tree, which is expensive. 
-	Dynamic zones are handled separately and are much cheaper to update.
-	:::
-
-	@class Zone
-]=]
 local Zone = {}
 Zone.__index = Zone
 
@@ -1113,9 +1113,9 @@ function Zone.destroy(self: Types.InternalZone): ()
 				local ref = State.entityToReference[entity] or entity
 				for _, fn in cbs do
 					if safety then
-						task.spawn(fn, ref, self)
+						task.spawn(fn, ref, self, entity)
 					else
-						fn(ref, self)
+						fn(ref, self, entity)
 					end
 				end
 			end

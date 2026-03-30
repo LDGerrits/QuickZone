@@ -134,6 +134,15 @@ local function processProfileChange(entity: Types.Entity)
 			end
 
 			oldBucket[maxEntities] = nil
+
+			-- If the bucket is now empty, remove it and update the bucket list
+			if #oldBucket == 0 then
+				buckets[currentRate] = nil
+				local listIdx = table.find(bucketList, currentRate)
+				if listIdx then
+					table.remove(bucketList, listIdx)
+				end
+			end
 		end
 
 		-- Add to new bucket
@@ -240,18 +249,19 @@ local function queryCallbackDynamic(zoneId: number)
 end
 
 local function fireCallback(
-	callbacks: { (Types.Entity, Types.Zone) -> () },
-	entity: any,
+	callbacks: { (any, Types.Zone, Types.Entity) -> () },
+	reference: any,
 	zone: Types.Zone,
+	entity: any,
 	safety: boolean
 )
 	if safety then
 		for _, callback in callbacks do
-			task.spawn(callback, entity, zone)
+			task.spawn(callback, reference, zone, entity)
 		end
 	else
 		for _, callback in callbacks do
-			callback(entity, zone)
+			callback(reference, zone, entity)
 		end
 	end
 end
@@ -434,7 +444,7 @@ function Scheduler.update(dt: number)
 					local safety = observerSafety[observerId]
 					local zone = zoneIdToZoneObj[oldZoneId]
 					local reference = entityToReference[entity] or entity
-					fireCallback(cbs, reference, zone, safety)
+					fireCallback(cbs, reference, zone, entity, safety)
 				end
 
 				-- Entries & Transitions
@@ -470,7 +480,7 @@ function Scheduler.update(dt: number)
 
 						local zone = zoneIdToZoneObj[zoneIdx]
 						local reference = entityToReference[entity] or entity
-						fireCallback(cbs, reference, zone, safety)
+						fireCallback(cbs, reference, zone, entity, safety)
 					else -- Transition
 						local cbs = observerTransitionedCallbacks[observerId]
 						if not cbs then
@@ -479,7 +489,7 @@ function Scheduler.update(dt: number)
 
 						local zone = zoneIdToZoneObj[zoneIdx]
 						local reference = entityToReference[entity] or entity
-						fireCallback(cbs, reference, zone, safety)
+						fireCallback(cbs, reference, zone, entity, safety)
 					end
 				end
 			end

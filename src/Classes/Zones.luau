@@ -1,15 +1,15 @@
 --!strict
+--[=[
+	@class Zones
 
-local Types = require(script.Parent.Parent.Types)
-
---[=[ 
 	Zones manages multiple individual `Zone` objects as a single, unified entity. 
 	This allows you to create complex shapes and structures by combining multiple zones together. 
 	You can attach observers to a `Zones` instance, and they will be automatically attached to all contained zones. 
 	When a zone is added or removed from the `Zones` instance, observers will be updated accordingly.
-
-	@class Zones
 ]=]
+
+local Types = require(script.Parent.Parent.Types)
+
 local Zones = {}
 Zones.__index = Zones
 
@@ -247,11 +247,11 @@ function Zones.iterZones(self: Types.InternalZones): () -> Types.Zone?
 end
 
 --[=[ 
-    Returns an array of all references from the underlying zones.
+	Returns an array of all references from the underlying zones.
 
-    @method getReferences
-    @within Zones
-    @return { BasePart | Attachment | Bone }
+	@method getReferences
+	@within Zones
+	@return { BasePart | Attachment | Bone }
 ]=]
 function Zones.getReferences(self: Types.InternalZones): { BasePart | Attachment | Bone }
 	local results = {}
@@ -265,12 +265,12 @@ function Zones.getReferences(self: Types.InternalZones): { BasePart | Attachment
 end
 
 --[=[
-    Returns a zero-allocation iterator for all references within this group of zones.
-    Yields both the reference and the specific Zone it belongs to.
+	Returns a zero-allocation iterator for all references within this group of zones.
+	Yields both the reference and the specific Zone it belongs to.
 
-    @method iterReferences
-    @within Zones
-    @return () -> ((BasePart | Attachment | Bone)?, Zone?)
+	@method iterReferences
+	@within Zones
+	@return () -> ((BasePart | Attachment | Bone)?, Zone?)
 ]=]
 function Zones.iterReferences(self: Types.InternalZones): () -> ((BasePart | Attachment | Bone)?, Types.Zone?)
 	local currentZone = nil

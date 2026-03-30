@@ -39,9 +39,9 @@ local State = {
 
 	observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } },
 	observerPriorityMap = {} :: { [number]: number },
-	observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } },
-	observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } },
-	observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone) -> () } },
+	observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } },
+	observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } },
+	observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } },
 	observerEnabled = {} :: { [number]: boolean },
 	observerSafety = {} :: { [number]: boolean },
 	observerUpdateRate = {} :: { [number]: number },

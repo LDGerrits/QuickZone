@@ -12,7 +12,7 @@ sidebar_position: 1
 
 **Physics-Free Scaling.** QuickZone achieves *O(N log Z)* scaling by bypassing the physics engine in favor of pure geometric math and a custom Linear Bounding Volume Hierarchy (LBVH). Performance is driven by the number of entities, while the map size is virtually irrelevant.
 
-**Unopinionated API.** Whether you prefer classic event-driven programming, robust lifecycle management (`observe()`), or zero-allocation polling for ECS architectures, QuickZone can fit your workflow.
+**Agnostic.** Whether you prefer classic event-driven programming, robust lifecycle management (`observe()`), or zero-allocation polling for ECS architectures, QuickZone can fit your workflow.
 
 **Total Performance Control.** The runtime cost is entirely in your control. Through a budgeted scheduler, the workload is smeared across frames and only consumes as much CPU time as you explicitly allow. Paired with contiguous arrays that produce virtually zero garbage collection (GC) pressure, QuickZone produces a flat, predictable performance profile.
 
@@ -87,7 +87,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 The package name + version is
 
 ```
-ldgerrits/quickzone@^1.3.15
+ldgerrits/quickzone@^1.3.16
 ```
 
 ### Manual
