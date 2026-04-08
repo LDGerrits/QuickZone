@@ -84,10 +84,17 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 ## Installation
 
 ### Wally
-The package name + version is
+Add the following to your wally.toml file:
 
-```
+```toml
 ldgerrits/quickzone@^1.3.181
+```
+
+### NPM
+For roblox-ts projects, install the package as follows:
+
+```Bash
+npm i @rbxts/quickzone
 ```
 
 ### Manual
