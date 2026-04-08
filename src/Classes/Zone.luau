@@ -77,7 +77,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		table.insert(
 			connections,
 			reference:GetPropertyChangedSignal('Size'):Connect(function()
-				local newHalfSize = reference.Size * 0.5
+				local newHalfSize = reference.ExtentsSize * 0.5
 				if dynamicHalfSizes[zone.id] ~= newHalfSize then
 					dynamicHalfSizes[zone.id] = newHalfSize
 					State.pendingDynamicRebuild = true
@@ -273,7 +273,7 @@ function Zone.fromPart(
 	local metadata = config and config.metadata
 	local autoSync = config and config.autoSync or false
 
-	return newZoneInternal(part.CFrame, part.Size, shapeId, part, isDynamic, metadata, autoSync)
+	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
 end
 
 --[=[
@@ -676,7 +676,7 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 
 	if reference:IsA('BasePart') then
 		local newCFrame = reference.CFrame
-		local newHalfSize = reference.Size * 0.5
+		local newHalfSize = reference.ExtentsSize * 0.5
 		local newShape = getShapeEnumValue(reference)
 
 		if self.dynamic then
