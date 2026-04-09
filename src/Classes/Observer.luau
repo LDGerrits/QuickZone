@@ -72,7 +72,7 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 		end
 
 		local stillTracked = false
-		for groupId in (State.entityToObservers[entity] or {}) do
+		for groupId in State.entityToGroups[entity] do
 			if State.groupToObservers[groupId] and State.groupToObservers[groupId][observerId] then
 				stillTracked = true
 				break
