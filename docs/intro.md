@@ -87,7 +87,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 Add the following to your wally.toml file:
 
 ```toml
-ldgerrits/quickzone@^1.3.185
+ldgerrits/quickzone@^1.3.186
 ```
 
 ### NPM
