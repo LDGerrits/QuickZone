@@ -66,10 +66,20 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 		dirtyProfiles[entity] = true
 		dirtyTopology[entity] = true
 
-		local activeObservers = State.entityToObservers[entity] or {}
 		local oldZoneId = data.activeObserverMemberships[observerId]
+		if not oldZoneId then
+			continue
+		end
 
-		if not oldZoneId or activeObservers[observerId] then
+		local stillTracked = false
+		for groupId in (State.entityToObservers[entity] or {}) do
+			if State.groupToObservers[groupId] and State.groupToObservers[groupId][observerId] then
+				stillTracked = true
+				break
+			end
+		end
+
+		if stillTracked then
 			continue
 		end
 
