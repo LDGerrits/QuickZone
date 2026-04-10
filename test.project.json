@@ -1,0 +1,16 @@
+{
+	"name": "quickzone-test",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"QuickZone": {
+				"$path": "default.project.json"
+			}
+		},
+		"ServerScriptService": {
+			"Test": {
+				"$path": "tests"
+			}
+		}
+	}
+}
