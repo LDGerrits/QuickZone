@@ -109,6 +109,10 @@ function tiniest.configure(
 			local ok, err = catch_errors(inner :: any, root_context)
 			current_context = nil
 			if not ok then
+				if typeof(err) == "table" then
+					print(err.message)
+				end
+				
 				error(err, 0)
 			end
 		end
