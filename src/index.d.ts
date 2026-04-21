@@ -8,7 +8,7 @@ export interface EntityTable {
 	GetPivot?: (self: any) => CFrame
 }
 
-export type Entity = BasePart | Model | Camera | Attachment | Bone | EntityTable
+export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | EntityTable
 
 export interface Zone {
 	setAutoSync(autoSync: boolean): Zone
