@@ -32,13 +32,13 @@ QuickZone uses point-based detection. It checks if a specific point (e.g., the c
 
 - **Budgeted Scheduler**: Set a hard frame budget (e.g., 1ms) to completely eliminate lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile.
 
-- **Shape Support**: Built-in for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes..
+- **Shape Support**: Built-in for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes.
 
 - **Declarative Lifecycles**: Replace event-based logic with the observe pattern for declarative logic. There is no need to manually track `onEnter` and `onExit` states.
 
 - **Decoupled Architecture**: Separate where tracking happens (Zones) from who is being tracked (Groups) and how the system responds (Observers). Bind complex behaviors to groups of entities with zero boilerplate.
 
-- **ECS-Ready**: Built-in support for zero-allocation iterators and deterministic manual stepping, making it a perfect fit for ECS architectures and data-oriented workflows
+- **ECS-Ready**: Built-in support for zero-allocation iterators and deterministic manual stepping, making it a perfect fit for ECS architectures and data-oriented workflows.
 
 - **Zero-Allocation Runtime**: By utilizing contiguous arrays and object pooling, QuickZone produces virtually zero GC pressure to avoid memory-related stutters.
 
@@ -115,7 +115,7 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 -- Create a group that automatically tracks the client's character (including respawns)
 local myPlayer = Group.localPlayer()
 
--- Find all current and future instances with the 'Water' tag.
+-- Find all current and future instances with the 'AntiGravity' tag.
 local zones = Zone.fromTag('AntiGravity', {
     metadata = { GravityMultiplier = 0.4 }
 })
@@ -139,7 +139,7 @@ gravityObserver:observe(function(player, zone)
     -- Create the Anti-Gravity force on enter
     local force = Instance.new('BodyForce')
     force.Name = 'AntiGravityForce'
-    force.Force = Vector3.new(0, hrp.AssemblyMass * workspace.Gravity * (1- multiplier), 0)
+    force.Force = Vector3.new(0, hrp.AssemblyMass * workspace.Gravity * (1 - multiplier), 0)
     force.Parent = hrp
 
     -- Automatically destroy the force when the player exits the zone
@@ -172,7 +172,7 @@ gravityObserver:onLocalPlayerEnter(function(zone)
 
     local force = Instance.new('BodyForce')
     force.Name = 'AntiGravityForce'
-    force.Force = Vector3.new(0, hrp.AssemblyMass * workspace.Gravity * (1- multiplier), 0)
+    force.Force = Vector3.new(0, hrp.AssemblyMass * workspace.Gravity * (1 - multiplier), 0)
     force.Parent = hrp
 end)
 
@@ -229,7 +229,7 @@ local function gravitySystem(dt)
         local meta = zone:getMetadata()
         local multiplier = meta and meta.GravityMultiplier or 1
         
-        local upwardForce = hrp.AssemblyMass * workspace.Gravity * (1- multiplier)
+        local upwardForce = hrp.AssemblyMass * workspace.Gravity * (1 - multiplier)
         hrp:ApplyImpulse(Vector3.new(0, upwardForce * dt, 0))
     end
 end

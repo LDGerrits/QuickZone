@@ -96,7 +96,7 @@ local zone = Zone.new({
 ```
 
 ### Single & Dynamic Creation
-For maximum perfomance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
+For maximum performance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
 ```lua
 local trainZone = Zone.fromPart(workspace.TrainCarriage, { 
 	isDynamic = true,
@@ -146,7 +146,7 @@ dynamicZone:sync()
 Groups are collections of entities (Parts, Models, Players, etc.).
 
 ### Specialized Groups
-QuickZone provides built-in abstractions that automatically handle player lifecyles.
+QuickZone provides built-in abstractions that automatically handle player lifecycles.
 
 ```lua
 -- Tracks all players in the server
@@ -166,7 +166,7 @@ local projectiles = Group.new({
 ```
 
 ### Managing Entities
-You can add BaseParts, Models, Attachments, Bones, or tables with a Position.
+You can add BaseParts, Models, Attachments, Bones, Cameras, or tables with a Position.
 
 ```lua
 -- Add a Model (tracks the PrimaryPart or Pivot)
@@ -363,8 +363,8 @@ Perform instant checks without using the Observer/Group pattern.
 -- Get all zones at a specific vector
 local zones = QuickZone:getZonesAtPoint(Vector3.new(10, 5, 0))
 
--- Get the group an entity belongs to
-local group = QuickZone:getGroupsOfEntity(workspace.Part)
+-- Get the groups an entity belongs to
+local groups = QuickZone:getGroupsOfEntity(workspace.Part)
 ```
 
 ---

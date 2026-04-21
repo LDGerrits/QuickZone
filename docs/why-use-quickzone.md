@@ -109,7 +109,7 @@ Because QuickZone relies on pure math rather than the Physics engine, it is not 
 
 - **Cameras**: Uses `.CFrame.Position`.
 
-- **Tables**: Uses any custom `.Position`, `.WorldPosition` and `.CFrame` field, or `:GetPivot()`.
+- **Tables**: Uses any custom `.Position`, `.WorldPosition`, `.CFrame`, `.Transform` field, or `:GetPivot()`.
 
 This allows you to track real-time simulations (e.g. a spell cast or an RC car) without the overhead of creating physical Instances.
 
