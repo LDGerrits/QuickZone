@@ -15,6 +15,7 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local State = require(script.Parent.Parent.Core.State)
 local Log = require(script.Parent.Parent.Utils.Log)
 
@@ -28,106 +29,6 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local IS_CLIENT = RunService:IsClient()
-
-local function trackPlayer(group: Types.InternalGroup, player: Player, trackerStore: { [Player]: () -> () })
-	if trackerStore[player] then
-		return
-	end
-
-	local charConn: RBXScriptConnection?
-	local hrpConn: RBXScriptConnection?
-	local currentCharacter: Model?
-	local currentHrp: BasePart?
-
-	local function clearHrp(targetHrp: BasePart?)
-		if targetHrp and targetHrp ~= currentHrp then
-			return
-		end
-
-		if hrpConn then
-			hrpConn:Disconnect()
-			hrpConn = nil
-		end
-
-		if currentHrp then
-			group:_remove(currentHrp)
-			currentHrp = nil
-		end
-	end
-
-	local function clearCharacter()
-		clearHrp()
-		if charConn then
-			charConn:Disconnect()
-			charConn = nil
-		end
-		currentCharacter = nil
-	end
-
-	local function checkHrp(character: Model)
-		if character ~= currentCharacter then
-			return
-		end
-
-		local hrp = character:FindFirstChild('HumanoidRootPart')
-
-		if hrp and hrp:IsA('BasePart') and hrp ~= currentHrp then
-			clearHrp()
-			currentHrp = hrp
-
-			State.entityToReference[hrp] = player
-			State.referenceToEntity[player] = hrp
-			group:_add(currentHrp)
-
-			-- Listen for the HRP streaming out or getting destroyed
-			hrpConn = hrp.AncestryChanged:Connect(function(_, parent)
-				if not parent then
-					clearHrp(hrp)
-				end
-			end)
-		end
-	end
-
-	local function onCharacterAdded(character: Model)
-		clearCharacter()
-		currentCharacter = character
-
-		checkHrp(character)
-
-		-- Listen for the HRP streaming in dynamically
-		charConn = character.ChildAdded:Connect(function(child)
-			if child.Name == 'HumanoidRootPart' then
-				checkHrp(character)
-			end
-		end)
-	end
-
-	local addedConn = player.CharacterAdded:Connect(onCharacterAdded)
-
-	local removingConn = player.CharacterRemoving:Connect(function(character)
-		if currentCharacter == character then
-			clearCharacter()
-		end
-	end)
-
-	trackerStore[player] = function()
-		addedConn:Disconnect()
-		removingConn:Disconnect()
-		clearCharacter()
-	end
-
-	if player.Character then
-		onCharacterAdded(player.Character)
-	end
-end
-
-local function untrackPlayer(player: Player, trackerStore: { [Player]: () -> () })
-	local cleanup = trackerStore[player]
-	if cleanup then
-		cleanup()
-		trackerStore[player] = nil
-	end
-end
 
 local Group = {}
 Group.__index = Group
@@ -265,37 +166,16 @@ function Group.players(): Types.Group<Player>
 	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
-	local trackerStore = {} :: { [Player]: () -> () }
-	local mainConnections = {} :: { RBXScriptConnection }
-
-	table.insert(
-		mainConnections,
-		Players.PlayerAdded:Connect(function(player)
-			trackPlayer(group, player, trackerStore)
-		end)
-	)
-
-	table.insert(
-		mainConnections,
-		Players.PlayerRemoving:Connect(function(player)
-			untrackPlayer(player, trackerStore)
-		end)
-	)
+	local conn = Players.PlayerAdded:Connect(function(player)
+		group:_add(player)
+	end)
 
 	for _, player in Players:GetPlayers() do
-		trackPlayer(group, player, trackerStore)
+		group:_add(player)
 	end
 
 	group:onDestroy(function()
-		for _, conn in mainConnections do
-			conn:Disconnect()
-		end
-		for _, cleanup in trackerStore do
-			cleanup()
-		end
-
-		table.clear(mainConnections)
-		table.clear(trackerStore)
+		conn:Disconnect()
 	end)
 
 	return group
@@ -321,14 +201,7 @@ function Group.localPlayer(): Types.Group<Player>
 	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
-	local lp = Players.LocalPlayer
-	local trackers = {}
-
-	trackPlayer(group, lp, trackers)
-
-	group:onDestroy(function()
-		untrackPlayer(lp, trackers)
-	end)
+	group:_add(Players.LocalPlayer)
 
 	return group
 end
@@ -608,6 +481,11 @@ function Group.destroy(self: Types.InternalGroup): ()
 end
 
 function Group._add(self: Types.InternalGroup, reference: any): Types.Group
+	if typeof(reference) == 'Instance' and reference:IsA('Player') then
+		PlayerTracker.subscribe(reference, self)
+		return self
+	end
+
 	local entity: Types.Entity = State.referenceToEntity[reference] or reference
 
 	if not State.entityToGroups[entity] then
@@ -697,6 +575,11 @@ function Group._addBulk(self: Types.InternalGroup, references: { any }): Types.G
 end
 
 function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
+	if typeof(reference) == 'Instance' and reference:IsA('Player') then
+		PlayerTracker.unsubscribe(reference, self)
+		return self
+	end
+
 	local entity: Types.Entity = State.referenceToEntity[reference] or reference
 
 	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
