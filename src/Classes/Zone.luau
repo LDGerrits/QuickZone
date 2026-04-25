@@ -1209,6 +1209,11 @@ function Zone.destroy(self: Types.InternalZone): ()
 		end
 	end
 
+	-- Clear the reference before the onDestroyCallbacks are firedThis to ensure that,
+	-- when the callback attempts to detach the observer manually,
+	-- it safely early-returns without double-decrementing the count.
+	State.zoneAttachedObservers[id] = nil
+
 	if self.onDestroyCallbacks then
 		-- The table must be cloned to avoid iterator shifts
 		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
@@ -1218,7 +1223,6 @@ function Zone.destroy(self: Types.InternalZone): ()
 		table.clear(self.onDestroyCallbacks)
 	end
 
-	State.zoneAttachedObservers[id] = nil
 	State.zoneIdToZoneObj[id] = nil
 
 	if self.dynamic then

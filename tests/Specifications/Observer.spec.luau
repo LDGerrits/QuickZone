@@ -1,4 +1,5 @@
 --!strict
+local CollectionService = game:GetService('CollectionService')
 local ServerScriptService = game:GetService('ServerScriptService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
@@ -754,6 +755,49 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 			partA:Destroy()
 			partB:Destroy()
+		end)
+
+		Test('Observer tracks entities correctly after a tagged part streams out and back in.', function()
+			local tag = 'QZStreamOutInBug'
+
+			local part = Create()
+			part.Size = Vector3.new(10, 10, 10)
+			part.Position = Vector3.new(0, 0, 0)
+			part.Parent = workspace
+			CollectionService:AddTag(part, tag)
+
+			local zones = Zone.fromTag(tag)
+
+			local entity = { Position = Vector3.new(0, 0, 0) }
+			local group = Group.new({ entities = { entity } })
+
+			local observer = Observer.new({
+				groups = { group },
+				zones = { zones },
+			})
+
+			task.wait()
+
+			Expect(#observer:getEntitiesInside()).is(1)
+
+			-- Streaming out
+			part.Parent = nil
+			task.wait()
+
+			Expect(#observer:getEntitiesInside()).is(0)
+
+			-- Streaming in
+			part.Parent = workspace
+			task.wait()
+			task.wait()
+
+			Expect(#observer:getEntitiesInside()).is(1)
+
+			observer:destroy()
+			group:destroy()
+			zones:destroy()
+			CollectionService:RemoveTag(part, tag)
+			part:Destroy()
 		end)
 	end)
 
