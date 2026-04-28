@@ -61,7 +61,7 @@ function tiniest_for_roblox.configure(
 		local function discover(
 			ancestor: Instance
 		): ()
-			self.describe(ancestor.Name, function()
+			self.describe(ancestor.Name:gsub("^%d+-", "", 1), function()
 				if ancestor:IsA("ModuleScript") and ancestor.Name:match(file_name_pattern) then
 					local requireOk, module = pcall(require, ancestor)
 					if not requireOk then
