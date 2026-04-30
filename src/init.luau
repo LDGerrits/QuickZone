@@ -462,7 +462,7 @@ end
 	@return () -> Group?
 ]=]
 function QuickZone:iterGroups(): () -> Types.Group?
-	local groupId = nil
+	local groupId: number? = nil
 	return function(): Types.Group?
 		groupId = next(groups, groupId)
 		return groupId and groups[groupId] or nil
@@ -477,7 +477,7 @@ end
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZones(): () -> Types.Zone?
-	local zoneId = nil
+	local zoneId: number? = nil
 
 	return function(): Types.Zone?
 		zoneId = next(zoneIdToZoneObj, zoneId)
@@ -493,7 +493,7 @@ end
 	@return () -> any?
 ]=]
 function QuickZone:iterEntities(): () -> any?
-	local entity = nil
+	local entity: Types.Entity? = nil
 
 	return function(): any?
 		entity = next(entityData, entity)
@@ -512,7 +512,7 @@ end
 	@return () -> Observer?
 ]=]
 function QuickZone:iterObservers(): () -> Types.Observer<any>?
-	local observerId = nil
+	local observerId: number? = nil
 
 	return function(): Types.Observer<any>?
 		observerId = next(observerIdToObserverObj, observerId)
@@ -538,7 +538,7 @@ function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
 		end
 	end
 
-	local groupId = nil
+	local groupId: number? = nil
 	return function(): Types.Group?
 		groupId = next(groupIds, groupId)
 		return groupId and groups[groupId] or nil
@@ -564,18 +564,18 @@ function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
 	end
 
 	local memberships = data.activeObserverMemberships
-	local seenZones = {}
-	local observerId = nil
+	local seenZones = {} :: { [number]: boolean }
+	local observerId: number? = nil
 
 	return function(): Types.Zone?
 		while true do
-			observerId = next(memberships, observerId)
+			observerId = next(memberships, observerId :: any) :: number?
 			if not observerId then
 				return nil
 			end
 
-			local zoneId = memberships[observerId]
-			if seenZones[zoneId] then
+			local zoneId = memberships[observerId :: number] :: number?
+			if not zoneId or seenZones[zoneId] then
 				continue
 			end
 

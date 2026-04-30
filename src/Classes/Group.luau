@@ -89,7 +89,7 @@ end
 	@return Group
 ]=]
 function Group.fromTag(tag: string): Types.Group<Types.Entity>
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Types.Entity>
+	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Types.Entity>
 	group.isManaged = true
 
 	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
@@ -166,7 +166,7 @@ end
 	@return Group
 ]=]
 function Group.players(): Types.Group<Player>
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
+	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
 	local conn = Players.PlayerAdded:Connect(function(player)
@@ -202,7 +202,7 @@ function Group.localPlayer(): Types.Group<Player>
 		Log.fatal('Group.localPlayer() can only be called on the Client.', nil)
 	end
 
-	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
+	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Player>
 	group.isManaged = true
 
 	group:_add(Players.LocalPlayer)

@@ -113,8 +113,8 @@ function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSi
 		objMinCache[id] = bMin
 		objMaxCache[id] = bMax
 
-		min = vector.min(min, bMin)
-		max = vector.max(max, bMax)
+		min = min:Min(bMin)
+		max = max:Max(bMax)
 
 		count += 1
 
@@ -150,7 +150,7 @@ function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSi
 	end
 
 	-- Add padding to avoid edge cases with flat scenes
-	local padding = vector.max(vector.one, (max - min) * 0.01)
+	local padding = ((max - min) * 0.01):Max(Vector3.one)
 	local sceneMin, sceneMax = min - padding, max + padding
 	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
 
@@ -160,7 +160,7 @@ function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSi
 		entry.mortonCode = positionToMortonCode(pos, sceneMin, scaleX, scaleY, scaleZ)
 	end
 
-	table.sort(listCache, function(a, b)
+	table.sort(listCache, function(a: ListEntity, b: ListEntity)
 		return a.mortonCode < b.mortonCode
 	end)
 

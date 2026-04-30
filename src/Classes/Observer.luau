@@ -742,7 +742,7 @@ function Observer.observeGroup(
 	return self:observe(function(_, zone, entity: any)
 		local groups = State.entityToGroups[entity]
 		if not groups then
-			return
+			return nil
 		end
 
 		for groupId, _ in groups do
@@ -808,7 +808,7 @@ function Observer.onGroupEnter(
 	return self:observe(function(_, zone, entity: any)
 		local groups = State.entityToGroups[entity]
 		if not groups then
-			return
+			return nil
 		end
 
 		for groupId, _ in groups do
@@ -865,7 +865,7 @@ function Observer.onGroupExit(
 	return self:observe(function(_, zone, entity: any)
 		local groups = State.entityToGroups[entity]
 		if not groups then
-			return
+			return nil
 		end
 
 		for groupId, _ in groups do
@@ -1385,23 +1385,23 @@ end
 	@return () -> Zone?
 ]=]
 function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
-	local zoneId = nil
-	local attachedList = nil
+	local zoneId: number? = nil
+	local attachedList: { number }? = nil
 	local observerId = self.id
 
 	return function(): Types.Zone?
 		while true do
 			zoneId, attachedList = next(zoneAttachedObservers, zoneId)
 
-			if not zoneId then
+			if not zoneId or not attachedList then
 				return nil
 			end
 
-			if not table.find(attachedList, observerId) then
+			if not table.find(attachedList :: { number }, observerId) then
 				continue
 			end
 
-			local zone = State.zoneIdToZoneObj[zoneId]
+			local zone = State.zoneIdToZoneObj[zoneId :: number]
 			if zone then
 				return zone
 			end
@@ -1417,23 +1417,23 @@ end
 	@return () -> Group?
 ]=]
 function Observer.iterGroups(self: Types.InternalObserver): () -> Types.Group?
-	local groupId = nil
-	local observersMap = nil
+	local groupId: number? = nil
+	local observersMap: { [number]: boolean }? = nil
 	local observerId = self.id
 
 	return function(): Types.Group?
 		while true do
 			groupId, observersMap = next(State.groupToObservers, groupId)
 
-			if not groupId then
+			if not groupId or not observersMap then
 				return nil
 			end
 
-			if not observersMap[observerId] then
+			if not (observersMap :: { [number]: boolean })[observerId] then
 				continue
 			end
 
-			local group = State.groups[groupId]
+			local group = State.groups[groupId :: number]
 			if group then
 				return group
 			end
@@ -1450,18 +1450,18 @@ end
 	@return () -> (Entity?, Zone?)
 ]=]
 function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> (any?, Types.Zone?)
-	local entities = State.observerTrackingEntities[self.id]
-	local entity = nil
+	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: boolean }
+	local entity: Types.Entity? = nil
 	local observerId = self.id
 
 	return function()
 		while true do
-			entity = next(entities, entity)
+			entity = next(entities, entity :: any) :: Types.Entity?
 			if not entity then
 				return nil
 			end
 
-			local data = State.entityData[entity]
+			local data = State.entityData[entity :: Types.Entity]
 			if not data then
 				continue
 			end
@@ -1471,7 +1471,7 @@ function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> (any?,
 				continue
 			end
 
-			local ref = State.entityToReference[entity] or entity
+			local ref = State.entityToReference[entity :: Types.Entity] or entity :: Types.Entity
 			return ref, State.zoneIdToZoneObj[zoneId]
 		end
 	end
@@ -1486,18 +1486,18 @@ end
 	@return () -> (Player?, Zone?)
 ]=]
 function Observer.iterPlayersInside(self: Types.InternalObserver): () -> (Player?, Types.Zone?)
-	local entities = State.observerTrackingEntities[self.id]
-	local entity = nil
+	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: boolean }
+	local entity: Types.Entity? = nil
 	local observerId = self.id
 
 	return function()
 		while true do
-			entity = next(entities, entity)
+			entity = next(entities, entity :: any) :: Types.Entity?
 			if not entity then
-				return nil
+				return nil, nil
 			end
 
-			local data = State.entityData[entity]
+			local data = State.entityData[entity :: Types.Entity]
 			if not data then
 				continue
 			end
@@ -1507,7 +1507,7 @@ function Observer.iterPlayersInside(self: Types.InternalObserver): () -> (Player
 				continue
 			end
 
-			local ref = State.entityToReference[entity] or entity
+			local ref = State.entityToReference[entity :: Types.Entity] or entity :: Types.Entity
 			if typeof(ref) == 'Instance' and ref:IsA('Player') then
 				return ref, State.zoneIdToZoneObj[zoneId]
 			end
@@ -1532,24 +1532,24 @@ function Observer.iterEntitiesInZone(self: Types.InternalObserver, zone: Types.Z
 		end
 	end
 
-	local entity = nil
+	local entity: Types.Entity? = nil
 	local targetZoneId = zone:getId()
 	local observerId = self.id
 
 	return function(): Types.Entity?
 		while true do
-			entity = next(entities, entity)
+			entity = next(entities, entity :: any) :: Types.Entity?
 			if not entity then
 				return nil
 			end
 
-			local data = State.entityData[entity]
+			local data = State.entityData[entity :: Types.Entity]
 
 			if not data or data.activeObserverMemberships[observerId] ~= targetZoneId then
 				continue
 			end
 
-			return State.entityToReference[entity] or entity
+			return State.entityToReference[entity :: Types.Entity] or entity :: Types.Entity
 		end
 	end
 end
@@ -1571,24 +1571,24 @@ function Observer.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zo
 		end
 	end
 
-	local entity = nil
+	local entity: Types.Entity? = nil
 	local targetZoneId = zone:getId()
 	local observerId = self.id
 
 	return function(): Player?
 		while true do
-			entity = next(entities, entity)
+			entity = next(entities, entity :: any) :: Types.Entity?
 			if not entity then
 				return nil
 			end
 
-			local data = State.entityData[entity]
+			local data = State.entityData[entity :: Types.Entity]
 
 			if not data or data.activeObserverMemberships[observerId] ~= targetZoneId then
 				continue
 			end
 
-			local ref = State.entityToReference[entity] or entity
+			local ref = State.entityToReference[entity :: Types.Entity] or entity :: Types.Entity
 			if typeof(ref) == 'Instance' and ref:IsA('Player') then
 				return ref
 			end

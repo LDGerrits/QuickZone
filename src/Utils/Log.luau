@@ -13,7 +13,7 @@ local function formatLog(messageTemplate: string, trace: string?, ...: any): str
 		messageText ..= ` \n---- Stack trace ----\n{finalTrace}`
 	end
 
-	return messageText:gsub('\n', '\n    ')
+	return (messageText:gsub('\n', '\n    '))
 end
 
 function Log.info(message: string, trace: string?, ...: any)
@@ -30,7 +30,7 @@ end
 
 function Log.nonFatal(message: string, trace: string?, ...: any)
 	local formattedString = formatLog(message, trace, ...)
-	task.spawn(error, formattedString, 0)
+	task.spawn(error :: any, formattedString, 0)
 end
 
 return Log
