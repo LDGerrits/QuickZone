@@ -50,9 +50,9 @@ local dynamicTree = State.dynamicTree
 local ctx_pos: Vector3
 local ctx_cCount: number = 0
 local ctx_highestWin: number
-local ctx_candidatePriority: { [number]: number } = table.create(16)
-local ctx_candidateIndex: { [number]: number } = table.create(16)
-local ctx_candidateList: { [number]: number } = table.create(16)
+local ctx_candidatePriority = table.create(16) :: { [number]: number }
+local ctx_candidateIndex = table.create(16) :: { [number]: number }
+local ctx_candidateList = table.create(16) :: { [number]: number }
 local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
 
@@ -150,7 +150,7 @@ local function processProfileChange(entity: Types.Entity)
 			if not buckets[maxRate] then
 				buckets[maxRate] = {}
 				table.insert(bucketList, maxRate)
-				table.sort(bucketList, function(a, b)
+				table.sort(bucketList, function(a: number, b: number)
 					return a > b
 				end)
 			end
@@ -388,11 +388,10 @@ function Scheduler.update(dt: number)
 			local needsDynamic = data.needsDynamic
 
 			local shouldCheck = false
-			if data.logicVersion ~= logicVersion then
-				shouldCheck = true
-			elseif data.needsDynamic and data.dynamicVersion ~= dynamicVersion then
-				shouldCheck = true
-			elseif data.needsStatic and data.staticVersion ~= staticVersion then
+			if data.logicVersion ~= logicVersion
+				or (needsDynamic and data.dynamicVersion ~= dynamicVersion)
+				or (needsStatic and data.staticVersion ~= staticVersion)
+			then
 				shouldCheck = true
 			else
 				local lastPosition = data.lastPosition

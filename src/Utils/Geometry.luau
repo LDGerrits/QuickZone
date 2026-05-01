@@ -13,7 +13,7 @@ local MORTON_SHIFT8_MASK = 0xF00F00F
 local MORTON_SHIFT4_MASK = 0x30C30C3
 local MORTON_SHIFT2_MASK = 0x9249249
 
-local expandLUT = table.create(1024)
+local expandLUT = table.create(1024) :: { number }
 for i = 0, 1023 do
 	local value = i
 	value = bit32.bor(bit32.lshift(value, 16), value)

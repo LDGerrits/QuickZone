@@ -5,7 +5,7 @@
 local Geometry = require(script.Parent.Geometry)
 local Types = require(script.Parent.Parent.Types)
 
-local HUGE_VECTOR = Vector3.one * math.huge
+local HUGE_VECTOR = vector.one * math.huge
 local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
 local unionBounds = Geometry.unionBounds
@@ -160,7 +160,7 @@ function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSi
 		entry.mortonCode = positionToMortonCode(pos, sceneMin, scaleX, scaleY, scaleZ)
 	end
 
-	table.sort(listCache, function(a, b)
+	table.sort(listCache, function(a: ListEntity, b: ListEntity)
 		return a.mortonCode < b.mortonCode
 	end)
 
