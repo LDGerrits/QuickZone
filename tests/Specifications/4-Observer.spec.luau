@@ -237,6 +237,32 @@ return function(Tiniest: Tiniest)
 			observer:destroy()
 			zone:destroy()
 		end)
+
+		Test('Detaching the only attached zone fires onExit for its entities.', function()
+			local exits = 0
+			local part = CreatePart()
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+			local group = Group.new({ entities = { part } })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+
+			observer:onExit(function()
+				exits += 1
+			end)
+			QuickZone:update(1 / 10)
+
+			Expect(exits).is(0)
+
+			observer:detach(zone)
+			QuickZone:update(1 / 10)
+
+			Expect(exits).is(1)
+			Expect(#observer:getEntitiesInside()).is(0)
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
+			part:Destroy()
+		end)
 	end)
 
 	Describe('Observer:observe', function()
@@ -1067,7 +1093,7 @@ return function(Tiniest: Tiniest)
 			local part = CreatePart({ CFrame = CFrame.new(3, 0, 0) })
 			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
 			local group = Group.new({ entities = { part } })
-			local observer = Observer.new({ zones = { zone }, groups = { group }, precision = 0.1, safety = false })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, precision = 0.5, safety = false })
 
 			observer:onExit(function()
 				exits += 1
@@ -1082,6 +1108,34 @@ return function(Tiniest: Tiniest)
 			Expect(exits).is(0)
 
 			observer:destroy()
+			group:destroy()
+			zone:destroy()
+			part:Destroy()
+		end)
+
+		Test('The tighter precision applies when two observers share an entity.', function()
+			local laxExits, tightExits = 0, 0
+			local part = CreatePart({ CFrame = CFrame.new(3, 0, 0) })
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+			local group = Group.new({ entities = { part } })
+			local lax = Observer.new({ zones = { zone }, groups = { group }, precision = 5, safety = false })
+			local tight = Observer.new({ zones = { zone }, groups = { group }, precision = 0.5, safety = false })
+
+			lax:onExit(function()
+				laxExits += 1
+			end)
+			tight:onExit(function()
+				tightExits += 1
+			end)
+			QuickZone:update(1 / 10)
+			part.CFrame = CFrame.new(5.5, 0, 0)
+			QuickZone:update(1 / 10)
+
+			Expect(laxExits).is(1)
+			Expect(tightExits).is(1)
+
+			tight:destroy()
+			lax:destroy()
 			group:destroy()
 			zone:destroy()
 			part:Destroy()
@@ -1166,12 +1220,14 @@ return function(Tiniest: Tiniest)
 			group = Group.new({ entities = { entity } })
 			observer = Observer.new({ zones = { zones }, groups = { group } })
 			task.wait()
+			QuickZone:update(1 / 10)
 
 			Expect(#observer:getEntitiesInside()).is(1)
 
 			-- Streaming out
 			part.Parent = nil
 			task.wait()
+			QuickZone:update(1 / 10)
 
 			Expect(#observer:getEntitiesInside()).is(0)
 
@@ -1583,6 +1639,27 @@ return function(Tiniest: Tiniest)
 			observer:destroy()
 
 			Expect(exits).is(1)
+			group:destroy()
+			zone:destroy()
+			part:Destroy()
+		end)
+
+		Test('Observer keeps tracking the shared entity after destroying another observer.', function()
+			local part = CreatePart()
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+			local group = Group.new({ entities = { part } })
+			local observerA = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			local observerB = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+
+			observerA:onEnter(function()
+				observerB:destroy()
+			end)
+			QuickZone:update(1 / 10)
+
+			Expect(observerA:getEntitiesInside()).has_value(part)
+			Expect(observerA:getZoneOfEntity(part)).is(zone)
+
+			observerA:destroy()
 			group:destroy()
 			zone:destroy()
 			part:Destroy()

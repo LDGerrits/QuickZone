@@ -6,14 +6,13 @@ type InstanceTree = {
 }
 
 local PART_DEFAULTS: { [string]: any } = {
-  Transparency = 1,
+	Transparency = 1,
 	Anchored = true,
 	CanCollide = false,
 	CanQuery = false,
 	CanTouch = false,
 	AudioCanCollide = false,
 	EnableFluidForces = false,
-	Parent = workspace,
 }
 
 local Util = {}
@@ -25,6 +24,7 @@ function Util.create<C>(tree: InstanceTree): C
 		for property, value in PART_DEFAULTS do
 			object[property] = value
 		end
+		object.Parent = workspace
 	end
 	if tree.properties ~= nil then
 		for property, value in tree.properties do
@@ -49,11 +49,9 @@ end
 
 function Util.createParts(count: number, properties: { [string]: any }?): { BasePart }
 	local parts: { BasePart } = table.create(count)
-
 	for i = 1, count do
 		table.insert(parts, Util.createPart(properties))
 	end
-	
 	return parts
 end
 

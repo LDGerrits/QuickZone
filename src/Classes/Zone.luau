@@ -100,6 +100,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 	end
 
 	zone.syncConnections = connections
+	zone:sync()
 end
 
 local function updateObserverZoneCount(observerId: number, isDynamic: boolean, delta: number)
@@ -110,6 +111,11 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 
 	-- Only flag entities dirty if the observer's topology fundamentally changed
 	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
+		-- Only force a global logic override when an observer loses its last zone
+		if current == 1 and newCount == 0 then
+			State.logicVersion += 1
+		end
+
 		for groupId, observers in State.groupToObservers do
 			if not observers[observerId] then
 				continue

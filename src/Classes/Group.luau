@@ -685,7 +685,7 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 		State.dirtyTopology[entity] = nil
 
 		local ref = State.entityToReference[entity]
-		if ref then
+		if ref and not (typeof(ref) == 'Instance' and ref:IsA('Player')) then
 			State.entityToReference[entity] = nil
 			-- Ensure we only clear the reverse map if it still points to this exact entity
 			if State.referenceToEntity[ref] == entity then

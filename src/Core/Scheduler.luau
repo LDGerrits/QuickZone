@@ -460,6 +460,10 @@ function Scheduler.update(dt: number)
 					ctx_candidateIndex[observerId] = nil
 					ctx_candidateList[i] = nil
 
+					if not observerTrackingEntities[observerId] then
+						continue
+					end
+
 					if priority < ctx_highestWin then
 						continue
 					end

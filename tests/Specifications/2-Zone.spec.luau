@@ -616,12 +616,16 @@ return function(Tiniest: Tiniest)
 		end)
 
 		Test('Rewires autoSync to the new reference, disconnecting from the old one.', function()
-			local size = Vector3.one * 20
+			local size = Vector3.one * 50
 			local partA = CreatePart({ Size = Vector3.one * 10 })
-			local partB = CreatePart({ Size = Vector3.one * 10 })
+			local partB = CreatePart({ Size = Vector3.one * 25 })
 			local zone = Zone.fromPart(partA, { autoSync = true })
 
+			Expect(zone:getSize()).is(Vector3.one * 10)
+
 			zone:setReference(partB)
+
+			Expect(zone:getSize()).is(Vector3.one * 25)
 
 			partB.Size = size
 			task.wait()
