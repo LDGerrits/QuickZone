@@ -111,6 +111,11 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 
 	-- Only flag entities dirty if the observer's topology fundamentally changed
 	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
+		-- Only force a global logic override when an observer loses its last zone
+		if current == 1 and newCount == 0 then
+			State.logicVersion += 1
+		end
+
 		for groupId, observers in State.groupToObservers do
 			if not observers[observerId] then
 				continue
@@ -671,8 +676,6 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 	else
 		State.staticVersion += 1
 	end
-
-	State.logicVersion += 1
 
 	return self
 end
