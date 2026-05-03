@@ -113,31 +113,34 @@ local Observer = {}
 Observer.__index = Observer
 
 --[=[ 
-	Creates an Observer. Observers listen for entities entering or exiting assigned Zones.
+	Creates an Observer. Observers listen for entities subscribed Groups entering or exiting attached Zones.
 
 	```lua
 	local observer = QuickZone.Observer.new({
 		groups = { enemyGroup, playerGroup } -- Immediately subscribe to these groups
 		zones = { damageZone } -- Immediately subscribe to these zones
-		priority = 20, -- The priority value is used to resolve overlaps
-		updateRate = 20, -- Check at 20Hz
-		precision = 0.5, -- Ignore movement smaller than 0.5 studs
-		enabled = false, -- Observer will not start processing spatial checks
-		safety = false, -- Do not wrap callbacks in task.spawn
+		priority = 20, -- The priority value is used to resolve overlaps (defaults to 0)
+		updateRate = 20, -- Check at 20Hz (defaults to 30)
+		precision = 0.5, -- Ignore movement smaller than 0.5 studs (defaults to 0.1)
+		enabled = false, -- Observer will not start processing spatial checks (defaults to true)
+		safety = false, -- Wrap callbacks in task.spawn (defaults to true)
 	})
 	```
+
+	:::warning Safety 
+	If safety is set to false, any yielding will result in breaking QuickZone.
+	Only set it to false if you do not want the overhead of virtual threads.
+	:::
 
 	:::info Resolution Priority
 	When an entity is inside multiple zones watched by different observers, 
 	higher priority observers take complete control.
 	:::
 
-	:::warning Safety 
-	If set to unsafe, you are not allowed to yield in the callbacks anymore. If you do, QuickZone will throw errors.
-	:::
-
 	:::note Dynamic Instantiation
-	QuickZone will warn you if an Observer is created without groups or zones. To suppress this warning when building observers dynamically, explicitly pass an empty table (`zones = {}`) or instantiate the observer as disabled (`enabled = false`).
+	QuickZone will warn you if an Observer is created without groups or zones. 
+	To suppress this warning when building observers dynamically, 
+	explicitly pass an empty table (`zones = {}`) or instantiate the observer as disabled (`enabled = false`).
 	:::
 
 	@tag Constructor
