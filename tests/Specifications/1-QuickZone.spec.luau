@@ -278,7 +278,7 @@ return function(Tiniest: Tiniest)
 		Test('Returns zones containing the entity after each tick.', function()
 			local resultA, resultB
 			local cframeA = CFrame.new(1000, 0, 0)
-			local cframeB = CFrame.new(2000, 0, 0) 
+			local cframeB = CFrame.new(2000, 0, 0)
 			local part = CreatePart({ CFrame = cframeA })
 			local zoneA = Zone.new({ cframe = cframeA, size = Vector3.one * 10 })
 			local zoneB = Zone.new({ cframe = cframeB, size = Vector3.one * 10 })

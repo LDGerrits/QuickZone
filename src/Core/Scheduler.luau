@@ -388,7 +388,8 @@ function Scheduler.update(dt: number)
 			local needsDynamic = data.needsDynamic
 
 			local shouldCheck = false
-			if data.logicVersion ~= logicVersion
+			if
+				data.logicVersion ~= logicVersion
 				or (needsDynamic and data.dynamicVersion ~= dynamicVersion)
 				or (needsStatic and data.staticVersion ~= staticVersion)
 			then

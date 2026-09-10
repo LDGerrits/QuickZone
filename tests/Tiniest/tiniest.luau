@@ -1,59 +1,59 @@
 -- From dphfox/tiniest, licenced under BSD
 --!strict
 
-local tiniest_plugin = require("./tiniest_plugin")
+local tiniest_plugin = require('./tiniest_plugin')
 
 type Context = DescribeContext | RunContext
 
 type DescribeContext = {
-	type: "describe",
-	labels: {string},
-	add_test: (Test) -> ()
+	type: 'describe',
+	labels: { string },
+	add_test: (Test) -> (),
 }
 
 type RunContext = {
-	type: "run"
+	type: 'run',
 }
 
 export type ErrorReport = {
-	type: "tiniest.ErrorReport",
+	type: 'tiniest.ErrorReport',
 	line: number,
 	source: string,
 	message: string,
 	trace: string,
 	code: {
 		snippet: string,
-		line: string
-	}?
+		line: string,
+	}?,
 }
 
 export type Test = {
-	labels: {string},
-	run: () -> ()
+	labels: { string },
+	run: () -> (),
 }
 
 export type RunResult = {
-	tests: {Test},
+	tests: { Test },
 	status_tally: {
 		pass: number,
-		fail: number
+		fail: number,
 	},
-	individual: {[Test]: TestRunResult}
+	individual: { [Test]: TestRunResult },
 }
 
 export type TestRunResult = PassTestRunResult | FailTestRunResult
 
 export type PassTestRunResult = {
-	status: "pass"
+	status: 'pass',
 }
 
 export type FailTestRunResult = {
-	status: "fail",
-	error: ErrorReport
+	status: 'fail',
+	error: ErrorReport,
 }
 
 export type Options = {
-	plugins: nil | {tiniest_plugin.Plugin}
+	plugins: nil | { tiniest_plugin.Plugin },
 }
 
 export type RunOptions = {}
@@ -62,16 +62,16 @@ local function catch_errors(func: any, ...)
 	local outer_trace
 	local function handler(message)
 		local report: ErrorReport
-		if typeof(message) == "table" and message.type == "tiniest.ErrorReport" then
+		if typeof(message) == 'table' and message.type == 'tiniest.ErrorReport' then
 			report = message :: ErrorReport
 		else
-			local source, line = debug.info(2, "sl")
+			local source, line = debug.info(2, 'sl')
 			report = {
-				type = "tiniest.ErrorReport",
+				type = 'tiniest.ErrorReport',
 				line = line,
 				source = source,
 				message = tostring(message),
-				trace = debug.traceback(nil, 2)
+				trace = debug.traceback(nil, 2),
 			}
 		end
 		local from, to = string.find(report.trace, outer_trace, 1, true)
@@ -80,15 +80,13 @@ local function catch_errors(func: any, ...)
 		end
 		return report
 	end
-	outer_trace = debug.traceback(); return xpcall(func, handler, ...)
+	outer_trace = debug.traceback()
+	return xpcall(func, handler, ...)
 end
 
 local tiniest = {}
 
-function tiniest.configure(
-	options: Options
-)
-
+function tiniest.configure(options: Options)
 	local plugins = tiniest_plugin.configure(options.plugins)
 
 	local get_context, with_root_context, with_inner_context
@@ -96,31 +94,25 @@ function tiniest.configure(
 		local current_context: Context? = nil
 
 		function get_context(): Context
-			assert(current_context ~= nil, "This function can only be called from inside of a test suite")
+			assert(current_context ~= nil, 'This function can only be called from inside of a test suite')
 			return current_context
 		end
 
-		function with_root_context(
-			root_context: Context,
-			inner: (Context) -> ()
-		): ()
+		function with_root_context(root_context: Context, inner: (Context) -> ()): ()
 			assert(current_context == nil, "This function can't be called from inside of a test suite")
 			current_context = root_context
 			local ok, err = catch_errors(inner :: any, root_context)
 			current_context = nil
 			if not ok then
-				if typeof(err) == "table" then
+				if typeof(err) == 'table' then
 					print(err.message)
 				end
-				
+
 				error(err, 0)
 			end
 		end
 
-		function with_inner_context(
-			make_context: (Context) -> Context,
-			inner: (Context) -> ()
-		): ()
+		function with_inner_context(make_context: (Context) -> Context, inner: (Context) -> ()): ()
 			local outer_context = get_context()
 			local inner_context = make_context(outer_context)
 			current_context = inner_context
@@ -134,12 +126,9 @@ function tiniest.configure(
 
 	local self = {}
 
-	function self.describe(
-		label: string,
-		inner: () -> ()
-	): ()
+	function self.describe(label: string, inner: () -> ()): ()
 		with_inner_context(function(outer_context: Context): Context
-			assert(outer_context.type == "describe", "This function can only be called outside of tests")
+			assert(outer_context.type == 'describe', 'This function can only be called outside of tests')
 			local context = table.clone(outer_context)
 			context.labels = table.clone(context.labels)
 			table.insert(context.labels, label)
@@ -147,88 +136,77 @@ function tiniest.configure(
 		end, inner)
 	end
 
-	function self.test(
-		label: string,
-		run: () -> ()
-	): ()
+	function self.test(label: string, run: () -> ()): ()
 		local context = get_context()
-		assert(context.type == "describe", "This function can only be called outside of tests")
+		assert(context.type == 'describe', 'This function can only be called outside of tests')
 		local labels = table.clone(context.labels)
 		table.insert(labels, label)
 		local test: Test = {
 			labels = labels,
-			run = run
+			run = run,
 		}
 		context.add_test(test)
 	end
 
-	function self.collect_tests(
-		inner: () -> ()
-	): {Test}
+	function self.collect_tests(inner: () -> ()): { Test }
 		local tests = {}
 		local context: Context = {
-			type = "describe",
+			type = 'describe',
 			labels = {},
 			add_test = function(test)
 				table.insert(tests, test)
-			end
+			end,
 		}
 		with_root_context(context, inner)
 		return tests
 	end
 
-	function self.run_tests(
-		tests: {Test},
-		run_options: RunOptions
-	): RunResult
-		plugins.notify("before_run", tests, run_options)
+	function self.run_tests(tests: { Test }, run_options: RunOptions): RunResult
+		plugins.notify('before_run', tests, run_options)
 
 		local context: Context = {
-			type = "run"
+			type = 'run',
 		}
-		
+
 		local individual = {}
 		for _, test in tests do
-			plugins.notify("before_test", test, run_options)
-			local _, test_run_result = xpcall(
-				function()
-					with_root_context(context, test.run)
-					local pass: TestRunResult = {
-						status = "pass"
+			plugins.notify('before_test', test, run_options)
+			local _, test_run_result = xpcall(function()
+				with_root_context(context, test.run)
+				local pass: TestRunResult = {
+					status = 'pass',
+				}
+				return pass
+			end, function(message)
+				if typeof(message) == 'table' and message.type == 'tiniest.ErrorReport' then
+					local fail: TestRunResult = {
+						status = 'fail',
+						error = message :: ErrorReport,
 					}
-					return pass
-				end,
-				function(message)
-					if typeof(message) == "table" and message.type == "tiniest.ErrorReport" then
-						local fail: TestRunResult = {
-							status = "fail",
-							error = message :: ErrorReport
-						}
-						return fail
-					else
-						local source, line = debug.info(1, "sl")
-						local error: ErrorReport = {
-							type = "tiniest.ErrorReport",
-							line = line,
-							source = source,
-							message = tostring(message),
-							trace = debug.traceback()
-						}
-						local fail: TestRunResult = {
-							status = "fail",
-							error = error
-						}
-						return fail
-					end
+					return fail
+				else
+					local source, line = debug.info(1, 'sl')
+					local error: ErrorReport = {
+						type = 'tiniest.ErrorReport',
+						line = line,
+						source = source,
+						message = tostring(message),
+						trace = debug.traceback(),
+					}
+					local fail: TestRunResult = {
+						status = 'fail',
+						error = error,
+					}
+					return fail
 				end
-			)
-			plugins.notify("after_test", test, test_run_result, run_options)
+			end)
+			plugins.notify('after_test', test, test_run_result, run_options)
 			individual[test] = test_run_result
 		end
 
 		local status_tally = {
 			pass = 0,
-			fail = 0
+			fail = 0,
 		}
 
 		for _, result in individual do
@@ -238,9 +216,9 @@ function tiniest.configure(
 		local result: RunResult = {
 			tests = tests,
 			status_tally = status_tally,
-			individual = individual
+			individual = individual,
 		}
-		plugins.notify("after_run", result, run_options)
+		plugins.notify('after_run', result, run_options)
 
 		return result
 	end
