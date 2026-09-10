@@ -1,7 +1,7 @@
 <div align="center">
 	<h1>QuickZone</h1>
 	<p>A high-performance, physics-free spatial query library for Roblox. Maintain 60 FPS with 1M+ zones.</p>
-	<a href="https://LDGerrits.github.io/QuickZone/"><strong>View docs</strong></a>
+	<a href="https://LDGerrits.github.io/QuickZone/"><strong>documentation</strong></a>
 </div>
 <!--moonwave-hide-before-this-line-->
 
@@ -38,3 +38,12 @@
 - **Zero-Allocation Runtime**: By utilizing contiguous arrays and object pooling, QuickZone produces virtually zero GC pressure to avoid memory-related stutters.
 
 - **Dynamic Zones**: Use moving zones at very little cost. QuickZone maintains separate Static and Dynamic LBVHs for maximum efficiency.
+
+## Contributing
+
+Pull requests are welcome!
+Read the [contribution guidelines](CONTRIBUTING.md) to set up your local environment, run tests, and submit code changes.
+
+## License
+
+See the [licence](LICENSE.md) for details.

@@ -12,6 +12,7 @@ exclude = [
     ".gitignore",
     ".styluaignore",
     "README.md",
+    "CONTRIBUTING.md",
     "moonwave.toml",
     "rokit.toml",
     "stylua.toml",
