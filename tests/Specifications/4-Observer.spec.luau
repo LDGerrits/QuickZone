@@ -38,7 +38,7 @@ return function(Tiniest: Tiniest)
 				updateRate = 30,
 				precision = 0.5,
 				enabled = false,
-				safety = false
+				safety = false,
 			})
 
 			Expect(#observer:getZones()).is(1)
@@ -320,6 +320,43 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 			part:Destroy()
 		end)
+
+		Test('Observer cleans up when a tagged container is destroyed.', function()
+			local tag = 'QZ_FROM_TAG_OBSERVE_DESTROY'
+			local model = Instance.new('Model')
+			local part = CreatePart({ CFrame = CFrame.identity, Size = Vector3.one * 10 })
+
+			part.Parent = model
+			model.Parent = workspace
+			CollectionService:AddTag(model, tag)
+
+			local zones = Zone.fromTag(tag)
+			local entity = CreatePart({ CFrame = CFrame.identity })
+			local group = Group.new({ entities = { entity } })
+			local observer = Observer.new({ zones = { zones }, groups = { group }, safety = false })
+
+			local cleanedUp = false
+			observer:observe(function()
+				return function()
+					cleanedUp = true
+				end
+			end)
+
+			QuickZone:update(1 / 10)
+			Expect(#observer:getEntitiesInside()).is(1)
+
+			model:Destroy()
+			task.wait()
+			QuickZone:update(1 / 10)
+
+			Expect(cleanedUp).is_true()
+			Expect(#observer:getEntitiesInside()).is(0)
+
+			observer:destroy()
+			group:destroy()
+			zones:destroy()
+			entity:Destroy()
+		end)
 	end)
 
 	Describe('Observer:onEnter', function()
@@ -478,7 +515,7 @@ return function(Tiniest: Tiniest)
 			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
 			local group = Group.new({ entities = { part } })
 			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
-			
+
 			observer:onExit(function()
 				exits += 1
 			end)()
@@ -811,7 +848,7 @@ return function(Tiniest: Tiniest)
 			local part = CreatePart({ CFrame = CFrame.new(-6, 0, 0) })
 			local group = Group.new({ entities = { part } })
 			local observer = Observer.new({ zones = { zoneA, zoneB }, groups = { group }, safety = false })
-			
+
 			observer:onTransition(function()
 				transitions += 1
 			end)()
@@ -1017,7 +1054,7 @@ return function(Tiniest: Tiniest)
 			Expect(bFires).is(1)
 			Expect(aFires).is(0)
 			Expect(observerA:setPriority(20)).is(observerA)
-			
+
 			observerB:setPriority(0)
 			QuickZone:update(1 / 10)
 
@@ -1545,33 +1582,36 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Observer:iterEntitiesInZone', function()
-		Test('Only entities attributed to the given zone are yielded, with entities from other zones absent.', function()
-			local count = 0
-			local seen = {}
-			local partA = CreatePart({ CFrame = CFrame.new(0, 0, 0) })
-			local partB = CreatePart({ CFrame = CFrame.new(20, 0, 0) })
-			local zoneA = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
-			local zoneB = Zone.new({ cframe = CFrame.new(20, 0, 0), size = Vector3.one * 10 })
-			local group = Group.new({ entities = { partA, partB } })
-			local observer = Observer.new({ zones = { zoneA, zoneB }, groups = { group }, safety = false })
+		Test(
+			'Only entities attributed to the given zone are yielded, with entities from other zones absent.',
+			function()
+				local count = 0
+				local seen = {}
+				local partA = CreatePart({ CFrame = CFrame.new(0, 0, 0) })
+				local partB = CreatePart({ CFrame = CFrame.new(20, 0, 0) })
+				local zoneA = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+				local zoneB = Zone.new({ cframe = CFrame.new(20, 0, 0), size = Vector3.one * 10 })
+				local group = Group.new({ entities = { partA, partB } })
+				local observer = Observer.new({ zones = { zoneA, zoneB }, groups = { group }, safety = false })
 
-			QuickZone:update(1 / 10)
-			for entity in observer:iterEntitiesInZone(zoneA) do
-				count += 1
-				seen[entity] = (seen[entity] or 0) + 1
+				QuickZone:update(1 / 10)
+				for entity in observer:iterEntitiesInZone(zoneA) do
+					count += 1
+					seen[entity] = (seen[entity] or 0) + 1
+				end
+
+				Expect(count).is(1)
+				Expect(seen[partA]).is(1)
+				Expect(seen[partB]).never_exists()
+
+				observer:destroy()
+				group:destroy()
+				zoneA:destroy()
+				zoneB:destroy()
+				partA:Destroy()
+				partB:Destroy()
 			end
-
-			Expect(count).is(1)
-			Expect(seen[partA]).is(1)
-			Expect(seen[partB]).never_exists()
-
-			observer:destroy()
-			group:destroy()
-			zoneA:destroy()
-			zoneB:destroy()
-			partA:Destroy()
-			partB:Destroy()
-		end)
+		)
 	end)
 
 	Describe('Observer:iterPlayersInZone', function()

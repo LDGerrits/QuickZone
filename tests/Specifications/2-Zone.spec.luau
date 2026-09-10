@@ -30,7 +30,7 @@ return function(Tiniest: Tiniest)
 
 		Test('Accepts every supported shape type.', function()
 			for _, shape in SHAPE_TYPES do
-				local zone = Zone.new({ cframe = cframe, size = size, shape = (shape :: Types.ShapeType) })
+				local zone = Zone.new({ cframe = cframe, size = size, shape = shape :: Types.ShapeType })
 
 				Expect(zone:getShape()).is(shape)
 				zone:destroy()
@@ -120,7 +120,7 @@ return function(Tiniest: Tiniest)
 			for reference, _ in zones:iterReferences() do
 				seen[reference] = true
 			end
-			
+
 			for _, part in parts do
 				Expect(seen[part]).is_true()
 			end
@@ -133,7 +133,8 @@ return function(Tiniest: Tiniest)
 
 		Test('Each inner zone independent from its own source.', function()
 			local matched = 0
-			local partA = CreatePart({ CFrame = CFrame.new(10, 0, 0), Size = Vector3.one * 4, Shape = Enum.PartType.Ball })
+			local partA =
+				CreatePart({ CFrame = CFrame.new(10, 0, 0), Size = Vector3.one * 4, Shape = Enum.PartType.Ball })
 			local partB = CreatePart({ CFrame = CFrame.new(-10, 5, 0), Size = Vector3.new(6, 2, 8) })
 			local zones = Zone.fromParts({ partA, partB })
 
@@ -527,6 +528,51 @@ return function(Tiniest: Tiniest)
 			model:Destroy()
 			part:Destroy()
 		end)
+
+		Test('Destroying a tagged container cleans up descendant zones.', function()
+			local tag = 'QZ_FROM_TAG_DESTROY_CONTAINER'
+			local model = Instance.new('Model')
+			local part = CreatePart()
+
+			part.Parent = model
+			model.Parent = workspace
+			CollectionService:AddTag(model, tag)
+			local zones = Zone.fromTag(tag)
+
+			Expect(#zones:getZones()).is(1)
+
+			model:Destroy()
+			task.wait()
+
+			Expect(#zones:getZones()).is(0)
+			zones:destroy()
+		end)
+
+		Test('Destroying a container cleans up parts that also had direct tags.', function()
+			local tag = 'QZ_FROM_TAG_OVERLAP_DESTROY'
+			local model = Instance.new('Model')
+			local part = CreatePart()
+
+			part.Parent = model
+			model.Parent = workspace
+
+			CollectionService:AddTag(part, tag)
+			CollectionService:AddTag(model, tag)
+			local zones = Zone.fromTag(tag)
+
+			Expect(#zones:getZones()).is(1)
+
+			CollectionService:RemoveTag(part, tag)
+			task.wait()
+
+			Expect(#zones:getZones()).is(1)
+
+			model:Destroy()
+			task.wait()
+
+			Expect(#zones:getZones()).is(0)
+			zones:destroy()
+		end)
 	end)
 
 	Describe('Zone:setAutoSync', function()
@@ -710,7 +756,7 @@ return function(Tiniest: Tiniest)
 			local zone = Zone.new({ cframe = CFrame.new(origin), size = Vector3.one * 10 })
 
 			QuickZone:rebuild()
-			
+
 			Expect(zone:isDynamic()).never_is_true()
 			Expect(QuickZone:getZonesAtPoint(origin)).has_value(zone)
 
@@ -952,38 +998,41 @@ return function(Tiniest: Tiniest)
 			end
 		end)
 
-		Test('Zones:getZones, Zones:getReferences, Zones:iterZones, and Zones:iterReferences each yield every entry once.', function()
-			local zoneCount = 0
-			local seenZones, seenReferences = {}, {}
-			local parts = CreateParts(3)
-			local zones = Zone.fromParts(parts)
+		Test(
+			'Zones:getZones, Zones:getReferences, Zones:iterZones, and Zones:iterReferences each yield every entry once.',
+			function()
+				local zoneCount = 0
+				local seenZones, seenReferences = {}, {}
+				local parts = CreateParts(3)
+				local zones = Zone.fromParts(parts)
 
-			Expect(#zones:getZones()).is(#parts)
-			Expect(#zones:getReferences()).is(#parts)
+				Expect(#zones:getZones()).is(#parts)
+				Expect(#zones:getReferences()).is(#parts)
 
-			for zone in zones:iterZones() do
-				zoneCount += 1
-				seenZones[zone] = (seenZones[zone] or 0) + 1
+				for zone in zones:iterZones() do
+					zoneCount += 1
+					seenZones[zone] = (seenZones[zone] or 0) + 1
+				end
+
+				Expect(zoneCount).is(#parts)
+				for _, zone in zones:getZones() do
+					Expect(seenZones[zone]).is(1)
+				end
+
+				for reference, _ in zones:iterReferences() do
+					seenReferences[reference] = (seenReferences[reference] or 0) + 1
+				end
+
+				for _, part in parts do
+					Expect(seenReferences[part]).is(1)
+				end
+
+				zones:destroy()
+				for _, part in parts do
+					part:Destroy()
+				end
 			end
-
-			Expect(zoneCount).is(#parts)
-			for _, zone in zones:getZones() do
-				Expect(seenZones[zone]).is(1)
-			end
-
-			for reference, _ in zones:iterReferences() do
-				seenReferences[reference] = (seenReferences[reference] or 0) + 1
-			end
-
-			for _, part in parts do
-				Expect(seenReferences[part]).is(1)
-			end
-
-			zones:destroy()
-			for _, part in parts do
-				part:Destroy()
-			end
-		end)
+		)
 
 		Test('Propagates setDynamic to every inner zone.', function()
 			local parts = CreateParts(2)
