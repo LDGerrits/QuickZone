@@ -69,10 +69,6 @@ local function getShapeEnumValue(part: BasePart): number
 	return Enum.PartType.Block.Value
 end
 
---[=[
-	@ignore
-	Returns the reference only if it can answer mesh containment queries.
-]=]
 local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): BasePart?
 	if reference and reference:IsA('BasePart') then
 		return reference
@@ -80,11 +76,6 @@ local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): Base
 	return nil
 end
 
---[=[
-	@ignore
-	Writes a zone's shape type, keeping the mesh registry in sync. Mesh zones resolve
-	containment through the part itself, so they are only valid with a queryable part.
-]=]
 local function applyShapeType(id: number, isDynamic: boolean, shapeType: number, part: BasePart?)
 	if shapeType == MESH_SHAPE_VALUE and not part then
 		Log.warn("Shape 'Mesh' requires a BasePart reference. Defaulting Zone %d to Block.", nil, id)
