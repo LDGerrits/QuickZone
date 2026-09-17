@@ -95,6 +95,24 @@ local zone = Zone.new({
 })
 ```
 
+### Mesh Zones
+`Zone.fromPart` detects MeshParts and Unions and gives them the `Mesh` shape. Containment for these zones is resolved against the part's collision geometry, so concave and irregular volumes are matched properly instead of being approximated by their bounding box.
+
+```lua
+-- Shape is detected automatically; nothing extra to configure
+local caveZone = Zone.fromPart(workspace.CaveMesh)
+```
+
+The bulk constructors (`fromParts`, `fromDescendants`, `fromChildren`, `fromTag`) pick this up as well, so a folder holding a mix of blocks and meshes needs no special handling.
+
+:::caution Requires a part
+A `Mesh` zone queries its part reference directly, so it only works on zones that have a `BasePart` reference. Setting `shape = 'Mesh'` on a zone without one (or on a zone referencing an Attachment or Bone) falls back to `Block` and warns.
+:::
+
+:::info Collision Fidelity
+The queried geometry is the part's collision geometry, so its `CollisionFidelity` decides how precise the zone is.
+:::
+
 ### Single & Dynamic Creation
 For maximum performance, use `isDynamic = true` for zones attached to moving platforms, vehicles, or projectiles.
 ```lua

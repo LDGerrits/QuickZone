@@ -1,4 +1,8 @@
 --!strict
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+
+local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
+
 type InstanceTree = {
 	className: string,
 	properties: { [string]: any }?,
@@ -45,6 +49,24 @@ function Util.createPart(properties: { [string]: any }?): Part
 		className = 'Part',
 		properties = properties,
 	})
+end
+
+function Util.captureWarnings(callback: () -> ()): { string }
+	local captured: { string } = {}
+	local original = Log.warn
+
+	Log.warn = function(message: string, _trace: string?, ...: any)
+		table.insert(captured, string.format(message, ...))
+	end
+
+	local ok, err = pcall(callback)
+	Log.warn = original
+
+	if not ok then
+		error(err, 0)
+	end
+
+	return captured
 end
 
 function Util.createParts(count: number, properties: { [string]: any }?): { BasePart }

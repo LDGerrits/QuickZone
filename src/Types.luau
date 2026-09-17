@@ -1,11 +1,14 @@
 --!strict
 
 --[=[
-	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
+	@type ShapeType "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge" | "Mesh"
 	@within QuickZone
 	The geometric shape of a Zone.
+
+	`Mesh` resolves containment against the collision geometry of the zone's part
+	reference, so it requires a `BasePart` reference to query.
 ]=]
-export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge'
+export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge' | 'Mesh'
 
 --[=[
 	@interface EntityTable

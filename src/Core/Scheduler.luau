@@ -17,9 +17,11 @@ local isPointInShape = Geometry.isPointInShape
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
 local staticTypes = State.staticTypes
+local staticMeshes = State.staticMeshes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
+local dynamicMeshes = State.dynamicMeshes
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneAttachedObservers = State.zoneAttachedObservers
 local autoSyncZones = State.autoSyncZones
@@ -237,13 +239,29 @@ local function processZoneHit(zoneId: number)
 end
 
 local function queryCallbackStatic(zoneId: number)
-	if isPointInShape(ctx_pos, staticCFrames[zoneId], staticHalfSizes[zoneId], staticTypes[zoneId]) then
+	if
+		isPointInShape(
+			ctx_pos,
+			staticCFrames[zoneId],
+			staticHalfSizes[zoneId],
+			staticTypes[zoneId],
+			staticMeshes[zoneId]
+		)
+	then
 		processZoneHit(zoneId)
 	end
 end
 
 local function queryCallbackDynamic(zoneId: number)
-	if isPointInShape(ctx_pos, dynamicCFrames[zoneId], dynamicHalfSizes[zoneId], dynamicTypes[zoneId]) then
+	if
+		isPointInShape(
+			ctx_pos,
+			dynamicCFrames[zoneId],
+			dynamicHalfSizes[zoneId],
+			dynamicTypes[zoneId],
+			dynamicMeshes[zoneId]
+		)
+	then
 		processZoneHit(zoneId)
 	end
 end

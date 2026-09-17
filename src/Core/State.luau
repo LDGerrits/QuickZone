@@ -10,10 +10,12 @@ local State = {
 	staticCFrames = {} :: { [number]: CFrame },
 	staticHalfSizes = {} :: { [number]: Vector3 },
 	staticTypes = {} :: { [number]: number },
+	staticMeshes = {} :: { [number]: BasePart },
 
 	dynamicCFrames = {} :: { [number]: CFrame },
 	dynamicHalfSizes = {} :: { [number]: Vector3 },
 	dynamicTypes = {} :: { [number]: number },
+	dynamicMeshes = {} :: { [number]: BasePart },
 
 	staticTree = { nodes = {}, count = 0 } :: Types.Tree,
 	dynamicTree = { nodes = {}, count = 0 } :: Types.Tree,

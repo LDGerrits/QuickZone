@@ -3,7 +3,8 @@
 	@class Zone
 	
 	Zones define physical areas in world space. They can be static or dynamic 
-	and support shapes like Blocks, Balls, and Cylinders.
+	and support shapes like Blocks, Balls, and Cylinders, as well as the collision
+	geometry of MeshParts and Unions.
 	
 	Zones themselves are 'passive', meaning they must be attached to an Observer before any detection occurs.
 
@@ -31,8 +32,13 @@ local staticTypes = State.staticTypes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
+local staticMeshes = State.staticMeshes
+local dynamicMeshes = State.dynamicMeshes
 
 local isPointInShape = Geometry.isPointInShape
+
+local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
+local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
 
 local SHAPE_MAP = {
 	Block = Enum.PartType.Block.Value,
@@ -40,11 +46,16 @@ local SHAPE_MAP = {
 	Ball = Enum.PartType.Ball.Value,
 	Wedge = Enum.PartType.Wedge.Value,
 	CornerWedge = Enum.PartType.CornerWedge.Value,
+	Mesh = MESH_SHAPE_VALUE,
 }
 
 local function getShapeEnumValue(part: BasePart): number
 	if part:IsA('Part') then
 		return part.Shape.Value
+	end
+
+	if part:IsA('MeshPart') or part:IsA('PartOperation') then
+		return MESH_SHAPE_VALUE
 	end
 
 	if part:IsA('WedgePart') then
@@ -56,6 +67,39 @@ local function getShapeEnumValue(part: BasePart): number
 	end
 
 	return Enum.PartType.Block.Value
+end
+
+--[=[
+	@ignore
+	Returns the reference only if it can answer mesh containment queries.
+]=]
+local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): BasePart?
+	if reference and reference:IsA('BasePart') then
+		return reference
+	end
+	return nil
+end
+
+--[=[
+	@ignore
+	Writes a zone's shape type, keeping the mesh registry in sync. Mesh zones resolve
+	containment through the part itself, so they are only valid with a queryable part.
+]=]
+local function applyShapeType(id: number, isDynamic: boolean, shapeType: number, part: BasePart?)
+	if shapeType == MESH_SHAPE_VALUE and not part then
+		Log.warn("Shape 'Mesh' requires a BasePart reference. Defaulting Zone %d to Block.", nil, id)
+		shapeType = BLOCK_SHAPE_VALUE
+	end
+
+	local meshPart = if shapeType == MESH_SHAPE_VALUE then part else nil
+
+	if isDynamic then
+		dynamicTypes[id] = shapeType
+		dynamicMeshes[id] = meshPart
+	else
+		staticTypes[id] = shapeType
+		staticMeshes[id] = meshPart
+	end
 end
 
 local function clearAutoSync(zone: Types.InternalZone)
@@ -152,14 +196,14 @@ local function newZoneInternal(
 	if isDynamic then
 		State.dynamicCFrames[id] = cframe
 		State.dynamicHalfSizes[id] = halfSize
-		State.dynamicTypes[id] = shapeType
 		State.pendingDynamicRebuild = true
 	else
 		State.staticCFrames[id] = cframe
 		State.staticHalfSizes[id] = halfSize
-		State.staticTypes[id] = shapeType
 		State.pendingStaticRebuild = true
 	end
+
+	applyShapeType(id, isDynamic, shapeType, asQueryablePart(reference))
 
 	local self: Types.InternalZone = setmetatable({
 		id = id,
@@ -238,6 +282,9 @@ end
 	Creates a Zone automatically based on the Part's properties.
 	Supported shapes: Block, Ball (Spheres), Cylinder, Wedge, and CornerWedge.
 
+	MeshParts and solid modelled parts (unions, intersections and negates) get the
+	`Mesh` shape, which resolves containment against the part's collision geometry.
+
 	```lua
 	local part = workspace.ZonePart
 	local zone = QuickZone.Zone.fromPart(part)
@@ -265,14 +312,7 @@ function Zone.fromPart(
 		autoSync: boolean?,
 	}?
 ): Types.Zone
-	local shapeId = Enum.PartType.Block.Value
-	if part:IsA('Part') then
-		shapeId = part.Shape.Value
-	elseif part:IsA('WedgePart') then
-		shapeId = Enum.PartType.Wedge.Value
-	elseif part:IsA('CornerWedgePart') then
-		shapeId = Enum.PartType.CornerWedge.Value
-	end
+	local shapeId = getShapeEnumValue(part)
 
 	local isDynamic = config and config.isDynamic or false
 	local metadata = config and config.metadata
@@ -740,6 +780,13 @@ end
 function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Attachment | Bone)?): Types.Zone
 	self.reference = reference
 
+	local currentShape = if self.dynamic then dynamicTypes[self.id] else staticTypes[self.id]
+	if currentShape == MESH_SHAPE_VALUE then
+		-- Mesh zones query the part directly, so the new reference has to take over.
+		-- Without a queryable part the zone falls back to its bounding box.
+		applyShapeType(self.id, self.dynamic, MESH_SHAPE_VALUE, asQueryablePart(reference))
+	end
+
 	if self.autoSync then
 		clearAutoSync(self)
 		if reference then
@@ -793,8 +840,8 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 				needsUpdate = true
 			end
 
-			if dynamicTypes[id] ~= newShape then
-				dynamicTypes[id] = newShape
+			if dynamicTypes[id] ~= newShape or (newShape == MESH_SHAPE_VALUE and dynamicMeshes[id] ~= reference) then
+				applyShapeType(id, true, newShape, reference)
 				needsUpdate = true
 			end
 
@@ -814,8 +861,8 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 				needsUpdate = true
 			end
 
-			if staticTypes[id] ~= newShape then
-				staticTypes[id] = newShape
+			if staticTypes[id] ~= newShape or (newShape == MESH_SHAPE_VALUE and staticMeshes[id] ~= reference) then
+				applyShapeType(id, false, newShape, reference)
 				needsUpdate = true
 			end
 
@@ -885,10 +932,12 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 		dynamicCFrames[id] = staticCFrames[id]
 		dynamicHalfSizes[id] = staticHalfSizes[id]
 		dynamicTypes[id] = staticTypes[id]
+		dynamicMeshes[id] = staticMeshes[id]
 
 		staticCFrames[id] = nil
 		staticHalfSizes[id] = nil
 		staticTypes[id] = nil
+		staticMeshes[id] = nil
 	else
 		if self.autoSync then
 			self:setAutoSync(false)
@@ -897,10 +946,12 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 		staticCFrames[id] = dynamicCFrames[id]
 		staticHalfSizes[id] = dynamicHalfSizes[id]
 		staticTypes[id] = dynamicTypes[id]
+		staticMeshes[id] = dynamicMeshes[id]
 
 		dynamicCFrames[id] = nil
 		dynamicHalfSizes[id] = nil
 		dynamicTypes[id] = nil
+		dynamicMeshes[id] = nil
 	end
 
 	State.pendingStaticRebuild = true
@@ -997,11 +1048,7 @@ function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.
 		Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(shape))
 	end
 
-	if self.dynamic then
-		dynamicTypes[self.id] = shapeType
-	else
-		staticTypes[self.id] = shapeType
-	end
+	applyShapeType(self.id, self.dynamic, shapeType, asQueryablePart(self.reference))
 
 	if self.dynamic then
 		State.dynamicVersion += 1
@@ -1113,6 +1160,8 @@ function Zone.getShape(self: Types.InternalZone): Types.ShapeType
 		return 'Wedge'
 	elseif shapeType == Enum.PartType.CornerWedge.Value then
 		return 'CornerWedge'
+	elseif shapeType == MESH_SHAPE_VALUE then
+		return 'Mesh'
 	end
 	return 'Block'
 end
@@ -1128,9 +1177,9 @@ end
 function Zone.isPointInside(self: Types.InternalZone, point: Vector3): boolean
 	local id = self.id
 	if self.dynamic then
-		return isPointInShape(point, dynamicCFrames[id], dynamicHalfSizes[id], dynamicTypes[id])
+		return isPointInShape(point, dynamicCFrames[id], dynamicHalfSizes[id], dynamicTypes[id], dynamicMeshes[id])
 	else
-		return isPointInShape(point, staticCFrames[id], staticHalfSizes[id], staticTypes[id])
+		return isPointInShape(point, staticCFrames[id], staticHalfSizes[id], staticTypes[id], staticMeshes[id])
 	end
 end
 
@@ -1249,11 +1298,13 @@ function Zone.destroy(self: Types.InternalZone): ()
 		dynamicCFrames[id] = nil
 		dynamicHalfSizes[id] = nil
 		dynamicTypes[id] = nil
+		dynamicMeshes[id] = nil
 		State.pendingDynamicRebuild = true
 	else
 		staticCFrames[id] = nil
 		staticHalfSizes[id] = nil
 		staticTypes[id] = nil
+		staticMeshes[id] = nil
 		State.pendingStaticRebuild = true
 	end
 

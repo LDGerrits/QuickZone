@@ -1,5 +1,5 @@
 --!strict
---v1.4.8 • LDGerrits
+--v1.5.0 • LDGerrits
 --[=[
 	@class QuickZone
 
@@ -30,9 +30,11 @@ local referenceToEntity = State.referenceToEntity
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
 local staticTypes = State.staticTypes
+local staticMeshes = State.staticMeshes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
+local dynamicMeshes = State.dynamicMeshes
 local dynamicTree = State.dynamicTree
 local staticTree = State.staticTree
 
@@ -380,7 +382,15 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	local count = 0
 
 	queryPoint(dynamicTree, position, function(zoneId)
-		if isPointInShape(position, dynamicCFrames[zoneId], dynamicHalfSizes[zoneId], dynamicTypes[zoneId]) then
+		if
+			isPointInShape(
+				position,
+				dynamicCFrames[zoneId],
+				dynamicHalfSizes[zoneId],
+				dynamicTypes[zoneId],
+				dynamicMeshes[zoneId]
+			)
+		then
 			local zone = zoneIdToZoneObj[zoneId]
 			if zone then
 				count += 1
@@ -390,7 +400,15 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	end)
 
 	queryPoint(staticTree, position, function(zoneId)
-		if isPointInShape(position, staticCFrames[zoneId], staticHalfSizes[zoneId], staticTypes[zoneId]) then
+		if
+			isPointInShape(
+				position,
+				staticCFrames[zoneId],
+				staticHalfSizes[zoneId],
+				staticTypes[zoneId],
+				staticMeshes[zoneId]
+			)
+		then
 			local zone = zoneIdToZoneObj[zoneId]
 			if zone then
 				count += 1
@@ -637,7 +655,13 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 
 				if
 					hitId > 0
-					and isPointInShape(point, dynamicCFrames[hitId], dynamicHalfSizes[hitId], dynamicTypes[hitId])
+					and isPointInShape(
+						point,
+						dynamicCFrames[hitId],
+						dynamicHalfSizes[hitId],
+						dynamicTypes[hitId],
+						dynamicMeshes[hitId]
+					)
 				then
 					return zoneIdToZoneObj[hitId]
 				end
@@ -662,7 +686,13 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 
 				if
 					hitId > 0
-					and isPointInShape(point, staticCFrames[hitId], staticHalfSizes[hitId], staticTypes[hitId])
+					and isPointInShape(
+						point,
+						staticCFrames[hitId],
+						staticHalfSizes[hitId],
+						staticTypes[hitId],
+						staticMeshes[hitId]
+					)
 				then
 					return zoneIdToZoneObj[hitId]
 				end

@@ -28,9 +28,11 @@ local zoneAttachedObservers = State.zoneAttachedObservers
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
 local staticTypes = State.staticTypes
+local staticMeshes = State.staticMeshes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
+local dynamicMeshes = State.dynamicMeshes
 local dynamicTree = State.dynamicTree
 local staticTree = State.staticTree
 
@@ -1129,7 +1131,15 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 			continue
 		end
 
-		if isPointInShape(position, dynamicCFrames[hitId], dynamicHalfSizes[hitId], dynamicTypes[hitId]) then
+		if
+			isPointInShape(
+				position,
+				dynamicCFrames[hitId],
+				dynamicHalfSizes[hitId],
+				dynamicTypes[hitId],
+				dynamicMeshes[hitId]
+			)
+		then
 			return true
 		end
 	end
@@ -1158,7 +1168,15 @@ function Observer.isPointInside(self: Types.InternalObserver, position: Vector3)
 			continue
 		end
 
-		if isPointInShape(position, staticCFrames[hitId], staticHalfSizes[hitId], staticTypes[hitId]) then
+		if
+			isPointInShape(
+				position,
+				staticCFrames[hitId],
+				staticHalfSizes[hitId],
+				staticTypes[hitId],
+				staticMeshes[hitId]
+			)
+		then
 			return true
 		end
 	end

@@ -1,4 +1,4 @@
-export type ShapeType = "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
+export type ShapeType = "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge" | "Mesh"
 
 export interface EntityTable {
 	Position?: Vector3

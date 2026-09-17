@@ -7,6 +7,7 @@ local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
 local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
 local WEDGE_SHAPE_VALUE = Enum.PartType.Wedge.Value
 local CORNER_WEDGE_SHAPE_VALUE = Enum.PartType.CornerWedge.Value
+local MESH_SHAPE_VALUE = -1 -- Meshes have no Enum.PartType equivalent
 
 local MORTON_SHIFT16_MASK = 0xFF0000FF
 local MORTON_SHIFT8_MASK = 0xF00F00F
@@ -32,6 +33,8 @@ local function expandBits(value: number): number
 end
 
 local Geometry = {}
+
+Geometry.MESH_SHAPE_VALUE = MESH_SHAPE_VALUE
 
 function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB: Vector3): (Vector3, Vector3)
 	return vector.min(minA, minB), vector.max(maxA, maxB)
@@ -71,7 +74,13 @@ function Geometry.positionToMortonCode(
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end
 
-function Geometry.isPointInShape(point: Vector3, cframe: CFrame, halfSize: Vector3, shapeType: number): boolean
+function Geometry.isPointInShape(
+	point: Vector3,
+	cframe: CFrame,
+	halfSize: Vector3,
+	shapeType: number,
+	part: BasePart?
+): boolean
 	if shapeType == BLOCK_SHAPE_VALUE then
 		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
 		return vector.min(localPoint, halfSize) == localPoint
@@ -114,6 +123,11 @@ function Geometry.isPointInShape(point: Vector3, cframe: CFrame, halfSize: Vecto
 		end
 		local absolute_point = vector.abs(localPoint)
 		return vector.min(absolute_point, halfSize) == absolute_point
+	elseif shapeType == MESH_SHAPE_VALUE then
+		if not part then
+			return false
+		end
+		return part:GetClosestPointOnSurface(point) == point
 	end
 
 	return false

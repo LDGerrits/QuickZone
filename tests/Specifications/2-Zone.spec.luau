@@ -23,6 +23,7 @@ return function(Tiniest: Tiniest)
 	local Create = Util.create
 	local CreatePart = Util.createPart
 	local CreateParts = Util.createParts
+	local CaptureWarnings = Util.captureWarnings
 
 	Describe('Zone.new', function()
 		local cframe = CFrame.identity
@@ -68,6 +69,40 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 			part:Destroy()
 		end)
+
+		Test('Shape Mesh is accepted quietly alongside a part reference.', function()
+			local part = CreatePart()
+			local zone: Types.Zone
+
+			local warnings = CaptureWarnings(function()
+				zone = Zone.new({ cframe = cframe, size = size, shape = 'Mesh', reference = part })
+			end)
+
+			Expect(#warnings).is(0)
+			Expect(zone:getShape()).is('Mesh')
+
+			zone:destroy()
+			part:Destroy()
+		end)
+
+		Test('Shape Mesh warns and falls back to Block without a part reference.', function()
+			local attachment: Attachment = Create({ className = 'Attachment' })
+			local orphaned: Types.Zone
+			local attached: Types.Zone
+
+			local warnings = CaptureWarnings(function()
+				orphaned = Zone.new({ cframe = cframe, size = size, shape = 'Mesh' })
+				attached = Zone.new({ cframe = cframe, size = size, shape = 'Mesh', reference = attachment })
+			end)
+
+			Expect(#warnings).is(2)
+			Expect(orphaned:getShape()).is('Block')
+			Expect(attached:getShape()).is('Block')
+
+			orphaned:destroy()
+			attached:destroy()
+			attachment:Destroy()
+		end)
 	end)
 
 	Describe('Zone.fromPart', function()
@@ -104,6 +139,24 @@ return function(Tiniest: Tiniest)
 			local zone = Zone.fromPart(part)
 
 			Expect(zone:getShape()).is('CornerWedge')
+			zone:destroy()
+			part:Destroy()
+		end)
+
+		Test('MeshPart maps to shape Mesh.', function()
+			local part: MeshPart = Create({ className = 'MeshPart' })
+			local zone = Zone.fromPart(part)
+
+			Expect(zone:getShape()).is('Mesh')
+			zone:destroy()
+			part:Destroy()
+		end)
+
+		Test('Solid modelled parts map to shape Mesh.', function()
+			local part: UnionOperation = Create({ className = 'UnionOperation' })
+			local zone = Zone.fromPart(part)
+
+			Expect(zone:getShape()).is('Mesh')
 			zone:destroy()
 			part:Destroy()
 		end)
@@ -661,6 +714,40 @@ return function(Tiniest: Tiniest)
 			part:Destroy()
 		end)
 
+		Test('Mesh zones follow the new reference, falling back to Block without a part.', function()
+			local partA: MeshPart = Create({
+				className = 'MeshPart',
+				properties = { CFrame = CFrame.new(300, 0, 0), Size = Vector3.one * 10 },
+			})
+			local partB: MeshPart = Create({
+				className = 'MeshPart',
+				properties = { CFrame = CFrame.new(400, 0, 0), Size = Vector3.one * 10 },
+			})
+			local zone = Zone.fromPart(partA)
+
+			Expect(zone:getShape()).is('Mesh')
+			Expect(zone:isPointInside(partA.Position)).is_true()
+
+			zone:setReference(partB)
+			zone:sync()
+
+			Expect(zone:getShape()).is('Mesh')
+			Expect(zone:isPointInside(partB.Position)).is_true()
+			Expect(zone:isPointInside(partA.Position)).never_is_true()
+
+			local warnings = CaptureWarnings(function()
+				zone:setReference(nil)
+			end)
+
+			Expect(#warnings).is(1)
+			Expect(zone:getShape()).is('Block')
+			Expect(zone:isPointInside(partB.Position)).is_true()
+
+			zone:destroy()
+			partA:Destroy()
+			partB:Destroy()
+		end)
+
 		Test('Rewires autoSync to the new reference, disconnecting from the old one.', function()
 			local size = Vector3.one * 50
 			local partA = CreatePart({ Size = Vector3.one * 10 })
@@ -838,6 +925,24 @@ return function(Tiniest: Tiniest)
 
 			zone:destroy()
 		end)
+
+		Test('Swapping to Mesh adopts the part reference, and back again releases it.', function()
+			local part: MeshPart = Create({ className = 'MeshPart', properties = { Size = Vector3.one * 10 } })
+			local zone = Zone.new({ cframe = part.CFrame, size = part.Size, reference = part })
+
+			Expect(zone:setShape('Mesh')).is(zone)
+			Expect(zone:getShape()).is('Mesh')
+			Expect(zone:isPointInside(part.Position)).is_true()
+			Expect(zone:isPointInside(part.Position + Vector3.new(5.1, 0, 0))).never_is_true()
+
+			zone:setShape('Ball')
+
+			Expect(zone:getShape()).is('Ball')
+			Expect(zone:isPointInside(part.Position + Vector3.new(4, 4, 4))).never_is_true()
+
+			zone:destroy()
+			part:Destroy()
+		end)
 	end)
 
 	Describe('Zone:setMetadata', function()
@@ -957,6 +1062,46 @@ return function(Tiniest: Tiniest)
 
 			zoneA:destroy()
 			zoneB:destroy()
+		end)
+
+		Test('Mesh: checks points of aligned and rotated zones.', function()
+			local partA: MeshPart = Create({ className = 'MeshPart', properties = { Size = size } })
+			local partB: MeshPart = Create({ className = 'MeshPart', properties = { CFrame = rotation, Size = size } })
+			local zoneA = Zone.fromPart(partA)
+			local zoneB = Zone.fromPart(partB)
+
+			Expect(zoneA:isPointInside(Vector3.zero)).is_true()
+			Expect(zoneA:isPointInside(Vector3.new(4.9, 4.9, 4.9))).is_true()
+			Expect(zoneA:isPointInside(Vector3.new(5.1, 0, 0))).never_is_true()
+			Expect(zoneA:isPointInside(Vector3.new(100, 0, 0))).never_is_true()
+			Expect(zoneB:isPointInside(rotation:PointToWorldSpace(Vector3.zero))).is_true()
+			Expect(zoneB:isPointInside(rotation:PointToWorldSpace(Vector3.new(4.9, 4.9, 4.9)))).is_true()
+			Expect(zoneB:isPointInside(rotation:PointToWorldSpace(Vector3.new(5.1, 0, 0)))).never_is_true()
+			Expect(zoneB:isPointInside(rotation:PointToWorldSpace(Vector3.new(100, 0, 0)))).never_is_true()
+
+			zoneA:destroy()
+			zoneB:destroy()
+			partA:Destroy()
+			partB:Destroy()
+		end)
+
+		Test('Mesh: survives a switch between the static and dynamic trees.', function()
+			local part: MeshPart = Create({ className = 'MeshPart', properties = { Size = size } })
+			local zone = Zone.fromPart(part)
+
+			Expect(zone:setDynamic(true)).is(zone)
+			Expect(zone:getShape()).is('Mesh')
+			Expect(zone:isPointInside(Vector3.new(4.9, 4.9, 4.9))).is_true()
+			Expect(zone:isPointInside(Vector3.new(5.1, 0, 0))).never_is_true()
+
+			zone:setDynamic(false)
+
+			Expect(zone:getShape()).is('Mesh')
+			Expect(zone:isPointInside(Vector3.new(4.9, 4.9, 4.9))).is_true()
+			Expect(zone:isPointInside(Vector3.new(5.1, 0, 0))).never_is_true()
+
+			zone:destroy()
+			part:Destroy()
 		end)
 	end)
 
