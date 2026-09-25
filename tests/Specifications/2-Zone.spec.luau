@@ -1085,6 +1085,53 @@ return function(Tiniest: Tiniest)
 			partB:Destroy()
 		end)
 
+		Test('Mesh: every interior point of a rotated, offset part is inside despite float error.', function()
+			local part: MeshPart = Create({
+				className = 'MeshPart',
+				properties = {
+					CFrame = CFrame.new(13.7, 4.2, -9.1) * CFrame.Angles(0.3, 1.1, 0.7),
+					Size = Vector3.new(20, 10, 30),
+				},
+			})
+			local zone = Zone.fromPart(part)
+			local rng = Random.new(1)
+			local misses = 0
+
+			for _ = 1, 500 do
+				local localPoint = Vector3.new(
+					rng:NextNumber(-0.49, 0.49),
+					rng:NextNumber(-0.49, 0.49),
+					rng:NextNumber(-0.49, 0.49)
+				) * part.Size
+				if not zone:isPointInside(part.CFrame:PointToWorldSpace(localPoint)) then
+					misses += 1
+				end
+			end
+
+			Expect(misses).is(0)
+
+			zone:destroy()
+			part:Destroy()
+		end)
+
+		Test('Mesh: points clearly outside a rotated part stay outside.', function()
+			local part: MeshPart = Create({
+				className = 'MeshPart',
+				properties = {
+					CFrame = CFrame.new(13.7, 4.2, -9.1) * CFrame.Angles(0.3, 1.1, 0.7),
+					Size = Vector3.new(20, 10, 30),
+				},
+			})
+			local zone = Zone.fromPart(part)
+
+			Expect(zone:isPointInside(part.CFrame:PointToWorldSpace(Vector3.new(10.05, 0, 0)))).never_is_true()
+			Expect(zone:isPointInside(part.CFrame:PointToWorldSpace(Vector3.new(0, -5.05, 0)))).never_is_true()
+			Expect(zone:isPointInside(part.CFrame:PointToWorldSpace(Vector3.new(0, 0, 15.05)))).never_is_true()
+
+			zone:destroy()
+			part:Destroy()
+		end)
+
 		Test('Mesh: survives a switch between the static and dynamic trees.', function()
 			local part: MeshPart = Create({ className = 'MeshPart', properties = { Size = size } })
 			local zone = Zone.fromPart(part)

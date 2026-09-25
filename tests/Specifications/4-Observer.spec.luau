@@ -867,6 +867,53 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Observer with overlapping Mesh zones', function()
+		Test('Moving around the union of two overlapping parts never exits or re-enters it.', function()
+			local rotation = CFrame.Angles(0.3, 1.1, 0.7)
+			local partA: MeshPart = Util.create({
+				className = 'MeshPart',
+				properties = { CFrame = CFrame.new(50, 20, 50) * rotation, Size = Vector3.one * 20 },
+			})
+			local partB: MeshPart = Util.create({
+				className = 'MeshPart',
+				properties = { CFrame = partA.CFrame * CFrame.new(12, 0, 0), Size = Vector3.one * 20 },
+			})
+			local zoneA = Zone.fromPart(partA)
+			local zoneB = Zone.fromPart(partB)
+			local entity = CreatePart({ CFrame = partA.CFrame })
+			local group = Group.new({ entities = { entity } })
+			local observer = Observer.new({ zones = { zoneA, zoneB }, groups = { group }, safety = false })
+			local rng = Random.new(1)
+			local enters, exits = 0, 0
+
+			observer:onEnter(function()
+				enters += 1
+			end)
+			observer:onExit(function()
+				exits += 1
+			end)
+
+			for _ = 1, 200 do
+				local localPoint =
+					Vector3.new(rng:NextNumber(-9.5, 21.5), rng:NextNumber(-9.5, 9.5), rng:NextNumber(-9.5, 9.5))
+				entity.CFrame = partA.CFrame * CFrame.new(localPoint)
+				QuickZone:update(1 / 10)
+			end
+
+			Expect(enters).is(1)
+			Expect(exits).is(0)
+			Expect(observer:getEntitiesInside()).has_value(entity)
+
+			observer:destroy()
+			group:destroy()
+			zoneA:destroy()
+			zoneB:destroy()
+			entity:Destroy()
+			partA:Destroy()
+			partB:Destroy()
+		end)
+	end)
+
 	Describe('Observer:onPlayerTransition', function()
 		Test('Callback fires when the player crosses between zones.', function()
 			local seenPlayer, seenZone

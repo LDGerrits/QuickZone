@@ -8,6 +8,7 @@ local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
 local WEDGE_SHAPE_VALUE = Enum.PartType.Wedge.Value
 local CORNER_WEDGE_SHAPE_VALUE = Enum.PartType.CornerWedge.Value
 local MESH_SHAPE_VALUE = -1 -- Meshes have no Enum.PartType equivalent
+local MESH_TOLERANCE_SQ = 1e-2 * 1e-2 -- 0.01 studs to account for float error up to 50k studs
 
 local MORTON_SHIFT16_MASK = 0xFF0000FF
 local MORTON_SHIFT8_MASK = 0xF00F00F
@@ -127,7 +128,8 @@ function Geometry.isPointInShape(
 		if not part then
 			return false
 		end
-		return part:GetClosestPointOnSurface(point) == point
+		local offset = part:GetClosestPointOnSurface(point) - point
+		return vector.dot(offset, offset) <= MESH_TOLERANCE_SQ
 	end
 
 	return false
