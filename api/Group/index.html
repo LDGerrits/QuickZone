@@ -16,8 +16,8 @@ Groups represent a collection of entities that should be tracked by the system.
 :::info Observer
 Every entity must be in a group to be observed.
 :::"><link data-rh="true" rel="canonical" href="https://LDGerrits.github.io/QuickZone/api/Group"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Group" hreflang="en"><link data-rh="true" rel="alternate" href="https://LDGerrits.github.io/QuickZone/api/Group" hreflang="x-default"><link rel="stylesheet" href="/QuickZone/assets/css/styles.5ec48d9a.css">
-<script src="/QuickZone/assets/js/runtime~main.45fd3d9b.js" defer="defer"></script>
-<script src="/QuickZone/assets/js/main.d9e95881.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/runtime~main.ba80bb0a.js" defer="defer"></script>
+<script src="/QuickZone/assets/js/main.7b585f6f.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -139,7 +139,7 @@ myGroup<span class="token punctuation">:</span><span class="token function">add<
             <li><strong>Model:</strong> Uses <code>PrimaryPart.Position</code> or <code>GetPivot()</code></li>
             <li><strong>Attachment/Bone:</strong> Uses <code>WorldPosition</code></li>
             <li><strong>Camera:</strong> Uses <code>CFrame</code></li>
-            <li><strong>Table:</strong> Looks for <code>.Position</code>, <code>.CFrame</code>, <code>.WorldPosition</code>, or <code>:GetPivot()</code>.</li>
+            <li><strong>Table:</strong> Looks for <code>.Position</code>, <code>.CFrame</code>, <code>.Transform</code>, <code>.WorldPosition</code>, or <code>:GetPivot()</code>.</li>
           </ul>
         </div>
       </div>
@@ -315,7 +315,7 @@ myGroup<span class="token punctuation">:</span><span class="token function">addB
         },
         {
             &quot;name&quot;: &quot;add&quot;,
-            &quot;desc&quot;: &quot; \nAdds an entity to the group.\n\n#### Example: Adding Different Entity Types\n```lua\n-- Adding a BasePart and a Model\nmyGroup:add(workspace.Part):add(workspace.NPCModel)\n\n-- Adding a custom table\nlocal spell = {\n\tCFrame = CFrame.new(0, 10, 0),\n\tName = &#x27;Fireball&#x27;\n}\nmyGroup:add(spell)\n```\n\n:::info Strategy Detection\nQuickZone automatically determines how to track the entity&#x27;s position:\n* **BasePart:** Uses `Position`\n* **Model:** Uses `PrimaryPart.Position` or `GetPivot()`\n* **Attachment/Bone:** Uses `WorldPosition`\n* **Camera:** Uses `CFrame`\n* **Table:** Looks for `.Position`, `.CFrame`, `.WorldPosition`, or `:GetPivot()`.\n:::&quot;,
+            &quot;desc&quot;: &quot; \nAdds an entity to the group.\n\n#### Example: Adding Different Entity Types\n```lua\n-- Adding a BasePart and a Model\nmyGroup:add(workspace.Part):add(workspace.NPCModel)\n\n-- Adding a custom table\nlocal spell = {\n\tCFrame = CFrame.new(0, 10, 0),\n\tName = &#x27;Fireball&#x27;\n}\nmyGroup:add(spell)\n```\n\n:::info Strategy Detection\nQuickZone automatically determines how to track the entity&#x27;s position:\n* **BasePart:** Uses `Position`\n* **Model:** Uses `PrimaryPart.Position` or `GetPivot()`\n* **Attachment/Bone:** Uses `WorldPosition`\n* **Camera:** Uses `CFrame`\n* **Table:** Looks for `.Position`, `.CFrame`, `.Transform`, `.WorldPosition`, or `:GetPivot()`.\n:::&quot;,
             &quot;params&quot;: [
                 {
                     &quot;name&quot;: &quot;entity&quot;,
