@@ -119,13 +119,13 @@ Observer.__index = Observer
 
 	```lua
 	local observer = QuickZone.Observer.new({
-		groups = { enemyGroup, playerGroup } -- Immediately subscribe to these groups
-		zones = { damageZone } -- Immediately subscribe to these zones
+		groups = { enemyGroup, playerGroup }, -- Immediately subscribe to these groups
+		zones = { damageZone }, -- Immediately attach to these zones
 		priority = 20, -- The priority value is used to resolve overlaps (defaults to 0)
 		updateRate = 20, -- Check at 20Hz (defaults to 30)
 		precision = 0.5, -- Ignore movement smaller than 0.5 studs (defaults to 0.1)
 		enabled = false, -- Observer will not start processing spatial checks (defaults to true)
-		safety = false, -- Wrap callbacks in task.spawn (defaults to true)
+		safety = false, -- Call callbacks directly instead of through task.spawn (defaults to true)
 	})
 	```
 

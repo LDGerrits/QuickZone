@@ -15,17 +15,17 @@
 
 **Agnostic.** Whether you prefer classic event-driven programming, robust lifecycle management, or zero-allocation iterators for ECS architectures, QuickZone can fit your workflow.
 
-**Total Performance Control.** The runtime cost is entirely in your control. Through a budgeted scheduler, the workload is smeared across frames and only consumes as much CPU time as you explicitly allow. Paired with contiguous arrays that produce virtually zero garbage collection (GC) pressure, QuickZone produces a flat, predictable performance profile.
+**Total Performance Control.** The runtime cost is in your control. A budgeted scheduler smears entity processing across frames and stops once the CPU time you allow is used up. Paired with contiguous arrays that produce virtually zero garbage collection (GC) pressure, QuickZone produces a flat, predictable performance profile.
 
 **Unit Tested.** A rigorous unit testing suite ensures stable and predictable behavior across all systems.
 
 ## What it offers
 
-- **Endless Scale**: The number of zones has zero impact on performance. Maintain 60 FPS even with over a million zones in your game.
+- **Endless Scale**: The number of zones barely affects per-frame cost, because each lookup walks the LBVH in *O(log Z)*. Maintain 60 FPS even with over a million zones in your game.
 
 - **Track Anything**: Track Players, BaseParts, Models, Attachments, Bones, Cameras, or even custom tables. If it has a position, QuickZone can track it.
 
-- **Budgeted Scheduler**: Set a hard frame budget (e.g., 1ms) to completely eliminate lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile.
+- **Budgeted Scheduler**: Set a frame budget (e.g., 1ms) to keep entity processing from causing lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile.
 
 - **Shape Support**: Built-in for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes. MeshParts and Unions are supported through their collision geometry.
 
@@ -35,7 +35,7 @@
 
 - **ECS-Ready**: Built-in support for zero-allocation iterators and deterministic manual stepping, making it a perfect fit for ECS architectures and data-oriented workflows
 
-- **Zero-Allocation Runtime**: By utilizing contiguous arrays and object pooling, QuickZone produces virtually zero GC pressure to avoid memory-related stutters.
+- **Minimal GC Pressure**: The spatial update loop reuses its arrays and tree nodes instead of allocating new tables, so QuickZone produces virtually zero garbage and avoids memory-related stutters.
 
 - **Dynamic Zones**: Use moving zones at very little cost. QuickZone maintains separate Static and Dynamic LBVHs for maximum efficiency.
 

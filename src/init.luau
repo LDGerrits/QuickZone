@@ -161,8 +161,8 @@ end
 	```lua
 	QuickZone:setReference(transformComponent, numberId)
 
-	local entityGroup = QuickZone.Group.new({ Entities = { entityId } })
-	local observer = QuickZone.Observer.new({ Groups = {entityGroup} })
+	local entityGroup = QuickZone.Group.new({ entities = { transformComponent } })
+	local observer = QuickZone.Observer.new({ groups = { entityGroup } })
 
 	observer:onEnter(function(numberId, zone)
 		print(tostring(numberId) .. " entered!")

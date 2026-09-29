@@ -42,6 +42,8 @@ end)
 Ideal for ECS frameworks or continuous logic. Instead of waiting for events, your systems poll the state every frame using zero-allocation iterators. You should disable the internal scheduler to step the update method manually for perfect determinism.
 
 ```lua
+local RunService = game:GetService('RunService')
+
 QuickZone:setEnabled(false) -- Disable auto-loop
 
 local function spatialSystem(dt)
@@ -96,7 +98,7 @@ local zone = Zone.new({
 ```
 
 ### Mesh Zones
-`Zone.fromPart` detects MeshParts and Unions and gives them the `Mesh` shape. Containment for these zones is resolved against the part's collision geometry, so concave and irregular volumes are matched properly instead of being approximated by their bounding box.
+`Zone.fromPart` detects MeshParts and Unions and gives them the `Mesh` shape. Containment for these zones is resolved against the part's collision geometry instead of being approximated by their bounding box.
 
 ```lua
 -- Shape is detected automatically; nothing extra to configure
@@ -110,7 +112,11 @@ A `Mesh` zone queries its part reference directly, so it only works on zones tha
 :::
 
 :::info Collision Fidelity
-The queried geometry is the part's collision geometry, so its `CollisionFidelity` decides how precise the zone is.
+The queried geometry is the part's collision geometry, so its `CollisionFidelity` decides how precise the zone is. `Box` and `Hull` fill in concave areas; use `PreciseConvexDecomposition` if concave areas (like the inside of an arch) must stay outside the zone.
+:::
+
+:::caution Cost
+Unlike the other shapes, a `Mesh` check calls `BasePart:GetClosestPointOnSurface`, which goes through the physics engine. It only runs for points inside the zone's bounding box, but it is more expensive than the math used for primitive shapes.
 :::
 
 ### Single & Dynamic Creation
@@ -128,7 +134,7 @@ QuickZone batches tree rebuilds once per frame. By adding a zone to the smaller 
 ### Updating Zones
 Dynamic zones need to know when their physical reference moves. You can let QuickZone handle this automatically or control it manually.
 
-You can quickly create a dynamic zone from an existing physical part. If you set autoSync = true, QuickZone will automatically update the zone's position in the spatial tree every frame to match the part.
+You can quickly create a dynamic zone from an existing physical part. If you set autoSync = true, QuickZone will automatically keep the zone's position in the spatial tree in sync with the part (30 times per second by default, see `QuickZone:setAutoSyncRate`). Size and shape changes of a part are picked up as they happen. Enabling autoSync makes the zone dynamic.
 
 ```lua
 local truckZone = Zone.fromPart(workspace.Truck.Hitbox, { 
@@ -144,7 +150,7 @@ local trainZone = Zone.new({
     size = Vector3.new(15, 10, 30),
     shape = 'Block',
     reference = train.CabinAttachment,
-    autoSync = true, -- QuickZone automatically moves the dynamic zone with the attachment every frame!
+    autoSync = true, -- QuickZone automatically moves the dynamic zone with the attachment!
     metadata = { route = 'North Express' }
 })
 ```
@@ -156,7 +162,7 @@ If you prefer strict control over when spatial updates happen, leave autoSync of
 -- Manually move a dynamic zone
 dynamicZone:setPosition(Vector3.new(0, 50, 0))
 
--- Sync a dynamic zone to references's current CFrame, Size, and Shape
+-- Sync a zone to its reference's current CFrame, Size, and Shape (only the CFrame for Attachments and Bones)
 dynamicZone:sync()
 ```
 
@@ -309,7 +315,7 @@ Observers use a priority system to handle overlapping zones. An entity 'belongs'
 #### Pattern 1: The Data-Driven Pattern (Single Observer + Transitions)
 **Best for**: Systems that share the exact same logic, but use different values (e.g., all Environmental Hazards, all Healing Zones, all XP Zones).
 
-If a player walks from a Lava zone into an overlapping SuperLava zone attached to the same observer, they never actually left the observer's overall coverage area. Therefore, `onExit` and `onEnter` will not fire. Instead, QuickZone fires an `onTransition` event.
+If a player walks from a Lava zone into an overlapping SuperLava zone attached to the same observer, they never actually left the observer's overall coverage area. Therefore, `onExit` and `onEnter` will not fire. Instead, QuickZone fires an `onTransition` event. Zones within one observer share the same priority, so the player stays assigned to Lava while standing in the overlap; the transition fires once they leave Lava and are only inside SuperLava.
 
 This allows you to update metadata instantly!
 
@@ -348,10 +354,14 @@ If you have overlapping zones that do fundamentally different things, you should
 local lowPriority = Observer.new({ priority = 0 })
 local highPriority = Observer.new({ priority = 10 })
 
--- If a player is inside Zone A (Low) and Zone B (High) simultaneously:
--- 1. highPriority:onEnter() fires for Zone B.
--- 2. lowPriority:onExit() fires for Zone A.
+-- If a player is inside Zone A (Low) and then enters Zone B (High):
+-- 1. lowPriority:onExit() fires for Zone A.
+-- 2. highPriority:onEnter() fires for Zone B.
 ```
+
+:::caution Priorities apply across all observers
+Priorities are compared across every observer that tracks the entity, not just the ones whose zones "belong together". While a player is inside a zone of a priority 10 observer, they are removed from every lower-priority observer they are tracked by, including unrelated ones like a hazard observer at the default priority 0. Keep unrelated systems at the same priority.
+:::
 
 ### Observer State
 Observers can be toggled to pause logic without destroying the configuration.

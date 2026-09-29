@@ -276,7 +276,7 @@ end
 	* **Model:** Uses `PrimaryPart.Position` or `GetPivot()`
 	* **Attachment/Bone:** Uses `WorldPosition`
 	* **Camera:** Uses `CFrame`
-	* **Table:** Looks for `.Position`, `.CFrame`, `.WorldPosition`, or `:GetPivot()`.
+	* **Table:** Looks for `.Position`, `.CFrame`, `.Transform`, `.WorldPosition`, or `:GetPivot()`.
 	:::
 
 	@tag Chainable

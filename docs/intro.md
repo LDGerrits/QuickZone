@@ -14,7 +14,7 @@ sidebar_position: 1
 
 **Agnostic.** Whether you prefer classic event-driven programming, robust lifecycle management, or zero-allocation iterators for ECS architectures, QuickZone can fit your workflow.
 
-**Total Performance Control.** The runtime cost is entirely in your control. Through a budgeted scheduler, the workload is smeared across frames and only consumes as much CPU time as you explicitly allow. Paired with contiguous arrays that produce virtually zero garbage collection (GC) pressure, QuickZone produces a flat, predictable performance profile.
+**Total Performance Control.** The runtime cost is in your control. A budgeted scheduler smears entity processing across frames and stops once the CPU time you allow is used up. Paired with contiguous arrays that produce virtually zero garbage collection (GC) pressure, QuickZone produces a flat, predictable performance profile.
 
 **Unit Tested.** A rigorous unit testing suite ensures stable and predictable behavior across all systems.
 
@@ -26,11 +26,11 @@ QuickZone uses point-based detection. It checks if a specific point (e.g., the c
 
 ## Core Features
 
-- **Endless Scale**: The number of zones has zero impact on performance. Maintain 60 FPS even with over a million zones in your game.
+- **Endless Scale**: The number of zones barely affects per-frame cost, because each lookup walks the LBVH in *O(log Z)*. Maintain 60 FPS even with over a million zones in your game.
 
 - **Track Anything**: Track Players, BaseParts, Models, Attachments, Bones, Cameras, or even custom tables. If it has a position, QuickZone can track it.
 
-- **Budgeted Scheduler**: Set a hard frame budget (e.g., 1ms) to completely eliminate lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile.
+- **Budgeted Scheduler**: Set a frame budget (e.g., 1ms) to keep entity processing from causing lag spikes. Workloads are smeared across frames to maintain a flat, predictable performance profile.
 
 - **Shape Support**: Built-in for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes. MeshParts and Unions are supported through their collision geometry.
 
@@ -40,7 +40,7 @@ QuickZone uses point-based detection. It checks if a specific point (e.g., the c
 
 - **ECS-Ready**: Built-in support for zero-allocation iterators and deterministic manual stepping, making it a perfect fit for ECS architectures and data-oriented workflows.
 
-- **Zero-Allocation Runtime**: By utilizing contiguous arrays and object pooling, QuickZone produces virtually zero GC pressure to avoid memory-related stutters.
+- **Minimal GC Pressure**: The spatial update loop reuses its arrays and tree nodes instead of allocating new tables, so QuickZone produces virtually zero garbage and avoids memory-related stutters.
 
 - **Dynamic Zones**: Use moving zones at very little cost. QuickZone maintains separate Static and Dynamic LBVHs for maximum efficiency.
 
@@ -55,7 +55,7 @@ _Note: For the QuickZone benchmark, we used a frame budget of 1ms, the entities'
 ### Test 1: High Zone Count
 *Scenario: 500 moving entities, 10,000 zones, recorded over 30 seconds.*
 
-This test highlights the fundamental flaw in traditional Zone-Centric libraries. As map complexity grows, their performance degrades exponentially.
+This test highlights the fundamental flaw in traditional Zone-Centric libraries. Their cost grows with every zone added, so performance collapses as map complexity grows.
 
 | Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
 | --- | --- | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 **The Result:** QuickZone maintained a perfect 60 FPS.
 * ZonePlus and SimpleZone imploded, dropping to 3-5 FPS, making the game unplayable.
 * ZonePlus consumed over 4 GB of memory, which would crash most mobile devices instantly.
-* QuickZone proved its *O(N log Z)* algorithmic advantage.
+* The result is consistent with QuickZone's *O(N log Z)* scaling.
 * QuickZone vs. QuickBounds: Both libraries scaled well by maintaining ~60 FPS. However, QuickZone still maintained a slight FPS lead and, more importantly, delivered double the event throughput (643 vs 328) compared to QuickBounds.
 
 ### Test 2: High Entity Count
@@ -79,7 +79,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 | Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
 **The Result:** QuickZone is the only library that maintained near-baseline FPS (-1% impact).
-* ZonePlus caused a 28% drop in framerate.
+* ZonePlus caused a 30% drop in framerate.
 * QuickZone handled the load with 98% less memory than ZonePlus.
 * QuickZone vs. QuickBounds: QuickZone averages ~1 FPS higher than QuickBounds. More importantly, QuickZone processed 4x the volume of events (2,271 vs 566).
 
@@ -89,7 +89,8 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 Add the following to your wally.toml file:
 
 ```toml
-ldgerrits/quickzone@1.4.8
+[dependencies]
+QuickZone = "ldgerrits/quickzone@1.5.1"
 ```
 
 ### NPM
@@ -187,7 +188,7 @@ end)
 ```
 
 ### Option C: The Polling Approach (Data-Oriented / ECS)
-Use iterators to poll state for continuous logic. To enhance ECS workflows, you can also turn off auto-updating and update QuickZone manually. It is even possible to manually link entities to a reference like an Id or an object.
+Use iterators to poll state for continuous logic. To enhance ECS workflows, you can also turn off auto-updating and update QuickZone manually. It is even possible to link a non-player entity to a reference like an Id or an object with `QuickZone:setReference(entity, reference)`, so callbacks and iterators return that reference instead of the entity.
 
 ```lua
 local Players = game:GetService('Players')
@@ -199,12 +200,9 @@ local Zone, Group, Observer = QuickZone.Zone, QuickZone.Group, QuickZone.Observe
 QuickZone:setEnabled(false)
 
 local localPlayer = Players.LocalPlayer
-local characterModel = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 
--- Track this Model's physical position, but return the local player in queries
-QuickZone:setReference(characterModel, localPlayer)
-
--- Add the local player to the spatial group (QuickZone tracks the mapped model automatically)
+-- Add the local player to the spatial group. QuickZone tracks the character's
+-- HumanoidRootPart (including respawns) and returns the Player in queries.
 local playerGroup = Group.new():add(localPlayer)
 local zones = Zone.fromTag('AntiGravity', {
     metadata = { GravityMultiplier = 0.4 }

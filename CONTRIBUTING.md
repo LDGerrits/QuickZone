@@ -27,7 +27,7 @@ Fork the repository, create a feature branch, and write unit tests for any chang
 
 ## Local Development
 
-Follow these steps to set up Rogen locally and make changes.
+Follow these steps to set up QuickZone locally and make changes.
 
 ### 1. Prerequisites
 
@@ -46,7 +46,7 @@ rokit install
 
 ### 3. Running Tests
 
-Tests should be ran in an empty Roblox place.
+Tests should be run in an empty Roblox place.
 
 1. Serve the test project file:
    ```bash

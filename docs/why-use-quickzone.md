@@ -6,7 +6,7 @@ sidebar_position: 3
 
 Traditional zone libraries like ZonePlus and SimpleZone act as wrappers for Roblox's physics engine (e.g., `GetBoundsInBox`, `GetPartsInPart` or `.Touched`), resulting in expensive collision geometry calculations and synchronization overhead.
 
-QuickZone bypasses the physics engine in favor of geometric math and data-oriented design. It implements a Linear BVH (LBVH) that resolves spatial queries using highly optimized VM bytecode to eliminate overhead.
+QuickZone bypasses the physics engine in favor of geometric math and data-oriented design. It implements a Linear BVH (LBVH) and runs its hot paths (the scheduler, tree and geometry math) under Luau's native code generation to keep overhead low.
 
 ---
 
@@ -35,28 +35,28 @@ Writing performant code shouldn't mean writing complicated code. QuickZone is de
 ### 3. Data-Oriented Design (DOD)
 Most Roblox libraries rely heavily on Object-Oriented Programming (OOP). QuickZone is built entirely around Data-Oriented Design, prioritizing how the CPU actually reads memory.
 
-- **Structure of Arrays (SoA)**: QuickZone stores data in parallel, primitive arrays for maximum performance.
+- **Structure of Arrays (SoA)**: Zone geometry (CFrames, half-sizes and shape types) is stored in parallel tables indexed by zone id instead of inside zone objects, so the hot loop never touches the objects themselves.
 
-- **Contiguous Memory**: QuickZone stores its LBVH and entity data in pre-allocated, flat arrays. This completely eliminates slow pointer-chasing and guarantees maximum CPU cache locality.
+- **Flattened Tree**: The LBVH is stored as a single flat array in depth-first order. Every node stores a skip index, so a query is a linear, stackless walk through the array with no recursion. Node tables are reused between rebuilds instead of being recreated.
 
-- **Bitwise Spatial Sorting**: To effectively map 3D space into these flat 1D arrays, QuickZone utilizes **Morton Codes (Z-Order Curves)**. By transforming 3D coordinates into integers via highly optimized bitwise operations, spatial queries become instant array lookups.
+- **Bitwise Spatial Sorting**: To build the tree, QuickZone sorts zones along **Morton Codes (Z-Order Curves)**. Transforming 3D coordinates into integers via bitwise operations places zones that are close in space close together in the array, which keeps the tree tight and cheap to build.
 
-- **Zero GC Pressure**: Because QuickZone relies on stable arrays and aggressive object pooling, it generates practically zero garbage during runtime. This completely eliminates the micro-stutters typically caused by Luau's Garbage Collector cleaning up old tables.
+- **Low GC Pressure**: Because QuickZone reuses its arrays and tree nodes, the spatial update loop generates practically zero garbage. This avoids the micro-stutters typically caused by Luau's Garbage Collector cleaning up old tables. (Callbacks with `safety` enabled run through `task.spawn`, which creates a thread per event.)
 
-- **Iterators**: QuickZone provides zero-allocation generators like `iterEntitiesInside`. Because these iterators allocate no new memory, QuickZone is a perfect library for Entity Component System (ECS) workflows.
+- **Iterators**: QuickZone provides iterators like `iterEntitiesInside` that walk its internal state directly instead of building result tables, which makes QuickZone a great fit for Entity Component System (ECS) workflows.
 
 ---
 
 ### 4. Architecture
 QuickZone moves away from monolithic, instance-bound logic in favor of a Group-Observer-Zone topology. This architecture separates what is being tracked from where the tracking occurs and how the system should respond.
 
-![Priority](topology_quickzone.png)
+![Group-Observer-Zone topology](topology_quickzone.png)
 
 #### Groups
 A Group is a collection of entities that share logical categorization. An entity can be part of multiple groups at the same time.
 
 #### Observers
-Observers act as the logic bridge. They subscribe to Groups and are attached to Zones, creating a many-to-many relationship that keeps game logic decoupled and clean. Performance can be configured per Observer, like setting the update rate in Hz or the precision, i.e. the minimum distance threshold to perform a spatial query, in studs. This prevents wasting CPU cycles checking a slow-moving NPC, for example.
+Observers act as the logic bridge. They subscribe to Groups and are attached to Zones, creating a many-to-many relationship that keeps game logic decoupled and clean. Performance can be configured per Observer, like setting the update rate in Hz or the precision, i.e. the minimum distance threshold to perform a spatial query, in studs. This prevents wasting CPU cycles checking a slow-moving NPC, for example. If an entity is tracked by several Observers, it is checked once per update using the highest update rate and the finest precision among them.
 
 Because Observers are decoupled from the physics engine, they can aggregate spatial data. Tracking an entire Group costs no additional spatial queries. And through the use of `observeGroup`, an Observer can fire an event when the first member of a Group enters a zone, and clean up when the last member leaves. 
 
@@ -66,13 +66,13 @@ Because Observers are decoupled from the physics engine, they can aggregate spat
 A common issue with spatial libraries is stutter due to it processing too many things in one frame. QuickZone fixes this via its smart Scheduler.
 
 #### Frame Budgeting
-You can set a hard time limit (e.g., 1ms). The Scheduler monitors os.clock() in real-time. If the budget is met, the system pauses immediately and resumes in the next frame. This guarantees that QuickZone will never be the cause of a frame drop.
+You can set a time limit (e.g., 1ms). The Scheduler checks `os.clock()` every 32 entities. Once the budget is used up, it stops and resumes where it left off in the next frame. This keeps entity processing from causing frame drops. Two things are not split across frames: pending tree rebuilds, which always run to completion, and your own callbacks, which run inside the step.
 
 #### Workload Smearing
-The scheduler smears updates across frames. This means that, if you have a Group of 600 entities updating at 10Hz, QuickZone will process exactly 100 entities per frame at 60 fps. This ensures that we have flat, predictable performance profile with no peaks or valleys.
+The scheduler smears updates across frames. This means that, if 600 entities are tracked by a 10Hz Observer, QuickZone will process exactly 100 entities per frame at 60 fps. This ensures a flat, predictable performance profile with no peaks or valleys.
 
 #### No starvation
-The Scheduler uses a Round-Robin strategy for Group processing. Instead of processing groups in order, QuickZone cycles through them fairly. This prevents the issue where a heavy group keeps consuming the entire frame budget and 'starving' the subsequent groups.
+Entities are grouped into buckets by update rate, and the Scheduler cycles through these buckets Round-Robin. Instead of always starting with the same bucket, each frame starts with the next one. This prevents the issue where a heavy bucket keeps consuming the entire frame budget and 'starving' the others.
 
 ---
 
@@ -90,7 +90,7 @@ Rebuilding an LBVH is computationally expensive. QuickZone optimizes this by bat
 By separating static and dynamic zones, QuickZone minimizes the workload of the LBVH rebuilder. Rebuilding a small tree of 5 moving platforms is significantly faster than rebuilding a tree containing 500 static buildings.
 
 :::info Frame budget
-Rebuilding the LBVHs is part of the frame budget. Thus, rebuilding will result in less time for processing the groups of entities.
+Rebuilding the LBVHs counts towards the frame budget. Thus, rebuilding will result in less time for processing the groups of entities. A rebuild itself is never interrupted, so rebuilding a large static tree can take longer than the budget.
 :::
 
 #### Demand-Driven Queries
@@ -105,13 +105,13 @@ Because QuickZone relies on pure math rather than the Physics engine, it is not 
 
 - **BaseParts**: Uses `.Position`.
 
-- **Models**: Uses `.PrimaryPart.Position` or `:GetPivot()` (if `.PrimaryPart` does not exist).
+- **Models**: Uses `.PrimaryPart.Position` or `:GetPivot()` (if `.PrimaryPart` does not exist). This is decided when the Model is added, so a Model added without a `PrimaryPart` keeps using its pivot.
 
 - **Attachments/Bones**: Uses `.WorldPosition`.
 
 - **Cameras**: Uses `.CFrame.Position`.
 
-- **Custom Tables**: Uses any custom `.Position`, `.WorldPosition` and `.CFrame` field, or a `:GetPivot()` method. This allows you to track real-time simulations (e.g. a spell cast or an RC car) without the overhead of creating physical Instances.
+- **Custom Tables**: Uses the first of a custom `.Position`, `.CFrame`, `.Transform` or `.WorldPosition` field, or a `:GetPivot()` method. This allows you to track real-time simulations (e.g. a spell cast or an RC car) without the overhead of creating physical Instances.
 
 ---
 
@@ -124,7 +124,7 @@ _Note: For the QuickZone benchmark, we used a frame budget of 1ms, the entities'
 ### Test 1: High Zone Count
 *Scenario: 500 moving entities, 10,000 zones, recorded over 30 seconds.*
 
-This test highlights the fundamental flaw in traditional Zone-Centric libraries. As map complexity grows, their performance degrades exponentially.
+This test highlights the fundamental flaw in traditional Zone-Centric libraries. Their cost grows with every zone added, so performance collapses as map complexity grows.
 
 | Metric | QuickZone | ZonePlus | SimpleZone | QuickBounds | Empty Script |
 | --- | --- | --- | --- | --- | --- |
@@ -135,7 +135,7 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 **The Result:** QuickZone maintained a perfect 60 FPS.
 * ZonePlus and SimpleZone imploded, dropping to 3-5 FPS, making the game unplayable.
 * ZonePlus consumed over 4 GB of memory, which would crash most mobile devices instantly.
-* QuickZone proved its *O(N log Z)* algorithmic advantage.
+* The result is consistent with QuickZone's *O(N log Z)* scaling.
 * QuickZone vs. QuickBounds: Both libraries scaled well by maintaining ~60 FPS. However, QuickZone still maintained a slight FPS lead and, more importantly, delivered double the event throughput (643 vs 328) compared to QuickBounds.
 
 ### Test 2: High Entity Count
@@ -148,6 +148,6 @@ This test highlights the fundamental flaw in traditional Zone-Centric libraries.
 | Memory Usage (MB) | 2.13 | 159 | 1.77 | 2.60 | 1.04 |
 
 **The Result:** QuickZone is the only library that maintained near-baseline FPS (-1% impact).
-* ZonePlus caused a 28% drop in framerate.
+* ZonePlus caused a 30% drop in framerate.
 * QuickZone handled the load with 98% less memory than ZonePlus.
 * QuickZone vs. QuickBounds: QuickZone averages ~1 FPS higher than QuickBounds. More importantly, QuickZone processed 4x the volume of events (2,271 vs 566).
