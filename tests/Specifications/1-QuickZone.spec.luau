@@ -591,5 +591,37 @@ return function(Tiniest: Tiniest)
 			staticZone:destroy()
 			dynamicZone:destroy()
 		end)
+
+		Test('Never yields a zone that moved away from the point while iterating.', function()
+			local center = Vector3.new(30000, 0, 0)
+			local zoneA = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			local farZones = {}
+
+			QuickZone:rebuild()
+			local iterator = QuickZone:iterZonesAtPoint(center)
+			local first = iterator()
+			local other = if first == zoneA then zoneB else zoneA
+
+			-- Move the other zone away and grow the tree so it gets a new buffer
+			other:setCFrame(CFrame.new(center + Vector3.new(0, 500, 0)))
+			for i = 1, 1000 do
+				table.insert(
+					farZones,
+					Zone.new({ cframe = CFrame.new(center + Vector3.new(i * 20, 1000, 0)), size = Vector3.one })
+				)
+			end
+			QuickZone:rebuild()
+
+			for zone in iterator do
+				Expect(zone).never_is(other)
+			end
+
+			zoneA:destroy()
+			zoneB:destroy()
+			for _, zone in farZones do
+				zone:destroy()
+			end
+		end)
 	end)
 end

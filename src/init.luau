@@ -18,6 +18,7 @@ local LinearBVH = require(script.Utils.LinearBVH)
 local queryPoint = LinearBVH.queryPoint
 local nextLeaf = LinearBVH.nextLeaf
 local leafContainsPoint = ZoneShapes.leafContainsPoint
+local containsPoint = ZoneShapes.containsPoint
 
 local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
@@ -615,6 +616,8 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 	local offset = 0
 	local checkingDynamic = true
 
+	-- Walks the trees it started with, so every zone gets a full check
+
 	return function(): Types.Zone?
 		if checkingDynamic then
 			while true do
@@ -624,7 +627,7 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 					break
 				end
 
-				if leafContainsPoint(hitId, point) then
+				if containsPoint(hitId, point) then
 					return zoneIdToZoneObj[hitId]
 				end
 			end
@@ -640,7 +643,7 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 				break
 			end
 
-			if leafContainsPoint(hitId, point) then
+			if containsPoint(hitId, point) then
 				return zoneIdToZoneObj[hitId]
 			end
 		end
