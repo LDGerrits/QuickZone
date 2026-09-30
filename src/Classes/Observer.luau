@@ -1228,12 +1228,12 @@ end
 ]=]
 function Observer.getZones(self: Types.InternalObserver): { Types.Zone }
 	local results = {}
-	for zoneId, attachedList in State.zoneAttachedObservers do
+	for slot, attachedList in State.zoneAttachedObservers do
 		if not table.find(attachedList, self.id) then
 			continue
 		end
 
-		local zone = State.zoneIdToZoneObj[zoneId]
+		local zone = State.zoneSlotToZoneObj[slot]
 		if zone then
 			table.insert(results, zone)
 		end
@@ -1344,15 +1344,15 @@ end
 	@return () -> Zone?
 ]=]
 function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
-	local zoneId: number?
+	local slot: number?
 	local attachedList: { number }
 	local observerId = self.id
 
 	return function(): Types.Zone?
 		while true do
-			zoneId, attachedList = next(zoneAttachedObservers, zoneId)
+			slot, attachedList = next(zoneAttachedObservers, slot)
 
-			if not zoneId then
+			if not slot then
 				return nil
 			end
 
@@ -1360,7 +1360,7 @@ function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
 				continue
 			end
 
-			local zone = State.zoneIdToZoneObj[zoneId :: number]
+			local zone = State.zoneSlotToZoneObj[slot :: number]
 			if zone then
 				return zone
 			end
@@ -1607,7 +1607,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 		observers[id] = nil
 	end
 
-	for zoneId, attachedList in State.zoneAttachedObservers do
+	for slot, attachedList in State.zoneAttachedObservers do
 		local idx = table.find(attachedList, id)
 		if idx then
 			local lastIdx = #attachedList
@@ -1615,7 +1615,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 				attachedList[idx] = attachedList[lastIdx]
 			end
 			attachedList[lastIdx] = nil
-			State.zoneSoleObserver[zoneId] = if #attachedList == 1 then attachedList[1] else nil
+			State.zoneSoleObserver[slot] = if #attachedList == 1 then attachedList[1] else nil
 		end
 	end
 

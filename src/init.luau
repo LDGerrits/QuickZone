@@ -22,6 +22,7 @@ local containsPoint = ZoneShapes.containsPoint
 
 local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
+local zoneSlotToZoneObj = State.zoneSlotToZoneObj
 local entityData = State.entityData
 local observerIdToObserverObj = State.observerIdToObserverObj
 local groups = State.groups
@@ -45,6 +46,7 @@ local debugFolder: Folder?
 type DebugVisual = {
 	adornment: any,
 	shape: Types.ShapeType,
+	zone: Types.Zone,
 }
 
 local debugVisuals = {} :: { [number]: DebugVisual }
@@ -385,9 +387,9 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	for _, tree in queryTrees do
 		local hitCount = queryPoint(tree, position, queryHits)
 		for i = 1, hitCount do
-			local zoneId = queryHits[i]
-			if leafContainsPoint(zoneId, position) then
-				local zone = zoneIdToZoneObj[zoneId]
+			local slot = queryHits[i]
+			if leafContainsPoint(slot, position) then
+				local zone = zoneSlotToZoneObj[slot]
 				if zone then
 					count += 1
 					results[count] = zone
@@ -628,7 +630,7 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 				end
 
 				if containsPoint(hitId, point) then
-					return zoneIdToZoneObj[hitId]
+					return zoneSlotToZoneObj[hitId]
 				end
 			end
 
@@ -644,7 +646,7 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 			end
 
 			if containsPoint(hitId, point) then
-				return zoneIdToZoneObj[hitId]
+				return zoneSlotToZoneObj[hitId]
 			end
 		end
 
@@ -682,14 +684,16 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	newDebugFolder.Parent = workspace
 	debugFolder = newDebugFolder
 
-	local function getOrCreateVisual(id: number): DebugVisual
-		local visual = debugVisuals[id]
-		local zone = zoneIdToZoneObj[id]
+	-- Keyed by slot, which a new zone may take over
+	local function getOrCreateVisual(slot: number): DebugVisual
+		local visual = debugVisuals[slot]
+		local zone = zoneSlotToZoneObj[slot]
 		local shape = zone:getShape()
 
-		if visual and visual.shape ~= shape then
+		if visual and (visual.shape ~= shape or visual.zone ~= zone) then
 			visual.adornment:Destroy()
-			debugVisuals[id] = nil
+			debugVisuals[slot] = nil
+			visual = nil
 		end
 
 		if not visual then
@@ -701,7 +705,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			else
 				adornment = Instance.new('BoxHandleAdornment')
 			end
-			adornment.Name = 'Zone_' .. id
+			adornment.Name = 'Zone_' .. zone:getId()
 			adornment.Adornee = workspace.Terrain
 			adornment.Transparency = Config.Debug.transparency
 			adornment.AlwaysOnTop = true
@@ -710,8 +714,9 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			visual = {
 				adornment = adornment,
 				shape = shape,
+				zone = zone,
 			}
-			debugVisuals[id] = visual
+			debugVisuals[slot] = visual
 		end
 		return visual
 	end

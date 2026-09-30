@@ -23,6 +23,7 @@ local shapeBoundsMax = State.shapeBoundsMax
 local shapePositions = State.shapePositions
 local treeExact = State.treeExact
 local zoneIdToZoneObj = State.zoneIdToZoneObj
+local zoneSlotIds = State.zoneSlotIds
 local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneSoleObserver = State.zoneSoleObserver
 local autoSyncZones = State.autoSyncZones
@@ -236,12 +237,13 @@ local function processObserverHit(observerId: number, zoneId: number)
 	end
 end
 
-local function processZoneHit(zoneId: number)
-	local observers = zoneAttachedObservers[zoneId]
+local function processZoneHit(slot: number)
+	local observers = zoneAttachedObservers[slot]
 	if not observers then
 		return
 	end
 
+	local zoneId = zoneSlotIds[slot]
 	for _, observerId in observers do
 		processObserverHit(observerId, zoneId)
 	end
@@ -250,24 +252,24 @@ end
 local function queryTree(tree: Types.Tree, position: Vector3)
 	local hitCount = queryPoint(tree, position, ctx_hits)
 	for i = 1, hitCount do
-		local zoneId = ctx_hits[i]
-		local observerId = zoneSoleObserver[zoneId]
+		local slot = ctx_hits[i]
+		local observerId = zoneSoleObserver[slot]
 
 		if observerId then
 			if ctx_candidatePriority[observerId] ~= nil then
 				-- An observer's zones share a priority, so only the current zone can take over
-				if ctx_currentMemberships[observerId] ~= zoneId then
+				if ctx_currentMemberships[observerId] ~= zoneSlotIds[slot] then
 					continue
 				end
 			elseif not ctx_linkedObservers[observerId] then
 				continue
 			end
 
-			if treeExact[zoneId] or containsPoint(zoneId, position) then
-				processObserverHit(observerId, zoneId)
+			if treeExact[slot] or containsPoint(slot, position) then
+				processObserverHit(observerId, zoneSlotIds[slot])
 			end
-		elseif treeExact[zoneId] or containsPoint(zoneId, position) then
-			processZoneHit(zoneId)
+		elseif treeExact[slot] or containsPoint(slot, position) then
+			processZoneHit(slot)
 		end
 	end
 end
@@ -321,21 +323,21 @@ function Scheduler.update(dt: number)
 			autoSyncTimer = 0
 			local needsRebuild = false
 
-			for id, zone in autoSyncZones do
+			for slot, zone in autoSyncZones do
 				local reference = zone.reference
 				if not reference then
 					continue
 				end
 
 				local newCF = reference:IsA('Attachment') and reference.WorldCFrame or reference.CFrame
-				local oldCF = dynamicCFrames[id]
+				local oldCF = dynamicCFrames[slot]
 
 				if oldCF == newCF then
 					continue
 				end
 
-				dynamicCFrames[id] = newCF
-				ZoneShapes.refresh(id)
+				dynamicCFrames[slot] = newCF
+				ZoneShapes.refresh(slot)
 				needsRebuild = true
 			end
 
@@ -614,6 +616,15 @@ function Scheduler.rebuildTrees()
 
 	if ZoneChanges.commit(staticChanges, State.staticVersion + 1, (staticTree.count + 1) // 2) then
 		State.staticVersion += 1
+	end
+
+	-- Released slots are safe to reuse
+	local released = State.releasedZoneSlots
+	local releasedCount = #released
+	if releasedCount > 0 then
+		local free = State.freeZoneSlots
+		table.move(released, 1, releasedCount, #free + 1, free)
+		table.clear(released)
 	end
 end
 

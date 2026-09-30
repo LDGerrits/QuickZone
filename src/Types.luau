@@ -163,6 +163,7 @@ export type InternalZone = Zone & {
 	detach: (self: Zone, observer: any) -> Zone,
 
 	id: number,
+	slot: number,
 	reference: (Attachment | BasePart | Bone)?,
 	dynamic: boolean,
 	metadata: any?,
