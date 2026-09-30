@@ -5,7 +5,9 @@
 -- Caches every zone's world-space shape so queries and rebuilds never read a CFrame
 
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local ZoneChanges = require(script.Parent.ZoneChanges)
 local State = require(script.Parent.State)
+local Types = require(script.Parent.Parent.Types)
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 
@@ -23,6 +25,9 @@ local shapeBoundsMin = State.shapeBoundsMin
 local shapeBoundsMax = State.shapeBoundsMax
 local shapeAxisAligned = State.shapeAxisAligned
 local treeExact = State.treeExact
+local dynamicCFrames = State.dynamicCFrames
+local staticChanges = State.staticChanges
+local dynamicChanges = State.dynamicChanges
 
 local function isAxis(direction: Vector3): boolean
 	local magnitude = vector.abs(direction)
@@ -31,12 +36,17 @@ end
 
 local ZoneShapes = {}
 
+local function changesOf(isDynamic: boolean): Types.ZoneChanges
+	return if isDynamic then dynamicChanges else staticChanges
+end
+
 -- Call after the CFrame, size, shape or mesh changes
-function ZoneShapes.refresh(id: number, isDynamic: boolean)
+function ZoneShapes.refresh(id: number)
+	local isDynamic = dynamicCFrames[id] ~= nil
 	local cframe, halfSize, shapeType, part
 	if isDynamic then
 		cframe, halfSize, shapeType, part =
-			State.dynamicCFrames[id], State.dynamicHalfSizes[id], State.dynamicTypes[id], State.dynamicMeshes[id]
+			dynamicCFrames[id], State.dynamicHalfSizes[id], State.dynamicTypes[id], State.dynamicMeshes[id]
 	else
 		cframe, halfSize, shapeType, part =
 			State.staticCFrames[id], State.staticHalfSizes[id], State.staticTypes[id], State.staticMeshes[id]
@@ -48,6 +58,16 @@ function ZoneShapes.refresh(id: number, isDynamic: boolean)
 	local up = Vector3.new(r01, r11, r21)
 	local back = Vector3.new(r02, r12, r22)
 	local boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
+
+	-- Entities in the old or new box may be affected
+	local changes = changesOf(isDynamic)
+	if not changes.all then
+		local oldMin = shapeBoundsMin[id]
+		if oldMin then
+			ZoneChanges.add(changes, oldMin, shapeBoundsMax[id])
+		end
+		ZoneChanges.add(changes, boundsMin, boundsMax)
+	end
 
 	shapeTypes[id] = shapeType
 	shapeHalfSizes[id] = halfSize
@@ -65,7 +85,20 @@ function ZoneShapes.refresh(id: number, isDynamic: boolean)
 	treeExact[id] = nil
 end
 
-function ZoneShapes.remove(id: number)
+-- For changes that don't alter the shape, like attaching
+function ZoneShapes.touch(id: number, isDynamic: boolean)
+	local min = shapeBoundsMin[id]
+	if min then
+		ZoneChanges.add(changesOf(isDynamic), min, shapeBoundsMax[id])
+	end
+end
+
+function ZoneShapes.remove(id: number, wasDynamic: boolean)
+	local min = shapeBoundsMin[id]
+	if min then
+		ZoneChanges.add(changesOf(wasDynamic), min, shapeBoundsMax[id])
+	end
+
 	shapeTypes[id] = nil
 	shapeHalfSizes[id] = nil
 	shapeParts[id] = nil

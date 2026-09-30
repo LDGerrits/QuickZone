@@ -10,8 +10,10 @@ local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
 local State = require(script.Parent.State)
 local ZoneShapes = require(script.Parent.ZoneShapes)
+local ZoneChanges = require(script.Parent.ZoneChanges)
 
 local queryPoint = LinearBVH.queryPoint
+local touches = ZoneChanges.touches
 local containsPoint = ZoneShapes.containsPoint
 
 local staticCFrames = State.staticCFrames
@@ -47,6 +49,8 @@ local dirtyTopology = State.dirtyTopology
 
 local staticTree = State.staticTree
 local dynamicTree = State.dynamicTree
+local staticChanges = State.staticChanges
+local dynamicChanges = State.dynamicChanges
 
 local ctx_hits = table.create(64) :: { number }
 local ctx_cCount: number = 0
@@ -331,7 +335,7 @@ function Scheduler.update(dt: number)
 				end
 
 				dynamicCFrames[id] = newCF
-				ZoneShapes.refresh(id, true)
+				ZoneShapes.refresh(id)
 				needsRebuild = true
 			end
 
@@ -408,21 +412,29 @@ function Scheduler.update(dt: number)
 			local needsStatic = data.needsStatic
 			local needsDynamic = data.needsDynamic
 
-			local shouldCheck = false
-			if
-				data.logicVersion ~= logicVersion
-				or (needsDynamic and data.dynamicVersion ~= dynamicVersion)
-				or (needsStatic and data.staticVersion ~= staticVersion)
-			then
-				shouldCheck = true
-			else
-				local lastPosition = data.lastPosition
+			local lastPosition = data.lastPosition
+			local shouldCheck = data.logicVersion ~= logicVersion
+
+			if not shouldCheck then
 				local dx = position.X - lastPosition.X
 				local dy = position.Y - lastPosition.Y
 				local dz = position.Z - lastPosition.Z
 
-				if (dx * dx + dy * dy + dz * dz) >= data.precisionSq then
-					shouldCheck = true
+				shouldCheck = (dx * dx + dy * dy + dz * dz) >= data.precisionSq
+			end
+
+			-- Standing still, so only zone changes at either position matter
+			if not shouldCheck and needsDynamic and data.dynamicVersion ~= dynamicVersion then
+				shouldCheck = touches(dynamicChanges, data.dynamicVersion, dynamicVersion, position, lastPosition)
+				if not shouldCheck then
+					data.dynamicVersion = dynamicVersion
+				end
+			end
+
+			if not shouldCheck and needsStatic and data.staticVersion ~= staticVersion then
+				shouldCheck = touches(staticChanges, data.staticVersion, staticVersion, position, lastPosition)
+				if not shouldCheck then
+					data.staticVersion = staticVersion
 				end
 			end
 
@@ -588,12 +600,19 @@ function Scheduler.rebuildTrees()
 	if State.pendingDynamicRebuild then
 		updateTree(dynamicTree, dynamicCFrames)
 		State.pendingDynamicRebuild = false
-		State.dynamicVersion += 1
 	end
 
 	if State.pendingStaticRebuild then
 		updateTree(staticTree, staticCFrames)
 		State.pendingStaticRebuild = false
+	end
+
+	-- New version for every tree that changed
+	if ZoneChanges.commit(dynamicChanges, State.dynamicVersion + 1, (dynamicTree.count + 1) // 2) then
+		State.dynamicVersion += 1
+	end
+
+	if ZoneChanges.commit(staticChanges, State.staticVersion + 1, (staticTree.count + 1) // 2) then
 		State.staticVersion += 1
 	end
 end

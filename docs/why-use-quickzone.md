@@ -93,6 +93,9 @@ By separating static and dynamic zones, QuickZone minimizes the workload of the 
 Rebuilding the LBVHs counts towards the frame budget. Thus, rebuilding will result in less time for processing the groups of entities. A rebuild itself is never interrupted, so rebuilding a large static tree can take longer than the budget.
 :::
 
+#### Change-Aware Re-evaluation
+An entity that hasn't moved is only queried again if a zone changed around it. A few moving platforms or short-lived hitboxes won't make every idle entity re-query.
+
 #### Demand-Driven Queries
 QuickZone will only perform a spatial query for an entity against the Dynamic LBVH if it is tracked by an Observer that is explicitly attached to a dynamic zone. If your observers only care about static zones, the dynamic tree is bypassed entirely for those entities, saving potentially thousands of unnecessary checks per second.
 
