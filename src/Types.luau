@@ -57,6 +57,27 @@ export type Tree = {
 	membersChanged: boolean,
 }
 
+-- See Core/ZoneChanges
+export type ChangeSlot = {
+	version: number,
+	-- Everything changed
+	all: boolean,
+	-- One leaf per box
+	tree: Tree,
+}
+
+export type ZoneChanges = {
+	-- Boxes since the last commit
+	boxesMin: { Vector3 },
+	boxesMax: { Vector3 },
+	boxCenters: { Vector3 },
+	boxCount: number,
+	all: boolean,
+	boxLimit: number,
+	-- One slot per tree version
+	history: { ChangeSlot },
+}
+
 export type EntityData = {
 	activeObserverMemberships: { [number]: number },
 	lastPosition: Vector3,

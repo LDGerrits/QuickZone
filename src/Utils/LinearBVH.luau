@@ -31,6 +31,7 @@ local ID_OFFSET = 28
 local RADIX_BITS = 10
 local RADIX_SIZE = 1024
 local RADIX_PASSES = 3
+local INSERTION_SORT_LIMIT = 32
 
 -- Rebuild once the cost passes this factor of the built cost
 -- Teleporting zones skip refitting for REFIT_BACKOFF updates
@@ -72,8 +73,31 @@ local function ensureScratch(count: number)
 	idsB = buffer.create(size)
 end
 
+-- Stable insertion sort for small counts
+local function insertionSort(count: number)
+	for i = 1, count - 1 do
+		local code = readu32(codesA, i * 4)
+		local id = readu32(idsA, i * 4)
+		local j = i - 1
+		while j >= 0 and readu32(codesA, j * 4) > code do
+			writeu32(codesA, (j + 1) * 4, readu32(codesA, j * 4))
+			writeu32(idsA, (j + 1) * 4, readu32(idsA, j * 4))
+			j -= 1
+		end
+		writeu32(codesA, (j + 1) * 4, code)
+		writeu32(idsA, (j + 1) * 4, id)
+	end
+
+	sortedCodes, sortedIds = codesA, idsA
+end
+
 -- Stable radix sort, the result ends up in sortedCodes/sortedIds
 local function radixSort(count: number)
+	if count <= INSERTION_SORT_LIMIT then
+		insertionSort(count)
+		return
+	end
+
 	local srcCodes, srcIds, dstCodes, dstIds = codesA, idsA, codesB, idsB
 
 	for pass = 0, RADIX_PASSES - 1 do
@@ -326,6 +350,34 @@ function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, hits: { number }
 	end
 
 	return hitCount
+end
+
+-- Whether any leaf contains the point
+function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
+	local buf = tree.buffer
+	local endOffset = tree.count * NODE_SIZE
+	local px, py, pz = point.X, point.Y, point.Z
+
+	local offset = 0
+	while offset < endOffset do
+		if
+			px >= readf32(buf, offset)
+			and px <= readf32(buf, offset + 12)
+			and py >= readf32(buf, offset + 4)
+			and py <= readf32(buf, offset + 16)
+			and pz >= readf32(buf, offset + 8)
+			and pz <= readf32(buf, offset + 20)
+		then
+			if readu32(buf, offset + ID_OFFSET) ~= 0 then
+				return true
+			end
+			offset += NODE_SIZE
+		else
+			offset = readu32(buf, offset + SKIP_OFFSET) -- Skip branch
+		end
+	end
+
+	return false
 end
 
 -- Resumable queryPoint. Returns the offset to resume from and the leaf id (0 when done)

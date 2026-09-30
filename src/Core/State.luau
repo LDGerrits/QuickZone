@@ -31,6 +31,26 @@ local State = {
 	-- Zones whose leaf is exactly their shape
 	treeExact = {} :: { [number]: boolean },
 
+	-- Where zones changed per tree
+	staticChanges = {
+		boxesMin = {},
+		boxesMax = {},
+		boxCenters = {},
+		boxCount = 0,
+		all = false,
+		boxLimit = 0,
+		history = {},
+	} :: Types.ZoneChanges,
+	dynamicChanges = {
+		boxesMin = {},
+		boxesMax = {},
+		boxCenters = {},
+		boxCount = 0,
+		all = false,
+		boxLimit = 0,
+		history = {},
+	} :: Types.ZoneChanges,
+
 	staticTree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false } :: Types.Tree,
 	dynamicTree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false } :: Types.Tree,
 	pendingStaticRebuild = false,
