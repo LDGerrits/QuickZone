@@ -1699,6 +1699,43 @@ return function(Tiniest: Tiniest)
 				end
 			end
 		)
+
+		Test('Tells the entity about a new zone created where a destroyed zone it was left in stood.', function()
+			local position = Vector3.new(-5000, 0, -5000)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local observer = Observer.new({ groups = { group }, safety = false })
+
+			local zoneA = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			observer:attach(zoneA)
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(zoneA)
+
+			-- zoneA is destroyed before the entity is evaluated again
+			observer:detach(zoneA)
+			zoneA:destroy()
+			QuickZone:rebuild()
+
+			local reported = {}
+			observer:onEnter(function(_, zone)
+				table.insert(reported, zone)
+			end)
+			observer:onTransition(function(_, zone)
+				table.insert(reported, zone)
+			end)
+
+			local zoneB = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			observer:attach(zoneB)
+			QuickZone:update(1)
+
+			Expect(observer:getZoneOfEntity(entity)).is(zoneB)
+			Expect(#reported).is(1)
+			Expect(reported[1]).is(zoneB)
+
+			observer:destroy()
+			group:destroy()
+			zoneB:destroy()
+		end)
 	end)
 
 	Describe('Observer:getZoneOfPlayer', function()

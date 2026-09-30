@@ -366,6 +366,94 @@ return function(Tiniest: Tiniest)
 				zone:destroy()
 			end
 		end)
+
+		Test('Finds zones created after others were destroyed, and never the destroyed ones.', function()
+			local rng = Random.new(1001)
+			local origin = Vector3.new(-7000, 0, -3000)
+			local zones = {}
+			local destroyed = {}
+			local ids = {}
+			local observer = Observer.new()
+
+			local function addZone(isDynamic: boolean)
+				local zone = Zone.new(Util.randomZoneConfig(rng, origin, 60, isDynamic))
+				Expect(ids[zone:getId()]).is(nil)
+				ids[zone:getId()] = true
+				observer:attach(zone)
+				table.insert(zones, zone)
+			end
+
+			local function checkPoints(rebuilt: boolean)
+				for _ = 1, 150 do
+					local point = origin + Util.randomOffset(rng, 75)
+					local found = QuickZone:getZonesAtPoint(point)
+					local iterated = {}
+					for zone in QuickZone:iterZonesAtPoint(point) do
+						table.insert(iterated, zone)
+					end
+
+					for _, list in { found, iterated } do
+						for _, zone in list do
+							Expect(destroyed[zone]).is(nil)
+							Expect(zone:isPointInside(point)).is(true)
+						end
+						if rebuilt then
+							Expect(Util.findMismatch(zones, point, list)).is(nil)
+						end
+					end
+
+					if rebuilt then
+						local insideAny = false
+						for _, zone in zones do
+							insideAny = insideAny or zone:isPointInside(point)
+						end
+						Expect(observer:isPointInside(point)).is(insideAny)
+					end
+				end
+
+				local live = {}
+				for _, zone in zones do
+					live[zone] = true
+				end
+				for _, list in { QuickZone:getZones(), observer:getZones() } do
+					local count = 0
+					for _, zone in list do
+						if live[zone] then
+							count += 1
+						end
+						Expect(destroyed[zone]).is(nil)
+					end
+					Expect(count).is(#zones)
+				end
+			end
+
+			for i = 1, 90 do
+				addZone(i % 3 == 0)
+			end
+			QuickZone:rebuild()
+			checkPoints(true)
+
+			for _ = 1, 5 do
+				for _ = 1, 30 do
+					local zone = table.remove(zones, rng:NextInteger(1, #zones))
+					destroyed[zone] = true
+					zone:destroy()
+				end
+				QuickZone:rebuild()
+
+				for i = 1, 30 do
+					addZone(i % 3 == 0)
+				end
+				checkPoints(false)
+				QuickZone:rebuild()
+				checkPoints(true)
+			end
+
+			observer:destroy()
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
 	end)
 
 	Describe('QuickZone:getZonesOfEntity', function()
