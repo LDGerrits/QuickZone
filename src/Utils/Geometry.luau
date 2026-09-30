@@ -41,19 +41,21 @@ function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB:
 	return vector.min(minA, minB), vector.max(maxA, maxB)
 end
 
-function Geometry.getObjectBounds(cframe: CFrame, halfSize: Vector3): (Vector3, Vector3)
-	local pos = cframe.Position
-	local right = cframe.RightVector
-	local up = cframe.UpVector
-	local look = cframe.LookVector
-
+-- Bounds of a box from its basis vectors
+function Geometry.getBounds(
+	position: Vector3,
+	right: Vector3,
+	up: Vector3,
+	back: Vector3,
+	halfSize: Vector3
+): (Vector3, Vector3)
 	-- Calculate the projection of the box extents onto the global axes
-	local x = math.abs(right.X) * halfSize.X + math.abs(up.X) * halfSize.Y + math.abs(look.X) * halfSize.Z
-	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(look.Y) * halfSize.Z
-	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(look.Z) * halfSize.Z
+	local x = math.abs(right.X) * halfSize.X + math.abs(up.X) * halfSize.Y + math.abs(back.X) * halfSize.Z
+	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(back.Y) * halfSize.Z
+	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(back.Z) * halfSize.Z
 
 	local extent = Vector3.new(x, y, z)
-	return pos - extent, pos + extent
+	return position - extent, position + extent
 end
 
 function Geometry.getMortonScale(sceneMin: Vector3, sceneMax: Vector3): (number, number, number)
@@ -75,22 +77,31 @@ function Geometry.positionToMortonCode(
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end
 
+-- PointToObjectSpace without the engine call
+local function toObjectSpace(point: Vector3, position: Vector3, right: Vector3, up: Vector3, back: Vector3): Vector3
+	local offset = point - position
+	return Vector3.new(vector.dot(offset, right), vector.dot(offset, up), vector.dot(offset, back))
+end
+
+-- Takes the position and basis vectors instead of a CFrame
 function Geometry.isPointInShape(
 	point: Vector3,
-	cframe: CFrame,
+	position: Vector3,
+	right: Vector3,
+	up: Vector3,
+	back: Vector3,
 	halfSize: Vector3,
 	shapeType: number,
 	part: BasePart?
 ): boolean
 	if shapeType == BLOCK_SHAPE_VALUE then
-		local localPoint = vector.abs(cframe:PointToObjectSpace(point))
+		local localPoint = vector.abs(toObjectSpace(point, position, right, up, back))
 		return vector.min(localPoint, halfSize) == localPoint
 	elseif shapeType == CYLINDER_SHAPE_VALUE then
-		local position = cframe.Position
 		local halfHeight = halfSize.X
-		local start = position - cframe.RightVector * halfHeight
+		local start = position - right * halfHeight
 		local toPoint = point - start
-		local axis = cframe.RightVector
+		local axis = right
 		local projection = vector.dot(toPoint, axis)
 		if projection >= 0 and projection <= halfHeight * 2 :: number then
 			local closestPointOnAxis = start :: Vector3 + axis :: Vector3 * projection
@@ -101,10 +112,9 @@ function Geometry.isPointInShape(
 		return false
 	elseif shapeType == BALL_SHAPE_VALUE then
 		local radiusSq = halfSize.X * halfSize.X
-		local position = cframe.Position
 		return vector.dot(position - point, position - point) <= radiusSq
 	elseif shapeType == WEDGE_SHAPE_VALUE then
-		local localPoint = cframe:PointToObjectSpace(point)
+		local localPoint = toObjectSpace(point, position, right, up, back)
 		local absolutePoint = vector.abs(localPoint)
 		if vector.min(absolutePoint, halfSize) == absolutePoint then
 			local size = halfSize * 2
@@ -113,7 +123,7 @@ function Geometry.isPointInShape(
 		return false
 	elseif shapeType == CORNER_WEDGE_SHAPE_VALUE then
 		local size = halfSize * 2
-		local localPoint = cframe:PointToObjectSpace(point)
+		local localPoint = toObjectSpace(point, position, right, up, back)
 		local plane1_normal = vector.normalize(Vector3.new(0, size.Z, size.Y))
 		if vector.dot(localPoint, plane1_normal) > 0 then
 			return false

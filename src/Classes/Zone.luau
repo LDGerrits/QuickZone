@@ -21,6 +21,7 @@
 local CollectionService = game:GetService('CollectionService')
 
 local State = require(script.Parent.Parent.Core.State)
+local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local Log = require(script.Parent.Parent.Utils.Log)
@@ -34,8 +35,6 @@ local dynamicHalfSizes = State.dynamicHalfSizes
 local dynamicTypes = State.dynamicTypes
 local staticMeshes = State.staticMeshes
 local dynamicMeshes = State.dynamicMeshes
-
-local isPointInShape = Geometry.isPointInShape
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
@@ -115,6 +114,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 				local newHalfSize = reference.ExtentsSize * 0.5
 				if dynamicHalfSizes[zone.id] ~= newHalfSize then
 					dynamicHalfSizes[zone.id] = newHalfSize
+					ZoneShapes.refresh(zone.id, true)
 					State.pendingDynamicRebuild = true
 				end
 			end)
@@ -128,6 +128,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 				local newShape = reference.Shape.Value
 				if dynamicTypes[zone.id] ~= newShape then
 					dynamicTypes[zone.id] = newShape
+					ZoneShapes.refresh(zone.id, true)
 					State.pendingDynamicRebuild = true
 				end
 			end)
@@ -195,6 +196,7 @@ local function newZoneInternal(
 	end
 
 	applyShapeType(id, isDynamic, shapeType, asQueryablePart(reference))
+	ZoneShapes.refresh(id, isDynamic)
 
 	local self: Types.InternalZone = setmetatable({
 		id = id,
@@ -776,6 +778,7 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 		-- Mesh zones query the part directly, so the new reference has to take over.
 		-- Without a queryable part the zone falls back to its bounding box.
 		applyShapeType(self.id, self.dynamic, MESH_SHAPE_VALUE, asQueryablePart(reference))
+		ZoneShapes.refresh(self.id, self.dynamic)
 	end
 
 	if self.autoSync then
@@ -837,6 +840,7 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 			end
 
 			if needsUpdate then
+				ZoneShapes.refresh(id, true)
 				State.pendingDynamicRebuild = true
 			end
 		else
@@ -858,6 +862,7 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 			end
 
 			if needsUpdate then
+				ZoneShapes.refresh(id, false)
 				State.pendingStaticRebuild = true
 			end
 		end
@@ -873,6 +878,7 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 			end
 
 			dynamicCFrames[id] = newCFrame
+			ZoneShapes.refresh(id, true)
 			State.pendingDynamicRebuild = true
 		else
 			if staticCFrames[id] == newCFrame then
@@ -880,6 +886,7 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 			end
 
 			staticCFrames[id] = newCFrame
+			ZoneShapes.refresh(id, false)
 			State.pendingStaticRebuild = true
 		end
 
@@ -972,6 +979,7 @@ function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
 		staticCFrames[self.id] = cf
 		State.pendingStaticRebuild = true
 	end
+	ZoneShapes.refresh(self.id, self.dynamic)
 	return self
 end
 
@@ -1017,6 +1025,7 @@ function Zone.setSize(self: Types.InternalZone, size: Vector3): Types.Zone
 		staticHalfSizes[self.id] = halfSize
 		State.pendingStaticRebuild = true
 	end
+	ZoneShapes.refresh(self.id, self.dynamic)
 	return self
 end
 
@@ -1040,11 +1049,15 @@ function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.
 	end
 
 	applyShapeType(self.id, self.dynamic, shapeType, asQueryablePart(self.reference))
+	ZoneShapes.refresh(self.id, self.dynamic)
 
+	-- The rebuild restores the exact leaf
 	if self.dynamic then
 		State.dynamicVersion += 1
+		State.pendingDynamicRebuild = true
 	else
 		State.staticVersion += 1
+		State.pendingStaticRebuild = true
 	end
 
 	return self
@@ -1166,12 +1179,7 @@ end
 	@return boolean
 ]=]
 function Zone.isPointInside(self: Types.InternalZone, point: Vector3): boolean
-	local id = self.id
-	if self.dynamic then
-		return isPointInShape(point, dynamicCFrames[id], dynamicHalfSizes[id], dynamicTypes[id], dynamicMeshes[id])
-	else
-		return isPointInShape(point, staticCFrames[id], staticHalfSizes[id], staticTypes[id], staticMeshes[id])
-	end
+	return ZoneShapes.containsPoint(self.id, point)
 end
 
 --[=[ 
@@ -1298,6 +1306,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 		staticMeshes[id] = nil
 		State.pendingStaticRebuild = true
 	end
+	ZoneShapes.remove(id)
 
 	setmetatable(self :: any, nil)
 end

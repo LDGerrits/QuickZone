@@ -6,22 +6,20 @@ local RunService = game:GetService('RunService')
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
-local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
 local State = require(script.Parent.State)
+local ZoneShapes = require(script.Parent.ZoneShapes)
 
 local queryPoint = LinearBVH.queryPoint
-local isPointInShape = Geometry.isPointInShape
+local containsPoint = ZoneShapes.containsPoint
 
 local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local staticMeshes = State.staticMeshes
 local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
-local dynamicMeshes = State.dynamicMeshes
+local shapeBoundsMin = State.shapeBoundsMin
+local shapeBoundsMax = State.shapeBoundsMax
+local shapePositions = State.shapePositions
+local treeExact = State.treeExact
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneAttachedObservers = State.zoneAttachedObservers
 local autoSyncZones = State.autoSyncZones
@@ -49,7 +47,7 @@ local dirtyTopology = State.dirtyTopology
 local staticTree = State.staticTree
 local dynamicTree = State.dynamicTree
 
-local ctx_pos: Vector3
+local ctx_hits = table.create(64) :: { number }
 local ctx_cCount: number = 0
 local ctx_highestWin: number
 local ctx_candidatePriority = table.create(16) :: { [number]: number }
@@ -238,31 +236,13 @@ local function processZoneHit(zoneId: number)
 	end
 end
 
-local function queryCallbackStatic(zoneId: number)
-	if
-		isPointInShape(
-			ctx_pos,
-			staticCFrames[zoneId],
-			staticHalfSizes[zoneId],
-			staticTypes[zoneId],
-			staticMeshes[zoneId]
-		)
-	then
-		processZoneHit(zoneId)
-	end
-end
-
-local function queryCallbackDynamic(zoneId: number)
-	if
-		isPointInShape(
-			ctx_pos,
-			dynamicCFrames[zoneId],
-			dynamicHalfSizes[zoneId],
-			dynamicTypes[zoneId],
-			dynamicMeshes[zoneId]
-		)
-	then
-		processZoneHit(zoneId)
+local function queryTree(tree: Types.Tree, position: Vector3)
+	local hitCount = queryPoint(tree, position, ctx_hits)
+	for i = 1, hitCount do
+		local zoneId = ctx_hits[i]
+		if treeExact[zoneId] or containsPoint(zoneId, position) then
+			processZoneHit(zoneId)
+		end
 	end
 end
 
@@ -329,6 +309,7 @@ function Scheduler.update(dt: number)
 				end
 
 				dynamicCFrames[id] = newCF
+				ZoneShapes.refresh(id, true)
 				needsRebuild = true
 			end
 
@@ -432,16 +413,15 @@ function Scheduler.update(dt: number)
 				ctx_linkedObservers = entityToObservers[entity]
 				ctx_currentMemberships = data.activeObserverMemberships
 
-				ctx_pos = position
 				ctx_cCount = 0
 				ctx_highestWin = -math.huge
 
 				if needsDynamic then
-					queryPoint(dynamicTree, position, queryCallbackDynamic)
+					queryTree(dynamicTree, position)
 				end
 
 				if needsStatic then
-					queryPoint(staticTree, position, queryCallbackStatic)
+					queryTree(staticTree, position)
 				end
 
 				local current = data.activeObserverMemberships
@@ -575,13 +555,15 @@ end
 
 function Scheduler.rebuildTrees()
 	if State.pendingDynamicRebuild then
-		LinearBVH.build(dynamicTree, dynamicCFrames, dynamicHalfSizes)
+		LinearBVH.build(dynamicTree, dynamicCFrames, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		ZoneShapes.markBuilt(dynamicCFrames)
 		State.pendingDynamicRebuild = false
 		State.dynamicVersion += 1
 	end
 
 	if State.pendingStaticRebuild then
-		LinearBVH.build(staticTree, staticCFrames, staticHalfSizes)
+		LinearBVH.build(staticTree, staticCFrames, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		ZoneShapes.markBuilt(staticCFrames)
 		State.pendingStaticRebuild = false
 		State.staticVersion += 1
 	end
