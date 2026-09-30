@@ -1531,6 +1531,174 @@ return function(Tiniest: Tiniest)
 				end
 			end
 		)
+
+		Test(
+			'Keeps entities that stand still in the right zone as zones move, reshape, appear, disappear and are detached.',
+			function()
+				local rng = Random.new(1207)
+				local origin = Vector3.new(-6000, 0, 6000)
+
+				local entities = {}
+				for i = 1, 120 do
+					entities[i] = { Position = origin + Util.randomOffset(rng, 55) }
+				end
+				local group = Group.new({ entities = entities, autoClean = false })
+
+				-- Equal priority, some zones are shared
+				local observers = {
+					Observer.new({ groups = { group }, precision = 1, safety = false }),
+					Observer.new({ groups = { group }, precision = 1, safety = false }),
+				}
+				local watched = { {}, {} } :: { { [any]: boolean } }
+				local allZones = {} :: { [any]: boolean }
+
+				local function addZone(isDynamic: boolean)
+					local zone = Zone.new(Util.randomZoneConfig(rng, origin, 50, isDynamic))
+					allZones[zone] = true
+					local which = rng:NextInteger(1, 3)
+					for index = 1, 2 do
+						if which == 3 or which == index then
+							observers[index]:attach(zone)
+							watched[index][zone] = true
+						end
+					end
+					return zone
+				end
+
+				local function randomZones(count: number): { any }
+					local list = {}
+					for zone in allZones do
+						table.insert(list, zone)
+					end
+					table.sort(list, function(a, b)
+						return a:getId() < b:getId()
+					end)
+					local picked = {}
+					for _ = 1, math.min(count, #list) do
+						table.insert(picked, table.remove(list, rng:NextInteger(1, #list)))
+					end
+					return picked
+				end
+
+				for i = 1, 160 do
+					addZone(i % 2 == 0)
+				end
+
+				-- Every entity is evaluated in one tick
+				QuickZone:setFrameBudget(1000)
+				local previousZones = { {}, {} }
+
+				local function checkEntities()
+					QuickZone:update(1)
+					for index, observer in observers do
+						for i, entity in entities do
+							local zone = observer:getZoneOfEntity(entity)
+							local containing = {}
+							for candidate in watched[index] do
+								if candidate:isPointInside(entity.Position) then
+									containing[candidate] = true
+								end
+							end
+
+							if zone then
+								Expect(containing[zone]).is(true)
+							else
+								Expect(next(containing)).is(nil)
+							end
+
+							local previous = previousZones[index][i]
+							if previous and containing[previous] then
+								Expect(zone).is(previous)
+							end
+							previousZones[index][i] = zone
+						end
+					end
+				end
+
+				checkEntities()
+
+				-- Moved a little, teleported, resized and reshaped
+				for _ = 1, 3 do
+					for _, zone in randomZones(12) do
+						zone:setCFrame(zone:getCFrame() + Util.randomOffset(rng, 4))
+					end
+					for _, zone in randomZones(6) do
+						zone:setCFrame(Util.randomCFrame(rng, origin, 50))
+					end
+					for _, zone in randomZones(4) do
+						zone:setPosition(origin + Util.randomOffset(rng, 50))
+					end
+					for _, zone in randomZones(4) do
+						zone:setSize(Util.randomSize(rng, zone:getShape()))
+					end
+					for _, zone in randomZones(3) do
+						local shape = ({ 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' })[rng:NextInteger(1, 5)]
+						zone:setShape(shape)
+						zone:setSize(Util.randomSize(rng, shape))
+					end
+					checkEntities()
+				end
+
+				-- Moved away and back within one frame
+				for _, zone in randomZones(10) do
+					local cframe = zone:getCFrame()
+					zone:setCFrame(cframe + Vector3.new(500, 0, 0))
+					zone:setCFrame(cframe)
+				end
+				checkEntities()
+
+				-- Added and destroyed
+				for i = 1, 20 do
+					addZone(i % 2 == 0)
+				end
+				checkEntities()
+				for _, zone in randomZones(25) do
+					allZones[zone] = nil
+					watched[1][zone] = nil
+					watched[2][zone] = nil
+					zone:destroy()
+				end
+				checkEntities()
+
+				-- Detached from one observer, attached to the other
+				for _, zone in randomZones(15) do
+					if watched[1][zone] then
+						observers[1]:detach(zone)
+						watched[1][zone] = nil
+					elseif not watched[2][zone] then
+						observers[2]:attach(zone)
+						watched[2][zone] = true
+					end
+				end
+				checkEntities()
+
+				-- Moved between the static and dynamic trees
+				for _, zone in randomZones(12) do
+					zone:setDynamic(not zone:isDynamic())
+				end
+				checkEntities()
+
+				-- Several rebuilds between ticks
+				for rebuilds = 1, 40 do
+					for _, zone in randomZones(if rebuilds <= 3 then 12 else 2) do
+						zone:setCFrame(Util.randomCFrame(rng, origin, 50))
+					end
+					QuickZone:rebuild()
+					if rebuilds == 3 or rebuilds == 40 then
+						checkEntities()
+					end
+				end
+
+				QuickZone:setFrameBudget(1)
+				for _, observer in observers do
+					observer:destroy()
+				end
+				group:destroy()
+				for zone in allZones do
+					zone:destroy()
+				end
+			end
+		)
 	end)
 
 	Describe('Observer:getZoneOfPlayer', function()
