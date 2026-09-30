@@ -1261,9 +1261,12 @@ function Zone.destroy(self: Types.InternalZone): ()
 				continue
 			end
 
-			for entity, _ in trackedEntities do
-				local data = State.entityData[entity]
+			for entity, zoneId in trackedEntities do
+				if zoneId ~= id then
+					continue
+				end
 
+				local data = State.entityData[entity]
 				if not data or data.activeObserverMemberships[observerId] ~= id then
 					continue
 				end

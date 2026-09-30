@@ -510,11 +510,10 @@ function Scheduler.update(dt: number)
 
 					-- Update the tracker.
 					current[observerId] = zoneIdx
+					observerTrackingEntities[observerId][entity] = zoneIdx
 					local safety = observerSafety[observerId]
 
 					if not currentZoneId then -- New entry
-						observerTrackingEntities[observerId][entity] = true
-
 						local cbs = observerEnteredCallbacks[observerId]
 						if not cbs then
 							continue
