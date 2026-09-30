@@ -574,6 +574,60 @@ return function(Tiniest: Tiniest)
 			group:destroy()
 			part:Destroy()
 		end)
+
+		Test('Destroying a zone exits exactly the entities in it, for each observer that placed them there.', function()
+			local origin = Vector3.new(4000, 0, -4000)
+			local away = origin + Vector3.new(100, 0, 0)
+			local stays = { Position = origin }
+			local joins = { Position = away }
+			local leaves = { Position = origin }
+			local elsewhere = { Position = away }
+			local group = Group.new({ entities = { stays, joins, leaves, elsewhere }, autoClean = false })
+
+			local zone = Zone.new({ cframe = CFrame.new(origin), size = Vector3.one * 10 })
+			local other = Zone.new({ cframe = CFrame.new(away), size = Vector3.one * 10 })
+			local observers = {
+				Observer.new({ zones = { zone, other }, groups = { group }, safety = false }),
+				Observer.new({ zones = { zone }, groups = { group }, safety = false }),
+				Observer.new({ zones = { zone }, groups = { group }, safety = false }),
+			}
+			QuickZone:update(1)
+
+			-- One entity joins, one leaves, and the third observer detaches
+			joins.Position = origin
+			leaves.Position = away
+			observers[3]:detach(zone)
+			QuickZone:update(1)
+
+			local exited = { {}, {}, {} }
+			local disconnects = {}
+			for index, observer in observers do
+				disconnects[index] = observer:onExit(function(entity, exitedZone)
+					exited[index][entity] = exitedZone
+				end)
+			end
+			zone:destroy()
+			for _, disconnect in disconnects do
+				disconnect()
+			end
+
+			for index = 1, 2 do
+				Expect(exited[index][stays]).is(zone)
+				Expect(exited[index][joins]).is(zone)
+				Expect(exited[index][leaves]).is(nil)
+				Expect(exited[index][elsewhere]).is(nil)
+			end
+			Expect(next(exited[3])).is(nil)
+			Expect(observers[1]:getZoneOfEntity(leaves)).is(other)
+			Expect(observers[1]:getZoneOfEntity(elsewhere)).is(other)
+			Expect(observers[2]:getZoneOfEntity(stays)).is(nil)
+
+			for _, observer in observers do
+				observer:destroy()
+			end
+			group:destroy()
+			other:destroy()
+		end)
 	end)
 
 	Describe('Observer:observePlayer', function()
