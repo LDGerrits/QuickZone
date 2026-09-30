@@ -22,6 +22,7 @@ local shapePositions = State.shapePositions
 local treeExact = State.treeExact
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneAttachedObservers = State.zoneAttachedObservers
+local zoneSoleObserver = State.zoneSoleObserver
 local autoSyncZones = State.autoSyncZones
 
 local observerPriorityMap = State.observerPriorityMap
@@ -202,6 +203,35 @@ local function processTopologyChange(entity: Types.Entity)
 	data.needsDynamic = needsDynamic
 end
 
+local function processObserverHit(observerId: number, zoneId: number)
+	if not ctx_linkedObservers[observerId] or observerEnabled[observerId] == false then
+		return
+	end
+
+	local currentPriority = ctx_candidatePriority[observerId]
+	local priority = observerPriorityMap[observerId] or 0
+
+	if not currentPriority then -- First hit
+		ctx_cCount += 1
+		ctx_candidateList[ctx_cCount] = observerId
+		ctx_candidateIndex[observerId] = zoneId
+		ctx_candidatePriority[observerId] = priority
+
+		if priority > ctx_highestWin then
+			ctx_highestWin = priority
+		end
+	elseif priority > currentPriority then -- Override previous hits
+		ctx_candidateIndex[observerId] = zoneId
+		ctx_candidatePriority[observerId] = priority
+
+		if priority > ctx_highestWin then
+			ctx_highestWin = priority
+		end
+	elseif priority == currentPriority and ctx_currentMemberships[observerId] == zoneId then -- Sticky behavior
+		ctx_candidateIndex[observerId] = zoneId
+	end
+end
+
 local function processZoneHit(zoneId: number)
 	local observers = zoneAttachedObservers[zoneId]
 	if not observers then
@@ -209,30 +239,7 @@ local function processZoneHit(zoneId: number)
 	end
 
 	for _, observerId in observers do
-		if ctx_linkedObservers[observerId] and observerEnabled[observerId] ~= false then
-			local currentPriority = ctx_candidatePriority[observerId]
-			local priority = observerPriorityMap[observerId] or 0
-
-			if not currentPriority then -- First hit
-				ctx_cCount += 1
-				ctx_candidateList[ctx_cCount] = observerId
-				ctx_candidateIndex[observerId] = zoneId
-				ctx_candidatePriority[observerId] = priority
-
-				if priority > ctx_highestWin then
-					ctx_highestWin = priority
-				end
-			elseif priority > currentPriority then -- Override previous hits
-				ctx_candidateIndex[observerId] = zoneId
-				ctx_candidatePriority[observerId] = priority
-
-				if priority > ctx_highestWin then
-					ctx_highestWin = priority
-				end
-			elseif priority == currentPriority and ctx_currentMemberships[observerId] == zoneId then -- Sticky behavior
-				ctx_candidateIndex[observerId] = zoneId
-			end
-		end
+		processObserverHit(observerId, zoneId)
 	end
 end
 
@@ -240,7 +247,22 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	local hitCount = queryPoint(tree, position, ctx_hits)
 	for i = 1, hitCount do
 		local zoneId = ctx_hits[i]
-		if treeExact[zoneId] or containsPoint(zoneId, position) then
+		local observerId = zoneSoleObserver[zoneId]
+
+		if observerId then
+			if ctx_candidatePriority[observerId] ~= nil then
+				-- An observer's zones share a priority, so only the current zone can take over
+				if ctx_currentMemberships[observerId] ~= zoneId then
+					continue
+				end
+			elseif not ctx_linkedObservers[observerId] then
+				continue
+			end
+
+			if treeExact[zoneId] or containsPoint(zoneId, position) then
+				processObserverHit(observerId, zoneId)
+			end
+		elseif treeExact[zoneId] or containsPoint(zoneId, position) then
 			processZoneHit(zoneId)
 		end
 	end
@@ -553,17 +575,24 @@ function Scheduler.setFrameBudget(n: number)
 	frameBudget = n
 end
 
+-- Refit if only shapes changed, rebuild if zones were added or removed or the tree degraded
+local function updateTree(tree: Types.Tree, members: { [number]: any })
+	if tree.membersChanged or not LinearBVH.refit(tree, shapeBoundsMin, shapeBoundsMax) then
+		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		tree.membersChanged = false
+	end
+	ZoneShapes.markBuilt(members)
+end
+
 function Scheduler.rebuildTrees()
 	if State.pendingDynamicRebuild then
-		LinearBVH.build(dynamicTree, dynamicCFrames, shapeBoundsMin, shapeBoundsMax, shapePositions)
-		ZoneShapes.markBuilt(dynamicCFrames)
+		updateTree(dynamicTree, dynamicCFrames)
 		State.pendingDynamicRebuild = false
 		State.dynamicVersion += 1
 	end
 
 	if State.pendingStaticRebuild then
-		LinearBVH.build(staticTree, staticCFrames, shapeBoundsMin, shapeBoundsMax, shapePositions)
-		ZoneShapes.markBuilt(staticCFrames)
+		updateTree(staticTree, staticCFrames)
 		State.pendingStaticRebuild = false
 		State.staticVersion += 1
 	end

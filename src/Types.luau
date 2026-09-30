@@ -49,6 +49,12 @@ export type BoundingVolume = {
 export type Tree = {
 	buffer: buffer,
 	count: number,
+	-- Summed branch area when built
+	cost: number,
+	-- Updates until refitting is tried again
+	refitSkips: number,
+	-- Rebuild instead of refit
+	membersChanged: boolean,
 }
 
 export type EntityData = {
