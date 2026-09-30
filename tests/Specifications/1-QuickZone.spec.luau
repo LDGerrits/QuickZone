@@ -272,6 +272,100 @@ return function(Tiniest: Tiniest)
 			staticZone:destroy()
 			dynamicZone:destroy()
 		end)
+
+		Test('Agrees with every zone checked on its own while zones are moved, reshaped, added and removed.', function()
+			local rng = Random.new(20260930)
+			local origin = Vector3.new(-7000, 0, 3000)
+			local zones = {}
+			local observer = Observer.new()
+
+			local function addZone(isDynamic: boolean)
+				local zone = Zone.new(Util.randomZoneConfig(rng, origin, 60, isDynamic))
+				observer:attach(zone)
+				table.insert(zones, zone)
+			end
+
+			local function checkPoints()
+				QuickZone:rebuild()
+				for _ = 1, 200 do
+					local point = origin + Util.randomOffset(rng, 75)
+
+					Expect(Util.findMismatch(zones, point, QuickZone:getZonesAtPoint(point))).is(nil)
+
+					local iterated = {}
+					for zone in QuickZone:iterZonesAtPoint(point) do
+						table.insert(iterated, zone)
+					end
+					Expect(Util.findMismatch(zones, point, iterated)).is(nil)
+
+					local insideAny = false
+					for _, zone in zones do
+						insideAny = insideAny or zone:isPointInside(point)
+					end
+					Expect(observer:isPointInside(point)).is(insideAny)
+				end
+			end
+
+			for i = 1, 160 do
+				addZone(i % 2 == 0)
+			end
+			checkPoints()
+
+			-- Small moves, like a moving platform
+			for _ = 1, 5 do
+				for _, zone in zones do
+					if zone:isDynamic() then
+						zone:setCFrame(zone:getCFrame() + Util.randomOffset(rng, 2))
+					end
+				end
+				checkPoints()
+			end
+
+			-- Teleports
+			for _, zone in zones do
+				if zone:isDynamic() then
+					zone:setCFrame(Util.randomCFrame(rng, origin, 60))
+				end
+			end
+			checkPoints()
+
+			-- Moving a few static zones
+			for i = 1, 20 do
+				local zone = zones[i * 2 - 1]
+				zone:setCFrame(Util.randomCFrame(rng, origin, 60))
+			end
+			checkPoints()
+
+			-- Resizing and reshaping
+			for i = 1, 40 do
+				local zone = zones[rng:NextInteger(1, #zones)]
+				local shape = ({ 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' })[rng:NextInteger(1, 5)]
+				zone:setShape(shape)
+				zone:setSize(Util.randomSize(rng, shape))
+			end
+			checkPoints()
+
+			-- Removing and adding zones
+			for _ = 1, 30 do
+				table.remove(zones, rng:NextInteger(1, #zones)):destroy()
+			end
+			for i = 1, 30 do
+				addZone(i % 2 == 0)
+			end
+			checkPoints()
+
+			-- Switching trees
+			for i = 1, 20 do
+				local zone = zones[i]
+				zone:setDynamic(not zone:isDynamic())
+			end
+			checkPoints()
+
+			observer:destroy()
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
 	end)
 
 	Describe('QuickZone:getZonesOfEntity', function()
