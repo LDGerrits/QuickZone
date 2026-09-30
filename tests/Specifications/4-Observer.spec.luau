@@ -1446,6 +1446,91 @@ return function(Tiniest: Tiniest)
 			zoneB:destroy()
 			part:Destroy()
 		end)
+
+		Test(
+			'Attributes each entity to a zone containing it, keeping its zone while it still fits, as everything moves.',
+			function()
+				local rng = Random.new(930)
+				local origin = Vector3.new(6000, 0, -4000)
+				local zones = {}
+				for i = 1, 160 do
+					table.insert(zones, Zone.new(Util.randomZoneConfig(rng, origin, 50, i % 2 == 0)))
+				end
+
+				local entities = {}
+				for i = 1, 80 do
+					entities[i] = { Position = origin + Util.randomOffset(rng, 55) }
+				end
+
+				local group = Group.new({ entities = entities, autoClean = false })
+				local observer = Observer.new({ zones = zones, groups = { group }, precision = 0, safety = false })
+				local previousZones = {}
+
+				-- Every entity is evaluated in one tick
+				QuickZone:setFrameBudget(1000)
+
+				local function checkEntities()
+					QuickZone:update(1)
+					for i, entity in entities do
+						local zone = observer:getZoneOfEntity(entity)
+						local containing = {}
+						for _, candidate in zones do
+							if candidate:isPointInside(entity.Position) then
+								containing[candidate] = true
+							end
+						end
+
+						if zone then
+							Expect(containing[zone]).is(true)
+						else
+							Expect(next(containing)).is(nil)
+						end
+
+						local previous = previousZones[i]
+						if previous and containing[previous] then
+							Expect(zone).is(previous)
+						end
+						previousZones[i] = zone
+					end
+				end
+
+				checkEntities()
+
+				for _ = 1, 4 do
+					for _, entity in entities do
+						entity.Position += Util.randomOffset(rng, 3)
+					end
+					for _, zone in zones do
+						if zone:isDynamic() then
+							zone:setCFrame(zone:getCFrame() + Util.randomOffset(rng, 2))
+						end
+					end
+					checkEntities()
+				end
+
+				for _, zone in zones do
+					if zone:isDynamic() then
+						zone:setCFrame(Util.randomCFrame(rng, origin, 50))
+					end
+				end
+				checkEntities()
+
+				for _, entity in entities do
+					entity.Position = origin + Util.randomOffset(rng, 55)
+				end
+				for i = 1, 20 do
+					zones[i * 2 - 1]:setCFrame(Util.randomCFrame(rng, origin, 50))
+				end
+				checkEntities()
+
+				QuickZone:setFrameBudget(1)
+				observer:destroy()
+				group:destroy()
+				for _, zone in zones do
+					zone:destroy()
+				end
+			end
+		)
 	end)
 
 	Describe('Observer:getZoneOfPlayer', function()
