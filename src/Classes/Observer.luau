@@ -1607,7 +1607,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 		observers[id] = nil
 	end
 
-	for _, attachedList in State.zoneAttachedObservers do
+	for zoneId, attachedList in State.zoneAttachedObservers do
 		local idx = table.find(attachedList, id)
 		if idx then
 			local lastIdx = #attachedList
@@ -1615,6 +1615,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 				attachedList[idx] = attachedList[lastIdx]
 			end
 			attachedList[lastIdx] = nil
+			State.zoneSoleObserver[zoneId] = if #attachedList == 1 then attachedList[1] else nil
 		end
 	end
 

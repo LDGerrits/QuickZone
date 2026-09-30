@@ -189,10 +189,12 @@ local function newZoneInternal(
 		State.dynamicCFrames[id] = cframe
 		State.dynamicHalfSizes[id] = halfSize
 		State.pendingDynamicRebuild = true
+		State.dynamicTree.membersChanged = true
 	else
 		State.staticCFrames[id] = cframe
 		State.staticHalfSizes[id] = halfSize
 		State.pendingStaticRebuild = true
+		State.staticTree.membersChanged = true
 	end
 
 	applyShapeType(id, isDynamic, shapeType, asQueryablePart(reference))
@@ -685,6 +687,7 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 
 	if not table.find(attached, observer.id) then
 		table.insert(attached, observer.id)
+		State.zoneSoleObserver[self.id] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, self.dynamic, 1)
 	end
 
@@ -711,6 +714,7 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
+		State.zoneSoleObserver[self.id] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, self.dynamic, -1)
 	end
 
@@ -954,6 +958,8 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 
 	State.pendingStaticRebuild = true
 	State.pendingDynamicRebuild = true
+	State.staticTree.membersChanged = true
+	State.dynamicTree.membersChanged = true
 
 	return self
 end
@@ -1281,6 +1287,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	-- This is to ensure that, when the callback attempts to detach the observer manually,
 	-- it safely early-returns without double-decrementing the count.
 	State.zoneAttachedObservers[id] = nil
+	State.zoneSoleObserver[id] = nil
 
 	if self.onDestroyCallbacks then
 		-- The table must be cloned to avoid iterator shifts
@@ -1299,12 +1306,14 @@ function Zone.destroy(self: Types.InternalZone): ()
 		dynamicTypes[id] = nil
 		dynamicMeshes[id] = nil
 		State.pendingDynamicRebuild = true
+		State.dynamicTree.membersChanged = true
 	else
 		staticCFrames[id] = nil
 		staticHalfSizes[id] = nil
 		staticTypes[id] = nil
 		staticMeshes[id] = nil
 		State.pendingStaticRebuild = true
+		State.staticTree.membersChanged = true
 	end
 	ZoneShapes.remove(id)
 

@@ -31,8 +31,8 @@ local State = {
 	-- Zones whose leaf is exactly their shape
 	treeExact = {} :: { [number]: boolean },
 
-	staticTree = { buffer = buffer.create(0), count = 0 } :: Types.Tree,
-	dynamicTree = { buffer = buffer.create(0), count = 0 } :: Types.Tree,
+	staticTree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false } :: Types.Tree,
+	dynamicTree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false } :: Types.Tree,
 	pendingStaticRebuild = false,
 	pendingDynamicRebuild = false,
 	staticVersion = 0,
@@ -67,6 +67,8 @@ local State = {
 
 	autoSyncZones = {} :: { [number]: Types.InternalZone },
 	zoneAttachedObservers = {} :: { [number]: { number } },
+	-- Observer of zones attached to exactly one
+	zoneSoleObserver = {} :: { [number]: number },
 	zoneIdToZoneObj = {} :: { [number]: Types.InternalZone },
 	observerIdToObserverObj = {} :: { [number]: Types.InternalObserver },
 }
