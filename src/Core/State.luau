@@ -17,8 +17,22 @@ local State = {
 	dynamicTypes = {} :: { [number]: number },
 	dynamicMeshes = {} :: { [number]: BasePart },
 
-	staticTree = { nodes = {}, count = 0 } :: Types.Tree,
-	dynamicTree = { nodes = {}, count = 0 } :: Types.Tree,
+	-- World-space shape of every zone
+	shapeTypes = {} :: { [number]: number },
+	shapeHalfSizes = {} :: { [number]: Vector3 },
+	shapeParts = {} :: { [number]: BasePart },
+	shapePositions = {} :: { [number]: Vector3 },
+	shapeRights = {} :: { [number]: Vector3 },
+	shapeUps = {} :: { [number]: Vector3 },
+	shapeBacks = {} :: { [number]: Vector3 },
+	shapeBoundsMin = {} :: { [number]: Vector3 },
+	shapeBoundsMax = {} :: { [number]: Vector3 },
+	shapeAxisAligned = {} :: { [number]: boolean },
+	-- Zones whose leaf is exactly their shape
+	treeExact = {} :: { [number]: boolean },
+
+	staticTree = { buffer = buffer.create(0), count = 0 } :: Types.Tree,
+	dynamicTree = { buffer = buffer.create(0), count = 0 } :: Types.Tree,
 	pendingStaticRebuild = false,
 	pendingDynamicRebuild = false,
 	staticVersion = 0,

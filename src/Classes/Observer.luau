@@ -13,10 +13,12 @@ local RunService = game:GetService('RunService')
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
-local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
+local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 
-local isPointInShape = Geometry.isPointInShape
+local queryPoint = LinearBVH.queryPoint
+local leafContainsPoint = ZoneShapes.leafContainsPoint
 
 local hasAttachedMap = {} :: { [number]: boolean }
 local hasSubscribedMap = {} :: { [number]: boolean }
@@ -25,16 +27,11 @@ local dirtyProfiles = State.dirtyProfiles
 local dirtyTopology = State.dirtyTopology
 local zoneAttachedObservers = State.zoneAttachedObservers
 
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local staticMeshes = State.staticMeshes
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
-local dynamicMeshes = State.dynamicMeshes
 local dynamicTree = State.dynamicTree
 local staticTree = State.staticTree
+
+local queryHits = {} :: { number }
+local queryTrees = { dynamicTree, staticTree }
 
 local IS_CLIENT = RunService:IsClient()
 
@@ -1104,80 +1101,21 @@ end
 	@return boolean
 ]=]
 function Observer.isPointInside(self: Types.InternalObserver, position: Vector3): boolean
-	local px, py, pz = position.X, position.Y, position.Z
 	local observerId = self.id
 
-	local nodes = dynamicTree.nodes
-	local index = 1
-	local count = dynamicTree.count
-	while index <= count do
-		local node = nodes[index]
-		local min, max = node.min, node.max
+	for _, tree in queryTrees do
+		local hitCount = queryPoint(tree, position, queryHits)
+		for i = 1, hitCount do
+			local hitId = queryHits[i]
 
-		if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
-			index = node.skipIndex
-			continue
-		end
+			local observers = zoneAttachedObservers[hitId]
+			if not observers or not table.find(observers, observerId) then
+				continue
+			end
 
-		local hitId = node.id
-		index += 1
-
-		if hitId == 0 then
-			continue
-		end
-
-		local observers = zoneAttachedObservers[hitId]
-		if not observers or not table.find(observers, observerId) then
-			continue
-		end
-
-		if
-			isPointInShape(
-				position,
-				dynamicCFrames[hitId],
-				dynamicHalfSizes[hitId],
-				dynamicTypes[hitId],
-				dynamicMeshes[hitId]
-			)
-		then
-			return true
-		end
-	end
-
-	nodes = staticTree.nodes
-	index = 1
-	count = staticTree.count
-	while index <= count do
-		local node = nodes[index]
-		local min, max = node.min, node.max
-
-		if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
-			index = node.skipIndex
-			continue
-		end
-
-		local hitId = node.id
-		index += 1
-
-		if hitId == 0 then
-			continue
-		end
-
-		local observers = zoneAttachedObservers[hitId]
-		if not observers or not table.find(observers, observerId) then
-			continue
-		end
-
-		if
-			isPointInShape(
-				position,
-				staticCFrames[hitId],
-				staticHalfSizes[hitId],
-				staticTypes[hitId],
-				staticMeshes[hitId]
-			)
-		then
-			return true
+			if leafContainsPoint(hitId, position) then
+				return true
+			end
 		end
 	end
 

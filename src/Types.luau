@@ -45,15 +45,9 @@ export type BoundingVolume = {
 	axisLength: number?,
 }
 
-export type Node = {
-	min: Vector3,
-	max: Vector3,
-	id: number,
-	skipIndex: number,
-}
-
+-- Flat LBVH, see Utils/LinearBVH for the node layout
 export type Tree = {
-	nodes: { Node },
+	buffer: buffer,
 	count: number,
 }
 

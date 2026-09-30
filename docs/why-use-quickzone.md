@@ -37,7 +37,7 @@ Most Roblox libraries rely heavily on Object-Oriented Programming (OOP). QuickZo
 
 - **Structure of Arrays (SoA)**: Zone geometry (CFrames, half-sizes and shape types) is stored in parallel tables indexed by zone id instead of inside zone objects, so the hot loop never touches the objects themselves.
 
-- **Flattened Tree**: The LBVH is stored as a single flat array in depth-first order. Every node stores a skip index, so a query is a linear, stackless walk through the array with no recursion. Node tables are reused between rebuilds instead of being recreated.
+- **Flattened Tree**: The LBVH is stored as a single flat buffer in depth-first order. Every node stores a skip index, so a query is a linear, stackless walk through the buffer with no recursion. The buffer is reused between rebuilds instead of being recreated.
 
 - **Bitwise Spatial Sorting**: To build the tree, QuickZone sorts zones along **Morton Codes (Z-Order Curves)**. Transforming 3D coordinates into integers via bitwise operations places zones that are close in space close together in the array, which keeps the tree tight and cheap to build.
 

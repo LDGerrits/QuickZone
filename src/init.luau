@@ -12,11 +12,12 @@ local Types = require(script.Types)
 local Config = require(script.Config)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
-local Geometry = require(script.Utils.Geometry)
+local ZoneShapes = require(script.Core.ZoneShapes)
 local LinearBVH = require(script.Utils.LinearBVH)
 
 local queryPoint = LinearBVH.queryPoint
-local isPointInShape = Geometry.isPointInShape
+local nextLeaf = LinearBVH.nextLeaf
+local leafContainsPoint = ZoneShapes.leafContainsPoint
 
 local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
@@ -29,14 +30,13 @@ local referenceToEntity = State.referenceToEntity
 
 local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local staticMeshes = State.staticMeshes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
-local dynamicMeshes = State.dynamicMeshes
 local dynamicTree = State.dynamicTree
 local staticTree = State.staticTree
+
+local queryHits = {} :: { number }
+local queryTrees = { dynamicTree, staticTree }
 
 local debugConnection: RBXScriptConnection?
 local debugFolder: Folder?
@@ -381,41 +381,19 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	local results = {}
 	local count = 0
 
-	queryPoint(dynamicTree, position, function(zoneId)
-		if
-			isPointInShape(
-				position,
-				dynamicCFrames[zoneId],
-				dynamicHalfSizes[zoneId],
-				dynamicTypes[zoneId],
-				dynamicMeshes[zoneId]
-			)
-		then
-			local zone = zoneIdToZoneObj[zoneId]
-			if zone then
-				count += 1
-				results[count] = zone
+	for _, tree in queryTrees do
+		local hitCount = queryPoint(tree, position, queryHits)
+		for i = 1, hitCount do
+			local zoneId = queryHits[i]
+			if leafContainsPoint(zoneId, position) then
+				local zone = zoneIdToZoneObj[zoneId]
+				if zone then
+					count += 1
+					results[count] = zone
+				end
 			end
 		end
-	end)
-
-	queryPoint(staticTree, position, function(zoneId)
-		if
-			isPointInShape(
-				position,
-				staticCFrames[zoneId],
-				staticHalfSizes[zoneId],
-				staticTypes[zoneId],
-				staticMeshes[zoneId]
-			)
-		then
-			local zone = zoneIdToZoneObj[zoneId]
-			if zone then
-				count += 1
-				results[count] = zone
-			end
-		end
-	end)
+	end
 
 	return results
 end
@@ -628,74 +606,42 @@ end
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
-	local dynamicNodes = dynamicTree.nodes
+	local dynamicBuffer = dynamicTree.buffer
 	local dynamicCount = dynamicTree.count or 0
 
-	local staticNodes = staticTree.nodes
+	local staticBuffer = staticTree.buffer
 	local staticCount = staticTree.count or 0
 
-	local px, py, pz = point.X, point.Y, point.Z
-
-	local index = 1
+	local offset = 0
 	local checkingDynamic = true
 
 	return function(): Types.Zone?
 		if checkingDynamic then
-			while index <= dynamicCount do
-				local node = dynamicNodes[index]
-				local min, max = node.min, node.max
-
-				if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
-					index = node.skipIndex
-					continue
+			while true do
+				local hitId
+				offset, hitId = nextLeaf(dynamicBuffer, dynamicCount, point, offset)
+				if hitId == 0 then
+					break
 				end
 
-				index += 1
-				local hitId = node.id
-
-				if
-					hitId > 0
-					and isPointInShape(
-						point,
-						dynamicCFrames[hitId],
-						dynamicHalfSizes[hitId],
-						dynamicTypes[hitId],
-						dynamicMeshes[hitId]
-					)
-				then
+				if leafContainsPoint(hitId, point) then
 					return zoneIdToZoneObj[hitId]
 				end
 			end
 
 			checkingDynamic = false
-			index = 1
+			offset = 0
 		end
 
-		if not checkingDynamic then
-			while index <= staticCount do
-				local node = staticNodes[index]
-				local min, max = node.min, node.max
+		while true do
+			local hitId
+			offset, hitId = nextLeaf(staticBuffer, staticCount, point, offset)
+			if hitId == 0 then
+				break
+			end
 
-				if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
-					index = node.skipIndex
-					continue
-				end
-
-				index += 1
-				local hitId = node.id
-
-				if
-					hitId > 0
-					and isPointInShape(
-						point,
-						staticCFrames[hitId],
-						staticHalfSizes[hitId],
-						staticTypes[hitId],
-						staticMeshes[hitId]
-					)
-				then
-					return zoneIdToZoneObj[hitId]
-				end
+			if leafContainsPoint(hitId, point) then
+				return zoneIdToZoneObj[hitId]
 			end
 		end
 
