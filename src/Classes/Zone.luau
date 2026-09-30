@@ -75,25 +75,29 @@ local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): Base
 	return nil
 end
 
-local function applyShapeType(id: number, isDynamic: boolean, shapeType: number, part: BasePart?)
+local function applyShapeType(slot: number, isDynamic: boolean, shapeType: number, part: BasePart?)
 	if shapeType == MESH_SHAPE_VALUE and not part then
-		Log.warn("Shape 'Mesh' requires a BasePart reference. Defaulting Zone %d to Block.", nil, id)
+		Log.warn(
+			"Shape 'Mesh' requires a BasePart reference. Defaulting Zone %d to Block.",
+			nil,
+			State.zoneSlotIds[slot]
+		)
 		shapeType = BLOCK_SHAPE_VALUE
 	end
 
 	local meshPart = if shapeType == MESH_SHAPE_VALUE then part else nil
 
 	if isDynamic then
-		dynamicTypes[id] = shapeType
-		dynamicMeshes[id] = meshPart
+		dynamicTypes[slot] = shapeType
+		dynamicMeshes[slot] = meshPart
 	else
-		staticTypes[id] = shapeType
-		staticMeshes[id] = meshPart
+		staticTypes[slot] = shapeType
+		staticMeshes[slot] = meshPart
 	end
 end
 
 local function clearAutoSync(zone: Types.InternalZone)
-	State.autoSyncZones[zone.id] = nil
+	State.autoSyncZones[zone.slot] = nil
 	if zone.syncConnections then
 		for _, conn in zone.syncConnections do
 			conn:Disconnect()
@@ -103,7 +107,7 @@ local function clearAutoSync(zone: Types.InternalZone)
 end
 
 local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
-	State.autoSyncZones[zone.id] = zone
+	State.autoSyncZones[zone.slot] = zone
 
 	local connections = zone.syncConnections or {}
 
@@ -112,9 +116,9 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 			connections,
 			reference:GetPropertyChangedSignal('Size'):Connect(function()
 				local newHalfSize = reference.ExtentsSize * 0.5
-				if dynamicHalfSizes[zone.id] ~= newHalfSize then
-					dynamicHalfSizes[zone.id] = newHalfSize
-					ZoneShapes.refresh(zone.id)
+				if dynamicHalfSizes[zone.slot] ~= newHalfSize then
+					dynamicHalfSizes[zone.slot] = newHalfSize
+					ZoneShapes.refresh(zone.slot)
 					State.pendingDynamicRebuild = true
 				end
 			end)
@@ -126,9 +130,9 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 			connections,
 			reference:GetPropertyChangedSignal('Shape'):Connect(function()
 				local newShape = reference.Shape.Value
-				if dynamicTypes[zone.id] ~= newShape then
-					dynamicTypes[zone.id] = newShape
-					ZoneShapes.refresh(zone.id)
+				if dynamicTypes[zone.slot] ~= newShape then
+					dynamicTypes[zone.slot] = newShape
+					ZoneShapes.refresh(zone.slot)
 					State.pendingDynamicRebuild = true
 				end
 			end)
@@ -184,30 +188,40 @@ local function newZoneInternal(
 	local id = State.nextZoneId
 	State.nextZoneId += 1
 
+	-- Keyed by slot, which is reused, so the tables stay arrays
+	local slot = table.remove(State.freeZoneSlots)
+	if not slot then
+		slot = State.zoneSlotCount + 1
+		State.zoneSlotCount = slot
+	end
+	State.zoneSlotIds[slot] = id
+
 	local halfSize = size * 0.5
 	if isDynamic then
-		State.dynamicCFrames[id] = cframe
-		State.dynamicHalfSizes[id] = halfSize
+		State.dynamicCFrames[slot] = cframe
+		State.dynamicHalfSizes[slot] = halfSize
 		State.pendingDynamicRebuild = true
 		State.dynamicTree.membersChanged = true
 	else
-		State.staticCFrames[id] = cframe
-		State.staticHalfSizes[id] = halfSize
+		State.staticCFrames[slot] = cframe
+		State.staticHalfSizes[slot] = halfSize
 		State.pendingStaticRebuild = true
 		State.staticTree.membersChanged = true
 	end
 
-	applyShapeType(id, isDynamic, shapeType, asQueryablePart(reference))
-	ZoneShapes.refresh(id)
+	applyShapeType(slot, isDynamic, shapeType, asQueryablePart(reference))
+	ZoneShapes.refresh(slot)
 
 	local self: Types.InternalZone = setmetatable({
 		id = id,
+		slot = slot,
 		reference = reference,
 		dynamic = isDynamic,
 		metadata = metadata,
 		autoSync = false,
 	}, Zone) :: any
 	State.zoneIdToZoneObj[id] = self
+	State.zoneSlotToZoneObj[slot] = self
 
 	if autoSync then
 		self:setAutoSync(true)
@@ -682,23 +696,23 @@ end
 
 -- private
 function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	local attached = State.zoneAttachedObservers[self.id] or {}
-	State.zoneAttachedObservers[self.id] = attached
+	local attached = State.zoneAttachedObservers[self.slot] or {}
+	State.zoneAttachedObservers[self.slot] = attached
 
 	if not table.find(attached, observer.id) then
 		table.insert(attached, observer.id)
-		State.zoneSoleObserver[self.id] = if #attached == 1 then attached[1] else nil
+		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, self.dynamic, 1)
 	end
 
-	ZoneShapes.touch(self.id, self.dynamic)
+	ZoneShapes.touch(self.slot, self.dynamic)
 
 	return self
 end
 
 -- private
 function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	local attached = State.zoneAttachedObservers[self.id]
+	local attached = State.zoneAttachedObservers[self.slot]
 	if not attached then
 		return self
 	end
@@ -710,15 +724,15 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
-		State.zoneSoleObserver[self.id] = if #attached == 1 then attached[1] else nil
+		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, self.dynamic, -1)
 	end
 
 	if #attached == 0 then
-		State.zoneAttachedObservers[self.id] = nil
+		State.zoneAttachedObservers[self.slot] = nil
 	end
 
-	ZoneShapes.touch(self.id, self.dynamic)
+	ZoneShapes.touch(self.slot, self.dynamic)
 
 	return self
 end
@@ -769,12 +783,12 @@ end
 function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Attachment | Bone)?): Types.Zone
 	self.reference = reference
 
-	local currentShape = if self.dynamic then dynamicTypes[self.id] else staticTypes[self.id]
+	local currentShape = if self.dynamic then dynamicTypes[self.slot] else staticTypes[self.slot]
 	if currentShape == MESH_SHAPE_VALUE then
 		-- Mesh zones query the part directly, so the new reference has to take over.
 		-- Without a queryable part the zone falls back to its bounding box.
-		applyShapeType(self.id, self.dynamic, MESH_SHAPE_VALUE, asQueryablePart(reference))
-		ZoneShapes.refresh(self.id)
+		applyShapeType(self.slot, self.dynamic, MESH_SHAPE_VALUE, asQueryablePart(reference))
+		ZoneShapes.refresh(self.slot)
 	end
 
 	if self.autoSync then
@@ -810,7 +824,7 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 		return self
 	end
 
-	local id = self.id
+	local slot = self.slot
 
 	if reference:IsA('BasePart') then
 		local newCFrame = reference.CFrame
@@ -820,45 +834,47 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 		if self.dynamic then
 			local needsUpdate = false
 
-			if dynamicCFrames[id] ~= newCFrame then
-				dynamicCFrames[id] = newCFrame
+			if dynamicCFrames[slot] ~= newCFrame then
+				dynamicCFrames[slot] = newCFrame
 				needsUpdate = true
 			end
 
-			if dynamicHalfSizes[id] ~= newHalfSize then
-				dynamicHalfSizes[id] = newHalfSize
+			if dynamicHalfSizes[slot] ~= newHalfSize then
+				dynamicHalfSizes[slot] = newHalfSize
 				needsUpdate = true
 			end
 
-			if dynamicTypes[id] ~= newShape or (newShape == MESH_SHAPE_VALUE and dynamicMeshes[id] ~= reference) then
-				applyShapeType(id, true, newShape, reference)
+			if
+				dynamicTypes[slot] ~= newShape or (newShape == MESH_SHAPE_VALUE and dynamicMeshes[slot] ~= reference)
+			then
+				applyShapeType(slot, true, newShape, reference)
 				needsUpdate = true
 			end
 
 			if needsUpdate then
-				ZoneShapes.refresh(id)
+				ZoneShapes.refresh(slot)
 				State.pendingDynamicRebuild = true
 			end
 		else
 			local needsUpdate = false
 
-			if staticCFrames[id] ~= newCFrame then
-				staticCFrames[id] = newCFrame
+			if staticCFrames[slot] ~= newCFrame then
+				staticCFrames[slot] = newCFrame
 				needsUpdate = true
 			end
 
-			if staticHalfSizes[id] ~= newHalfSize then
-				staticHalfSizes[id] = newHalfSize
+			if staticHalfSizes[slot] ~= newHalfSize then
+				staticHalfSizes[slot] = newHalfSize
 				needsUpdate = true
 			end
 
-			if staticTypes[id] ~= newShape or (newShape == MESH_SHAPE_VALUE and staticMeshes[id] ~= reference) then
-				applyShapeType(id, false, newShape, reference)
+			if staticTypes[slot] ~= newShape or (newShape == MESH_SHAPE_VALUE and staticMeshes[slot] ~= reference) then
+				applyShapeType(slot, false, newShape, reference)
 				needsUpdate = true
 			end
 
 			if needsUpdate then
-				ZoneShapes.refresh(id)
+				ZoneShapes.refresh(slot)
 				State.pendingStaticRebuild = true
 			end
 		end
@@ -869,20 +885,20 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 	if reference:IsA('Attachment') or reference:IsA('Bone') then
 		local newCFrame = reference.WorldCFrame
 		if self.dynamic then
-			if dynamicCFrames[id] == newCFrame then
+			if dynamicCFrames[slot] == newCFrame then
 				return self
 			end
 
-			dynamicCFrames[id] = newCFrame
-			ZoneShapes.refresh(id)
+			dynamicCFrames[slot] = newCFrame
+			ZoneShapes.refresh(slot)
 			State.pendingDynamicRebuild = true
 		else
-			if staticCFrames[id] == newCFrame then
+			if staticCFrames[slot] == newCFrame then
 				return self
 			end
 
-			staticCFrames[id] = newCFrame
-			ZoneShapes.refresh(id)
+			staticCFrames[slot] = newCFrame
+			ZoneShapes.refresh(slot)
 			State.pendingStaticRebuild = true
 		end
 
@@ -911,10 +927,10 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 		return self
 	end
 
-	local id = self.id
+	local slot = self.slot
 	self.dynamic = isDynamic
 
-	local attached = State.zoneAttachedObservers[id]
+	local attached = State.zoneAttachedObservers[slot]
 	if attached then
 		for _, obsId in attached do
 			updateObserverZoneCount(obsId, not isDynamic, -1)
@@ -923,29 +939,29 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 	end
 
 	if isDynamic then
-		dynamicCFrames[id] = staticCFrames[id]
-		dynamicHalfSizes[id] = staticHalfSizes[id]
-		dynamicTypes[id] = staticTypes[id]
-		dynamicMeshes[id] = staticMeshes[id]
+		dynamicCFrames[slot] = staticCFrames[slot]
+		dynamicHalfSizes[slot] = staticHalfSizes[slot]
+		dynamicTypes[slot] = staticTypes[slot]
+		dynamicMeshes[slot] = staticMeshes[slot]
 
-		staticCFrames[id] = nil
-		staticHalfSizes[id] = nil
-		staticTypes[id] = nil
-		staticMeshes[id] = nil
+		staticCFrames[slot] = nil
+		staticHalfSizes[slot] = nil
+		staticTypes[slot] = nil
+		staticMeshes[slot] = nil
 	else
 		if self.autoSync then
 			self:setAutoSync(false)
 		end
 
-		staticCFrames[id] = dynamicCFrames[id]
-		staticHalfSizes[id] = dynamicHalfSizes[id]
-		staticTypes[id] = dynamicTypes[id]
-		staticMeshes[id] = dynamicMeshes[id]
+		staticCFrames[slot] = dynamicCFrames[slot]
+		staticHalfSizes[slot] = dynamicHalfSizes[slot]
+		staticTypes[slot] = dynamicTypes[slot]
+		staticMeshes[slot] = dynamicMeshes[slot]
 
-		dynamicCFrames[id] = nil
-		dynamicHalfSizes[id] = nil
-		dynamicTypes[id] = nil
-		dynamicMeshes[id] = nil
+		dynamicCFrames[slot] = nil
+		dynamicHalfSizes[slot] = nil
+		dynamicTypes[slot] = nil
+		dynamicMeshes[slot] = nil
 	end
 
 	State.pendingStaticRebuild = true
@@ -971,13 +987,13 @@ end
 ]=]
 function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
 	if self.dynamic then
-		dynamicCFrames[self.id] = cf
+		dynamicCFrames[self.slot] = cf
 		State.pendingDynamicRebuild = true
 	else
-		staticCFrames[self.id] = cf
+		staticCFrames[self.slot] = cf
 		State.pendingStaticRebuild = true
 	end
-	ZoneShapes.refresh(self.id)
+	ZoneShapes.refresh(self.slot)
 	return self
 end
 
@@ -995,7 +1011,7 @@ end
 	@return Zone
 ]=]
 function Zone.setPosition(self: Types.InternalZone, pos: Vector3): Types.Zone
-	local currentCF = self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
+	local currentCF = self.dynamic and dynamicCFrames[self.slot] or staticCFrames[self.slot]
 	local newCF = currentCF.Rotation + pos
 	return self:setCFrame(newCF)
 end
@@ -1017,13 +1033,13 @@ function Zone.setSize(self: Types.InternalZone, size: Vector3): Types.Zone
 	local halfSize = size * 0.5
 
 	if self.dynamic then
-		dynamicHalfSizes[self.id] = halfSize
+		dynamicHalfSizes[self.slot] = halfSize
 		State.pendingDynamicRebuild = true
 	else
-		staticHalfSizes[self.id] = halfSize
+		staticHalfSizes[self.slot] = halfSize
 		State.pendingStaticRebuild = true
 	end
-	ZoneShapes.refresh(self.id)
+	ZoneShapes.refresh(self.slot)
 	return self
 end
 
@@ -1046,8 +1062,8 @@ function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.
 		Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(shape))
 	end
 
-	applyShapeType(self.id, self.dynamic, shapeType, asQueryablePart(self.reference))
-	ZoneShapes.refresh(self.id)
+	applyShapeType(self.slot, self.dynamic, shapeType, asQueryablePart(self.reference))
+	ZoneShapes.refresh(self.slot)
 
 	if self.dynamic then
 		State.pendingDynamicRebuild = true
@@ -1113,7 +1129,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getPosition(self: Types.InternalZone): Vector3
-	local cf = self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
+	local cf = self.dynamic and dynamicCFrames[self.slot] or staticCFrames[self.slot]
 	return cf.Position
 end
 
@@ -1125,7 +1141,7 @@ end
 	@return CFrame
 ]=]
 function Zone.getCFrame(self: Types.InternalZone): CFrame
-	return self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
+	return self.dynamic and dynamicCFrames[self.slot] or staticCFrames[self.slot]
 end
 
 --[=[
@@ -1136,7 +1152,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getSize(self: Types.InternalZone): Vector3
-	local halfSize = self.dynamic and dynamicHalfSizes[self.id] or staticHalfSizes[self.id]
+	local halfSize = self.dynamic and dynamicHalfSizes[self.slot] or staticHalfSizes[self.slot]
 	return halfSize * 2
 end
 
@@ -1148,7 +1164,7 @@ end
 	@return ShapeType
 ]=]
 function Zone.getShape(self: Types.InternalZone): Types.ShapeType
-	local shapeType = self.dynamic and dynamicTypes[self.id] or staticTypes[self.id]
+	local shapeType = self.dynamic and dynamicTypes[self.slot] or staticTypes[self.slot]
 	if shapeType == Enum.PartType.Block.Value then
 		return 'Block'
 	elseif shapeType == Enum.PartType.Ball.Value then
@@ -1174,7 +1190,7 @@ end
 	@return boolean
 ]=]
 function Zone.isPointInside(self: Types.InternalZone, point: Vector3): boolean
-	return ZoneShapes.containsPoint(self.id, point)
+	return ZoneShapes.containsPoint(self.slot, point)
 end
 
 --[=[ 
@@ -1234,7 +1250,8 @@ function Zone.destroy(self: Types.InternalZone): ()
 
 	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler
 	local id = self.id
-	local attachedObservers = State.zoneAttachedObservers[id]
+	local slot = self.slot
+	local attachedObservers = State.zoneAttachedObservers[slot]
 	if attachedObservers then
 		for _, observerId in attachedObservers do
 			updateObserverZoneCount(observerId, self.dynamic, -1)
@@ -1275,8 +1292,8 @@ function Zone.destroy(self: Types.InternalZone): ()
 	-- Clear the reference before the onDestroyCallbacks are fired.
 	-- This is to ensure that, when the callback attempts to detach the observer manually,
 	-- it safely early-returns without double-decrementing the count.
-	State.zoneAttachedObservers[id] = nil
-	State.zoneSoleObserver[id] = nil
+	State.zoneAttachedObservers[slot] = nil
+	State.zoneSoleObserver[slot] = nil
 
 	if self.onDestroyCallbacks then
 		-- The table must be cloned to avoid iterator shifts
@@ -1288,23 +1305,28 @@ function Zone.destroy(self: Types.InternalZone): ()
 	end
 
 	State.zoneIdToZoneObj[id] = nil
+	State.zoneSlotToZoneObj[slot] = nil
+	State.zoneSlotIds[slot] = nil
 
 	if self.dynamic then
-		dynamicCFrames[id] = nil
-		dynamicHalfSizes[id] = nil
-		dynamicTypes[id] = nil
-		dynamicMeshes[id] = nil
+		dynamicCFrames[slot] = nil
+		dynamicHalfSizes[slot] = nil
+		dynamicTypes[slot] = nil
+		dynamicMeshes[slot] = nil
 		State.pendingDynamicRebuild = true
 		State.dynamicTree.membersChanged = true
 	else
-		staticCFrames[id] = nil
-		staticHalfSizes[id] = nil
-		staticTypes[id] = nil
-		staticMeshes[id] = nil
+		staticCFrames[slot] = nil
+		staticHalfSizes[slot] = nil
+		staticTypes[slot] = nil
+		staticMeshes[slot] = nil
 		State.pendingStaticRebuild = true
 		State.staticTree.membersChanged = true
 	end
-	ZoneShapes.remove(id, self.dynamic)
+	ZoneShapes.remove(slot, self.dynamic)
+
+	-- Reusable after the next rebuild
+	table.insert(State.releasedZoneSlots, slot)
 
 	setmetatable(self :: any, nil)
 end

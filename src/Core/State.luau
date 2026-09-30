@@ -4,6 +4,12 @@ local Types = require(script.Parent.Parent.Types)
 
 local State = {
 	nextZoneId = 1,
+	-- Keyed by slot instead of id, slots are reused
+	zoneSlotCount = 0,
+	freeZoneSlots = {} :: { number },
+	-- Destroyed zones' slots, free after the next rebuild
+	releasedZoneSlots = {} :: { number },
+	zoneSlotIds = {} :: { [number]: number },
 	nextObserverId = 1,
 	nextGroupId = 1,
 
@@ -90,6 +96,7 @@ local State = {
 	-- Observer of zones attached to exactly one
 	zoneSoleObserver = {} :: { [number]: number },
 	zoneIdToZoneObj = {} :: { [number]: Types.InternalZone },
+	zoneSlotToZoneObj = {} :: { [number]: Types.InternalZone },
 	observerIdToObserverObj = {} :: { [number]: Types.InternalObserver },
 }
 
