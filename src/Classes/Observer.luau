@@ -1409,7 +1409,7 @@ end
 	@return () -> (Entity?, Zone?)
 ]=]
 function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> (any?, Types.Zone?)
-	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: boolean }
+	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: number }
 	local entity: Types.Entity?
 	local observerId = self.id
 
@@ -1445,7 +1445,7 @@ end
 	@return () -> (Player?, Zone?)
 ]=]
 function Observer.iterPlayersInside(self: Types.InternalObserver): () -> (Player?, Types.Zone?)
-	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: boolean }
+	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: number }
 	local entity: Types.Entity?
 	local observerId = self.id
 

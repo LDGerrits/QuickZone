@@ -79,7 +79,8 @@ local State = {
 	bucketList = {} :: { number },
 	buckets = {} :: { [number]: { Types.Entity } },
 
-	observerTrackingEntities = {} :: { [number]: { [Types.Entity]: boolean } },
+	-- Entity to the id of its zone
+	observerTrackingEntities = {} :: { [number]: { [Types.Entity]: number } },
 	observerPriorityMap = {} :: { [number]: number },
 	observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } },
 	observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } },
