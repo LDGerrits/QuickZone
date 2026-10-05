@@ -1246,6 +1246,12 @@ end
 	@within Zone
 ]=]
 function Zone.destroy(self: Types.InternalZone): ()
+	-- A callback below may destroy the zone again, which would release its slot twice
+	if self.destroyed then
+		return
+	end
+	self.destroyed = true
+
 	clearAutoSync(self)
 
 	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler

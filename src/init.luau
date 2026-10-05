@@ -17,6 +17,8 @@ local LinearBVH = require(script.Utils.LinearBVH)
 
 local queryPoint = LinearBVH.queryPoint
 local nextLeaf = LinearBVH.nextLeaf
+local acquireTree = LinearBVH.acquire
+local releaseTree = LinearBVH.release
 local leafContainsPoint = ZoneShapes.leafContainsPoint
 local containsPoint = ZoneShapes.containsPoint
 
@@ -603,22 +605,27 @@ end
 	Returns an iterator that returns every Zone intersecting the given point.
 	Ideal for zero-allocation ECS queries. Safe to `break` out of early.
 
+	:::info Rebuilds
+	The iterator keeps walking the trees as they were when it was created, even if they are rebuilt in between.
+	A tree rebuilt while an iterator is unfinished (including one you broke out of) is copied once instead of
+	overwritten. Prefer finishing the loop in hot paths.
+	:::
+
 	@method iterZonesAtPoint
 	@within QuickZone
 	@param point Vector3
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
-	local dynamicBuffer = dynamicTree.buffer
-	local dynamicCount = dynamicTree.count or 0
+	local dynamicCount = dynamicTree.count
+	local dynamicBuffer = acquireTree(dynamicTree)
 
-	local staticBuffer = staticTree.buffer
-	local staticCount = staticTree.count or 0
+	local staticCount = staticTree.count
+	local staticBuffer = acquireTree(staticTree)
 
 	local offset = 0
 	local checkingDynamic = true
-
-	-- Walks the trees it started with, so every zone gets a full check
+	local done = false
 
 	return function(): Types.Zone?
 		if checkingDynamic then
@@ -636,6 +643,11 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 
 			checkingDynamic = false
 			offset = 0
+			releaseTree(dynamicTree, dynamicBuffer)
+		end
+
+		if done then
+			return nil
 		end
 
 		while true do
@@ -649,6 +661,9 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 				return zoneSlotToZoneObj[hitId]
 			end
 		end
+
+		done = true
+		releaseTree(staticTree, staticBuffer)
 
 		return nil
 	end
