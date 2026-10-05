@@ -173,6 +173,44 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 	end
 end
 
+-- Fires the observer's exits for its entities in the zone
+local function exitEntities(zone: Types.InternalZone, observerId: number)
+	local trackedEntities = State.observerTrackingEntities[observerId]
+	if not trackedEntities then
+		return
+	end
+
+	local id = zone.id
+	for entity, zoneId in trackedEntities do
+		if zoneId ~= id then
+			continue
+		end
+
+		local data = State.entityData[entity]
+		if not data or data.activeObserverMemberships[observerId] ~= id then
+			continue
+		end
+
+		data.activeObserverMemberships[observerId] = nil
+		trackedEntities[entity] = nil
+
+		local cbs = State.observerExitedCallbacks[observerId]
+		if not cbs then
+			continue
+		end
+
+		local safety = State.observerSafety[observerId]
+		local ref = State.entityToReference[entity] or entity
+		for _, fn in cbs do
+			if safety then
+				task.spawn(fn, ref, zone, entity)
+			else
+				fn(ref, zone, entity)
+			end
+		end
+	end
+end
+
 local Zone = {}
 Zone.__index = Zone
 
@@ -696,6 +734,10 @@ end
 
 -- private
 function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
+	if self.destroyed then
+		return self
+	end
+
 	local attached = State.zoneAttachedObservers[self.slot] or {}
 	State.zoneAttachedObservers[self.slot] = attached
 
@@ -703,9 +745,12 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 		table.insert(attached, observer.id)
 		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, self.dynamic, 1)
-	end
+		ZoneShapes.touch(self.slot, self.dynamic)
 
-	ZoneShapes.touch(self.slot, self.dynamic)
+		if self.detachedObservers then
+			self.detachedObservers[observer.id] = nil
+		end
+	end
 
 	return self
 end
@@ -726,13 +771,17 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 		attached[lastIdx] = nil
 		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, self.dynamic, -1)
+		ZoneShapes.touch(self.slot, self.dynamic)
+
+		-- Its entities leave on the next tick, unless the zone is destroyed first
+		local detached = self.detachedObservers or {}
+		detached[observer.id] = true
+		self.detachedObservers = detached
 	end
 
 	if #attached == 0 then
 		State.zoneAttachedObservers[self.slot] = nil
 	end
-
-	ZoneShapes.touch(self.slot, self.dynamic)
 
 	return self
 end
@@ -1254,55 +1303,32 @@ function Zone.destroy(self: Types.InternalZone): ()
 
 	clearAutoSync(self)
 
-	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler
 	local id = self.id
 	local slot = self.slot
+
+	-- Detach before any callback runs, so a callback detaching again is a no-op
 	local attachedObservers = State.zoneAttachedObservers[slot]
+	State.zoneAttachedObservers[slot] = nil
+	State.zoneSoleObserver[slot] = nil
+
+	-- Exit while the zone object is still alive, so callbacks get it
 	if attachedObservers then
 		for _, observerId in attachedObservers do
 			updateObserverZoneCount(observerId, self.dynamic, -1)
-
-			local trackedEntities = State.observerTrackingEntities[observerId]
-			if not trackedEntities then
-				continue
-			end
-
-			for entity, zoneId in trackedEntities do
-				if zoneId ~= id then
-					continue
-				end
-
-				local data = State.entityData[entity]
-				if not data or data.activeObserverMemberships[observerId] ~= id then
-					continue
-				end
-
-				data.activeObserverMemberships[observerId] = nil
-				trackedEntities[entity] = nil
-
-				local cbs = State.observerExitedCallbacks[observerId]
-				if not cbs then
-					continue
-				end
-
-				local safety = State.observerSafety[observerId]
-				local ref = State.entityToReference[entity] or entity
-				for _, fn in cbs do
-					if safety then
-						task.spawn(fn, ref, self, entity)
-					else
-						fn(ref, self, entity)
-					end
-				end
-			end
+		end
+		for _, observerId in attachedObservers do
+			exitEntities(self, observerId)
 		end
 	end
 
-	-- Clear the reference before the onDestroyCallbacks are fired.
-	-- This is to ensure that, when the callback attempts to detach the observer manually,
-	-- it safely early-returns without double-decrementing the count.
-	State.zoneAttachedObservers[slot] = nil
-	State.zoneSoleObserver[slot] = nil
+	-- Observers detached since the last tick still have entities here
+	local detachedObservers = self.detachedObservers
+	if detachedObservers then
+		self.detachedObservers = nil
+		for observerId in detachedObservers do
+			exitEntities(self, observerId)
+		end
+	end
 
 	if self.onDestroyCallbacks then
 		-- The table must be cloned to avoid iterator shifts

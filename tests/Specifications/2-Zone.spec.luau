@@ -973,6 +973,22 @@ return function(Tiniest: Tiniest)
 		local size = Vector3.one * 10
 		local rotation = CFrame.Angles(0, math.pi / 4, 0)
 
+		Test('Block: a skewed, scaled CFrame agrees with PointToObjectSpace.', function()
+			local cframe =
+				CFrame.fromMatrix(Vector3.zero, Vector3.new(2, 0, 0), Vector3.new(1, 1, 0), Vector3.new(0, 0, 1))
+			local zone = Zone.new({ cframe = cframe, size = size })
+			local rng = Random.new(9)
+			for _ = 1, 200 do
+				local point = Util.randomOffset(rng, 12)
+				local localPoint = cframe:PointToObjectSpace(point)
+				local expected = math.abs(localPoint.X) <= 5
+					and math.abs(localPoint.Y) <= 5
+					and math.abs(localPoint.Z) <= 5
+				Expect(zone:isPointInside(point)).is(expected)
+			end
+			zone:destroy()
+		end)
+
 		Test('Block: checks points of aligned and rotated zones.', function()
 			local zoneA = Zone.new({ cframe = CFrame.identity, size = size })
 			local zoneB = Zone.new({ cframe = rotation, size = size })

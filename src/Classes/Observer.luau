@@ -65,6 +65,8 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 
 		dirtyProfiles[entity] = true
 		dirtyTopology[entity] = true
+		-- Another observer may take over an entity that stands still
+		data.logicVersion = -1
 
 		local oldZoneId = data.activeObserverMemberships[observerId]
 		if not oldZoneId then
@@ -1622,6 +1624,9 @@ function Observer.destroy(self: Types.InternalObserver): ()
 			end
 			attachedList[lastIdx] = nil
 			State.zoneSoleObserver[slot] = if #attachedList == 1 then attachedList[1] else nil
+			if #attachedList == 0 then
+				State.zoneAttachedObservers[slot] = nil
+			end
 		end
 	end
 

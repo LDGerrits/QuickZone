@@ -173,6 +173,8 @@ export type InternalZone = Zone & {
 	syncConnections: { RBXScriptConnection }?,
 	onDestroyCallbacks: { () -> () }?,
 	destroyed: boolean?,
+	-- Observers detached since attaching, whose entities may still be in the zone
+	detachedObservers: { [number]: boolean }?,
 }
 
 export type Zones = {
