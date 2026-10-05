@@ -10,6 +10,7 @@ local TiniestFolder = TestFolder.Tiniest
 local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -2150,6 +2151,181 @@ return function(Tiniest: Tiniest)
 			group:destroy()
 			zone:destroy()
 			part:Destroy()
+		end)
+	end)
+
+	Describe('Observer handoffs', function()
+		local function setup(position: Vector3)
+			local entity = { Position = position }
+			local zoneHigh = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local zoneLow = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			return entity, zoneHigh, zoneLow
+		end
+
+		Test('Unsubscribing a higher priority observer hands entities that stand still to a lower one.', function()
+			local entity, zoneHigh, zoneLow = setup(Vector3.new(-9000, 0, 9000))
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local high = Observer.new({ zones = { zoneHigh }, groups = { group }, priority = 2, safety = false })
+			local low = Observer.new({ zones = { zoneLow }, groups = { group }, priority = 1, safety = false })
+			QuickZone:update(1)
+			QuickZone:update(1)
+			Expect(high:getZoneOfEntity(entity)).is(zoneHigh)
+			Expect(low:getZoneOfEntity(entity)).is(nil)
+
+			high:unsubscribe(group)
+			QuickZone:update(1)
+
+			Expect(low:getZoneOfEntity(entity)).is(zoneLow)
+
+			high:destroy()
+			low:destroy()
+			group:destroy()
+			zoneHigh:destroy()
+			zoneLow:destroy()
+		end)
+
+		Test(
+			'Removing an entity from a higher priority group hands it to a lower one while it stands still.',
+			function()
+				local entity, zoneHigh, zoneLow = setup(Vector3.new(-9000, 0, 9100))
+				local groupHigh = Group.new({ entities = { entity }, autoClean = false })
+				local groupLow = Group.new({ entities = { entity }, autoClean = false })
+				local high =
+					Observer.new({ zones = { zoneHigh }, groups = { groupHigh }, priority = 2, safety = false })
+				local low = Observer.new({ zones = { zoneLow }, groups = { groupLow }, priority = 1, safety = false })
+				QuickZone:update(1)
+				QuickZone:update(1)
+				Expect(high:getZoneOfEntity(entity)).is(zoneHigh)
+
+				groupHigh:remove(entity)
+				QuickZone:update(1)
+
+				Expect(low:getZoneOfEntity(entity)).is(zoneLow)
+
+				high:destroy()
+				low:destroy()
+				groupHigh:destroy()
+				groupLow:destroy()
+				zoneHigh:destroy()
+				zoneLow:destroy()
+			end
+		)
+	end)
+
+	Describe('Observer callbacks that change state', function()
+		local function setup(position: Vector3)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observers = {
+				Observer.new({ zones = { zone }, groups = { group }, safety = false }),
+				Observer.new({ zones = { zone }, groups = { group }, safety = false }),
+			}
+			return entity, group, zone, observers
+		end
+
+		Test('An entity removed by one observer is not entered by another in the same tick.', function()
+			local _, group, zone, observers = setup(Vector3.new(9000, 0, 9000))
+			local enters = 0
+			for _, observer in observers do
+				observer:onEnter(function(entered)
+					enters += 1
+					QuickZone:removeEntity(entered)
+				end)
+			end
+			QuickZone:update(1)
+
+			Expect(enters).is(1)
+			for _, observer in observers do
+				Expect(#observer:getEntitiesInside()).is(0)
+			end
+
+			for _, observer in observers do
+				observer:destroy()
+			end
+			group:destroy()
+			zone:destroy()
+		end)
+
+		Test('A zone destroyed by one observer is not entered by another in the same tick.', function()
+			local entity, group, zone, observers = setup(Vector3.new(9000, 0, 9100))
+			local enteredZones = {}
+			local destroyed = false
+			for _, observer in observers do
+				observer:onEnter(function(_, enteredZone)
+					table.insert(enteredZones, enteredZone or false)
+					if not destroyed then
+						destroyed = true
+						zone:destroy()
+					end
+				end)
+			end
+			QuickZone:update(1)
+			QuickZone:update(1)
+
+			Expect(#enteredZones).is(1)
+			Expect(enteredZones[1]).is(zone)
+			for _, observer in observers do
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+			end
+
+			for _, observer in observers do
+				observer:destroy()
+			end
+			group:destroy()
+		end)
+	end)
+
+	Describe('Observer teardown', function()
+		Test('Destroying a zone just detached from an observer exits its entities with that zone.', function()
+			local position = Vector3.new(9000, 0, 9200)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+			local exitedZone: any = 'none'
+			observer:onExit(function(_, exited)
+				exitedZone = exited
+			end)
+			observer:detach(zone)
+			zone:destroy()
+			QuickZone:update(1)
+
+			Expect(exitedZone).is(zone)
+			Expect(#observer:getEntitiesInside()).is(0)
+
+			observer:destroy()
+			group:destroy()
+		end)
+
+		Test('Destroying an observer leaves no attachment state on its zones.', function()
+			local zone = Zone.new({ cframe = CFrame.new(9000, 0, 9300), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = {} })
+			observer:destroy()
+
+			Expect(State.zoneAttachedObservers[(zone :: any).slot]).is(nil)
+			zone:destroy()
+		end)
+
+		Test('Attaching an attached zone or detaching an unattached one records no zone change.', function()
+			local zone = Zone.new({ cframe = CFrame.new(9000, 0, 9400), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = {} })
+			local other = Observer.new({ zones = {}, groups = {} })
+			QuickZone:rebuild()
+			local version = State.staticVersion
+
+			observer:attach(zone)
+			other:detach(zone)
+			QuickZone:rebuild()
+
+			Expect(State.staticVersion).is(version)
+
+			observer:destroy()
+			other:destroy()
+			zone:destroy()
 		end)
 	end)
 end

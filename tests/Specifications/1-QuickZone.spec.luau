@@ -45,6 +45,39 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 			part:Destroy()
 		end)
+
+		Test('Keeps ticking when callbacks remove entities from the bucket being ticked.', function()
+			local position = Vector3.new(9000, 0, -9000)
+			local entities = {}
+			for i = 1, 6 do
+				entities[i] = { Position = position + Vector3.new(i, 0, 0) }
+			end
+			local group = Group.new({ entities = entities, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 20 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			local entered = {}
+			observer:onEnter(function(entity)
+				entered[entity] = true
+				group:remove(entity)
+			end)
+
+			-- Every entity is evaluated in one tick
+			QuickZone:setFrameBudget(1000)
+			local ok, err = pcall(function()
+				QuickZone:update(1)
+				QuickZone:update(1)
+			end)
+			QuickZone:setFrameBudget(1)
+
+			Expect(if ok then true else err).is(true)
+			for _, entity in entities do
+				Expect(entered[entity]).is(true)
+			end
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
+		end)
 	end)
 
 	Describe('QuickZone:setAutoSyncRate', function()

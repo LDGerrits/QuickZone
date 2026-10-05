@@ -503,6 +503,12 @@ function Scheduler.update(dt: number)
 						continue
 					end
 
+					-- An earlier callback may have removed the entity or destroyed the zone
+					local zone = zoneIdToZoneObj[zoneIdx]
+					if entityData[entity] ~= data or not zone then
+						continue
+					end
+
 					local currentZoneId = current[observerId]
 					if currentZoneId == zoneIdx then
 						continue
@@ -519,7 +525,6 @@ function Scheduler.update(dt: number)
 							continue
 						end
 
-						local zone = zoneIdToZoneObj[zoneIdx]
 						local reference = entityToReference[entity] or entity
 						fireCallback(cbs, reference, zone, entity, safety)
 					else -- Transition
@@ -528,14 +533,20 @@ function Scheduler.update(dt: number)
 							continue
 						end
 
-						local zone = zoneIdToZoneObj[zoneIdx]
 						local reference = entityToReference[entity] or entity
 						fireCallback(cbs, reference, zone, entity, safety)
 					end
 				end
 			end
 
-			idx += 1
+			-- Callbacks may have removed entities, swapping another into this index
+			if list[idx] == entity then
+				idx += 1
+			end
+			totalEntities = #list
+			if totalEntities == 0 then
+				break
+			end
 			if idx > totalEntities then
 				idx = 1
 			end

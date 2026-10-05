@@ -621,6 +621,8 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 
 	State.dirtyProfiles[entity] = true
 	State.dirtyTopology[entity] = true
+	-- Another observer may take over an entity that stands still
+	data.logicVersion = -1
 
 	for observerId, oldZoneId in data.activeObserverMemberships do
 		local stillTracked = false
