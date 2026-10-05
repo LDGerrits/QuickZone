@@ -28,10 +28,9 @@ local entityToGroups = State.entityToGroups
 local entityToReference = State.entityToReference
 local referenceToEntity = State.referenceToEntity
 
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
+local shapeCFrames = State.shapeCFrames
+local shapeHalfSizes = State.shapeHalfSizes
+local dynamicSlots = State.dynamicSlots
 
 local queryHits = {} :: { number }
 -- Candidate lists of finished iterZonesAtPoint iterators, for reuse
@@ -722,41 +721,20 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			return
 		end
 
-		-- Draw static zones
-		for id, cframe in staticCFrames do
-			local visual = getOrCreateVisual(id)
+		for slot, cframe in shapeCFrames do
+			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
-			local halfSize = staticHalfSizes[id]
+			local halfSize = shapeHalfSizes[slot]
 			local size = halfSize * 2
 
-			local observers = zoneAttachedObservers[id]
+			local observers = zoneAttachedObservers[slot]
 			local isActive = observers and next(observers) ~= nil
-			local color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
-
-			if visual.shape == 'Ball' then
-				box.Radius = math.max(halfSize.X, halfSize.Y, halfSize.Z)
-				box.CFrame = cframe
-			elseif visual.shape == 'Cylinder' then
-				box.Radius = math.max(halfSize.X, halfSize.Z)
-				box.Height = size.X
-				box.CFrame = cframe * CFrame.Angles(0, math.rad(90), 0)
+			local color
+			if dynamicSlots[slot] then
+				color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
 			else
-				box.Size = size
-				box.CFrame = cframe
+				color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
 			end
-			box.Color3 = color
-		end
-
-		-- Draw dynamic zones
-		for id, cframe in dynamicCFrames do
-			local visual = getOrCreateVisual(id)
-			local box = visual.adornment
-			local halfSize = dynamicHalfSizes[id]
-			local size = halfSize * 2
-
-			local observers = zoneAttachedObservers[id]
-			local isActive = observers and next(observers) ~= nil
-			local color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
 
 			if visual.shape == 'Ball' then
 				box.Radius = math.max(halfSize.X, halfSize.Y, halfSize.Z)
@@ -774,7 +752,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 
 		-- Destroy removed zones
 		for id, box in debugVisuals do
-			if not staticCFrames[id] and not dynamicCFrames[id] then
+			if not shapeCFrames[id] then
 				box.adornment:Destroy()
 				debugVisuals[id] = nil
 			end

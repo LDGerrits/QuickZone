@@ -18,8 +18,8 @@ local touches = ZoneChanges.touches
 local containsPoint = ZoneShapes.containsPoint
 local fireCallback = Callbacks.fire
 
-local staticCFrames = State.staticCFrames
-local dynamicCFrames = State.dynamicCFrames
+local staticSlots = State.staticSlots
+local dynamicSlots = State.dynamicSlots
 local shapeBoundsMin = State.shapeBoundsMin
 local shapeBoundsMax = State.shapeBoundsMax
 local shapePositions = State.shapePositions
@@ -322,28 +322,15 @@ function Scheduler.update(dt: number)
 
 		if autoSyncTimer >= syncInterval then
 			autoSyncTimer = 0
-			local needsRebuild = false
 
 			for slot, zone in autoSyncZones do
 				local reference = zone.reference
-				if not reference then
-					continue
+				if reference then
+					ZoneShapes.setCFrame(
+						slot,
+						if reference:IsA('Attachment') then reference.WorldCFrame else reference.CFrame
+					)
 				end
-
-				local newCF = reference:IsA('Attachment') and reference.WorldCFrame or reference.CFrame
-				local oldCF = dynamicCFrames[slot]
-
-				if oldCF == newCF then
-					continue
-				end
-
-				dynamicCFrames[slot] = newCF
-				ZoneShapes.refresh(slot)
-				needsRebuild = true
-			end
-
-			if needsRebuild then
-				State.pendingDynamicRebuild = true
 			end
 		end
 	end
@@ -623,12 +610,12 @@ end
 
 function Scheduler.rebuildTrees()
 	if State.pendingDynamicRebuild then
-		updateTree(dynamicTree, dynamicCFrames)
+		updateTree(dynamicTree, dynamicSlots)
 		State.pendingDynamicRebuild = false
 	end
 
 	if State.pendingStaticRebuild then
-		updateTree(staticTree, staticCFrames)
+		updateTree(staticTree, staticSlots)
 		State.pendingStaticRebuild = false
 	end
 

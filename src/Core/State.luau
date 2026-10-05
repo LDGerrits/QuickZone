@@ -15,20 +15,18 @@ local State = {
 	nextObserverId = 1,
 	nextGroupId = 1,
 
-	staticCFrames = {} :: { [number]: CFrame },
-	staticHalfSizes = {} :: { [number]: Vector3 },
-	staticTypes = {} :: { [number]: number },
-	staticMeshes = {} :: { [number]: BasePart },
+	-- Slots of the zones in each tree
+	staticSlots = {} :: { [number]: true },
+	dynamicSlots = {} :: { [number]: true },
 
-	dynamicCFrames = {} :: { [number]: CFrame },
-	dynamicHalfSizes = {} :: { [number]: Vector3 },
-	dynamicTypes = {} :: { [number]: number },
-	dynamicMeshes = {} :: { [number]: BasePart },
-
-	-- World-space shape of every zone
-	shapeTypes = {} :: { [number]: number },
+	-- Geometry of every zone, only written through Core/ZoneShapes
+	shapeCFrames = {} :: { [number]: CFrame },
 	shapeHalfSizes = {} :: { [number]: Vector3 },
+	shapeTypes = {} :: { [number]: number },
+	-- The part a Mesh zone queries
 	shapeParts = {} :: { [number]: BasePart },
+
+	-- World-space shape derived from the geometry
 	shapePositions = {} :: { [number]: Vector3 },
 	shapeRights = {} :: { [number]: Vector3 },
 	shapeUps = {} :: { [number]: Vector3 },
