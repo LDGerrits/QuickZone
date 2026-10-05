@@ -1226,14 +1226,14 @@ return function(Tiniest: Tiniest)
 			part.Size = Vector3.one * 20
 			part.CFrame = CFrame.new(0, 3100, 0)
 			task.wait() -- Deferred property signals
-			local resized = State.dynamicHalfSizes[slot] ~= nil
+			local resized = State.shapeHalfSizes[slot] ~= nil
 			local updated = pcall(QuickZone.update, QuickZone, 1)
-			local moved = State.dynamicCFrames[slot] ~= nil
+			local moved = State.shapeCFrames[slot] ~= nil
 
 			-- Leave no broken state behind for later tests
 			State.autoSyncZones[slot] = nil
-			State.dynamicHalfSizes[slot] = nil
-			State.dynamicCFrames[slot] = nil
+			State.shapeHalfSizes[slot] = nil
+			State.shapeCFrames[slot] = nil
 			part:Destroy()
 			QuickZone:rebuild()
 

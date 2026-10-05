@@ -2,7 +2,8 @@
 --!optimize 2
 --!strict
 
--- Caches every zone's world-space shape so queries and rebuilds never read a CFrame
+-- Owns every zone's geometry. Writes go through here, which keeps the world-space shape used by
+-- queries and rebuilds, the change log and the tree rebuild flags in step with it
 
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
@@ -16,8 +17,9 @@ local getBounds = Geometry.getBounds
 local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
-local shapeTypes = State.shapeTypes
+local shapeCFrames = State.shapeCFrames
 local shapeHalfSizes = State.shapeHalfSizes
+local shapeTypes = State.shapeTypes
 local shapeParts = State.shapeParts
 local shapePositions = State.shapePositions
 local shapeRights = State.shapeRights
@@ -27,7 +29,8 @@ local shapeBoundsMin = State.shapeBoundsMin
 local shapeBoundsMax = State.shapeBoundsMax
 local shapeAxisAligned = State.shapeAxisAligned
 local treeExact = State.treeExact
-local dynamicCFrames = State.dynamicCFrames
+local staticSlots = State.staticSlots
+local dynamicSlots = State.dynamicSlots
 local dynamicTree = State.dynamicTree
 local staticTree = State.staticTree
 local staticChanges = State.staticChanges
@@ -38,25 +41,35 @@ local function isAxis(direction: Vector3): boolean
 	return magnitude == Vector3.xAxis or magnitude == Vector3.yAxis or magnitude == Vector3.zAxis
 end
 
-local ZoneShapes = {}
-
 local function changesOf(isDynamic: boolean): Types.ZoneChanges
 	return if isDynamic then dynamicChanges else staticChanges
 end
 
--- Call after the CFrame, size, shape or mesh changes
-function ZoneShapes.refresh(id: number)
-	local isDynamic = dynamicCFrames[id] ~= nil
-	local cframe, halfSize, shapeType, part
+local function markPending(isDynamic: boolean)
 	if isDynamic then
-		cframe, halfSize, shapeType, part =
-			dynamicCFrames[id], State.dynamicHalfSizes[id], State.dynamicTypes[id], State.dynamicMeshes[id]
+		State.pendingDynamicRebuild = true
 	else
-		cframe, halfSize, shapeType, part =
-			State.staticCFrames[id], State.staticHalfSizes[id], State.staticTypes[id], State.staticMeshes[id]
+		State.pendingStaticRebuild = true
 	end
+end
 
-	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe:GetComponents()
+-- Zones were added to or removed from the tree, so it must be rebuilt rather than refit
+local function markMembersChanged(isDynamic: boolean)
+	markPending(isDynamic)
+	if isDynamic then
+		dynamicTree.membersChanged = true
+	else
+		staticTree.membersChanged = true
+	end
+end
+
+-- Recomputes the world-space shape from the geometry
+local function refresh(slot: number)
+	local isDynamic = dynamicSlots[slot] == true
+	local halfSize = shapeHalfSizes[slot]
+	local shapeType = shapeTypes[slot]
+
+	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = shapeCFrames[slot]:GetComponents()
 	local position = Vector3.new(x, y, z)
 	local right = Vector3.new(r00, r10, r20)
 	local up = Vector3.new(r01, r11, r21)
@@ -66,84 +79,167 @@ function ZoneShapes.refresh(id: number)
 	-- Entities in the old or new box may be affected
 	local changes = changesOf(isDynamic)
 	if not changes.all then
-		local oldMin = shapeBoundsMin[id]
+		local oldMin = shapeBoundsMin[slot]
 		if oldMin then
-			ZoneChanges.add(changes, oldMin, shapeBoundsMax[id])
+			ZoneChanges.add(changes, oldMin, shapeBoundsMax[slot])
 		end
 		ZoneChanges.add(changes, boundsMin, boundsMax)
 	end
 
-	shapeTypes[id] = shapeType
-	shapeHalfSizes[id] = halfSize
-	shapeParts[id] = part
-	shapePositions[id] = position
-	shapeRights[id] = right
-	shapeUps[id] = up
-	shapeBacks[id] = back
-	shapeBoundsMin[id] = boundsMin
-	shapeBoundsMax[id] = boundsMax
+	shapePositions[slot] = position
+	shapeRights[slot] = right
+	shapeUps[slot] = up
+	shapeBacks[slot] = back
+	shapeBoundsMin[slot] = boundsMin
+	shapeBoundsMax[slot] = boundsMax
 	-- Unrotated blocks are exactly their bounds
-	shapeAxisAligned[id] = shapeType == BLOCK_SHAPE_VALUE and isAxis(right) and isAxis(up) and isAxis(back)
+	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE and isAxis(right) and isAxis(up) and isAxis(back)
 
 	-- Leaf is stale until the next rebuild
-	treeExact[id] = nil
+	treeExact[slot] = nil
+
+	markPending(isDynamic)
+end
+
+local ZoneShapes = {}
+
+-- Adds a zone to the static or dynamic tree. part is the part a Mesh zone queries
+function ZoneShapes.add(
+	slot: number,
+	isDynamic: boolean,
+	cframe: CFrame,
+	halfSize: Vector3,
+	shapeType: number,
+	part: BasePart?
+)
+	if isDynamic then
+		dynamicSlots[slot] = true
+	else
+		staticSlots[slot] = true
+	end
+	markMembersChanged(isDynamic)
+
+	shapeCFrames[slot] = cframe
+	shapeHalfSizes[slot] = halfSize
+	shapeTypes[slot] = shapeType
+	shapeParts[slot] = part
+	refresh(slot)
+end
+
+-- Sets the whole geometry
+function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeType: number, part: BasePart?)
+	-- Ignore writes for removed zones, like a late property signal
+	if not shapeCFrames[slot] then
+		return
+	end
+
+	if
+		shapeCFrames[slot] == cframe
+		and shapeHalfSizes[slot] == halfSize
+		and shapeTypes[slot] == shapeType
+		and shapeParts[slot] == part
+	then
+		return
+	end
+
+	shapeCFrames[slot] = cframe
+	shapeHalfSizes[slot] = halfSize
+	shapeTypes[slot] = shapeType
+	shapeParts[slot] = part
+	refresh(slot)
+end
+
+function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
+	ZoneShapes.set(slot, cframe, shapeHalfSizes[slot], shapeTypes[slot], shapeParts[slot])
+end
+
+function ZoneShapes.setHalfSize(slot: number, halfSize: Vector3)
+	ZoneShapes.set(slot, shapeCFrames[slot], halfSize, shapeTypes[slot], shapeParts[slot])
+end
+
+function ZoneShapes.setShape(slot: number, shapeType: number, part: BasePart?)
+	ZoneShapes.set(slot, shapeCFrames[slot], shapeHalfSizes[slot], shapeType, part)
+end
+
+function ZoneShapes.isDynamic(slot: number): boolean
+	return dynamicSlots[slot] == true
+end
+
+-- Moves a zone between the static and dynamic trees. Its shape stays, so no zone change is recorded
+function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
+	if (dynamicSlots[slot] == true) == isDynamic then
+		return
+	end
+
+	if isDynamic then
+		staticSlots[slot] = nil
+		dynamicSlots[slot] = true
+	else
+		dynamicSlots[slot] = nil
+		staticSlots[slot] = true
+	end
+	markMembersChanged(true)
+	markMembersChanged(false)
 end
 
 -- For changes that don't alter the shape, like attaching
-function ZoneShapes.touch(id: number, isDynamic: boolean)
-	local min = shapeBoundsMin[id]
+function ZoneShapes.touch(slot: number)
+	local min = shapeBoundsMin[slot]
 	if min then
-		ZoneChanges.add(changesOf(isDynamic), min, shapeBoundsMax[id])
+		ZoneChanges.add(changesOf(dynamicSlots[slot] == true), min, shapeBoundsMax[slot])
 	end
 end
 
-function ZoneShapes.remove(id: number, wasDynamic: boolean)
-	local min = shapeBoundsMin[id]
-	if min then
-		ZoneChanges.add(changesOf(wasDynamic), min, shapeBoundsMax[id])
-	end
+function ZoneShapes.remove(slot: number)
+	local isDynamic = dynamicSlots[slot] == true
+	ZoneShapes.touch(slot)
 
-	shapeTypes[id] = nil
-	shapeHalfSizes[id] = nil
-	shapeParts[id] = nil
-	shapePositions[id] = nil
-	shapeRights[id] = nil
-	shapeUps[id] = nil
-	shapeBacks[id] = nil
-	shapeBoundsMin[id] = nil
-	shapeBoundsMax[id] = nil
-	shapeAxisAligned[id] = nil
-	treeExact[id] = nil
+	staticSlots[slot] = nil
+	dynamicSlots[slot] = nil
+	markMembersChanged(isDynamic)
+
+	shapeCFrames[slot] = nil
+	shapeHalfSizes[slot] = nil
+	shapeTypes[slot] = nil
+	shapeParts[slot] = nil
+	shapePositions[slot] = nil
+	shapeRights[slot] = nil
+	shapeUps[slot] = nil
+	shapeBacks[slot] = nil
+	shapeBoundsMin[slot] = nil
+	shapeBoundsMax[slot] = nil
+	shapeAxisAligned[slot] = nil
+	treeExact[slot] = nil
 end
 
 -- Called after a tree is rebuilt
-function ZoneShapes.markBuilt(ids: { [number]: any })
-	for id in ids do
-		treeExact[id] = shapeAxisAligned[id]
+function ZoneShapes.markBuilt(slots: { [number]: any })
+	for slot in slots do
+		treeExact[slot] = shapeAxisAligned[slot]
 	end
 end
 
-function ZoneShapes.containsPoint(id: number, point: Vector3): boolean
-	local shapeType = shapeTypes[id]
+function ZoneShapes.containsPoint(slot: number, point: Vector3): boolean
+	local shapeType = shapeTypes[slot]
 	if not shapeType then
 		return false
 	end
 
 	return isPointInShape(
 		point,
-		shapePositions[id],
-		shapeRights[id],
-		shapeUps[id],
-		shapeBacks[id],
-		shapeHalfSizes[id],
+		shapePositions[slot],
+		shapeRights[slot],
+		shapeUps[slot],
+		shapeBacks[slot],
+		shapeHalfSizes[slot],
 		shapeType,
-		shapeParts[id]
+		shapeParts[slot]
 	)
 end
 
 -- Skips the shape check for exact leaves
-function ZoneShapes.leafContainsPoint(id: number, point: Vector3): boolean
-	return treeExact[id] == true or ZoneShapes.containsPoint(id, point)
+function ZoneShapes.leafContainsPoint(slot: number, point: Vector3): boolean
+	return treeExact[slot] == true or ZoneShapes.containsPoint(slot, point)
 end
 
 -- Writes the ids of dynamic, then static, leaves containing the point to hits, returns the count.

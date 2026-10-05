@@ -1851,6 +1851,138 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Zone geometry changes', function()
+		Test('An entity that stands still notices every kind of zone geometry change.', function()
+			local far = Vector3.new(0, 500, 0)
+			local cases: { { name: string, setup: (Vector3) -> (any, BasePart?), change: (any, BasePart?, Vector3) -> () } } =
+				{
+					{
+						name = 'setCFrame',
+						setup = function(p)
+							return Zone.new({ cframe = CFrame.new(p + far), size = Vector3.one * 10 }), nil
+						end,
+						change = function(zone, _, p)
+							zone:setCFrame(CFrame.new(p))
+						end,
+					},
+					{
+						name = 'setPosition',
+						setup = function(p)
+							return Zone.new({ cframe = CFrame.new(p + far), size = Vector3.one * 10 }), nil
+						end,
+						change = function(zone, _, p)
+							zone:setPosition(p)
+						end,
+					},
+					{
+						name = 'setSize',
+						setup = function(p)
+							return Zone.new({ cframe = CFrame.new(p + Vector3.xAxis * 20), size = Vector3.one * 10 }),
+								nil
+						end,
+						change = function(zone)
+							zone:setSize(Vector3.one * 50)
+						end,
+					},
+					{
+						name = 'setShape',
+						setup = function(p)
+							return Zone.new({
+								cframe = CFrame.new(p + Vector3.one * 4),
+								size = Vector3.one * 10,
+								shape = 'Ball',
+							}),
+								nil
+						end,
+						change = function(zone)
+							zone:setShape('Block')
+						end,
+					},
+					{
+						name = 'setDynamic',
+						setup = function(p)
+							return Zone.new({ cframe = CFrame.new(p + far), size = Vector3.one * 10 }), nil
+						end,
+						change = function(zone, _, p)
+							zone:setDynamic(true)
+							zone:setCFrame(CFrame.new(p))
+						end,
+					},
+					{
+						name = 'sync',
+						setup = function(p)
+							local part = CreatePart({ CFrame = CFrame.new(p + far), Size = Vector3.one * 10 })
+							return Zone.fromPart(part), part
+						end,
+						change = function(zone, part, p)
+							(part :: BasePart).CFrame = CFrame.new(p)
+							zone:sync()
+						end,
+					},
+					{
+						name = 'autoSync move',
+						setup = function(p)
+							local part = CreatePart({ CFrame = CFrame.new(p + far), Size = Vector3.one * 10 })
+							return Zone.fromPart(part, { isDynamic = true, autoSync = true }), part
+						end,
+						change = function(_, part, p)
+							(part :: BasePart).CFrame = CFrame.new(p)
+						end,
+					},
+					{
+						name = 'autoSync size',
+						setup = function(p)
+							local part =
+								CreatePart({ CFrame = CFrame.new(p + Vector3.xAxis * 20), Size = Vector3.one * 10 })
+							return Zone.fromPart(part, { isDynamic = true, autoSync = true }), part
+						end,
+						change = function(_, part)
+							(part :: BasePart).Size = Vector3.one * 50
+							task.wait() -- Deferred property signals
+						end,
+					},
+					{
+						name = 'autoSync shape',
+						setup = function(p)
+							local part =
+								CreatePart({ CFrame = CFrame.new(p + Vector3.one * 4), Size = Vector3.one * 10 });
+							(part :: Part).Shape = Enum.PartType.Ball
+							return Zone.fromPart(part, { isDynamic = true, autoSync = true }), part
+						end,
+						change = function(_, part)
+							(part :: Part).Shape = Enum.PartType.Block
+							task.wait() -- Deferred property signals
+						end,
+					},
+				}
+
+			for i, case in cases do
+				local position = Vector3.new(12000, 0, 12000 + i * 200)
+				local entity = { Position = position }
+				local group = Group.new({ entities = { entity }, autoClean = false })
+				local zone, part = case.setup(position)
+				local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+				QuickZone:update(1)
+				QuickZone:update(1)
+				local before = observer:getZoneOfEntity(entity)
+
+				case.change(zone, part, position)
+				QuickZone:update(1)
+				local after = observer:getZoneOfEntity(entity)
+				local found = table.find(QuickZone:getZonesAtPoint(position), zone) ~= nil
+
+				observer:destroy()
+				group:destroy()
+				zone:destroy()
+				if part then
+					part:Destroy()
+				end
+
+				Expect(`{case.name}: {before == zone}, {after == zone}, {found}`).is(`{case.name}: false, true, true`)
+			end
+		end)
+	end)
+
 	Describe('Observer:getZoneOfPlayer', function()
 		Test('Returns the current zone for a player inside, and nil outside.', function()
 			local zoneA = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })

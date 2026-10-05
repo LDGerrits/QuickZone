@@ -165,7 +165,6 @@ export type InternalZone = Zone & {
 	id: number,
 	slot: number,
 	reference: (Attachment | BasePart | Bone)?,
-	dynamic: boolean,
 	metadata: any?,
 	autoSync: boolean,
 	syncConnections: { RBXScriptConnection }?,
