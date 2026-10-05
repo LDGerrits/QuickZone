@@ -15,6 +15,7 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+local Callbacks = require(script.Parent.Parent.Core.Callbacks)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local State = require(script.Parent.Parent.Core.State)
 local Log = require(script.Parent.Parent.Utils.Log)
@@ -648,16 +649,9 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 			continue
 		end
 
-		local safety = State.observerSafety[observerId]
 		local z = State.zoneIdToZoneObj[oldZoneId]
 		local ref = State.entityToReference[entity] or entity
-		for _, fn in cbs do
-			if safety then
-				task.spawn(fn, ref, z, entity)
-			else
-				fn(ref, z, entity)
-			end
-		end
+		Callbacks.fire(cbs, ref, z, entity, State.observerSafety[observerId])
 	end
 
 	if next(State.entityToGroups[entity]) == nil then

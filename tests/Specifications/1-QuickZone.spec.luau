@@ -837,6 +837,68 @@ return function(Tiniest: Tiniest)
 				zone:destroy()
 			end
 		end)
+
+		Test('Breaking out of an iteration does not make the next tree update allocate.', function()
+			local center = Vector3.new(-30000, 0, 6000)
+			local zones = {}
+			for i = 0, 9 do
+				local offset = Vector3.new(i * 20, 0, 0)
+				table.insert(
+					zones,
+					Zone.new({ cframe = CFrame.new(center + offset), size = Vector3.one * 10, isDynamic = true })
+				)
+			end
+			local function nudge(step: number)
+				for i, zone in zones do
+					zone:setCFrame(CFrame.new(center + Vector3.new((i - 1) * 20, step * 0.01, 0)))
+				end
+				QuickZone:rebuild()
+			end
+			for step = 1, 10 do
+				nudge(step)
+			end
+
+			local reallocations = 0
+			for step = 11, 20 do
+				local before = State.dynamicTree.buffer
+				for _ in QuickZone:iterZonesAtPoint(center) do
+					break
+				end
+				nudge(step)
+				if State.dynamicTree.buffer ~= before then
+					reallocations += 1
+				end
+			end
+
+			for _, zone in zones do
+				zone:destroy()
+			end
+			Expect(reallocations).is(0)
+		end)
+
+		Test('Never yields a zone destroyed while iterating.', function()
+			local center = Vector3.new(-30000, 0, 9000)
+			local zoneA = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			QuickZone:rebuild()
+
+			local iterator = QuickZone:iterZonesAtPoint(center)
+			local first = iterator()
+			local other = if first == zoneA then zoneB else zoneA
+			other:destroy()
+			QuickZone:rebuild()
+			-- Takes the destroyed zone's slot
+			local replacement = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+
+			local rest = {}
+			for zone in iterator do
+				table.insert(rest, zone)
+			end
+
+			Expect(#rest).is(0)
+			first:destroy()
+			replacement:destroy()
+		end)
 	end)
 
 	Describe('Tree memory', function()

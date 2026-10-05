@@ -10,6 +10,7 @@ local Util = require(TestFolder.Util)
 
 local Types = require(ReplicatedStorage.QuickZone.Types)
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 
 local SHAPE_TYPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
@@ -1210,6 +1211,36 @@ return function(Tiniest: Tiniest)
 			Expect(zoneB:isPointInside(positionB)).is(true)
 			zoneB:destroy()
 			Expect(fired).is(1)
+		end)
+
+		Test('A callback during destroy cannot keep a destroyed zone auto-syncing.', function()
+			local part = CreatePart({ CFrame = CFrame.new(0, 3000, 0), Size = Vector3.one * 10 })
+			local zone = Zone.fromPart(part, { isDynamic = true, autoSync = true })
+			local slot = (zone :: any).slot
+			zone:onDestroy(function()
+				zone:setReference(part)
+			end)
+			zone:destroy()
+			local stillSyncing = State.autoSyncZones[slot] ~= nil
+
+			part.Size = Vector3.one * 20
+			part.CFrame = CFrame.new(0, 3100, 0)
+			task.wait() -- Deferred property signals
+			local resized = State.dynamicHalfSizes[slot] ~= nil
+			local updated = pcall(QuickZone.update, QuickZone, 1)
+			local moved = State.dynamicCFrames[slot] ~= nil
+
+			-- Leave no broken state behind for later tests
+			State.autoSyncZones[slot] = nil
+			State.dynamicHalfSizes[slot] = nil
+			State.dynamicCFrames[slot] = nil
+			part:Destroy()
+			QuickZone:rebuild()
+
+			Expect(stillSyncing).is(false)
+			Expect(resized).is(false)
+			Expect(updated).is(true)
+			Expect(moved).is(false)
 		end)
 	end)
 

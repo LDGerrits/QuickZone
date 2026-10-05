@@ -20,6 +20,7 @@
 
 local CollectionService = game:GetService('CollectionService')
 
+local Callbacks = require(script.Parent.Parent.Core.Callbacks)
 local State = require(script.Parent.Parent.Core.State)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
@@ -107,6 +108,11 @@ local function clearAutoSync(zone: Types.InternalZone)
 end
 
 local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
+	-- A callback during destroy must not start syncing the zone again
+	if zone.destroyed then
+		return
+	end
+
 	State.autoSyncZones[zone.slot] = zone
 
 	local connections = zone.syncConnections or {}
@@ -199,15 +205,8 @@ local function exitEntities(zone: Types.InternalZone, observerId: number)
 			continue
 		end
 
-		local safety = State.observerSafety[observerId]
 		local ref = State.entityToReference[entity] or entity
-		for _, fn in cbs do
-			if safety then
-				task.spawn(fn, ref, zone, entity)
-			else
-				fn(ref, zone, entity)
-			end
-		end
+		Callbacks.fire(cbs, ref, zone, entity, State.observerSafety[observerId])
 	end
 end
 
@@ -747,8 +746,9 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 		updateObserverZoneCount(observer.id, self.dynamic, 1)
 		ZoneShapes.touch(self.slot, self.dynamic)
 
-		if self.detachedObservers then
-			self.detachedObservers[observer.id] = nil
+		local detachedZones = State.observerDetachedZones[observer.id]
+		if detachedZones then
+			detachedZones[self.id] = nil
 		end
 	end
 
@@ -774,9 +774,12 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 		ZoneShapes.touch(self.slot, self.dynamic)
 
 		-- Its entities leave on the next tick, unless the zone is destroyed first
-		local detached = self.detachedObservers or {}
-		detached[observer.id] = true
-		self.detachedObservers = detached
+		local detachedZones = State.observerDetachedZones[observer.id]
+		if not detachedZones then
+			detachedZones = {}
+			State.observerDetachedZones[observer.id] = detachedZones
+		end
+		detachedZones[self.id] = true
 	end
 
 	if #attached == 0 then
@@ -1302,6 +1305,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	self.destroyed = true
 
 	clearAutoSync(self)
+	self.autoSync = false
 
 	local id = self.id
 	local slot = self.slot
@@ -1321,11 +1325,21 @@ function Zone.destroy(self: Types.InternalZone): ()
 		end
 	end
 
-	-- Observers detached since the last tick still have entities here
-	local detachedObservers = self.detachedObservers
-	if detachedObservers then
-		self.detachedObservers = nil
-		for observerId in detachedObservers do
+	-- Observers detached since the last tick may still have entities here.
+	-- Collected first, as callbacks may add observers to the map
+	local detachedFrom: { number }? = nil
+	for observerId, detachedZones in State.observerDetachedZones do
+		if detachedZones[id] then
+			detachedZones[id] = nil
+			if next(detachedZones) == nil then
+				State.observerDetachedZones[observerId] = nil
+			end
+			detachedFrom = detachedFrom or {}
+			table.insert(detachedFrom :: { number }, observerId)
+		end
+	end
+	if detachedFrom then
+		for _, observerId in detachedFrom do
 			exitEntities(self, observerId)
 		end
 	end

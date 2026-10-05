@@ -55,8 +55,6 @@ export type Tree = {
 	refitSkips: number,
 	-- Rebuild instead of refit
 	membersChanged: boolean,
-	-- Unfinished iterators reading the buffer, which then gets copied before a write
-	readers: number,
 }
 
 -- See Core/ZoneChanges
@@ -173,8 +171,6 @@ export type InternalZone = Zone & {
 	syncConnections: { RBXScriptConnection }?,
 	onDestroyCallbacks: { () -> () }?,
 	destroyed: boolean?,
-	-- Observers detached since attaching, whose entities may still be in the zone
-	detachedObservers: { [number]: boolean }?,
 }
 
 export type Zones = {
