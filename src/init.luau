@@ -13,12 +13,8 @@ local Config = require(script.Config)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
 local ZoneShapes = require(script.Core.ZoneShapes)
-local LinearBVH = require(script.Utils.LinearBVH)
 
-local queryPoint = LinearBVH.queryPoint
-local nextLeaf = LinearBVH.nextLeaf
-local acquireTree = LinearBVH.acquire
-local releaseTree = LinearBVH.release
+local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
 local containsPoint = ZoneShapes.containsPoint
 
@@ -36,11 +32,10 @@ local staticCFrames = State.staticCFrames
 local staticHalfSizes = State.staticHalfSizes
 local dynamicCFrames = State.dynamicCFrames
 local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTree = State.dynamicTree
-local staticTree = State.staticTree
 
 local queryHits = {} :: { number }
-local queryTrees = { dynamicTree, staticTree }
+-- Candidate lists of finished iterZonesAtPoint iterators, for reuse
+local spareCandidates = {} :: { { Types.InternalZone } }
 
 local debugConnection: RBXScriptConnection?
 local debugFolder: Folder?
@@ -386,16 +381,14 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	local results = {}
 	local count = 0
 
-	for _, tree in queryTrees do
-		local hitCount = queryPoint(tree, position, queryHits)
-		for i = 1, hitCount do
-			local slot = queryHits[i]
-			if leafContainsPoint(slot, position) then
-				local zone = zoneSlotToZoneObj[slot]
-				if zone then
-					count += 1
-					results[count] = zone
-				end
+	local hitCount = leavesAtPoint(position, queryHits)
+	for i = 1, hitCount do
+		local slot = queryHits[i]
+		if leafContainsPoint(slot, position) then
+			local zone = zoneSlotToZoneObj[slot]
+			if zone then
+				count += 1
+				results[count] = zone
 			end
 		end
 	end
@@ -605,10 +598,11 @@ end
 	Returns an iterator that returns every Zone intersecting the given point.
 	Ideal for zero-allocation ECS queries. Safe to `break` out of early.
 
-	:::info Rebuilds
-	The iterator keeps walking the trees as they were when it was created, even if they are rebuilt in between.
-	A tree rebuilt while an iterator is unfinished (including one you broke out of) is copied once instead of
-	overwritten. Prefer finishing the loop in hot paths.
+	:::info Changes while iterating
+	The zones whose bounds hold the point are found when the iterator is created. Each is checked against
+	the point when it is reached, so zones destroyed or moved away in between are skipped, and zones that
+	arrive in between are not yielded. Finishing the loop lets the next iterator reuse its memory, so prefer
+	that in hot paths.
 	:::
 
 	@method iterZonesAtPoint
@@ -617,53 +611,38 @@ end
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
-	local dynamicCount = dynamicTree.count
-	local dynamicBuffer = acquireTree(dynamicTree)
+	local list = table.remove(spareCandidates) or {}
+	local count = 0
 
-	local staticCount = staticTree.count
-	local staticBuffer = acquireTree(staticTree)
+	local hitCount = leavesAtPoint(point, queryHits)
+	for i = 1, hitCount do
+		local zone = zoneSlotToZoneObj[queryHits[i]]
+		if zone then
+			count += 1
+			list[count] = zone
+		end
+	end
 
-	local offset = 0
-	local checkingDynamic = true
-	local done = false
+	local candidates: { Types.InternalZone }? = list
+	local index = 0
 
 	return function(): Types.Zone?
-		if checkingDynamic then
-			while true do
-				local hitId
-				offset, hitId = nextLeaf(dynamicBuffer, dynamicCount, point, offset)
-				if hitId == 0 then
-					break
-				end
-
-				if containsPoint(hitId, point) then
-					return zoneSlotToZoneObj[hitId]
-				end
-			end
-
-			checkingDynamic = false
-			offset = 0
-			releaseTree(dynamicTree, dynamicBuffer)
-		end
-
-		if done then
+		if not candidates then
 			return nil
 		end
 
-		while true do
-			local hitId
-			offset, hitId = nextLeaf(staticBuffer, staticCount, point, offset)
-			if hitId == 0 then
-				break
-			end
-
-			if containsPoint(hitId, point) then
-				return zoneSlotToZoneObj[hitId]
+		while index < count do
+			index += 1
+			local zone = candidates[index]
+			if not zone.destroyed and containsPoint(zone.slot, point) then
+				return zone
 			end
 		end
 
-		done = true
-		releaseTree(staticTree, staticBuffer)
+		-- Finished, so the list can be reused
+		table.clear(candidates)
+		table.insert(spareCandidates, candidates)
+		candidates = nil
 
 		return nil
 	end

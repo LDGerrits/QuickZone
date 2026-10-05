@@ -914,6 +914,8 @@ return function(Tiniest: Tiniest)
 			observer:onTransition(function()
 				transitions += 1
 			end)
+			-- Enter zoneA alone first, so the overlap keeps it
+			QuickZone:update(1 / 10)
 			part.CFrame = CFrame.new(0, 0, 0)
 			QuickZone:update(1 / 10)
 			part.CFrame = CFrame.new(6, 0, 0)
@@ -2274,6 +2276,120 @@ return function(Tiniest: Tiniest)
 			end
 			group:destroy()
 		end)
+
+		Test("An observer changed by another observer's callback is not entered in the same tick.", function()
+			local changes: { [string]: (any, any, any) -> () } = {
+				disable = function(observer)
+					observer:setEnabled(false)
+				end,
+				unsubscribe = function(observer, group)
+					observer:unsubscribe(group)
+				end,
+				remove = function(_, group, entity)
+					group:remove(entity)
+				end,
+				detach = function(observer, _, _, zone)
+					observer:detach(zone)
+				end,
+			}
+
+			local x = 0
+			for name, change in changes do
+				x += 100
+				local position = Vector3.new(9000 + x, 0, 9800)
+				local entity = { Position = position }
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local groups = {
+					Group.new({ entities = { entity }, autoClean = false }),
+					Group.new({ entities = { entity }, autoClean = false }),
+				}
+				local observers = {
+					Observer.new({ zones = { zone }, groups = { groups[1] }, safety = false }),
+					Observer.new({ zones = { zone }, groups = { groups[2] }, safety = false }),
+				}
+				local enters, exits = 0, 0
+				for i, observer in observers do
+					local other = 3 - i
+					observer:onEnter(function()
+						enters += 1
+						change(observers[other], groups[other], entity, zone)
+					end)
+					observer:onExit(function()
+						exits += 1
+					end)
+				end
+				QuickZone:update(1)
+				QuickZone:update(1)
+
+				for _, observer in observers do
+					observer:destroy()
+				end
+				for _, group in groups do
+					group:destroy()
+				end
+				zone:destroy()
+
+				Expect(`{name}: {enters} enter(s), {exits} exit(s)`).is(`{name}: 1 enter(s), 1 exit(s)`)
+			end
+		end)
+
+		Test('An observer changed in a way that keeps it watching still enters in the same tick.', function()
+			local entity, group, zone, observers = setup(Vector3.new(9000, 0, 9900))
+			local extraGroup = Group.new({ autoClean = false })
+			local enters = 0
+			for i, observer in observers do
+				local other = observers[3 - i]
+				observer:onEnter(function()
+					enters += 1
+					other:setPrecision(0.2)
+					extraGroup:add(entity)
+				end)
+			end
+			QuickZone:update(1)
+
+			for _, observer in observers do
+				observer:destroy()
+			end
+			extraGroup:destroy()
+			group:destroy()
+			zone:destroy()
+
+			Expect(enters).is(2)
+		end)
+
+		Test('An unsafe exit callback that errors does not break other observers.', function()
+			local start, finish = Vector3.new(9000, 0, 10000), Vector3.new(9000, 0, 10100)
+			local entity = { Position = start }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zoneA = Zone.new({ cframe = CFrame.new(start), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(finish), size = Vector3.one * 10 })
+			local failing = Observer.new({ zones = { zoneA }, groups = { group }, safety = false })
+			local other = Observer.new({ zones = { zoneB }, groups = { group }, safety = false })
+			QuickZone:update(1)
+			Expect(failing:getZoneOfEntity(entity)).is(zoneA)
+
+			failing:onExit(function()
+				error('exit failed')
+			end)
+			entity.Position = finish
+			pcall(QuickZone.update, QuickZone, 1)
+			QuickZone:update(1)
+			local entered = other:getZoneOfEntity(entity)
+
+			-- Leaving must still exit the other observer
+			entity.Position = Vector3.new(9000, 0, 10200)
+			QuickZone:update(1)
+			local left = other:getZoneOfEntity(entity)
+
+			failing:destroy()
+			other:destroy()
+			group:destroy()
+			zoneA:destroy()
+			zoneB:destroy()
+
+			Expect(entered).is(zoneB)
+			Expect(left).is(nil)
+		end)
 	end)
 
 	Describe('Observer teardown', function()
@@ -2299,6 +2415,57 @@ return function(Tiniest: Tiniest)
 
 			observer:destroy()
 			group:destroy()
+		end)
+
+		Test('A zone is fully destroyed even when an unsafe exit callback errors.', function()
+			local position = Vector3.new(9000, 0, 9500)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+			observer:onExit(function()
+				error('exit failed')
+			end)
+			local id = zone:getId()
+			local destroy = zone.destroy
+			pcall(destroy, zone)
+			pcall(destroy, zone)
+			QuickZone:rebuild()
+
+			local alive = State.zoneIdToZoneObj[id] ~= nil
+			local found = table.find(QuickZone:getZonesAtPoint(position), zone) ~= nil
+
+			observer:destroy()
+			group:destroy()
+
+			Expect(alive).is(false)
+			Expect(found).is(false)
+		end)
+
+		Test('Destroyed observers that detached leave no detach state behind.', function()
+			local part = CreatePart({ CFrame = CFrame.new(9000, 0, 9600) })
+			local zones = Zone.fromParts({ part })
+			local ids = {}
+			for _ = 1, 20 do
+				local observer = Observer.new({ zones = {}, groups = {} })
+				zones:attach(observer)
+				table.insert(ids, observer:getId())
+				observer:destroy()
+			end
+
+			local leftovers = 0
+			for _, id in ids do
+				if State.observerDetachedZones[id] then
+					leftovers += 1
+				end
+			end
+
+			zones:destroy()
+			part:Destroy()
+			Expect(leftovers).is(0)
 		end)
 
 		Test('Destroying an observer leaves no attachment state on its zones.', function()

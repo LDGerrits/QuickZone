@@ -77,6 +77,8 @@ local State = {
 	observerPrecisionSq = {} :: { [number]: number },
 	observerDynamicCount = {} :: { [number]: number },
 	observerStaticCount = {} :: { [number]: number },
+	-- Ids of zones the observer detached from, whose entities may still be in them
+	observerDetachedZones = {} :: { [number]: { [number]: boolean } },
 
 	autoSyncZones = {} :: { [number]: Types.InternalZone },
 	zoneAttachedObservers = {} :: { [number]: { number } },

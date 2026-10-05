@@ -5,6 +5,7 @@
 -- Caches every zone's world-space shape so queries and rebuilds never read a CFrame
 
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local ZoneChanges = require(script.Parent.ZoneChanges)
 local State = require(script.Parent.State)
 local Types = require(script.Parent.Parent.Types)
@@ -12,6 +13,7 @@ local Types = require(script.Parent.Parent.Types)
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 
 local getBounds = Geometry.getBounds
+local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
 local shapeTypes = State.shapeTypes
@@ -26,6 +28,8 @@ local shapeBoundsMax = State.shapeBoundsMax
 local shapeAxisAligned = State.shapeAxisAligned
 local treeExact = State.treeExact
 local dynamicCFrames = State.dynamicCFrames
+local dynamicTree = State.dynamicTree
+local staticTree = State.staticTree
 local staticChanges = State.staticChanges
 local dynamicChanges = State.dynamicChanges
 
@@ -140,6 +144,13 @@ end
 -- Skips the shape check for exact leaves
 function ZoneShapes.leafContainsPoint(id: number, point: Vector3): boolean
 	return treeExact[id] == true or ZoneShapes.containsPoint(id, point)
+end
+
+-- Writes the ids of dynamic, then static, leaves containing the point to hits, returns the count.
+-- Check each with leafContainsPoint before the trees change
+function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
+	local hitCount = queryPoint(dynamicTree, point, hits, 0)
+	return queryPoint(staticTree, point, hits, hitCount)
 end
 
 return ZoneShapes

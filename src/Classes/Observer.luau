@@ -10,14 +10,14 @@
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
+local Callbacks = require(script.Parent.Parent.Core.Callbacks)
 local Config = require(script.Parent.Parent.Config)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
-local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 
-local queryPoint = LinearBVH.queryPoint
+local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
 
 local hasAttachedMap = {} :: { [number]: boolean }
@@ -27,11 +27,7 @@ local dirtyProfiles = State.dirtyProfiles
 local dirtyTopology = State.dirtyTopology
 local zoneAttachedObservers = State.zoneAttachedObservers
 
-local dynamicTree = State.dynamicTree
-local staticTree = State.staticTree
-
 local queryHits = {} :: { number }
-local queryTrees = { dynamicTree, staticTree }
 
 local IS_CLIENT = RunService:IsClient()
 
@@ -100,13 +96,7 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 
 		local z = State.zoneIdToZoneObj[oldZoneId]
 		local ref = State.entityToReference[entity] or entity
-		for _, fn in cbs do
-			if safety then
-				task.spawn(fn, ref, z, entity)
-			else
-				fn(ref, z, entity)
-			end
-		end
+		Callbacks.fire(cbs, ref, z, entity, safety)
 	end
 end
 
@@ -1111,19 +1101,17 @@ end
 function Observer.isPointInside(self: Types.InternalObserver, position: Vector3): boolean
 	local observerId = self.id
 
-	for _, tree in queryTrees do
-		local hitCount = queryPoint(tree, position, queryHits)
-		for i = 1, hitCount do
-			local hitId = queryHits[i]
+	local hitCount = leavesAtPoint(position, queryHits)
+	for i = 1, hitCount do
+		local hitId = queryHits[i]
 
-			local observers = zoneAttachedObservers[hitId]
-			if not observers or not table.find(observers, observerId) then
-				continue
-			end
+		local observers = zoneAttachedObservers[hitId]
+		if not observers or not table.find(observers, observerId) then
+			continue
+		end
 
-			if leafContainsPoint(hitId, position) then
-				return true
-			end
+		if leafContainsPoint(hitId, position) then
+			return true
 		end
 	end
 
@@ -1642,6 +1630,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerPrecisionSq[id] = nil
 	State.observerStaticCount[id] = nil
 	State.observerDynamicCount[id] = nil
+	State.observerDetachedZones[id] = nil
 
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil

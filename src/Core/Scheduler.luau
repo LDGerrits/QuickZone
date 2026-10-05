@@ -6,6 +6,7 @@ local RunService = game:GetService('RunService')
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
+local Callbacks = require(script.Parent.Callbacks)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
 local State = require(script.Parent.State)
@@ -15,6 +16,7 @@ local ZoneChanges = require(script.Parent.ZoneChanges)
 local queryPoint = LinearBVH.queryPoint
 local touches = ZoneChanges.touches
 local containsPoint = ZoneShapes.containsPoint
+local fireCallback = Callbacks.fire
 
 local staticCFrames = State.staticCFrames
 local dynamicCFrames = State.dynamicCFrames
@@ -250,7 +252,7 @@ local function processZoneHit(slot: number)
 end
 
 local function queryTree(tree: Types.Tree, position: Vector3)
-	local hitCount = queryPoint(tree, position, ctx_hits)
+	local hitCount = queryPoint(tree, position, ctx_hits, 0)
 	for i = 1, hitCount do
 		local slot = ctx_hits[i]
 		local observerId = zoneSoleObserver[slot]
@@ -274,22 +276,21 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	end
 end
 
-local function fireCallback(
-	callbacks: { (any, Types.Zone, Types.Entity) -> () },
-	reference: any,
-	zone: Types.Zone,
-	entity: any,
-	safety: boolean
-)
-	if safety then
-		for _, callback in callbacks do
-			task.spawn(callback, reference, zone, entity)
-		end
-	else
-		for _, callback in callbacks do
-			callback(reference, zone, entity)
+-- Whether the observer still watches one of the entity's groups
+local function isSubscribed(entity: Types.Entity, observerId: number): boolean
+	local groups = entityToGroups[entity]
+	if not groups then
+		return false
+	end
+
+	for groupId in groups do
+		local observers = groupToObservers[groupId]
+		if observers and observers[observerId] then
+			return true
 		end
 	end
+
+	return false
 end
 
 local Scheduler = {}
@@ -506,6 +507,18 @@ function Scheduler.update(dt: number)
 					-- An earlier callback may have removed the entity or destroyed the zone
 					local zone = zoneIdToZoneObj[zoneIdx]
 					if entityData[entity] ~= data or not zone then
+						continue
+					end
+
+					-- Or changed the observer, so the entity is checked again next tick
+					local attached = zoneAttachedObservers[zone.slot]
+					if
+						observerEnabled[observerId] == false
+						or not attached
+						or not table.find(attached, observerId)
+						or not isSubscribed(entity, observerId)
+					then
+						data.logicVersion = -1
 						continue
 					end
 
