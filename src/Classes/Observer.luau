@@ -247,6 +247,12 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	for _, entity in group.entities do
 		dirtyProfiles[entity] = true
 		dirtyTopology[entity] = true
+
+		-- Entities that stand still are only re-queried near zone changes
+		local data = State.entityData[entity]
+		if data then
+			data.logicVersion = -1
+		end
 	end
 
 	return self

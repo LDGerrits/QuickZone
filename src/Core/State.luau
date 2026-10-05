@@ -1,6 +1,8 @@
 --!strict
 
 local Types = require(script.Parent.Parent.Types)
+local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
+local ZoneChanges = require(script.Parent.ZoneChanges)
 
 local State = {
 	nextZoneId = 1,
@@ -38,27 +40,11 @@ local State = {
 	treeExact = {} :: { [number]: boolean },
 
 	-- Where zones changed per tree
-	staticChanges = {
-		boxesMin = {},
-		boxesMax = {},
-		boxCenters = {},
-		boxCount = 0,
-		all = false,
-		boxLimit = 0,
-		history = {},
-	} :: Types.ZoneChanges,
-	dynamicChanges = {
-		boxesMin = {},
-		boxesMax = {},
-		boxCenters = {},
-		boxCount = 0,
-		all = false,
-		boxLimit = 0,
-		history = {},
-	} :: Types.ZoneChanges,
+	staticChanges = ZoneChanges.new(),
+	dynamicChanges = ZoneChanges.new(),
 
-	staticTree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false } :: Types.Tree,
-	dynamicTree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false } :: Types.Tree,
+	staticTree = LinearBVH.new(),
+	dynamicTree = LinearBVH.new(),
 	pendingStaticRebuild = false,
 	pendingDynamicRebuild = false,
 	staticVersion = 0,

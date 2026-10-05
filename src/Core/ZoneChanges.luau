@@ -18,6 +18,18 @@ local MAX_BOXES = 2048
 
 local ZoneChanges = {}
 
+function ZoneChanges.new(): Types.ZoneChanges
+	return {
+		boxesMin = {},
+		boxesMax = {},
+		boxCenters = {},
+		boxCount = 0,
+		all = false,
+		boxLimit = 0,
+		history = {},
+	}
+end
+
 function ZoneChanges.add(log: Types.ZoneChanges, min: Vector3, max: Vector3)
 	if log.all then
 		return
@@ -54,7 +66,7 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 		slot = {
 			version = -1,
 			all = false,
-			tree = { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false },
+			tree = LinearBVH.new(),
 		}
 		log.history[index] = slot
 	end
@@ -62,19 +74,17 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 	slot.version = version
 	slot.all = log.all
 
-	if not log.all then
-		local boxesMin, boxesMax, boxCenters = log.boxesMin, log.boxesMax, log.boxCenters
-		for i = 1, count do
-			boxCenters[i] = (boxesMin[i] + boxesMax[i]) * 0.5
-		end
-
-		-- Box indices are the leaf ids
-		LinearBVH.build(slot.tree, boxesMin, boxesMin, boxesMax, boxCenters)
-
-		table.clear(boxesMin)
-		table.clear(boxesMax)
-		table.clear(boxCenters)
+	local boxesMin, boxesMax, boxCenters = log.boxesMin, log.boxesMax, log.boxCenters
+	for i = 1, count do
+		boxCenters[i] = (boxesMin[i] + boxesMax[i]) * 0.5
 	end
+
+	-- Box indices are the leaf ids. Empty if everything changed, freeing the old leaves
+	LinearBVH.build(slot.tree, boxesMin, boxesMin, boxesMax, boxCenters)
+
+	table.clear(boxesMin)
+	table.clear(boxesMax)
+	table.clear(boxCenters)
 
 	log.boxCount = 0
 	log.all = false

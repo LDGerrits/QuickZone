@@ -38,7 +38,15 @@ local INSERTION_SORT_LIMIT = 32
 local REFIT_LIMIT = 1.5
 local REFIT_BACKOFF = 8
 
+-- Buffers above this many nodes shrink once less than a quarter is used
+local SHRINK_MIN_NODES = 64
+local SHRINK_FACTOR = 4
+
 local LinearBVH = {}
+
+function LinearBVH.new(): Types.Tree
+	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false, readers = 0 }
+end
 
 -- Build scratch space
 local memberIds = {} :: { number }
@@ -206,6 +214,24 @@ local function buildFlatTree(beginIndex: number, endIndex: number, offset: numbe
 	end
 end
 
+-- The buffer to build nodeCount nodes into. A new one if an iterator still reads it,
+-- or if it is too small or mostly unused
+local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
+	local buf = tree.buffer
+	local capacity = buffer.len(buf) // NODE_SIZE
+	if
+		tree.readers > 0
+		or capacity < nodeCount
+		or (capacity > SHRINK_MIN_NODES and capacity > nodeCount * SHRINK_FACTOR)
+	then
+		-- Grow with headroom
+		buf = buffer.create((nodeCount + nodeCount // 2) * NODE_SIZE)
+		tree.buffer = buf
+		tree.readers = 0
+	end
+	return buf
+end
+
 -- Builds the tree from the zones in members
 function LinearBVH.build(
 	tree: Types.Tree,
@@ -228,6 +254,7 @@ function LinearBVH.build(
 	end
 
 	if count == 0 then
+		prepareBuffer(tree, 0)
 		tree.count = 0
 		tree.cost = 0
 		return
@@ -248,14 +275,7 @@ function LinearBVH.build(
 	radixSort(count)
 
 	local nodeCount = 2 * count - 1
-	local buf = tree.buffer
-	if buffer.len(buf) < nodeCount * NODE_SIZE then
-		-- Grow with headroom
-		buf = buffer.create((nodeCount + nodeCount // 2) * NODE_SIZE)
-		tree.buffer = buf
-	end
-
-	buildBuffer = buf
+	buildBuffer = prepareBuffer(tree, nodeCount)
 	buildBoundsMin = boundsMin
 	buildBoundsMax = boundsMax
 	buildCost = 0
@@ -274,6 +294,14 @@ function LinearBVH.refit(tree: Types.Tree, boundsMin: { [number]: Vector3 }, bou
 	end
 
 	local buf = tree.buffer
+	if tree.readers > 0 then
+		local copy = buffer.create(buffer.len(buf))
+		buffer.copy(copy, 0, buf, 0, tree.count * NODE_SIZE)
+		buf = copy
+		tree.buffer = copy
+		tree.readers = 0
+	end
+
 	local cost = 0
 
 	-- Children follow their parent, so go backwards
@@ -352,34 +380,6 @@ function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, hits: { number }
 	return hitCount
 end
 
--- Whether any leaf contains the point
-function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
-	local buf = tree.buffer
-	local endOffset = tree.count * NODE_SIZE
-	local px, py, pz = point.X, point.Y, point.Z
-
-	local offset = 0
-	while offset < endOffset do
-		if
-			px >= readf32(buf, offset)
-			and px <= readf32(buf, offset + 12)
-			and py >= readf32(buf, offset + 4)
-			and py <= readf32(buf, offset + 16)
-			and pz >= readf32(buf, offset + 8)
-			and pz <= readf32(buf, offset + 20)
-		then
-			if readu32(buf, offset + ID_OFFSET) ~= 0 then
-				return true
-			end
-			offset += NODE_SIZE
-		else
-			offset = readu32(buf, offset + SKIP_OFFSET) -- Skip branch
-		end
-	end
-
-	return false
-end
-
 -- Resumable queryPoint. Returns the offset to resume from and the leaf id (0 when done)
 function LinearBVH.nextLeaf(buf: buffer, nodeCount: number, point: Vector3, offset: number): (number, number)
 	local endOffset = nodeCount * NODE_SIZE
@@ -405,6 +405,27 @@ function LinearBVH.nextLeaf(buf: buffer, nodeCount: number, point: Vector3, offs
 	end
 
 	return endOffset, 0
+end
+
+local nextLeaf = LinearBVH.nextLeaf
+
+-- For a resumable walk, returns the buffer to walk. Until released, writes go to a copy
+function LinearBVH.acquire(tree: Types.Tree): buffer
+	tree.readers += 1
+	return tree.buffer
+end
+
+function LinearBVH.release(tree: Types.Tree, buf: buffer)
+	-- Otherwise a write already moved the tree to a copy and reset the count
+	if tree.buffer == buf then
+		tree.readers -= 1
+	end
+end
+
+-- Whether any leaf contains the point
+function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
+	local _, id = nextLeaf(tree.buffer, tree.count, point, 0)
+	return id ~= 0
 end
 
 return LinearBVH

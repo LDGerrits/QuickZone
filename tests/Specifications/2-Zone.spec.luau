@@ -1170,6 +1170,33 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Zone:destroy', function()
+		Test('Destroying a zone again while it is being destroyed does nothing.', function()
+			local fired = 0
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+			zone:onDestroy(function()
+				fired += 1
+				if fired == 1 then
+					zone:destroy()
+				end
+			end)
+			zone:destroy()
+			QuickZone:rebuild()
+
+			-- New zones must not share the destroyed zone's storage
+			local positionA, positionB = Vector3.new(100, 0, 0), Vector3.new(-100, 0, 0)
+			local zoneA = Zone.new({ cframe = CFrame.new(positionA), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(positionB), size = Vector3.one * 10 })
+
+			Expect(zoneA:getPosition()).is(positionA)
+			Expect(zoneB:getPosition()).is(positionB)
+			zoneA:destroy()
+			Expect(zoneB:isPointInside(positionB)).is(true)
+			zoneB:destroy()
+			Expect(fired).is(1)
+		end)
+	end)
+
 	-- Zones are covered below.
 	Describe('Zones', function()
 		Test('Zones:contains only returns true for zones owned by this container.', function()

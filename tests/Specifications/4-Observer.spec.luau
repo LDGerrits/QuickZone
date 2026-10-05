@@ -110,6 +110,38 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 			part:Destroy()
 		end)
+
+		Test(
+			'Subscribing re-evaluates entities that stand still and are already tracked by another observer.',
+			function()
+				local position = Vector3.new(-8000, 0, 8000)
+				local entity = { Position = position }
+				local group = Group.new({ entities = { entity }, autoClean = false })
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local elsewhere =
+					Zone.new({ cframe = CFrame.new(position + Vector3.new(100, 0, 0)), size = Vector3.one * 10 })
+				local tracker = Observer.new({ zones = { elsewhere }, groups = { group }, safety = false })
+				local observer = Observer.new({ zones = { zone }, groups = {}, safety = false })
+				QuickZone:update(1)
+				QuickZone:update(1)
+
+				local entered
+				observer:onEnter(function(_, enteredZone)
+					entered = enteredZone
+				end)
+				observer:subscribe(group)
+				QuickZone:update(1)
+
+				Expect(entered).is(zone)
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+				observer:destroy()
+				tracker:destroy()
+				group:destroy()
+				zone:destroy()
+				elsewhere:destroy()
+			end
+		)
 	end)
 
 	Describe('Observer:unsubscribe', function()
@@ -1195,6 +1227,30 @@ return function(Tiniest: Tiniest)
 			group:destroy()
 			zone:destroy()
 			part:Destroy()
+		end)
+
+		Test('Resuming re-evaluates entities that stood still in a zone created while suspended.', function()
+			local position = Vector3.new(8000, 0, 8000)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local observer = Observer.new({ zones = {}, groups = { group }, safety = false })
+			QuickZone:update(1)
+
+			observer:setUpdateRate(0)
+			QuickZone:update(1)
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			observer:attach(zone)
+			QuickZone:update(1)
+			QuickZone:update(1)
+
+			observer:setUpdateRate(30)
+			QuickZone:update(1)
+
+			Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
 		end)
 	end)
 

@@ -9,6 +9,7 @@ local TiniestFolder = TestFolder.Tiniest
 local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -710,6 +711,147 @@ return function(Tiniest: Tiniest)
 			for _, zone in farZones do
 				zone:destroy()
 			end
+		end)
+
+		Test(
+			'Yields every zone at the point exactly once when the trees are rebuilt in place mid-iteration.',
+			function()
+				local center = Vector3.new(-30000, 0, 0)
+				local zoneA = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10, isDynamic = true })
+				local zoneB =
+					Zone.new({ cframe = CFrame.new(center + Vector3.one), size = Vector3.one * 10, isDynamic = true })
+				local otherZones = {}
+				-- Sort after both zones, so the first walk covers enough nodes
+				for i = 1, 20 do
+					table.insert(
+						otherZones,
+						Zone.new({
+							cframe = CFrame.new(center + Vector3.one * (i * 50)),
+							size = Vector3.one,
+							isDynamic = true,
+						})
+					)
+				end
+				QuickZone:rebuild()
+
+				local iterator = QuickZone:iterZonesAtPoint(center)
+				local seen = {}
+				local first = iterator() :: any
+				seen[first] = 1
+
+				-- Sort before both zones, small enough to reuse the buffer
+				for i = 1, 3 do
+					table.insert(
+						otherZones,
+						Zone.new({
+							cframe = CFrame.new(center - Vector3.one * (i * 50)),
+							size = Vector3.one,
+							isDynamic = true,
+						})
+					)
+				end
+				QuickZone:rebuild()
+
+				for zone in iterator do
+					seen[zone] = (seen[zone] or 0) + 1
+				end
+
+				Expect(seen[zoneA]).is(1)
+				Expect(seen[zoneB]).is(1)
+
+				zoneA:destroy()
+				zoneB:destroy()
+				for _, zone in otherZones do
+					zone:destroy()
+				end
+			end
+		)
+
+		Test('Leaves the tree correct when zones move slightly during an unfinished iteration.', function()
+			local center = Vector3.new(-30000, 0, 3000)
+			local zones = {}
+			for i = 0, 9 do
+				local offset = Vector3.new(i * 20, 0, 0)
+				table.insert(
+					zones,
+					Zone.new({ cframe = CFrame.new(center + offset), size = Vector3.one * 10, isDynamic = true })
+				)
+			end
+			local function nudge(step: number)
+				for i, zone in zones do
+					zone:setCFrame(CFrame.new(center + Vector3.new((i - 1) * 20, step * 0.01, 0)))
+				end
+				QuickZone:rebuild()
+			end
+
+			-- Small moves refit the tree, after any backoff from earlier tests runs out
+			for step = 1, 10 do
+				nudge(step)
+			end
+			Expect(State.dynamicTree.refitSkips).is(0)
+
+			local iterator = QuickZone:iterZonesAtPoint(center)
+			Expect(iterator()).is(zones[1])
+			nudge(11)
+			Expect(iterator()).is(nil)
+
+			for i, zone in zones do
+				local found = QuickZone:getZonesAtPoint(center + Vector3.new((i - 1) * 20, 0, 0))
+				Expect(table.find(found, zone)).never_is(nil)
+			end
+
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
+	end)
+
+	Describe('Tree memory', function()
+		Test('Shrinks once most zones are destroyed.', function()
+			local trees = { State.staticTree, State.dynamicTree }
+			local zones = {}
+			for i = 1, 3000 do
+				local position = Vector3.new(50000 + i * 4, 0, 0)
+				table.insert(
+					zones,
+					Zone.new({ cframe = CFrame.new(position), size = Vector3.one, isDynamic = i % 2 == 0 })
+				)
+			end
+			QuickZone:rebuild()
+
+			-- One commit with a box per moved zone, building a large change tree
+			for i = 1, 900 do
+				zones[i]:setCFrame(zones[i]:getCFrame() + Vector3.yAxis)
+			end
+			QuickZone:rebuild()
+
+			for _, zone in zones do
+				zone:destroy()
+			end
+			QuickZone:rebuild()
+
+			-- Every change slot gets overwritten by a small change
+			local zone = Zone.new({ cframe = CFrame.new(50000, 0, 0), size = Vector3.one })
+			local mover = Zone.new({ cframe = CFrame.new(50000, 0, 0), size = Vector3.one, isDynamic = true })
+			for i = 1, 20 do
+				zone:setCFrame(CFrame.new(50000, i, 0))
+				mover:setCFrame(CFrame.new(50000, i, 0))
+				QuickZone:rebuild()
+			end
+
+			-- The 3000-zone trees took about 144 KB, one zone needs a few bytes
+			local limit = 64 * 1024
+			for _, tree in trees do
+				Expect(buffer.len(tree.buffer) < limit).is(true)
+			end
+			for _, changes in { State.staticChanges, State.dynamicChanges } do
+				for _, slot in changes.history do
+					Expect(buffer.len(slot.tree.buffer) < limit).is(true)
+				end
+			end
+
+			zone:destroy()
+			mover:destroy()
 		end)
 	end)
 end
