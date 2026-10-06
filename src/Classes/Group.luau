@@ -15,9 +15,10 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
-local Callbacks = require(script.Parent.Parent.Core.Callbacks)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local State = require(script.Parent.Parent.Core.State)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 
 local STRAT_POS = Config.Strategy.POS
@@ -473,25 +474,42 @@ end
 	@within Group
 ]=]
 function Group.destroy(self: Types.InternalGroup): ()
+	-- A callback below may destroy the group again
+	if self.destroyed then
+		return
+	end
+	self.destroyed = true
+
 	if self.onDestroyCallbacks then
-		for _, callback in self.onDestroyCallbacks do
+		-- The table must be cloned to avoid iterator shifts
+		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
+		for _, callback in onDestroyCallbacks do
 			task.spawn(callback)
 		end
 		table.clear(self.onDestroyCallbacks)
 	end
 
+	-- Exit callbacks may remove other entities, swapping later ones into slots not yet visited
 	for idx = #self.entities, 1, -1 do
-		self:_remove(self.entities[idx])
+		local entity = self.entities[idx]
+		if entity ~= nil then
+			self:_remove(entity)
+		end
 	end
 
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil
 
-	setmetatable(self :: any, nil)
+	setmetatable(self :: any, Destroyed)
 end
 
 function Group._add(self: Types.InternalGroup, reference: any): Types.Group
+	-- A callback during destroy must not add entities that are never removed
+	if self.destroyed then
+		return self
+	end
+
 	if typeof(reference) == 'Instance' and reference:IsA('Player') then
 		PlayerTracker.subscribe(reference, self)
 		return self
@@ -625,36 +643,11 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 	-- Another observer may take over an entity that stands still
 	data.logicVersion = -1
 
-	for observerId, oldZoneId in data.activeObserverMemberships do
-		local stillTracked = false
-		for remainingGroupId in State.entityToGroups[entity] do
-			if State.groupToObservers[remainingGroupId] and State.groupToObservers[remainingGroupId][observerId] then
-				stillTracked = true
-				break
-			end
-		end
+	Memberships.exitUnsubscribed(entity, data)
 
-		if stillTracked then
-			continue
-		end
-
-		data.activeObserverMemberships[observerId] = nil
-
-		if State.observerTrackingEntities[observerId] then
-			State.observerTrackingEntities[observerId][entity] = nil
-		end
-
-		local cbs = State.observerExitedCallbacks[observerId]
-		if not cbs then
-			continue
-		end
-
-		local z = State.zoneIdToZoneObj[oldZoneId]
-		local ref = State.entityToReference[entity] or entity
-		Callbacks.fire(cbs, ref, z, entity, State.observerSafety[observerId])
-	end
-
-	if next(State.entityToGroups[entity]) == nil then
+	-- Exit callbacks may have removed the entity everywhere, or added it back
+	local groups = State.entityToGroups[entity]
+	if State.entityData[entity] == data and groups and next(groups) == nil then
 		-- Remove from bucket
 		local currentRate = data.updateRate
 		if currentRate and currentRate > 0 and State.buckets[currentRate] then

@@ -20,10 +20,11 @@
 
 local CollectionService = game:GetService('CollectionService')
 
-local Callbacks = require(script.Parent.Parent.Core.Callbacks)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
 local State = require(script.Parent.Parent.Core.State)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Zones = require(script.Parent.Zones)
@@ -157,37 +158,6 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 	end
 end
 
--- Fires the observer's exits for its entities in the zone
-local function exitEntities(zone: Types.InternalZone, observerId: number)
-	local trackedEntities = State.observerTrackingEntities[observerId]
-	if not trackedEntities then
-		return
-	end
-
-	local id = zone.id
-	for entity, zoneId in trackedEntities do
-		if zoneId ~= id then
-			continue
-		end
-
-		local data = State.entityData[entity]
-		if not data or data.activeObserverMemberships[observerId] ~= id then
-			continue
-		end
-
-		data.activeObserverMemberships[observerId] = nil
-		trackedEntities[entity] = nil
-
-		local cbs = State.observerExitedCallbacks[observerId]
-		if not cbs then
-			continue
-		end
-
-		local ref = State.entityToReference[entity] or entity
-		Callbacks.fire(cbs, ref, zone, entity, State.observerSafety[observerId])
-	end
-end
-
 local Zone = {}
 Zone.__index = Zone
 
@@ -200,6 +170,14 @@ local function newZoneInternal(
 	metadata: any?,
 	autoSync: boolean
 ): Types.Zone
+	-- Checked before anything is registered, so a bad config can't leave a broken slot in the tree
+	if typeof(cframe) ~= 'CFrame' then
+		Log.fatal('Zone cframe must be a CFrame, got %s.', nil, typeof(cframe))
+	end
+	if typeof(size) ~= 'Vector3' then
+		Log.fatal('Zone size must be a Vector3, got %s.', nil, typeof(size))
+	end
+
 	local id = State.nextZoneId
 	State.nextZoneId += 1
 
@@ -709,11 +687,6 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), 1)
 		ZoneShapes.touch(self.slot)
-
-		local detachedZones = State.observerDetachedZones[observer.id]
-		if detachedZones then
-			detachedZones[self.id] = nil
-		end
 	end
 
 	return self
@@ -735,15 +708,8 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 		attached[lastIdx] = nil
 		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
 		updateObserverZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), -1)
-		ZoneShapes.touch(self.slot)
-
 		-- Its entities leave on the next tick, unless the zone is destroyed first
-		local detachedZones = State.observerDetachedZones[observer.id]
-		if not detachedZones then
-			detachedZones = {}
-			State.observerDetachedZones[observer.id] = detachedZones
-		end
-		detachedZones[self.id] = true
+		ZoneShapes.touch(self.slot)
 	end
 
 	if #attached == 0 then
@@ -1148,33 +1114,24 @@ function Zone.destroy(self: Types.InternalZone): ()
 	State.zoneAttachedObservers[slot] = nil
 	State.zoneSoleObserver[slot] = nil
 
-	-- Exit while the zone object is still alive, so callbacks get it
 	if attachedObservers then
 		for _, observerId in attachedObservers do
 			updateObserverZoneCount(observerId, ZoneShapes.isDynamic(slot), -1)
 		end
-		for _, observerId in attachedObservers do
-			exitEntities(self, observerId)
-		end
 	end
 
-	-- Observers detached since the last tick may still have entities here.
-	-- Collected first, as callbacks may add observers to the map
-	local detachedFrom: { number }? = nil
-	for observerId, detachedZones in State.observerDetachedZones do
-		if detachedZones[id] then
-			detachedZones[id] = nil
-			if next(detachedZones) == nil then
-				State.observerDetachedZones[observerId] = nil
-			end
-			detachedFrom = detachedFrom or {}
-			table.insert(detachedFrom :: { number }, observerId)
+	-- Exit while the zone object is still alive, so callbacks get it. Observers that detached
+	-- since the last tick may still have entities here. Collected first, as exits change the map
+	local occupants = State.zoneOccupants[id]
+	if occupants then
+		local observerIds = {}
+		for observerId in occupants do
+			table.insert(observerIds, observerId)
 		end
-	end
-	if detachedFrom then
-		for _, observerId in detachedFrom do
-			exitEntities(self, observerId)
+		for _, observerId in observerIds do
+			Memberships.exitZone(observerId, id)
 		end
+		State.zoneOccupants[id] = nil
 	end
 
 	if self.onDestroyCallbacks then
@@ -1194,7 +1151,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	-- Reusable after the next rebuild
 	table.insert(State.releasedZoneSlots, slot)
 
-	setmetatable(self :: any, nil)
+	setmetatable(self :: any, Destroyed)
 end
 
 return Zone

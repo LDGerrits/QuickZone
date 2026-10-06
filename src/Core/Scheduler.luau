@@ -9,6 +9,7 @@ local Types = require(script.Parent.Parent.Types)
 local Callbacks = require(script.Parent.Callbacks)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Memberships = require(script.Parent.Memberships)
 local State = require(script.Parent.State)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local ZoneChanges = require(script.Parent.ZoneChanges)
@@ -17,6 +18,9 @@ local queryPoint = LinearBVH.queryPoint
 local touches = ZoneChanges.touches
 local containsPoint = ZoneShapes.containsPoint
 local fireCallback = Callbacks.fire
+local setMembership = Memberships.set
+local exitMembership = Memberships.exit
+local isSubscribed = Memberships.isSubscribed
 
 local staticSlots = State.staticSlots
 local dynamicSlots = State.dynamicSlots
@@ -33,7 +37,6 @@ local autoSyncZones = State.autoSyncZones
 local observerPriorityMap = State.observerPriorityMap
 local observerTrackingEntities = State.observerTrackingEntities
 local observerEnteredCallbacks = State.observerEnteredCallbacks
-local observerExitedCallbacks = State.observerExitedCallbacks
 local observerTransitionedCallbacks = State.observerTransitionedCallbacks
 local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
@@ -276,26 +279,9 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	end
 end
 
--- Whether the observer still watches one of the entity's groups
-local function isSubscribed(entity: Types.Entity, observerId: number): boolean
-	local groups = entityToGroups[entity]
-	if not groups then
-		return false
-	end
-
-	for groupId in groups do
-		local observers = groupToObservers[groupId]
-		if observers and observers[observerId] then
-			return true
-		end
-	end
-
-	return false
-end
-
 local Scheduler = {}
 
-function Scheduler.update(dt: number)
+local function tick(dt: number)
 	local start = os.clock()
 
 	-- Route entities that have changed groups or observers since the last update
@@ -451,26 +437,13 @@ function Scheduler.update(dt: number)
 				local current = data.activeObserverMemberships
 
 				-- Exits
-				for observerId, oldZoneId in current do
+				for observerId in current do
 					local newPri = ctx_candidatePriority[observerId]
 					if newPri and newPri >= ctx_highestWin then
 						continue
 					end
 
-					current[observerId] = nil
-					if observerTrackingEntities[observerId] then
-						observerTrackingEntities[observerId][entity] = nil
-					end
-
-					local cbs = observerExitedCallbacks[observerId]
-					if not cbs then
-						continue
-					end
-
-					local safety = observerSafety[observerId]
-					local zone = zoneIdToZoneObj[oldZoneId]
-					local reference = entityToReference[entity] or entity
-					fireCallback(cbs, reference, zone, entity, safety)
+					exitMembership(observerId, entity, data)
 				end
 
 				-- Entries & Transitions
@@ -514,28 +487,18 @@ function Scheduler.update(dt: number)
 						continue
 					end
 
-					-- Update the tracker.
-					current[observerId] = zoneIdx
-					observerTrackingEntities[observerId][entity] = zoneIdx
-					local safety = observerSafety[observerId]
+					setMembership(observerId, entity, data, zoneIdx)
 
-					if not currentZoneId then -- New entry
-						local cbs = observerEnteredCallbacks[observerId]
-						if not cbs then
-							continue
-						end
-
-						local reference = entityToReference[entity] or entity
-						fireCallback(cbs, reference, zone, entity, safety)
-					else -- Transition
-						local cbs = observerTransitionedCallbacks[observerId]
-						if not cbs then
-							continue
-						end
-
-						local reference = entityToReference[entity] or entity
-						fireCallback(cbs, reference, zone, entity, safety)
-					end
+					-- Entry if it was in none of the observer's zones, transition otherwise
+					local reference = entityToReference[entity] or entity
+					fireCallback(
+						if currentZoneId then observerTransitionedCallbacks else observerEnteredCallbacks,
+						observerId,
+						reference,
+						zone,
+						entity,
+						observerSafety[observerId]
+					)
 				end
 			end
 
@@ -567,6 +530,23 @@ function Scheduler.update(dt: number)
 		if (os.clock() - start) > frameBudget then
 			break
 		end
+	end
+end
+
+-- Set while a tick runs. A callback updating again would clobber the tick in progress,
+-- so that update is skipped and its work is left to the next tick
+local ticking = false
+
+function Scheduler.update(dt: number)
+	if ticking then
+		return
+	end
+
+	ticking = true
+	local ok, trace = xpcall(tick, debug.traceback, dt)
+	ticking = false
+	if not ok then
+		error(trace, 0)
 	end
 end
 

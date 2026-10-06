@@ -974,6 +974,29 @@ return function(Tiniest: Tiniest)
 		local size = Vector3.one * 10
 		local rotation = CFrame.Angles(0, math.pi / 4, 0)
 
+		Test(
+			'Balls and cylinders with uneven sizes are found by point queries wherever they contain the point.',
+			function()
+				local center = Vector3.new(12000, 0, 13300)
+				local ball = Zone.new({ cframe = CFrame.new(center), size = Vector3.new(10, 2, 2), shape = 'Ball' })
+				local cylinderCenter = center + Vector3.new(100, 0, 0)
+				local cylinder =
+					Zone.new({ cframe = CFrame.new(cylinderCenter), size = Vector3.new(2, 10, 4), shape = 'Cylinder' })
+				QuickZone:rebuild()
+
+				for _, case in
+					{ { ball, center + Vector3.new(0, 3, 0) }, { cylinder, cylinderCenter + Vector3.new(0, 0, 4) } }
+				do
+					local zone, point = case[1], case[2]
+					Expect(zone:isPointInside(point)).is(true)
+					Expect(table.find(QuickZone:getZonesAtPoint(point), zone)).never_is(nil)
+				end
+
+				ball:destroy()
+				cylinder:destroy()
+			end
+		)
+
 		Test('Block: a skewed, scaled CFrame agrees with PointToObjectSpace.', function()
 			local cframe =
 				CFrame.fromMatrix(Vector3.zero, Vector3.new(2, 0, 0), Vector3.new(1, 1, 0), Vector3.new(0, 0, 1))
@@ -1188,6 +1211,41 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Zone:destroy', function()
+		Test('A late reference Size signal after destroy does not resize the zone that reused its storage.', function()
+			local part = CreatePart({ CFrame = CFrame.new(12000, 0, 13000), Size = Vector3.one * 4 })
+			local zone = Zone.fromPart(part, { autoSync = true })
+			QuickZone:rebuild()
+
+			part.Size = Vector3.one * 40
+			zone:destroy()
+			QuickZone:rebuild()
+			local reused = Zone.new({ cframe = CFrame.new(12000, 0, 13100), size = Vector3.one * 2 })
+			task.wait()
+
+			Expect(reused:getSize()).is(Vector3.one * 2)
+
+			reused:destroy()
+			part:Destroy()
+		end)
+
+		Test('A zone created without a CFrame errors without breaking later tree updates.', function()
+			local ok = pcall(function()
+				Zone.new({ size = Vector3.one } :: any)
+			end)
+			Expect(ok).is(false)
+
+			local rebuilt, err = pcall(function()
+				QuickZone:rebuild()
+			end)
+			Expect(if rebuilt then true else err).is(true)
+
+			local position = Vector3.new(12000, 0, 13200)
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 4 })
+			QuickZone:rebuild()
+			Expect(table.find(QuickZone:getZonesAtPoint(position), zone)).never_is(nil)
+			zone:destroy()
+		end)
+
 		Test('Destroying a zone again while it is being destroyed does nothing.', function()
 			local fired = 0
 			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })

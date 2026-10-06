@@ -120,6 +120,7 @@ export type InternalGroup<T = any> = Group<T> & {
 	isManaged: boolean?,
 	autoClean: boolean,
 	onDestroyCallbacks: { () -> () }?,
+	destroyed: boolean?,
 }
 
 export type GroupClass = {
@@ -200,6 +201,7 @@ export type InternalZones = Zones & {
 	zones: { [any]: boolean },
 	observers: { [any]: boolean },
 	onDestroyCallbacks: { () -> () }?,
+	destroyed: boolean?,
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
 	add: (self: InternalZones, zone: Zone) -> (),
@@ -307,6 +309,7 @@ export type ObserverClass = {
 export type InternalObserver<T = any> = Observer<T> & {
 	id: number,
 	onDestroyCallbacks: { () -> () }?,
+	destroyed: boolean?,
 }
 
 export type QuickZone = {
