@@ -480,14 +480,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	end
 	self.destroyed = true
 
-	if self.onDestroyCallbacks then
-		-- The table must be cloned to avoid iterator shifts
-		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
-		for _, callback in onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
-	end
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	-- Exit callbacks may remove other entities, swapping later ones into slots not yet visited
 	for idx = #self.entities, 1, -1 do
@@ -501,7 +494,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil
 
-	setmetatable(self :: any, Destroyed)
+	setmetatable(self :: any, Destroyed.metatable)
 end
 
 function Group._add(self: Types.InternalGroup, reference: any): Types.Group

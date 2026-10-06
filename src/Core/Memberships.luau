@@ -1,3 +1,5 @@
+--!native
+--!optimize 2
 --!strict
 
 -- The zone each observer has an entity in. Writes go through here, which keeps the observer's
@@ -65,16 +67,18 @@ function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boo
 	return false
 end
 
--- Puts the entity in the observer's zone, returns the zone it was in
-function Memberships.set(observerId: number, entity: Types.Entity, data: Types.EntityData, zoneId: number): number?
+-- Moves the entity into the observer's zone, returns the zone it was in
+function Memberships.move(observerId: number, entity: Types.Entity, data: Types.EntityData, zoneId: number): number?
 	local memberships = data.activeObserverMemberships
 	local oldZoneId = memberships[observerId]
-	if oldZoneId == zoneId then
+	local tracked = observerTrackingEntities[observerId]
+	-- Destroyed observers track nothing
+	if oldZoneId == zoneId or not tracked then
 		return oldZoneId
 	end
 
 	memberships[observerId] = zoneId
-	observerTrackingEntities[observerId][entity] = zoneId
+	tracked[entity] = zoneId
 	if oldZoneId then
 		removeOccupant(oldZoneId, observerId)
 	end
@@ -122,6 +126,25 @@ function Memberships.exitZone(observerId: number, zoneId: number)
 			Memberships.exit(observerId, entity, data)
 		end
 	end
+end
+
+-- Exits every observer's entities in the zone, including observers that detached from it since the last tick
+function Memberships.exitAllFromZone(zoneId: number)
+	local occupants = zoneOccupants[zoneId]
+	if not occupants then
+		return
+	end
+
+	-- Collected first, as exits change the map
+	local observerIds = {}
+	for observerId in occupants do
+		table.insert(observerIds, observerId)
+	end
+	for _, observerId in observerIds do
+		Memberships.exitZone(observerId, zoneId)
+	end
+
+	zoneOccupants[zoneId] = nil
 end
 
 -- Exits the entity from every observer that no longer watches one of its groups

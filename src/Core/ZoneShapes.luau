@@ -12,10 +12,9 @@ local State = require(script.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
-local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
-local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
 
 local getBounds = Geometry.getBounds
+local getShapeExtents = Geometry.getShapeExtents
 local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
@@ -41,17 +40,6 @@ local dynamicChanges = State.dynamicChanges
 local function isAxis(direction: Vector3): boolean
 	local magnitude = vector.abs(direction)
 	return magnitude == Vector3.xAxis or magnitude == Vector3.yAxis or magnitude == Vector3.zAxis
-end
-
--- Half size of a box around the shape. Balls take their radius from X, cylinders from Y,
--- so uneven sizes reach past the zone's own box
-local function getShapeExtents(shapeType: number, halfSize: Vector3): Vector3
-	if shapeType == BALL_SHAPE_VALUE then
-		return Vector3.one * halfSize.X
-	elseif shapeType == CYLINDER_SHAPE_VALUE then
-		return Vector3.new(halfSize.X, halfSize.Y, halfSize.Y)
-	end
-	return halfSize
 end
 
 local function changesOf(isDynamic: boolean): Types.ZoneChanges

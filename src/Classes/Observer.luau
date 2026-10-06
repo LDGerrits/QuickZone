@@ -1549,14 +1549,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	end
 	self.destroyed = true
 
-	if self.onDestroyCallbacks then
-		-- The table must be cloned to avoid iterator shifts
-		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
-		for _, callback in onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
-	end
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	-- Exits every entity
 	self:setEnabled(false)
@@ -1590,7 +1583,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil
 
-	setmetatable(self :: any, Destroyed)
+	setmetatable(self :: any, Destroyed.metatable)
 end
 
 return Observer

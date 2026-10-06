@@ -339,14 +339,7 @@ function Zones.destroy(self: Types.InternalZones)
 	end
 	self.destroyed = true
 
-	if self.onDestroyCallbacks then
-		-- The table must be cloned to avoid iterator shifts
-		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
-		for _, callback in onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
-	end
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	for _, cleanup in self.onDestroyObserverCleanups do
 		cleanup()
@@ -362,7 +355,7 @@ function Zones.destroy(self: Types.InternalZones)
 	table.clear(self.onDestroyObserverCleanups)
 	table.clear(self.onDestroyZoneCleanups)
 
-	setmetatable(self :: any, Destroyed)
+	setmetatable(self :: any, Destroyed.metatable)
 end
 
 -- private

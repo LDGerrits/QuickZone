@@ -1120,28 +1120,10 @@ function Zone.destroy(self: Types.InternalZone): ()
 		end
 	end
 
-	-- Exit while the zone object is still alive, so callbacks get it. Observers that detached
-	-- since the last tick may still have entities here. Collected first, as exits change the map
-	local occupants = State.zoneOccupants[id]
-	if occupants then
-		local observerIds = {}
-		for observerId in occupants do
-			table.insert(observerIds, observerId)
-		end
-		for _, observerId in observerIds do
-			Memberships.exitZone(observerId, id)
-		end
-		State.zoneOccupants[id] = nil
-	end
+	-- Exit while the zone object is still alive, so callbacks get it
+	Memberships.exitAllFromZone(id)
 
-	if self.onDestroyCallbacks then
-		-- The table must be cloned to avoid iterator shifts
-		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
-		for _, callback in onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
-	end
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	State.zoneIdToZoneObj[id] = nil
 	State.zoneSlotToZoneObj[slot] = nil
@@ -1151,7 +1133,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	-- Reusable after the next rebuild
 	table.insert(State.releasedZoneSlots, slot)
 
-	setmetatable(self :: any, Destroyed)
+	setmetatable(self :: any, Destroyed.metatable)
 end
 
 return Zone
