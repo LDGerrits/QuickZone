@@ -2898,6 +2898,45 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Disabling from callbacks', function()
+		Test('Disabling exits every entity even when exit callbacks subscribe more groups.', function()
+			local position = Vector3.new(12000, 0, 12900)
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 40 })
+			local observer = Observer.new({ zones = { zone }, groups = {}, safety = false })
+			local groups, entities = {}, {}
+			for i = 1, 8 do
+				entities[i] = { Position = position + Vector3.new(i, 0, 0) }
+				groups[i] = Group.new({ entities = { entities[i] }, autoClean = false })
+				observer:subscribe(groups[i])
+			end
+			QuickZone:update(1)
+			Expect(#observer:getEntitiesInside()).is(8)
+
+			local added = {}
+			observer:onExit(function()
+				for _ = 1, 64 do
+					local group = Group.new()
+					table.insert(added, group)
+					observer:subscribe(group)
+				end
+			end)
+			observer:setEnabled(false)
+
+			for _, entity in entities do
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+			end
+
+			observer:destroy()
+			for _, group in groups do
+				group:destroy()
+			end
+			for _, group in added do
+				group:destroy()
+			end
+			zone:destroy()
+		end)
+	end)
+
 	Describe('Nested updates', function()
 		Test('An update called from inside a callback does not cost other entities their entries.', function()
 			local position = Vector3.new(12000, 0, 12800)

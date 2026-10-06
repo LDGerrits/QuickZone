@@ -18,7 +18,7 @@ local queryPoint = LinearBVH.queryPoint
 local touches = ZoneChanges.touches
 local containsPoint = ZoneShapes.containsPoint
 local fireCallback = Callbacks.fire
-local setMembership = Memberships.set
+local moveMembership = Memberships.move
 local exitMembership = Memberships.exit
 local isSubscribed = Memberships.isSubscribed
 
@@ -281,7 +281,7 @@ end
 
 local Scheduler = {}
 
-local function tick(dt: number)
+local function runTick(dt: number)
 	local start = os.clock()
 
 	-- Route entities that have changed groups or observers since the last update
@@ -487,7 +487,7 @@ local function tick(dt: number)
 						continue
 					end
 
-					setMembership(observerId, entity, data, zoneIdx)
+					moveMembership(observerId, entity, data, zoneIdx)
 
 					-- Entry if it was in none of the observer's zones, transition otherwise
 					local reference = entityToReference[entity] or entity
@@ -543,7 +543,7 @@ function Scheduler.update(dt: number)
 	end
 
 	ticking = true
-	local ok, trace = xpcall(tick, debug.traceback, dt)
+	local ok, trace = xpcall(runTick, debug.traceback, dt)
 	ticking = false
 	if not ok then
 		error(trace, 0)

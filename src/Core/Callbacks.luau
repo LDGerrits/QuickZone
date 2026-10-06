@@ -1,5 +1,8 @@
 --!strict
 
+-- Observer enter, exit and transition callbacks. Lists are keyed by observer id and only
+-- changed through connect, so firing never sees a list shift under it
+
 local Types = require(script.Parent.Parent.Types)
 
 type CallbackLists = { [number]: { (any, Types.Zone, Types.Entity) -> () } }

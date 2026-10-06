@@ -58,6 +58,17 @@ function Geometry.getBounds(
 	return position - extent, position + extent
 end
 
+-- Half size of a box around the shape. Balls take their radius from X, cylinders from Y,
+-- so uneven sizes reach past the zone's own box
+function Geometry.getShapeExtents(shapeType: number, halfSize: Vector3): Vector3
+	if shapeType == BALL_SHAPE_VALUE then
+		return Vector3.one * halfSize.X
+	elseif shapeType == CYLINDER_SHAPE_VALUE then
+		return Vector3.new(halfSize.X, halfSize.Y, halfSize.Y)
+	end
+	return halfSize
+end
+
 function Geometry.getMortonScale(sceneMin: Vector3, sceneMax: Vector3): (number, number, number)
 	local size = sceneMax - sceneMin
 	return 1023 / size.X, 1023 / size.Y, 1023 / size.Z
