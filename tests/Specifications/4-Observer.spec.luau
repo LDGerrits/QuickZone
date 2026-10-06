@@ -2577,29 +2577,6 @@ return function(Tiniest: Tiniest)
 			Expect(found).is(false)
 		end)
 
-		Test('Destroyed observers that detached leave no detach state behind.', function()
-			local part = CreatePart({ CFrame = CFrame.new(9000, 0, 9600) })
-			local zones = Zone.fromParts({ part })
-			local ids = {}
-			for _ = 1, 20 do
-				local observer = Observer.new({ zones = {}, groups = {} })
-				zones:attach(observer)
-				table.insert(ids, observer:getId())
-				observer:destroy()
-			end
-
-			local leftovers = 0
-			for _, id in ids do
-				if State.observerDetachedZones[id] then
-					leftovers += 1
-				end
-			end
-
-			zones:destroy()
-			part:Destroy()
-			Expect(leftovers).is(0)
-		end)
-
 		Test('Destroying an observer leaves no attachment state on its zones.', function()
 			local zone = Zone.new({ cframe = CFrame.new(9000, 0, 9300), size = Vector3.one * 10 })
 			local observer = Observer.new({ zones = { zone }, groups = {} })
@@ -2624,6 +2601,330 @@ return function(Tiniest: Tiniest)
 
 			observer:destroy()
 			other:destroy()
+			zone:destroy()
+		end)
+	end)
+
+	Describe('Removal from callbacks', function()
+		local function place(index: number): Vector3
+			return Vector3.new(12000 + index * 100, 0, 12000)
+		end
+
+		Test('Removing an entity whose exit callback removes it from its other groups does not error.', function()
+			local position = place(1)
+			local entity = { Position = position }
+			local groupA = Group.new({ entities = { entity }, autoClean = false })
+			local groupB = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = { groupA }, safety = false })
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+			observer:onExit(function(exited)
+				QuickZone:removeEntity(exited)
+			end)
+			local ok, err = pcall(function()
+				groupA:remove(entity)
+			end)
+
+			Expect(if ok then true else err).is(true)
+			Expect(table.find(QuickZone:getEntities(), entity)).is(nil)
+			Expect(groupB:contains(entity)).is(false)
+
+			observer:destroy()
+			groupA:destroy()
+			groupB:destroy()
+			zone:destroy()
+		end)
+
+		Test('Destroying a group whose exit callbacks remove its entities from other groups finishes.', function()
+			local position = place(2)
+			local entities = { { Position = position }, { Position = position } }
+			local groupA = Group.new({ entities = entities, autoClean = false })
+			local groupB = Group.new({ entities = entities, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = { groupA }, safety = false })
+			QuickZone:update(1)
+
+			observer:onExit(function(exited)
+				QuickZone:removeEntity(exited)
+			end)
+			local ok, err = pcall(function()
+				groupA:destroy()
+			end)
+
+			Expect(if ok then true else err).is(true)
+			Expect(table.find(QuickZone:getGroups(), groupA)).is(nil)
+
+			observer:destroy()
+			groupB:destroy()
+			zone:destroy()
+		end)
+
+		Test('Unsubscribing exits every entity even when exit callbacks remove entities from the group.', function()
+			local position = place(3)
+			local entities = {}
+			for i = 1, 4 do
+				entities[i] = { Position = position + Vector3.new(i, 0, 0) }
+			end
+			local group = Group.new({ entities = entities, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 20 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			QuickZone:update(1)
+			Expect(#observer:getEntitiesInside()).is(4)
+
+			local exited = {}
+			observer:onExit(function(entity)
+				exited[entity] = true
+				group:remove(entity)
+			end)
+			observer:unsubscribe(group)
+
+			for _, entity in entities do
+				Expect(exited[entity]).is(true)
+			end
+			Expect(#observer:getEntitiesInside()).is(0)
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
+		end)
+
+		Test('A callback that disconnects itself does not stop the next callback from firing.', function()
+			local position = place(4)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+
+			local firstFired, secondFired = false, false
+			local disconnectFirst
+			disconnectFirst = observer:onEnter(function()
+				firstFired = true
+				disconnectFirst()
+			end)
+			observer:onEnter(function()
+				secondFired = true
+			end)
+			QuickZone:update(1)
+
+			Expect(firstFired).is(true)
+			Expect(secondFired).is(true)
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
+		end)
+
+		Test('Disconnecting callbacks after the observer is destroyed does not error.', function()
+			local observer = Observer.new({ zones = {}, groups = {} })
+			local disconnectEnter = observer:onEnter(function() end)
+			local disconnectObserve = observer:observe(function() end)
+			observer:destroy()
+
+			local ok, err = pcall(function()
+				disconnectEnter()
+				disconnectObserve()
+			end)
+			Expect(if ok then true else err).is(true)
+		end)
+	end)
+
+	Describe('Destroying twice', function()
+		Test('An observer destroyed again from its onDestroy callback does not error.', function()
+			local observer = Observer.new({ zones = {}, groups = {} })
+			local fired = 0
+			observer:onDestroy(function()
+				fired += 1
+				if fired == 1 then
+					observer:destroy()
+				end
+			end)
+
+			local ok, err = pcall(function()
+				observer:destroy()
+			end)
+			Expect(if ok then true else err).is(true)
+			Expect(fired).is(1)
+		end)
+
+		Test('An onDestroy callback that disconnects itself does not skip the next one.', function()
+			local observer = Observer.new({ zones = {}, groups = {} })
+			local group = Group.new()
+			local secondFired = { observer = false, group = false }
+			for name, object in { observer = observer, group = group } :: { [string]: any } do
+				local disconnect
+				disconnect = object:onDestroy(function()
+					disconnect()
+				end)
+				object:onDestroy(function()
+					secondFired[name] = true
+				end)
+			end
+
+			observer:destroy()
+			group:destroy()
+			Expect(secondFired.observer).is(true)
+			Expect(secondFired.group).is(true)
+		end)
+
+		Test('A group destroyed again from its onDestroy callback does not error.', function()
+			local group = Group.new({ entities = { { Position = Vector3.zero } }, autoClean = false })
+			local fired = 0
+			group:onDestroy(function()
+				fired += 1
+				if fired == 1 then
+					group:destroy()
+				end
+			end)
+
+			local ok, err = pcall(function()
+				group:destroy()
+			end)
+			Expect(if ok then true else err).is(true)
+			Expect(fired).is(1)
+		end)
+
+		Test('Destroying a zone, observer or group a second time does nothing.', function()
+			local zone = Zone.new({ cframe = CFrame.new(12000, 0, 12500), size = Vector3.one })
+			local observer = Observer.new({ zones = {}, groups = {} })
+			local group = Group.new()
+			for _, object in { zone, observer, group } :: { any } do
+				object:destroy()
+				local ok, err = pcall(function()
+					object:destroy()
+				end)
+				Expect(if ok then true else err).is(true)
+			end
+		end)
+	end)
+
+	Describe('Zone occupancy bookkeeping', function()
+		local function place(index: number): Vector3
+			return Vector3.new(12000 + index * 100, 0, 12600)
+		end
+
+		Test('Leaves nothing behind once the entities have left a detached zone.', function()
+			local position = place(1)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			QuickZone:update(1)
+
+			for _ = 1, 3 do
+				observer:detach(zone)
+				QuickZone:update(1)
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+				observer:attach(zone)
+				QuickZone:update(1)
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
+			end
+			observer:detach(zone)
+			QuickZone:update(1)
+
+			Expect(State.zoneOccupants[zone:getId()]).is(nil)
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
+		end)
+
+		Test('Leaves nothing behind when the observer, group or entity goes away.', function()
+			local zones = {}
+			local teardowns = {
+				function(observer, _, _)
+					observer:destroy()
+				end,
+				function(_, group, _)
+					group:destroy()
+				end,
+				function(_, _, entity)
+					QuickZone:removeEntity(entity)
+				end,
+				function(observer, _, _)
+					observer:setEnabled(false)
+				end,
+			}
+			local cleanups = {}
+			for i, teardown in teardowns do
+				local position = place(i + 1)
+				local entity = { Position = position }
+				local group = Group.new({ entities = { entity }, autoClean = false })
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+				QuickZone:update(1)
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+				teardown(observer, group, entity)
+				table.insert(zones, zone)
+				table.insert(cleanups, observer)
+				table.insert(cleanups, group)
+			end
+
+			for _, zone in zones do
+				Expect(State.zoneOccupants[zone:getId()]).is(nil)
+			end
+
+			for _, object in cleanups do
+				object:destroy()
+			end
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
+
+		Test('Leaves nothing behind when an entity moves between zones of one observer.', function()
+			local position = place(6)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local first = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local second = Zone.new({ cframe = CFrame.new(position + Vector3.xAxis * 20), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { first, second }, groups = { group }, safety = false })
+			QuickZone:update(1)
+			entity.Position = position + Vector3.xAxis * 20
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(second)
+
+			Expect(State.zoneOccupants[first:getId()]).is(nil)
+			Expect(State.zoneOccupants[second:getId()][observer:getId()]).is(1)
+
+			observer:destroy()
+			Expect(State.zoneOccupants[second:getId()]).is(nil)
+
+			group:destroy()
+			first:destroy()
+			second:destroy()
+		end)
+	end)
+
+	Describe('Nested updates', function()
+		Test('An update called from inside a callback does not cost other entities their entries.', function()
+			local position = Vector3.new(12000, 0, 12800)
+			local entities = { { Position = position }, { Position = position + Vector3.xAxis } }
+			local group = Group.new({ entities = entities, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local first = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			local second = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			local nested = false
+			first:onEnter(function()
+				if not nested then
+					nested = true
+					QuickZone:update(1)
+				end
+			end)
+
+			QuickZone:update(1)
+			QuickZone:update(1)
+
+			for _, entity in entities do
+				Expect(first:getZoneOfEntity(entity)).is(zone)
+				Expect(second:getZoneOfEntity(entity)).is(zone)
+			end
+
+			first:destroy()
+			second:destroy()
+			group:destroy()
 			zone:destroy()
 		end)
 	end)

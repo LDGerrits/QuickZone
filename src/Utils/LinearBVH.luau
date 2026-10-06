@@ -48,20 +48,25 @@ function LinearBVH.new(): Types.Tree
 	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, membersChanged = false }
 end
 
--- Build scratch space
+local EMPTY_BUFFER = buffer.create(0)
+local EMPTY_BOUNDS = table.freeze({}) :: { [number]: Vector3 }
+
+-- Build scratch space, shared by every tree
 local memberIds = {} :: { number }
-local codesA = buffer.create(0)
-local idsA = buffer.create(0)
-local codesB = buffer.create(0)
-local idsB = buffer.create(0)
+local codesA = EMPTY_BUFFER
+local idsA = EMPTY_BUFFER
+local codesB = EMPTY_BUFFER
+local idsB = EMPTY_BUFFER
 local radixCounts = table.create(RADIX_SIZE, 0) :: { number }
+-- The tree the scratch space was grown for, the only one that shrinks it
+local scratchOwner: Types.Tree? = nil
 
 -- Set during a build
 local sortedCodes = codesA
 local sortedIds = idsA
-local buildBoundsMin = {} :: { [number]: Vector3 }
-local buildBoundsMax = {} :: { [number]: Vector3 }
-local buildBuffer = buffer.create(0)
+local buildBoundsMin = EMPTY_BOUNDS
+local buildBoundsMax = EMPTY_BOUNDS
+local buildBuffer = EMPTY_BUFFER
 local buildCost = 0
 
 -- Half the surface area, the usual BVH cost
@@ -69,16 +74,33 @@ local function halfArea(dx: number, dy: number, dz: number): number
 	return dx * dy + dy * dz + dz * dx
 end
 
-local function ensureScratch(count: number)
-	local size = count * 4
-	if buffer.len(codesA) >= size then
-		return
+-- Grows the scratch space for count members, or shrinks it once the tree it was grown for mostly
+-- shrank. Other trees don't shrink it, so a small tree can't make a large one allocate every build
+local function prepareScratch(tree: Types.Tree, count: number)
+	local capacity = buffer.len(codesA) // 4
+	if capacity >= count then
+		if tree ~= scratchOwner or capacity <= SHRINK_MIN_NODES or capacity <= count * SHRINK_FACTOR then
+			return
+		end
 	end
-	size = (count + count // 2) * 4
+
+	scratchOwner = tree
+	local size = (count + count // 2) * 4
 	codesA = buffer.create(size)
 	idsA = buffer.create(size)
 	codesB = buffer.create(size)
 	idsB = buffer.create(size)
+	sortedCodes, sortedIds = codesA, idsA
+
+	-- Keep only the ids of this build
+	if #memberIds > count then
+		memberIds = table.move(memberIds, 1, count, 1, table.create(count))
+	end
+end
+
+-- Bytes in each build scratch buffer
+function LinearBVH.scratchSize(): number
+	return buffer.len(codesA)
 end
 
 -- Stable insertion sort for small counts
@@ -247,6 +269,8 @@ function LinearBVH.build(
 		memberIds[count] = id
 	end
 
+	prepareScratch(tree, count)
+
 	if count == 0 then
 		prepareBuffer(tree, 0)
 		tree.count = 0
@@ -259,7 +283,6 @@ function LinearBVH.build(
 	local sceneMin, sceneMax = min - padding, max + padding
 	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
 
-	ensureScratch(count)
 	for i = 1, count do
 		local id = memberIds[i]
 		local offset = (i - 1) * 4
@@ -275,6 +298,11 @@ function LinearBVH.build(
 	buildCost = 0
 
 	buildFlatTree(0, count - 1, 0)
+
+	-- Don't keep the tree's buffer or the bounds alive once they are replaced
+	buildBuffer = EMPTY_BUFFER
+	buildBoundsMin = EMPTY_BOUNDS
+	buildBoundsMax = EMPTY_BOUNDS
 
 	tree.count = nodeCount
 	tree.cost = buildCost

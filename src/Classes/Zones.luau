@@ -9,6 +9,7 @@
 ]=]
 
 local Types = require(script.Parent.Parent.Types)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 
 local Zones = {}
 Zones.__index = Zones
@@ -332,8 +333,16 @@ end
 	@within Zones
 ]=]
 function Zones.destroy(self: Types.InternalZones)
+	-- A callback below may destroy the zones again
+	if self.destroyed then
+		return
+	end
+	self.destroyed = true
+
 	if self.onDestroyCallbacks then
-		for _, callback in self.onDestroyCallbacks do
+		-- The table must be cloned to avoid iterator shifts
+		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
+		for _, callback in onDestroyCallbacks do
 			task.spawn(callback)
 		end
 		table.clear(self.onDestroyCallbacks)
@@ -353,7 +362,7 @@ function Zones.destroy(self: Types.InternalZones)
 	table.clear(self.onDestroyObserverCleanups)
 	table.clear(self.onDestroyZoneCleanups)
 
-	setmetatable(self :: any, nil)
+	setmetatable(self :: any, Destroyed)
 end
 
 -- private

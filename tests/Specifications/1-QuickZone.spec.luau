@@ -10,6 +10,7 @@ local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
+local LinearBVH = require(ReplicatedStorage.QuickZone.Utils.LinearBVH)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -902,6 +903,21 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Tree memory', function()
+		Test('Build scratch space shrinks once most zones are destroyed.', function()
+			local zones = {}
+			for i = 1, 20000 do
+				table.insert(zones, Zone.new({ cframe = CFrame.new(60000 + i * 4, 0, 0), size = Vector3.one }))
+			end
+			QuickZone:rebuild()
+			for _, zone in zones do
+				zone:destroy()
+			end
+			QuickZone:rebuild()
+
+			-- 20000 zones need about 120 KB per scratch buffer
+			Expect(LinearBVH.scratchSize() < 32 * 1024).is(true)
+		end)
+
 		Test('Shrinks once most zones are destroyed.', function()
 			local trees = { State.staticTree, State.dynamicTree }
 			local zones = {}
