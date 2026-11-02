@@ -9,8 +9,6 @@ local State = {
 	-- Keyed by slot instead of id, slots are reused
 	zoneSlotCount = 0,
 	freeZoneSlots = {} :: { number },
-	-- Destroyed zones' slots, free after the next rebuild
-	releasedZoneSlots = {} :: { number },
 	zoneSlotIds = {} :: { [number]: number },
 	nextObserverId = 1,
 	nextGroupId = 1,

@@ -1188,6 +1188,30 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Zone:destroy', function()
+		Test('Zones created right after others are destroyed reuse their storage.', function()
+			local zones, slots = {}, {}
+			for i = 1, 50 do
+				zones[i] = Zone.new({ cframe = CFrame.new(12000 + i * 20, 0, 13400), size = Vector3.one })
+				slots[(zones[i] :: any).slot] = true
+			end
+			for _, zone in zones do
+				zone:destroy()
+			end
+
+			-- No tick in between, as when a map is torn down and rebuilt in one frame
+			local reused = 0
+			for i = 1, 50 do
+				zones[i] = Zone.new({ cframe = CFrame.new(12000 + i * 20, 0, 13400), size = Vector3.one })
+				if slots[(zones[i] :: any).slot] then
+					reused += 1
+				end
+			end
+			for _, zone in zones do
+				zone:destroy()
+			end
+			Expect(reused).is(50)
+		end)
+
 		Test('A late reference Size signal after destroy does not resize the zone that reused its storage.', function()
 			local part = CreatePart({ CFrame = CFrame.new(12000, 0, 13000), Size = Vector3.one * 4 })
 			local zone = Zone.fromPart(part, { autoSync = true })

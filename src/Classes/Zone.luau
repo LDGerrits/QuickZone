@@ -1136,8 +1136,8 @@ function Zone.destroy(self: Types.InternalZone): ()
 	State.zoneSlotIds[slot] = nil
 	ZoneShapes.remove(slot)
 
-	-- Reusable after the next rebuild
-	table.insert(State.releasedZoneSlots, slot)
+	-- Reusable right away, a stale tree leaf checks the new zone's shape
+	table.insert(State.freeZoneSlots, slot)
 
 	setmetatable(self :: any, nil)
 end
