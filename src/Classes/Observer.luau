@@ -1584,7 +1584,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil
 
-	setmetatable(self :: any, Destroyed.metatable)
+	setmetatable(self :: any, nil)
 end
 
 return Observer

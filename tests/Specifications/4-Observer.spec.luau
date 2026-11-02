@@ -2785,16 +2785,16 @@ return function(Tiniest: Tiniest)
 			Expect(fired).is(1)
 		end)
 
-		Test('Destroying a zone, observer or group a second time does nothing.', function()
+		Test('Destroying a zone, observer or group a second time errors.', function()
 			local zone = Zone.new({ cframe = CFrame.new(12000, 0, 12500), size = Vector3.one })
 			local observer = Observer.new({ zones = {}, groups = {} })
 			local group = Group.new()
 			for _, object in { zone, observer, group } :: { any } do
 				object:destroy()
-				local ok, err = pcall(function()
+				local ok = pcall(function()
 					object:destroy()
 				end)
-				Expect(if ok then true else err).is(true)
+				Expect(ok).is(false)
 			end
 		end)
 	end)
@@ -2846,7 +2846,7 @@ return function(Tiniest: Tiniest)
 					observer:setEnabled(false)
 				end,
 			}
-			local cleanups = {}
+			local cleanups: { any } = {}
 			for i, teardown in teardowns do
 				local position = place(i + 1)
 				local entity = { Position = position }
@@ -2867,7 +2867,9 @@ return function(Tiniest: Tiniest)
 			end
 
 			for _, object in cleanups do
-				object:destroy()
+				if not object.destroyed then
+					object:destroy()
+				end
 			end
 			for _, zone in zones do
 				zone:destroy()

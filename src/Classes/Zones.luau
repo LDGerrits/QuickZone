@@ -355,7 +355,7 @@ function Zones.destroy(self: Types.InternalZones)
 	table.clear(self.onDestroyObserverCleanups)
 	table.clear(self.onDestroyZoneCleanups)
 
-	setmetatable(self :: any, Destroyed.metatable)
+	setmetatable(self :: any, nil)
 end
 
 -- private

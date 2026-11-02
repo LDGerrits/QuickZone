@@ -397,7 +397,9 @@ function Zone.fromChildren(
 		local oldZone = instanceToZone[child]
 		if oldZone then
 			instanceToZone[child] = nil
-			oldZone:destroy()
+			if not oldZone.destroyed then
+				oldZone:destroy()
+			end
 		end
 	end
 
@@ -469,7 +471,9 @@ function Zone.fromDescendants(
 		local oldZone = instanceToZone[descendant]
 		if oldZone then
 			instanceToZone[descendant] = nil
-			oldZone:destroy()
+			if not oldZone.destroyed then
+				oldZone:destroy()
+			end
 		end
 	end
 
@@ -534,7 +538,9 @@ function Zone.fromTag(
 			local deadZone = instanceToZone[part]
 			if deadZone then
 				instanceToZone[part] = nil
-				deadZone:destroy()
+				if not deadZone.destroyed then
+					deadZone:destroy()
+				end
 			end
 			local destroyingConn = partDestroyingConnections[part]
 			if destroyingConn then
@@ -1133,7 +1139,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	-- Reusable after the next rebuild
 	table.insert(State.releasedZoneSlots, slot)
 
-	setmetatable(self :: any, Destroyed.metatable)
+	setmetatable(self :: any, nil)
 end
 
 return Zone
