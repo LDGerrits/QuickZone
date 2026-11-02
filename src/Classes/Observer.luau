@@ -943,7 +943,8 @@ function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Ty
 	State.logicVersion += 1
 
 	if not enabled then
-		for groupId, observersMap in State.groupToObservers do
+		-- Cloned, as exit callbacks may subscribe groups
+		for groupId, observersMap in table.clone(State.groupToObservers) do
 			if not observersMap[id] then
 				continue
 			end
