@@ -464,6 +464,12 @@ local function runTick(dt: number)
 						continue
 					end
 
+					-- Already in this zone, so nothing to enter
+					local currentZoneId = current[observerId]
+					if currentZoneId == zoneIdx then
+						continue
+					end
+
 					-- An earlier callback may have removed the entity or destroyed the zone
 					local zone = zoneIdToZoneObj[zoneIdx]
 					if entityData[entity] ~= data or not zone then
@@ -479,11 +485,6 @@ local function runTick(dt: number)
 						or not isSubscribed(entity, observerId)
 					then
 						data.logicVersion = -1
-						continue
-					end
-
-					local currentZoneId = current[observerId]
-					if currentZoneId == zoneIdx then
 						continue
 					end
 
