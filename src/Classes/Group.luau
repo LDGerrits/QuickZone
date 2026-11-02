@@ -494,7 +494,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil
 
-	setmetatable(self :: any, Destroyed.metatable)
+	setmetatable(self :: any, nil)
 end
 
 function Group._add(self: Types.InternalGroup, reference: any): Types.Group
