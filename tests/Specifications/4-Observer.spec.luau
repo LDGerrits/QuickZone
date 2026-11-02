@@ -2889,7 +2889,7 @@ return function(Tiniest: Tiniest)
 			Expect(observer:getZoneOfEntity(entity)).is(second)
 
 			Expect(State.zoneOccupants[first:getId()]).is(nil)
-			Expect(State.zoneOccupants[second:getId()][observer:getId()]).is(1)
+			Expect(State.zoneOccupants[second:getId()]).is(1)
 
 			observer:destroy()
 			Expect(State.zoneOccupants[second:getId()]).is(nil)

@@ -80,8 +80,8 @@ local State = {
 	zoneAttachedObservers = {} :: { [number]: { number } },
 	-- Observer of zones attached to exactly one
 	zoneSoleObserver = {} :: { [number]: number },
-	-- Zone id to the number of entities each observer has in it, only written through Core/Memberships
-	zoneOccupants = {} :: { [number]: { [number]: number } },
+	-- Zone id to the number of entities observers have in it, only written through Core/Memberships
+	zoneOccupants = {} :: { [number]: number },
 	zoneIdToZoneObj = {} :: { [number]: Types.InternalZone },
 	zoneSlotToZoneObj = {} :: { [number]: Types.InternalZone },
 	observerIdToObserverObj = {} :: { [number]: Types.InternalObserver },
