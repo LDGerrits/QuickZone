@@ -21,30 +21,14 @@ local zoneOccupants = State.zoneOccupants
 
 local fire = Callbacks.fire
 
-local function addOccupant(zoneId: number, observerId: number)
-	local occupants = zoneOccupants[zoneId]
-	if not occupants then
-		occupants = {}
-		zoneOccupants[zoneId] = occupants
-	end
-	occupants[observerId] = (occupants[observerId] or 0) + 1
+local function addOccupant(zoneId: number)
+	zoneOccupants[zoneId] = (zoneOccupants[zoneId] or 0) + 1
 end
 
-local function removeOccupant(zoneId: number, observerId: number)
-	local occupants = zoneOccupants[zoneId]
-	if not occupants then
-		return
-	end
-
-	local count = (occupants[observerId] or 0) - 1
-	if count > 0 then
-		occupants[observerId] = count
-		return
-	end
-
-	occupants[observerId] = nil
-	if next(occupants) == nil then
-		zoneOccupants[zoneId] = nil
+local function removeOccupant(zoneId: number)
+	local count = zoneOccupants[zoneId]
+	if count then
+		zoneOccupants[zoneId] = if count > 1 then count - 1 else nil
 	end
 end
 
@@ -80,9 +64,9 @@ function Memberships.move(observerId: number, entity: Types.Entity, data: Types.
 	memberships[observerId] = zoneId
 	tracked[entity] = zoneId
 	if oldZoneId then
-		removeOccupant(oldZoneId, observerId)
+		removeOccupant(oldZoneId)
 	end
-	addOccupant(zoneId, observerId)
+	addOccupant(zoneId)
 
 	return oldZoneId
 end
@@ -99,7 +83,7 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	if tracked then
 		tracked[entity] = nil
 	end
-	removeOccupant(zoneId, observerId)
+	removeOccupant(zoneId)
 
 	local reference = entityToReference[entity] or entity
 	fire(observerExitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observerSafety[observerId])
@@ -130,18 +114,20 @@ end
 
 -- Exits every observer's entities in the zone, including observers that detached from it since the last tick
 function Memberships.exitAllFromZone(zoneId: number)
-	local occupants = zoneOccupants[zoneId]
-	if not occupants then
+	if not zoneOccupants[zoneId] then
 		return
 	end
 
-	-- Collected first, as exits change the map
+	-- Collected first, as callbacks may create or destroy observers
 	local observerIds = {}
-	for observerId in occupants do
+	for observerId in observerTrackingEntities do
 		table.insert(observerIds, observerId)
 	end
 	for _, observerId in observerIds do
 		Memberships.exitZone(observerId, zoneId)
+		if not zoneOccupants[zoneId] then
+			break
+		end
 	end
 
 	zoneOccupants[zoneId] = nil
