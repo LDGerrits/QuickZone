@@ -14,7 +14,6 @@ local Types = require(script.Parent.Parent.Types)
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 
 local getBounds = Geometry.getBounds
-local getShapeExtents = Geometry.getShapeExtents
 local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
@@ -75,7 +74,7 @@ local function refresh(slot: number)
 	local right = Vector3.new(r00, r10, r20)
 	local up = Vector3.new(r01, r11, r21)
 	local back = Vector3.new(r02, r12, r22)
-	local boundsMin, boundsMax = getBounds(position, right, up, back, getShapeExtents(shapeType, halfSize))
+	local boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
 
 	-- Entities in the old or new box may be affected
 	local changes = changesOf(isDynamic)
