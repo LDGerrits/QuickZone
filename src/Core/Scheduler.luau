@@ -607,15 +607,6 @@ function Scheduler.rebuildTrees()
 	if ZoneChanges.commit(staticChanges, State.staticVersion + 1, (staticTree.count + 1) // 2) then
 		State.staticVersion += 1
 	end
-
-	-- Released slots are safe to reuse
-	local released = State.releasedZoneSlots
-	local releasedCount = #released
-	if releasedCount > 0 then
-		local free = State.freeZoneSlots
-		table.move(released, 1, releasedCount, #free + 1, free)
-		table.clear(released)
-	end
 end
 
 Scheduler.setEnabled(Config.Scheduler.enabled)
