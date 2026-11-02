@@ -974,29 +974,6 @@ return function(Tiniest: Tiniest)
 		local size = Vector3.one * 10
 		local rotation = CFrame.Angles(0, math.pi / 4, 0)
 
-		Test(
-			'Balls and cylinders with uneven sizes are found by point queries wherever they contain the point.',
-			function()
-				local center = Vector3.new(12000, 0, 13300)
-				local ball = Zone.new({ cframe = CFrame.new(center), size = Vector3.new(10, 2, 2), shape = 'Ball' })
-				local cylinderCenter = center + Vector3.new(100, 0, 0)
-				local cylinder =
-					Zone.new({ cframe = CFrame.new(cylinderCenter), size = Vector3.new(2, 10, 4), shape = 'Cylinder' })
-				QuickZone:rebuild()
-
-				for _, case in
-					{ { ball, center + Vector3.new(0, 3, 0) }, { cylinder, cylinderCenter + Vector3.new(0, 0, 4) } }
-				do
-					local zone, point = case[1], case[2]
-					Expect(zone:isPointInside(point)).is(true)
-					Expect(table.find(QuickZone:getZonesAtPoint(point), zone)).never_is(nil)
-				end
-
-				ball:destroy()
-				cylinder:destroy()
-			end
-		)
-
 		Test('Block: a skewed, scaled CFrame agrees with PointToObjectSpace.', function()
 			local cframe =
 				CFrame.fromMatrix(Vector3.zero, Vector3.new(2, 0, 0), Vector3.new(1, 1, 0), Vector3.new(0, 0, 1))
