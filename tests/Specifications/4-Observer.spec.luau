@@ -2532,6 +2532,35 @@ return function(Tiniest: Tiniest)
 			end
 		end)
 
+		Test('Later callbacks never see an entity enter after an earlier callback made it leave.', function()
+			local results = {}
+			for _, safety in { false, true } do
+				local position = Vector3.new(9000, 0, if safety then 10350 else 10300)
+				local entity = { Position = position }
+				local group = Group.new({ entities = { entity }, autoClean = false })
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local observer = Observer.new({ zones = { zone }, groups = { group }, safety = safety })
+				-- Picked up on entry
+				observer:onEnter(function()
+					zone:destroy()
+				end)
+				local inside = 0
+				observer:observe(function()
+					inside += 1
+					return function()
+						inside -= 1
+					end
+				end)
+				QuickZone:update(1)
+				table.insert(results, `safety {safety}: {inside} inside`)
+
+				observer:destroy()
+				group:destroy()
+			end
+
+			Expect(table.concat(results, ', ')).is('safety false: 0 inside, safety true: 0 inside')
+		end)
+
 		Test('An unsafe exit callback that errors does not break other observers.', function()
 			local start, finish = Vector3.new(9000, 0, 10000), Vector3.new(9000, 0, 10100)
 			local entity = { Position = start }
