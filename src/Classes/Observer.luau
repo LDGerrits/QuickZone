@@ -1552,8 +1552,9 @@ function Observer.destroy(self: Types.InternalObserver): ()
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
-	-- Exits every entity
+	-- Exits every entity. Destroyed from an exit callback, the loop that fired it may not have reached them all
 	self:setEnabled(false)
+	Memberships.exitObserver(self.id)
 
 	-- Unlinked entities must be rerouted, also when the observer was already disabled
 	local id = self.id

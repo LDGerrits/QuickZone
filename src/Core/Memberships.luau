@@ -112,6 +112,27 @@ function Memberships.exitZone(observerId: number, zoneId: number)
 	end
 end
 
+-- Exits every entity the observer has in a zone
+function Memberships.exitObserver(observerId: number)
+	local tracked = observerTrackingEntities[observerId]
+	if not tracked then
+		return
+	end
+
+	-- Collected first, as callbacks may change the map
+	local leaving = {}
+	for entity in tracked do
+		table.insert(leaving, entity)
+	end
+
+	for _, entity in leaving do
+		local data = entityData[entity]
+		if data then
+			Memberships.exit(observerId, entity, data)
+		end
+	end
+end
+
 -- Exits every observer's entities in the zone, including observers that detached from it since the last tick
 function Memberships.exitAllFromZone(zoneId: number)
 	if not zoneOccupants[zoneId] then
