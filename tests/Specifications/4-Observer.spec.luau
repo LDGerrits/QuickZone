@@ -2489,6 +2489,49 @@ return function(Tiniest: Tiniest)
 			Expect(enters).is(2)
 		end)
 
+		Test("An entity whose groups another entity's callback changed is not entered in the same tick.", function()
+			local changes: { [string]: (any, any, any) -> () } = {
+				unsubscribe = function(observer, watched)
+					observer:unsubscribe(watched)
+				end,
+				remove = function(_, watched, entity)
+					watched:remove(entity)
+				end,
+			}
+
+			local x = 0
+			for name, change in changes do
+				x += 100
+				local position = Vector3.new(9000 + x, 0, 9850)
+				local entities = { { Position = position }, { Position = position } }
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local watched = {
+					Group.new({ entities = { entities[1] }, autoClean = false }),
+					Group.new({ entities = { entities[2] }, autoClean = false }),
+				}
+				-- Keeps both entities tracked when they leave their watched group
+				local unwatched = Group.new({ entities = entities, autoClean = false })
+				local observer = Observer.new({ zones = { zone }, groups = watched, safety = false })
+				local enters = 0
+				observer:onEnter(function(entity)
+					enters += 1
+					local other = if entity == entities[1] then 2 else 1
+					change(observer, watched[other], entities[other])
+				end)
+				QuickZone:update(1)
+				QuickZone:update(1)
+
+				observer:destroy()
+				for _, group in watched do
+					group:destroy()
+				end
+				unwatched:destroy()
+				zone:destroy()
+
+				Expect(`{name}: {enters} enter(s)`).is(`{name}: 1 enter(s)`)
+			end
+		end)
+
 		Test('An unsafe exit callback that errors does not break other observers.', function()
 			local start, finish = Vector3.new(9000, 0, 10000), Vector3.new(9000, 0, 10100)
 			local entity = { Position = start }

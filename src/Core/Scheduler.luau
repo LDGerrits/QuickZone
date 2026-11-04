@@ -476,13 +476,14 @@ local function runTick(dt: number)
 						continue
 					end
 
-					-- Or changed the observer, so the entity is checked again next tick
+					-- Or changed the observer, so the entity is checked again next tick. Changes to its groups
+					-- leave its profile dirty, and a clean profile means the observer still watches one of them
 					local attached = zoneAttachedObservers[zone.slot]
 					if
 						observerEnabled[observerId] == false
 						or not attached
 						or not table.find(attached, observerId)
-						or not isSubscribed(entity, observerId)
+						or (dirtyProfiles[entity] and not isSubscribed(entity, observerId))
 					then
 						data.logicVersion = -1
 						continue
