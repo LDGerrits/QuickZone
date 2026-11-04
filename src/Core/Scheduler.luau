@@ -145,15 +145,6 @@ local function processProfileChange(entity: Types.Entity)
 			end
 
 			oldBucket[maxEntities] = nil
-
-			-- If the bucket is now empty, remove it and update the bucket list
-			if #oldBucket == 0 then
-				buckets[currentRate] = nil
-				local listIdx = table.find(bucketList, currentRate)
-				if listIdx then
-					table.remove(bucketList, listIdx)
-				end
-			end
 		end
 
 		-- Add to new bucket
@@ -298,6 +289,17 @@ local function runTick(dt: number)
 		dirtyTopology[entity] = nil
 		if entityData[entity] then
 			processTopologyChange(entity)
+		end
+	end
+
+	-- Drop buckets left empty by entities that changed rate or were removed. Only done here, as removals
+	-- from callbacks can't shrink the list while a tick goes through it
+	for i = #bucketList, 1, -1 do
+		local rate = bucketList[i]
+		if #buckets[rate] == 0 then
+			buckets[rate] = nil
+			bucketLastProcessedIndex[rate] = nil
+			table.remove(bucketList, i)
 		end
 	end
 
