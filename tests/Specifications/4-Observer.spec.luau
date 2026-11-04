@@ -3029,6 +3029,41 @@ return function(Tiniest: Tiniest)
 			end
 			zone:destroy()
 		end)
+
+		Test('Destroying an observer from an exit callback still exits every other entity.', function()
+			local results = {}
+			for index, name in { 'disable', 'unsubscribe', 'destroy' } do
+				local position = Vector3.new(12000, 0, 12700 + index * 50)
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 40 })
+				local entities = {}
+				for i = 1, 6 do
+					entities[i] = { Position = position + Vector3.new(i, 0, 0) }
+				end
+				local group = Group.new({ entities = entities, autoClean = false })
+				local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+				QuickZone:update(1)
+
+				local exits = 0
+				observer:onExit(function()
+					exits += 1
+					-- Does nothing when the observer is already being destroyed
+					observer:destroy()
+				end)
+				if name == 'disable' then
+					observer:setEnabled(false)
+				elseif name == 'unsubscribe' then
+					observer:unsubscribe(group)
+				else
+					observer:destroy()
+				end
+				table.insert(results, `{name}: {exits} exits`)
+
+				group:destroy()
+				zone:destroy()
+			end
+
+			Expect(table.concat(results, ', ')).is('disable: 6 exits, unsubscribe: 6 exits, destroy: 6 exits')
+		end)
 	end)
 
 	Describe('Nested updates', function()
