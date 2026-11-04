@@ -2561,6 +2561,42 @@ return function(Tiniest: Tiniest)
 			Expect(table.concat(results, ', ')).is('safety false: 0 inside, safety true: 0 inside')
 		end)
 
+		Test(
+			'An entity standing still enters an observer that a callback subscribed to its group earlier in the tick.',
+			function()
+				local position = Vector3.new(9000, 0, 10400)
+				local entities = { { Position = position }, { Position = position + Vector3.xAxis } }
+				local groups = {
+					Group.new({ entities = { entities[1] }, autoClean = false }),
+					Group.new({ entities = { entities[2] }, autoClean = false }),
+				}
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local first = Observer.new({ zones = { zone }, groups = groups, safety = false })
+				local second = Observer.new({ zones = { zone }, safety = false })
+
+				-- Whichever entity is checked first subscribes the second observer to the other's group
+				local other
+				first:onEnter(function(entity)
+					if not other then
+						other = if entity == entities[1] then 2 else 1
+						second:subscribe(groups[other])
+					end
+				end)
+				QuickZone:update(1)
+				QuickZone:update(1)
+				local zoneOfOther = second:getZoneOfEntity(entities[other])
+
+				first:destroy()
+				second:destroy()
+				for _, group in groups do
+					group:destroy()
+				end
+				zone:destroy()
+
+				Expect(zoneOfOther).is(zone)
+			end
+		)
+
 		Test('An unsafe exit callback that errors does not break other observers.', function()
 			local start, finish = Vector3.new(9000, 0, 10000), Vector3.new(9000, 0, 10100)
 			local entity = { Position = start }

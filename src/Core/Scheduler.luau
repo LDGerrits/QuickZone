@@ -505,6 +505,12 @@ local function runTick(dt: number)
 						zoneIdx
 					)
 				end
+
+				-- A callback changed its groups or their observers, which only applies from the next tick,
+				-- so it is checked again then even when standing still
+				if dirtyProfiles[entity] then
+					data.logicVersion = -1
+				end
 			end
 
 			-- Callbacks may have removed entities, swapping another into this index
