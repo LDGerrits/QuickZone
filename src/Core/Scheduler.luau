@@ -501,7 +501,8 @@ local function runTick(dt: number)
 						reference,
 						zone,
 						entity,
-						observerSafety[observerId]
+						observerSafety[observerId],
+						zoneIdx
 					)
 				end
 			end

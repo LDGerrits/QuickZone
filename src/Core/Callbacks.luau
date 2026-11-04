@@ -3,9 +3,12 @@
 -- Observer enter, exit and transition callbacks. Lists are keyed by observer id and only
 -- changed through connect, so firing never sees a list shift under it
 
+local State = require(script.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
 type CallbackLists = { [number]: { (any, Types.Zone, Types.Entity) -> () } }
+
+local entityData = State.entityData
 
 local function withTraceback(err: any): string
 	return debug.traceback(tostring(err), 2)
@@ -36,15 +39,17 @@ function Callbacks.connect(lists: CallbackLists, key: number, callback: (any, Ty
 	end
 end
 
--- Fires the callbacks in lists[key]. Unsafe callbacks run directly, but an error is
--- reported instead of thrown, so it can't interrupt the state change that fired it
+-- Fires the callbacks in lists[key] for an entity now in zoneId, or out of the observer's zones when nil.
+-- Unsafe callbacks run directly, but an error is reported instead of thrown, so it can't interrupt the
+-- state change that fired it
 function Callbacks.fire(
 	lists: CallbackLists,
 	key: number,
 	reference: any,
 	zone: Types.Zone,
 	entity: any,
-	safety: boolean
+	safety: boolean,
+	zoneId: number?
 )
 	local callbacks = lists[key]
 	if not callbacks then
@@ -52,8 +57,15 @@ function Callbacks.fire(
 	end
 
 	for i, callback in callbacks do
-		-- Skip callbacks an earlier one disconnected
 		if i > 1 then
+			-- Stop once an earlier callback moved the entity, as later ones would see this event after the
+			-- next. An entry would then come after its own exit, and never be followed by one
+			local data = entityData[entity]
+			if (if data then data.activeObserverMemberships[key] else nil) ~= zoneId then
+				break
+			end
+
+			-- Skip callbacks an earlier one disconnected
 			local current = lists[key]
 			if current ~= callbacks and not (current and table.find(current, callback)) then
 				continue
