@@ -2873,6 +2873,26 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 		end)
 
+		Test('Leaves no update rate behind once its last entity is removed.', function()
+			-- A rate no other test uses
+			local rate = 37
+			local entity = { Position = place(8) }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local observer = Observer.new({ groups = { group }, updateRate = rate, safety = false })
+			QuickZone:update(1)
+			local hadBucket = State.buckets[rate] ~= nil
+
+			group:remove(entity)
+			QuickZone:update(1)
+
+			Expect(hadBucket).is(true)
+			Expect(State.buckets[rate]).is(nil)
+			Expect(table.find(State.bucketList, rate)).is(nil)
+
+			observer:destroy()
+			group:destroy()
+		end)
+
 		Test('Leaves nothing behind when the observer, group or entity goes away.', function()
 			local zones = {}
 			local teardowns = {
