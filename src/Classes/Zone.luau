@@ -385,7 +385,7 @@ function Zone.fromChildren(
 	local function onAdded(child: Instance)
 		if child:IsA('BasePart') and not instanceToZone[child] then
 			local newZone = Zone.fromPart(child, {
-				isDynamic = isDynamic,
+				isDynamic = zones.dynamic,
 				metadata = zones.metadata,
 			})
 			instanceToZone[child] = newZone
@@ -459,7 +459,7 @@ function Zone.fromDescendants(
 	local function onAdded(descendant: Instance)
 		if descendant:IsA('BasePart') and not instanceToZone[descendant] then
 			local newZone = Zone.fromPart(descendant, {
-				isDynamic = isDynamic,
+				isDynamic = zones.dynamic,
 				metadata = zones.metadata,
 			})
 			instanceToZone[descendant] = newZone
@@ -528,93 +528,99 @@ function Zone.fromTag(
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
 	local partDestroyingConnections = {} :: { [BasePart]: RBXScriptConnection }
 	local instanceToZone = {} :: { [BasePart]: Types.Zone }
-	local partRefCount = {} :: { [BasePart]: number }
+	-- The tagged instances that claim each part, the part itself or a tagged container. A set rather than a
+	-- count, as a tagged instance reports itself again each time it moves
+	local partClaims = {} :: { [BasePart]: { [Instance]: true } }
 
-	local function removePart(part: BasePart)
-		local count = (partRefCount[part] or 0) - 1
-
-		if count <= 0 then -- No more active tags claim this part, so safe to destroy
-			partRefCount[part] = nil
-			local deadZone = instanceToZone[part]
-			if deadZone then
-				instanceToZone[part] = nil
-				if not deadZone.destroyed then
-					deadZone:destroy()
-				end
+	local function dropPart(part: BasePart)
+		partClaims[part] = nil
+		local deadZone = instanceToZone[part]
+		if deadZone then
+			instanceToZone[part] = nil
+			if not deadZone.destroyed then
+				deadZone:destroy()
 			end
-			local destroyingConn = partDestroyingConnections[part]
-			if destroyingConn then
-				destroyingConn:Disconnect()
-				partDestroyingConnections[part] = nil
-			end
-		else
-			partRefCount[part] = count
+		end
+		local destroyingConn = partDestroyingConnections[part]
+		if destroyingConn then
+			destroyingConn:Disconnect()
+			partDestroyingConnections[part] = nil
 		end
 	end
 
-	local function addPart(part: BasePart)
-		local count = (partRefCount[part] or 0) + 1
-		partRefCount[part] = count
+	local function releasePart(part: BasePart, claimer: Instance)
+		local claims = partClaims[part]
+		if not claims or not claims[claimer] then
+			return
+		end
+		claims[claimer] = nil
+		-- No more active tags claim this part, so safe to destroy
+		if next(claims) == nil then
+			dropPart(part)
+		end
+	end
 
-		-- Only create the zone if this is the first time
-		if count == 1 then
-			local newZone = Zone.fromPart(part, {
-				isDynamic = isDynamic,
-				metadata = zones.metadata,
-				autoSync = autoSync,
-			})
-			instanceToZone[part] = newZone
-			zones:add(newZone)
+	local function claimPart(part: BasePart, claimer: Instance)
+		local claims = partClaims[part]
+		if claims then
+			claims[claimer] = true
+			return
+		end
+		partClaims[part] = { [claimer] = true }
 
-			if partDestroyingConnections[part] == nil then
-				partDestroyingConnections[part] = part.Destroying:Connect(function()
-					partRefCount[part] = 1
-					removePart(part)
-				end)
+		local newZone = Zone.fromPart(part, {
+			isDynamic = zones.dynamic,
+			metadata = zones.metadata,
+			autoSync = zones.autoSync,
+		})
+		instanceToZone[part] = newZone
+		zones:add(newZone)
+
+		partDestroyingConnections[part] = part.Destroying:Connect(function()
+			dropPart(part)
+		end)
+	end
+
+	-- Releases what a tagged instance claimed, as it left the workspace or lost its tag
+	local function releaseInstance(instance: Instance)
+		if instance:IsA('BasePart') then
+			releasePart(instance, instance)
+			return
+		end
+		local conns = containerConnections[instance]
+		if conns then
+			conns[1]:Disconnect()
+			conns[2]:Disconnect()
+			containerConnections[instance] = nil
+		end
+		for _, descendant in instance:GetDescendants() do
+			if descendant:IsA('BasePart') then
+				releasePart(descendant, instance)
 			end
 		end
 	end
 
 	local function processTaggedInstance(instance: Instance)
-		local inWorkspace = instance:IsDescendantOf(workspace)
-		if inWorkspace then
-			if instance:IsA('BasePart') then
-				addPart(instance)
-			else
-				if not containerConnections[instance] then
-					local addedConn = instance.DescendantAdded:Connect(function(descendant)
-						if descendant:IsA('BasePart') then
-							addPart(descendant)
-						end
-					end)
-					local removedConn = instance.DescendantRemoving:Connect(function(descendant)
-						if descendant:IsA('BasePart') then
-							removePart(descendant)
-						end
-					end)
-					containerConnections[instance] = { addedConn, removedConn }
+		if not instance:IsDescendantOf(workspace) then
+			releaseInstance(instance)
+		elseif instance:IsA('BasePart') then
+			claimPart(instance, instance)
+		elseif not containerConnections[instance] then
+			local addedConn = instance.DescendantAdded:Connect(function(descendant)
+				if descendant:IsA('BasePart') then
+					claimPart(descendant, instance)
+				end
+			end)
+			local removedConn = instance.DescendantRemoving:Connect(function(descendant)
+				if descendant:IsA('BasePart') then
+					releasePart(descendant, instance)
+				end
+			end)
+			containerConnections[instance] = { addedConn, removedConn }
 
-					for _, descendant in instance:GetDescendants() do
-						if descendant:IsA('BasePart') then
-							addPart(descendant)
-						end
-					end
-				end
-			end
-		else
-			if instance:IsA('BasePart') then
-				removePart(instance)
-			else
-				local conns = containerConnections[instance]
-				if conns then
-					conns[1]:Disconnect()
-					conns[2]:Disconnect()
-					containerConnections[instance] = nil
-				end
-				for _, descendant in instance:GetDescendants() do
-					if descendant:IsA('BasePart') then
-						removePart(descendant)
-					end
+			for _, descendant in instance:GetDescendants() do
+				if descendant:IsA('BasePart') then
+					claimPart(descendant, instance)
 				end
 			end
 		end
@@ -636,22 +642,7 @@ function Zone.fromTag(
 			conn:Disconnect()
 			watchingAncestry[instance] = nil
 		end
-
-		if instance:IsA('BasePart') then
-			removePart(instance)
-		else
-			local conns = containerConnections[instance]
-			if conns then
-				conns[1]:Disconnect()
-				conns[2]:Disconnect()
-				containerConnections[instance] = nil
-			end
-			for _, descendant in instance:GetDescendants() do
-				if descendant:IsA('BasePart') then
-					removePart(descendant)
-				end
-			end
-		end
+		releaseInstance(instance)
 	end
 
 	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
@@ -673,7 +664,7 @@ function Zone.fromTag(
 		table.clear(containerConnections)
 		table.clear(partDestroyingConnections)
 		table.clear(instanceToZone)
-		table.clear(partRefCount)
+		table.clear(partClaims)
 	end)
 
 	return zones

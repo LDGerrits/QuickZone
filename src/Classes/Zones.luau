@@ -20,7 +20,8 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local self: Types.InternalZones = setmetatable({
-		dynamic = isDynamic,
+		-- Auto-synced zones are always dynamic
+		dynamic = isDynamic or autoSync,
 		metadata = metadata,
 		autoSync = autoSync,
 		zones = {} :: { [Types.Zone]: boolean },
@@ -158,11 +159,11 @@ end
 	@return Zones
 ]=]
 function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
-	if self.autoSync == autoSync then
-		return self
-	end
-
+	-- Applied to every zone even when unchanged, as single zones may have been changed directly
 	self.autoSync = autoSync
+	if autoSync then
+		self.dynamic = true
+	end
 
 	for zone, _ in self.zones do
 		zone:setAutoSync(autoSync)
@@ -185,11 +186,12 @@ end
 	@return Zones
 ]=]
 function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
-	if self.dynamic == isDynamic then
-		return self
-	end
-
+	-- Applied to every zone even when unchanged, as single zones may have been changed directly. Static
+	-- zones stop auto-syncing, as each zone does
 	self.dynamic = isDynamic
+	if not isDynamic then
+		self.autoSync = false
+	end
 
 	for zone, _ in self.zones do
 		zone:setDynamic(isDynamic)
@@ -368,13 +370,8 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 		zone:setMetadata(self.metadata)
 	end
 
-	if self.dynamic and not zone:isDynamic() then
-		zone:setDynamic(true)
-	end
-
-	if self.autoSync then
-		zone:setAutoSync(true)
-	end
+	zone:setDynamic(self.dynamic)
+	zone:setAutoSync(self.autoSync == true)
 
 	self.zones[zone] = true
 

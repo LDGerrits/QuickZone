@@ -1,6 +1,8 @@
 --!strict
 -- Inputs and situations that random use rarely produces: non-finite and degenerate geometry, exact boundaries,
--- extreme scales, odd entities, starved ticks and callbacks that yield or disconnect each other
+-- extreme scales, odd entities, starved ticks, callbacks that yield or disconnect each other, containers, group
+-- events, bad input and players
+local CollectionService = game:GetService('CollectionService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local ServerScriptService = game:GetService('ServerScriptService')
 
@@ -638,6 +640,117 @@ return function(Tiniest: Tiniest)
 
 				Expect(if ok then 'ran' else err).is('ran')
 				Expect(#observer:getEntitiesInside()).is(2)
+			end)
+		end)
+	end)
+
+	Describe('Containers', function()
+		Test('A tagged part keeps one zone however often it moves, and loses it with its tag.', function()
+			withCleanup(function(track)
+				local tag = 'QZ_EDGE_MOVING_TAG'
+				local folder = track(Instance.new('Folder'))
+				folder.Parent = workspace
+				local part = track(Util.createPart({ Position = Vector3.new(-28000, 0, -29000) }))
+				CollectionService:AddTag(part, tag)
+				local zones = track(Zone.fromTag(tag))
+
+				for _ = 1, 3 do
+					part.Parent = folder
+					task.wait()
+					part.Parent = workspace
+					task.wait()
+				end
+				local afterMoves = #zones:getZones()
+				CollectionService:RemoveTag(part, tag)
+				task.wait()
+				local afterUntag = #zones:getZones()
+
+				CollectionService:AddTag(part, tag)
+				task.wait()
+				part.Parent = folder
+				task.wait()
+				part.Parent = nil
+				task.wait()
+				local outOfWorld = #zones:getZones()
+				part.Parent = workspace
+				task.wait()
+				local backInWorld = #zones:getZones()
+
+				-- Claimed by its own tag and by a tagged folder, it keeps its zone until both let go
+				part.Parent = folder
+				CollectionService:AddTag(folder, tag)
+				task.wait()
+				local bothTagged = #zones:getZones()
+				CollectionService:RemoveTag(folder, tag)
+				task.wait()
+				local ownTagOnly = #zones:getZones()
+				CollectionService:RemoveTag(part, tag)
+				task.wait()
+
+				Expect(afterMoves).is(1)
+				Expect(afterUntag).is(0)
+				Expect(outOfWorld).is(0)
+				Expect(backInWorld).is(1)
+				Expect(bothTagged).is(1)
+				Expect(ownTagOnly).is(1)
+				Expect(#zones:getZones()).is(0)
+			end)
+		end)
+
+		Test("A container's zones follow its settings however they were toggled.", function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -28900)
+				local folder = track(Instance.new('Folder'))
+				folder.Parent = workspace
+				local function addPart(): BasePart
+					local part = Util.createPart({ Position = position })
+					part.Parent = folder
+					return part
+				end
+				local zones = track(Zone.fromChildren(folder, { isDynamic = true, autoSync = true }))
+				local function zoneOf(part: BasePart): any
+					for _, inner in zones:getZones() do
+						if inner:getReference() == part then
+							return inner
+						end
+					end
+					return nil
+				end
+				local function moved(part: BasePart): boolean
+					part.Position += Vector3.new(50, 0, 0)
+					QuickZone:update(1)
+					return (zoneOf(part):getPosition() - part.Position).Magnitude < 1e-3
+				end
+
+				local first = addPart()
+				-- Static zones don't auto-sync, also the parts added later
+				zones:setDynamic(false)
+				local demoted = addPart()
+				local firstStatic = not zoneOf(first):isDynamic()
+				local demotedStatic = not zoneOf(demoted):isDynamic()
+				local demotedMoved = moved(demoted)
+
+				zones:setDynamic(true)
+				zones:setAutoSync(true)
+				local firstMoved = moved(first)
+
+				zones:setAutoSync(false)
+				local late = addPart()
+				local lateDynamic = zoneOf(late):isDynamic()
+				local lateMoved = moved(late)
+
+				-- Auto-synced parts are dynamic, so the container says so
+				local synced = track(Zone.fromParts({ track(Util.createPart({ Position = position })) }, {
+					autoSync = true,
+				}))
+
+				Expect(firstStatic).is_true()
+				Expect(demotedStatic).is_true()
+				Expect(demotedMoved).is(false)
+				Expect(firstMoved).is_true()
+				Expect(lateDynamic).is_true()
+				Expect(lateMoved).is(false)
+				Expect(synced:isDynamic()).is_true()
 			end)
 		end)
 	end)
