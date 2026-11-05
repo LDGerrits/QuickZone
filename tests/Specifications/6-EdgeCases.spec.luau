@@ -3,6 +3,7 @@
 -- extreme scales, odd entities, starved ticks, callbacks that yield or disconnect each other, containers, group
 -- events, bad input and players
 local CollectionService = game:GetService('CollectionService')
+local LogService = game:GetService('LogService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local ServerScriptService = game:GetService('ServerScriptService')
 
@@ -775,6 +776,42 @@ return function(Tiniest: Tiniest)
 				Expect(if ok then 'ran' else err).is('ran')
 				Expect(zone:getPosition()).is(part.Position)
 				Expect(#warnings).is(1)
+			end)
+		end)
+
+		Test('An onDestroy callback that an earlier one disconnected does not fire.', function()
+			withCleanup(function(track)
+				local zone = Zone.new({ cframe = CFrame.new(-28000, 0, -28700), size = Vector3.one })
+				local fired = false
+				local disconnectSecond
+				zone:onDestroy(function()
+					disconnectSecond()
+				end)
+				disconnectSecond = zone:onDestroy(function()
+					fired = true
+				end)
+				zone:destroy()
+
+				-- Zones attached to an observer that destroys them as it is destroyed
+				local part = track(Util.createPart({ Position = Vector3.new(-28000, 0, -28700) }))
+				local zones = Zone.fromParts({ part })
+				local observer = Observer.new({})
+				observer:onDestroy(function()
+					zones:destroy()
+				end)
+				observer:attach(zones)
+				local errors = {}
+				local connection = LogService.MessageOut:Connect(function(message, kind)
+					if kind == Enum.MessageType.MessageError then
+						table.insert(errors, message)
+					end
+				end)
+				observer:destroy()
+				task.wait()
+				connection:Disconnect()
+
+				Expect(fired).is(false)
+				Expect(table.concat(errors, '\n')).is('')
 			end)
 		end)
 	end)
