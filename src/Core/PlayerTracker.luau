@@ -36,7 +36,7 @@ local function trackPlayer(player: Player)
 			if subscriptions then
 				for groupId, group in subscriptions do
 					if State.groups[groupId] then
-						group:_remove(currentHrp)
+						group:_removeEntity(currentHrp)
 					else
 						subscriptions[groupId] = nil
 					end
@@ -157,7 +157,7 @@ function PlayerTracker.unsubscribe(player: Player, group: Types.InternalGroup)
 
 	local currentHrp = State.referenceToEntity[player]
 	if currentHrp then
-		group:_remove(currentHrp)
+		group:_removeEntity(currentHrp)
 	end
 end
 
