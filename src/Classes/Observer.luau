@@ -312,6 +312,16 @@ local function checkGroup(group: any)
 	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
 		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
 	end
+	if group.destroyed then
+		Log.fatal('Group %d is destroyed.', nil, group.id)
+	end
+end
+
+-- A Zone or Zones. Destroyed ones lose their methods
+local function checkZone(zone: any)
+	if type(zone) ~= 'table' or type(zone.attach) ~= 'function' then
+		Log.fatal('Expected a live Zone or Zones, got %s.', nil, tostring(zone))
+	end
 end
 
 function Observer.new<T>(config: {
@@ -326,6 +336,13 @@ function Observer.new<T>(config: {
 	local priority = checkPriority(config and config.priority or 0)
 	local updateRate = checkUpdateRate(config and config.updateRate or Config.Observer.updateRate)
 	local precision = checkPrecision(config and config.precision or Config.Observer.precision)
+	-- All checked before anything is registered, so a bad entry can't leave a half-made observer behind
+	for _, zone in config and config.zones or {} do
+		checkZone(zone)
+	end
+	for _, group in config and config.groups or {} do
+		checkGroup(group)
+	end
 
 	local id = State.nextObserverId
 	State.nextObserverId += 1
@@ -484,6 +501,7 @@ end
 	@return Observer
 ]=]
 function Observer.attach(self: Types.InternalObserver, zone: any)
+	checkZone(zone)
 	hasAttachedMap[self.id] = true
 	zone:attach(self)
 	return self
