@@ -77,6 +77,7 @@ local buckets = State.buckets
 local nextBucketIndex = 1 -- Round-robin pointer
 local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
+local NOWHERE = Vector3.new(0 / 0, 0 / 0, 0 / 0)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -377,14 +378,20 @@ local function runTick(dt: number)
 			elseif strategy == STRAT_WORLD then
 				position = (entity :: Attachment).WorldPosition
 			elseif strategy == STRAT_CFRAME then
-				position = (entity :: BasePart).CFrame.Position
+				local cframe = (entity :: BasePart).CFrame
+				position = cframe and cframe.Position
 			elseif strategy == STRAT_TRANSFORM then
-				position = (entity :: any).Transform.Position
+				local transform = (entity :: any).Transform
+				position = transform and transform.Position
 			elseif strategy == STRAT_PRIM then
 				local prim = (entity :: Model).PrimaryPart
 				position = prim and prim.Position or (entity :: Model):GetPivot().Position
 			elseif strategy == STRAT_PIVOT then
 				position = (entity :: any):GetPivot().Position
+			end
+			-- A table entity without a position is nowhere, rather than an error that stops every entity after it
+			if not position then
+				position = NOWHERE
 			end
 
 			local needsStatic = data.needsStatic
@@ -398,7 +405,8 @@ local function runTick(dt: number)
 				local dy = position.Y - lastPosition.Y
 				local dz = position.Z - lastPosition.Z
 
-				shouldCheck = (dx * dx + dy * dy + dz * dz) >= data.precisionSq
+				-- A NaN position counts as moved, so the entity leaves its zone instead of keeping it forever
+				shouldCheck = not ((dx * dx + dy * dy + dz * dz) < data.precisionSq)
 			end
 
 			-- Standing still, so only zone changes at either position matter
