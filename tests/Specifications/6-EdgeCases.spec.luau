@@ -490,6 +490,56 @@ return function(Tiniest: Tiniest)
 				Expect(group:getEntities()[1]).is(reference)
 			end)
 		end)
+
+		Test("A member that is another entity's reference is removed itself.", function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27440)
+				local function part(): BasePart
+					return track(Util.createPart({ Position = position }))
+				end
+				local a, a2, b, c = part(), part(), part(), part()
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local first = track(Group.new({ entities = { a, a2 } }))
+				local second = Group.new({ entities = { b, c } })
+				local observer = track(Observer.new({ zones = { zone }, groups = { second }, safety = false }))
+				local exits = 0
+				observer:onExit(function()
+					exits += 1
+				end)
+				QuickZone:update(1)
+				-- b and c are members of second, and the references of a and a2
+				QuickZone:setReference(a, b)
+				QuickZone:setReference(a2, c)
+				second:remove(b)
+				local afterRemove = exits
+				second:destroy()
+
+				Expect(afterRemove).is(1)
+				Expect(exits).is(2)
+				Expect(#observer:getEntitiesInside()).is(0)
+				Expect(State.entityData[b]).is(nil)
+				Expect(State.entityData[c]).is(nil)
+				Expect(first:contains(a)).is_true()
+				Expect(first:contains(a2)).is_true()
+			end)
+		end)
+
+		Test('Removing one of several entities that share a reference removes only that one.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27430)
+				local a = track(Util.createPart({ Position = position }))
+				local b = track(Util.createPart({ Position = position }))
+				local npc = track(Instance.new('Model'))
+				local group = track(Group.new({ entities = { a, b } }))
+				QuickZone:setReference(a, npc)
+				QuickZone:setReference(b, npc)
+				QuickZone:removeEntity(a)
+
+				Expect(State.entityData[a]).is(nil)
+				Expect(State.entityData[b]).exists()
+				Expect(#group:getEntities()).is(1)
+			end)
+		end)
 	end)
 
 	Describe('Update rates and budgets', function()

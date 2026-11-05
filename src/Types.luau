@@ -112,6 +112,7 @@ export type InternalGroup<T = any> = Group<T> & {
 	_add: (self: Group<T>, entity: T) -> Group<T>,
 	_addBulk: (self: Group<T>, entities: { T }) -> Group<T>,
 	_remove: (self: Group<T>, entity: T) -> Group<T>,
+	_removeEntity: (self: Group<T>, entity: any) -> Group<T>,
 	_removeBulk: (self: Group<T>, entities: { T }) -> Group<T>,
 	_clear: (self: Group<T>) -> Group<T>,
 	id: number,

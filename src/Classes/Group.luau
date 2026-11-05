@@ -44,7 +44,7 @@ local function removeMember(group: Types.InternalGroup, entity: any)
 	end
 	-- Unless an exit callback destroyed the group meanwhile
 	if getmetatable(group :: any) then
-		group:_remove(entity)
+		group:_removeEntity(entity)
 	end
 end
 
@@ -113,7 +113,7 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 		if instance:IsDescendantOf(workspace) then
 			group:_add(instance)
 		else
-			group:_remove(instance)
+			group:_removeEntity(instance)
 		end
 	end
 
@@ -147,7 +147,7 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 			conn:Disconnect()
 			watchingInstances[instance] = nil
 		end
-		group:_remove(instance :: any)
+		group:_removeEntity(instance :: any)
 	end
 
 	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
@@ -254,7 +254,7 @@ function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.
 			if typeof(entity) == 'Instance' and not cleanups[entity] then
 				cleanups[entity] = (entity :: Instance).AncestryChanged:Connect(function(_, parent)
 					if not parent then
-						self:_remove(entity)
+						self:_removeEntity(entity)
 					end
 				end)
 			end
@@ -600,7 +600,7 @@ function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 	if self.autoClean and typeof(entity) == 'Instance' and not State.groupEntityCleanups[self.id][entity] then
 		State.groupEntityCleanups[self.id][entity] = (entity :: Instance).AncestryChanged:Connect(function(_, parent)
 			if not parent then
-				self:_remove(entity)
+				self:_removeEntity(entity)
 			end
 		end)
 	end
@@ -628,8 +628,16 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 		return self
 	end
 
-	local entity: Types.Entity = State.referenceToEntity[reference] or reference
+	-- A member is removed itself, also when it is another entity's reference
+	local groups = State.entityToGroups[reference]
+	if groups and groups[self.id] then
+		return self:_removeEntity(reference)
+	end
+	return self:_removeEntity(State.referenceToEntity[reference] or reference)
+end
 
+-- Removes the entity as given, never through the reference map. For internal callers that hold the member
+function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
 		return self
 	end
