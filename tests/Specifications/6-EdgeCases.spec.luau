@@ -921,6 +921,28 @@ return function(Tiniest: Tiniest)
 				Expect(zone:isPointInside(zonePosition + Vector3.new(8, 8, 0))).is(false)
 			end)
 		end)
+
+		Test('A mesh zone larger than its part is no larger than its box.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -28200)
+				local part =
+					track(Util.createPart({ Size = Vector3.one * 4, Position = position + Vector3.new(0, 50, 0) }))
+				local zone = track(Zone.new({
+					cframe = CFrame.new(position),
+					size = Vector3.one * 20,
+					shape = 'Mesh',
+					reference = part,
+				}))
+				QuickZone:rebuild()
+				local outside = position + Vector3.new(10.03, 0, 0)
+				local inside = position + Vector3.new(9.97, 0, 0)
+
+				Expect(zone:isPointInside(outside)).is(false)
+				Expect(setOf(QuickZone:getZonesAtPoint(outside))[zone]).is(nil)
+				Expect(zone:isPointInside(inside)).is_true()
+				Expect(setOf(QuickZone:getZonesAtPoint(inside))[zone]).is_true()
+			end)
+		end)
 	end)
 
 	Describe('Group events', function()

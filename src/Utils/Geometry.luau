@@ -140,9 +140,11 @@ function Geometry.isPointInShape(
 		end
 		-- The part's shape placed and sized where the zone is, so a zone that was moved or resized away from
 		-- its part agrees with the trees, which only know the zone
-		local localPoint = toObjectSpace(point, position, right, up, back) * (part.ExtentsSize / (halfSize * 2))
-		local query = part.CFrame:PointToWorldSpace(localPoint)
-		local offset = part:GetClosestPointOnSurface(query) - query
+		local scale = part.ExtentsSize / (halfSize * 2)
+		local partCFrame = part.CFrame
+		local query = partCFrame:PointToWorldSpace(toObjectSpace(point, position, right, up, back) * scale)
+		-- Measured at the zone's size, so the tolerance doesn't grow with it
+		local offset = partCFrame:VectorToObjectSpace(part:GetClosestPointOnSurface(query) - query) / scale
 		return vector.dot(offset, offset) <= MESH_TOLERANCE_SQ
 	end
 
