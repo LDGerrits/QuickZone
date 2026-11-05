@@ -7,6 +7,7 @@
 
 local Callbacks = require(script.Parent.Callbacks)
 local State = require(script.Parent.State)
+local ZoneShapes = require(script.Parent.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 
 local entityData = State.entityData
@@ -17,8 +18,13 @@ local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
 local observerGroupTrackers = State.observerGroupTrackers
 local observerSafety = State.observerSafety
+local observerTransitionedCallbacks = State.observerTransitionedCallbacks
+local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneOccupants = State.zoneOccupants
+local zoneSlotIds = State.zoneSlotIds
+
+local leafHits = {} :: { number }
 
 local fire = Callbacks.fire
 
@@ -98,8 +104,29 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	fire(observerExitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observerSafety[observerId])
 end
 
--- Exits the observer's entities in the zone
-function Memberships.exitZone(observerId: number, zoneId: number)
+-- Another zone of the observer that held the entity where it was last checked, or nil
+local function otherZoneOf(observerId: number, data: Types.EntityData, zoneId: number): number?
+	local position = data.lastPosition
+	local hitCount = ZoneShapes.leavesAtPoint(position, leafHits)
+	for i = 1, hitCount do
+		local slot = leafHits[i]
+		local otherId = zoneSlotIds[slot]
+		local attached = zoneAttachedObservers[slot]
+		if
+			otherId ~= zoneId
+			and attached
+			and table.find(attached, observerId)
+			and ZoneShapes.leafContainsPoint(slot, position)
+		then
+			return otherId
+		end
+	end
+	return nil
+end
+
+-- Takes the observer's entities out of a zone being destroyed. An entity another of the observer's zones holds
+-- moves there, as it would if the zone were detached, rather than leaving and entering again on the next tick
+function Memberships.leaveDestroyedZone(observerId: number, zoneId: number)
 	local tracked = observerTrackingEntities[observerId]
 	if not tracked then
 		return
@@ -115,7 +142,23 @@ function Memberships.exitZone(observerId: number, zoneId: number)
 
 	for _, entity in leaving do
 		local data = entityData[entity]
-		if data and data.activeObserverMemberships[observerId] == zoneId then
+		if not data or data.activeObserverMemberships[observerId] ~= zoneId then
+			continue
+		end
+		local otherId = otherZoneOf(observerId, data, zoneId)
+		if otherId then
+			Memberships.move(observerId, entity, data, otherId)
+			local reference = entityToReference[entity] or entity
+			fire(
+				observerTransitionedCallbacks,
+				observerId,
+				reference,
+				zoneIdToZoneObj[otherId],
+				entity,
+				observerSafety[observerId],
+				otherId
+			)
+		else
 			Memberships.exit(observerId, entity, data)
 		end
 	end
@@ -142,8 +185,9 @@ function Memberships.exitObserver(observerId: number)
 	end
 end
 
--- Exits every observer's entities in the zone, including observers that detached from it since the last tick
-function Memberships.exitAllFromZone(zoneId: number)
+-- Takes every observer's entities out of a zone being destroyed, including observers that detached from it
+-- since the last tick
+function Memberships.leaveZone(zoneId: number)
 	if not zoneOccupants[zoneId] then
 		return
 	end
@@ -154,7 +198,7 @@ function Memberships.exitAllFromZone(zoneId: number)
 		table.insert(observerIds, observerId)
 	end
 	for _, observerId in observerIds do
-		Memberships.exitZone(observerId, zoneId)
+		Memberships.leaveDestroyedZone(observerId, zoneId)
 		if not zoneOccupants[zoneId] then
 			break
 		end
