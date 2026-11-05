@@ -25,7 +25,8 @@ local MAX_GROUPS = 4
 local MAX_OBSERVERS = 4
 local SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
 
-type Entity = { Position: Vector3 }
+-- Tables with a Position or CFrame, parts and models
+type Entity = any
 
 type ObserverModel = {
 	observer: any,
@@ -57,6 +58,15 @@ type World = {
 	zones: { any },
 	groups: { any },
 	members: { [any]: { [Entity]: true } },
+	autoClean: { [any]: boolean },
+	references: { [Entity]: any },
+	-- Instance entities in the world, which auto-clean groups drop when they leave it
+	parented: { [Entity]: boolean },
+	-- Zones that follow a part
+	partOf: { [any]: BasePart },
+	-- Callbacks connected and disconnected at random
+	extras: { { dead: boolean, disconnect: () -> () } },
+	instances: { Instance },
 	observers: { ObserverModel },
 	-- Callbacks change state while set
 	mutating: boolean,
@@ -122,6 +132,36 @@ local function describeEntity(world: World, entity: Entity): string
 	return `entity {world.entityIndex[entity]}`
 end
 
+local function positionOf(entity: Entity): Vector3
+	if typeof(entity) == 'Instance' then
+		if entity:IsA('Model') then
+			local primary = entity.PrimaryPart
+			return if primary then primary.Position else entity:GetPivot().Position
+		end
+		return entity.Position
+	end
+	return if entity.CFrame then entity.CFrame.Position else entity.Position
+end
+
+local function setPositionOf(entity: Entity, position: Vector3)
+	if typeof(entity) == 'Instance' then
+		if entity:IsA('Model') then
+			entity:PivotTo(CFrame.new(position))
+		else
+			entity.Position = position
+		end
+	elseif entity.CFrame then
+		entity.CFrame = CFrame.new(position)
+	else
+		entity.Position = position
+	end
+end
+
+-- What the API hands out for the entity
+local function refOf(world: World, entity: Entity): any
+	return world.references[entity] or entity
+end
+
 local function pick<T>(rng: Random, list: { T }): T?
 	if #list == 0 then
 		return nil
@@ -179,8 +219,8 @@ local function checkEntry(world: World, model: ObserverModel, kind: string, enti
 		fail(world, `{what} without watching any of its groups`)
 	elseif
 		not world.changedInCallback
-		and not zone:isPointInside(entity.Position)
-		and not nearSurface(zone, entity.Position)
+		and not zone:isPointInside(positionOf(entity))
+		and not nearSurface(zone, positionOf(entity))
 	then
 		fail(world, `{what}, which does not contain it`)
 	end
@@ -237,6 +277,13 @@ local function connectObserver(world: World, model: ObserverModel)
 			'destroyObserver',
 			'teleportEntity',
 			'removeEntity',
+			'setReference',
+			'unparentEntity',
+			'reparentEntity',
+			'movePart',
+			'connectCallback',
+			'disconnectCallback',
+			'nestedUpdate',
 		}
 		world.callbackDepth += 1
 		world.changedInCallback = true
@@ -251,8 +298,8 @@ local function connectObserver(world: World, model: ObserverModel)
 
 	observer:onEnter(function(reference: any, zone: any, entity: any)
 		guarded('enter', entity, function()
-			if reference ~= entity then
-				fail(world, `enter got reference {reference} for a table entity`)
+			if reference ~= refOf(world, entity) then
+				fail(world, `enter got reference {reference} for {describeEntity(world, entity)}`)
 			end
 			if model.shadow[entity] ~= nil then
 				fail(
@@ -333,9 +380,28 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		if #world.zones >= MAX_ZONES then
 			return false
 		end
-		local zone = Zone.new(randomZoneConfig(world, rng))
+		local zone
+		if rng:NextNumber() < 0.25 then
+			-- Follows a part
+			local shape = ({ 'Block', 'Ball', 'Cylinder' })[rng:NextInteger(1, 3)]
+			local part = Util.createPart({
+				Shape = (Enum.PartType :: any)[shape],
+				Size = Util.randomSize(rng, shape),
+				CFrame = Util.randomCFrame(rng, world.origin, SPREAD),
+			})
+			table.insert(world.instances, part)
+			zone = Zone.fromPart(part, { autoSync = true, isDynamic = true })
+			world.partOf[zone] = part
+		else
+			zone = Zone.new(randomZoneConfig(world, rng))
+		end
 		table.insert(world.zones, zone)
-		record(world, `create {describeZone(zone)} ({zone:getShape()}, dynamic {zone:isDynamic()})`)
+		record(
+			world,
+			`create {describeZone(zone)} ({zone:getShape()}, dynamic {zone:isDynamic()}{if world.partOf[zone]
+				then ', following a part'
+				else ''})`
+		)
 		for _, model in liveObservers(world) do
 			if rng:NextNumber() < 0.5 then
 				model.observer:attach(zone)
@@ -353,6 +419,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		end
 		record(world, `destroy {describeZone(zone)}`)
 		removeFrom(world.zones, zone)
+		world.partOf[zone] = nil
 		for _, model in world.observers do
 			model.zones[zone] = nil
 		end
@@ -435,8 +502,10 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 				members[entity] = true
 			end
 		end
-		local group = Group.new({ entities = entities, autoClean = false })
+		local autoClean = rng:NextNumber() < 0.5
+		local group = Group.new({ entities = entities, autoClean = autoClean })
 		world.members[group] = members
+		world.autoClean[group] = autoClean
 		table.insert(world.groups, group)
 		record(world, `create group {group:getId()} with {#entities} entities`)
 		for _, model in liveObservers(world) do
@@ -460,6 +529,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 			model.groups[group] = nil
 		end
 		world.members[group] = nil
+		world.autoClean[group] = nil
 		group:destroy()
 		return true
 	end,
@@ -526,10 +596,121 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		return true
 	end,
 
+	setReference = function(world, rng)
+		local entity = world.entities[rng:NextInteger(1, #world.entities)]
+		if typeof(entity) == 'Instance' or not tracked(world, entity) then
+			return false
+		end
+		if world.references[entity] and rng:NextNumber() < 0.4 then
+			record(world, `clear the reference of {describeEntity(world, entity)}`)
+			world.references[entity] = nil
+			QuickZone:setReference(entity, nil)
+		else
+			local reference = { of = world.entityIndex[entity] }
+			record(world, `set a new reference for {describeEntity(world, entity)}`)
+			world.references[entity] = reference
+			QuickZone:setReference(entity, reference)
+		end
+		return true
+	end,
+
+	unparentEntity = function(world, rng)
+		local entity = world.entities[rng:NextInteger(1, #world.entities)]
+		if typeof(entity) ~= 'Instance' or not world.parented[entity] then
+			return false
+		end
+		record(world, `take {describeEntity(world, entity)} out of the world`)
+		-- Auto-clean groups drop it right away
+		for group, autoClean in world.autoClean do
+			if autoClean then
+				world.members[group][entity] = nil
+			end
+		end
+		world.parented[entity] = false
+		entity.Parent = nil
+		return true
+	end,
+
+	reparentEntity = function(world, rng)
+		local entity = world.entities[rng:NextInteger(1, #world.entities)]
+		if typeof(entity) ~= 'Instance' or world.parented[entity] then
+			return false
+		end
+		record(world, `put {describeEntity(world, entity)} back in the world`)
+		world.parented[entity] = true
+		entity.Parent = workspace
+		return true
+	end,
+
+	movePart = function(world, rng)
+		local zones = {}
+		for _, zone in world.zones do
+			if world.partOf[zone] then
+				table.insert(zones, zone)
+			end
+		end
+		local zone = pick(rng, zones)
+		if not zone then
+			return false
+		end
+		local part = world.partOf[zone]
+		if rng:NextNumber() < 0.7 then
+			record(world, `move the part of {describeZone(zone)}`)
+			part.CFrame = if rng:NextNumber() < 0.5
+				then Util.randomCFrame(rng, world.origin, SPREAD)
+				else part.CFrame + Util.randomOffset(rng, 3)
+		else
+			record(world, `resize the part of {describeZone(zone)}`)
+			part.Size = Util.randomSize(rng, zone:getShape())
+		end
+		return true
+	end,
+
+	connectCallback = function(world, rng)
+		local model = pick(rng, liveObservers(world))
+		if not model then
+			return false
+		end
+		local kind = ({ 'onEnter', 'onExit', 'onTransition' })[rng:NextInteger(1, 3)]
+		record(world, `connect another {kind} callback to observer {model.index}`)
+		local extra = { dead = false, disconnect = function() end }
+		extra.disconnect = model.observer[kind](model.observer, function()
+			if extra.dead then
+				fail(world, `a disconnected {kind} callback of observer {model.index} fired`)
+			end
+		end)
+		table.insert(world.extras, extra)
+		return true
+	end,
+
+	disconnectCallback = function(world, rng)
+		local live = {}
+		for _, extra in world.extras do
+			if not extra.dead then
+				table.insert(live, extra)
+			end
+		end
+		local extra = pick(rng, live)
+		if not extra then
+			return false
+		end
+		record(world, 'disconnect a callback')
+		extra.dead = true
+		extra.disconnect()
+		return true
+	end,
+
+	-- Skipped while a tick runs, a full tick otherwise
+	nestedUpdate = function(world)
+		record(world, 'update from a callback')
+		QuickZone:update(1)
+		return true
+	end,
+
 	teleportEntity = function(world, rng)
 		local entity = world.entities[rng:NextInteger(1, #world.entities)]
 		record(world, `teleport {describeEntity(world, entity)}`)
-		entity.Position = world.origin + Util.randomOffset(rng, SPREAD + 5)
+		setPositionOf(entity, world.origin + Util.randomOffset(rng, SPREAD + 5))
 		return true
 	end,
 
@@ -706,6 +887,12 @@ local WEIGHTS: { { any } } = {
 	{ 'toggleEnabled', 1.5 },
 	{ 'setPriority', 1.5 },
 	{ 'tuneObserver', 1 },
+	{ 'setReference', 1 },
+	{ 'unparentEntity', 0.8 },
+	{ 'reparentEntity', 0.8 },
+	{ 'movePart', 2 },
+	{ 'connectCallback', 0.8 },
+	{ 'disconnectCallback', 0.8 },
 }
 
 local TOTAL_WEIGHT = 0
@@ -725,7 +912,14 @@ local function randomOperationName(rng: Random): string
 end
 
 runOperation = function(world: World, name: string, rng: Random): boolean
-	return OPERATIONS[name](world, rng)
+	local applied = OPERATIONS[name](world, rng)
+	-- Entities that left every group lose their reference
+	for entity in world.references do
+		if not tracked(world, entity) then
+			world.references[entity] = nil
+		end
+	end
+	return applied
 end
 
 local function setOf(list: { any }): { [any]: true }
@@ -800,7 +994,11 @@ local function checkConsistency(world: World)
 	end
 
 	for _, group in world.groups do
-		if not sameSet(setOf(group:getEntities()), world.members[group]) then
+		local expected = {}
+		for entity in world.members[group] do
+			expected[refOf(world, entity)] = true
+		end
+		if not sameSet(setOf(group:getEntities()), expected) then
 			fail(world, `group {group:getId()} getEntities disagrees with the entities added`)
 			return
 		end
@@ -902,7 +1100,7 @@ end
 -- What is wrong with the entity after an update in which nothing changed, or nil. It is in a zone containing
 -- it, of the highest priority observers watching it, and keeps its zone while it still fits
 local function entityProblem(world: World, live: { ObserverModel }, entity: Entity): string?
-	local position = entity.Position
+	local position = positionOf(entity)
 	local candidates = {}
 	local best = -math.huge
 	for _, model in live do
@@ -978,8 +1176,16 @@ local function checkModel(world: World)
 	local live = liveObservers(world)
 	for _, entity in world.entities do
 		local problem = entityProblem(world, live, entity)
-		if problem and not nearAnySurface(world, entity.Position) then
+		if problem and not nearAnySurface(world, positionOf(entity)) then
 			fail(world, problem)
+			return
+		end
+	end
+
+	-- Zones following a part are where it is after an update
+	for zone, part in world.partOf do
+		if (zone :: any).autoSync and (zone:getCFrame().Position - part.Position).Magnitude > 1e-3 then
+			fail(world, `{describeZone(zone)} is at {zone:getCFrame().Position}, its part at {part.Position}`)
 			return
 		end
 	end
@@ -987,14 +1193,26 @@ local function checkModel(world: World)
 	-- Queries by zone agree with the zone of each entity
 	for _, model in live do
 		local observer = model.observer
+		-- Keyed by what the API hands out
 		local inside = {}
 		local byZone = {}
 		for _, entity in world.entities do
 			local zone = observer:getZoneOfEntity(entity)
 			if zone then
-				inside[entity] = zone
+				local ref = refOf(world, entity)
+				inside[ref] = zone
 				byZone[zone] = byZone[zone] or {}
-				byZone[zone][entity] = true
+				byZone[zone][ref] = true
+				if observer:getZoneOfEntity(ref) ~= zone then
+					fail(
+						world,
+						`observer {model.index} getZoneOfEntity disagrees for the reference of {describeEntity(
+							world,
+							entity
+						)}`
+					)
+					return
+				end
 			end
 		end
 
@@ -1040,10 +1258,10 @@ local function moveEntities(world: World)
 	for _, entity in world.entities do
 		local roll = rng:NextNumber()
 		if roll < 0.1 then
-			entity.Position = world.origin + Util.randomOffset(rng, SPREAD + 5)
+			setPositionOf(entity, world.origin + Util.randomOffset(rng, SPREAD + 5))
 		elseif roll < 0.5 then
 			-- Further than any precision, so it is always checked again
-			entity.Position += Util.randomOffset(rng, 1).Unit * rng:NextNumber(1, 4)
+			setPositionOf(entity, positionOf(entity) + Util.randomOffset(rng, 1).Unit * rng:NextNumber(1, 4))
 		end
 	end
 end
@@ -1083,6 +1301,12 @@ local function run(seed: number, steps: number): string?
 		zones = {},
 		groups = {},
 		members = {},
+		autoClean = {},
+		references = {},
+		parented = {},
+		partOf = {},
+		extras = {},
+		instances = {},
 		observers = {},
 		mutating = false,
 		changedInCallback = false,
@@ -1091,7 +1315,30 @@ local function run(seed: number, steps: number): string?
 		failure = nil,
 	}
 	for i = 1, ENTITY_COUNT do
-		local entity = { Position = world.origin + Util.randomOffset(rng, SPREAD + 5) }
+		local position = world.origin + Util.randomOffset(rng, SPREAD + 5)
+		local entity
+		local kind = i % 4
+		if kind == 0 then
+			entity = { Position = position }
+		elseif kind == 1 then
+			entity = { CFrame = CFrame.new(position) }
+		elseif kind == 2 then
+			entity = Util.createPart({ Position = position })
+		else
+			-- Half with a primary part, half followed by their pivot
+			entity = Instance.new('Model')
+			local part = Util.createPart({ Position = position })
+			part.Parent = entity
+			if i % 8 == 3 then
+				entity.PrimaryPart = part
+			end
+			entity.Parent = workspace
+			entity:PivotTo(CFrame.new(position))
+		end
+		if typeof(entity) == 'Instance' then
+			table.insert(world.instances, entity)
+			world.parented[entity] = true
+		end
 		world.entities[i] = entity
 		world.entityIndex[entity] = i
 	end
@@ -1122,6 +1369,23 @@ local function run(seed: number, steps: number): string?
 		end
 		if not quiet then
 			moveEntities(world)
+		end
+
+		-- Some steps first run ticks cut short by the budget, or with odd time steps
+		if not quiet and rng:NextNumber() < 0.25 then
+			for _ = 1, rng:NextInteger(1, 4) do
+				local budget = ({ 1e-6, 0.05, 1000 })[rng:NextInteger(1, 3)]
+				local dt = ({ 0, 1 / 60, 1 / 30, 0.5 })[rng:NextInteger(1, 4)]
+				record(world, `partial update, budget {budget} ms, dt {dt}`)
+				QuickZone:setFrameBudget(budget)
+				world.changedInCallback = false
+				local ok, err = pcall(QuickZone.update, QuickZone, dt)
+				QuickZone:setFrameBudget(1000)
+				if not ok then
+					fail(world, `partial update errored: {err}`)
+				end
+				checkConsistency(world)
+			end
 		end
 		update(world)
 
@@ -1180,6 +1444,9 @@ local function run(seed: number, steps: number): string?
 	for _, model in liveObservers(world) do
 		pcall(model.observer.destroy, model.observer)
 	end
+	for _, instance in world.instances do
+		instance:Destroy()
+	end
 
 	return world.failure
 end
@@ -1196,7 +1463,7 @@ return function(Tiniest: Tiniest)
 				-- Every entity is evaluated in one tick
 				QuickZone:setFrameBudget(1000)
 				local failures = {}
-				for seed = 1, 12 do
+				for seed = 1, 20 do
 					local failure = run(seed, 120)
 					if failure then
 						table.insert(failures, failure)
