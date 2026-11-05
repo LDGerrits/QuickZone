@@ -84,6 +84,10 @@ local function trackGroups(
 	-- Members inside of each group that is present, and the groups each entity counts for
 	local present = {} :: { [number]: { [Types.Entity]: true } }
 	local counted = {} :: { [Types.Entity]: { [number]: true } }
+	-- The zone each counted entity was last seen in
+	local lastZones = {} :: { [Types.Entity]: Types.Zone }
+	-- Set once disconnected, also by a callback halfway through a change
+	local disconnected = false
 
 	local function counts(entity: Types.Entity, groupId: number): boolean
 		local data = State.entityData[entity]
@@ -102,6 +106,9 @@ local function trackGroups(
 		local data = State.entityData[entity]
 		local zoneId = data and data.activeObserverMemberships[observerId]
 		local current = if zoneId then State.zoneIdToZoneObj[zoneId] else zone
+		if current and counted[entity] then
+			lastZones[entity] = current
+		end
 
 		-- Collected first, as the callbacks below may change groups and memberships
 		local leaving: { number }? = nil
@@ -123,14 +130,15 @@ local function trackGroups(
 		end
 
 		for _, groupId in leaving or {} do
-			-- A callback may have settled it already
+			-- A callback may have disconnected, or settled it already
 			local now = counted[entity]
-			if not (now and now[groupId]) or counts(entity, groupId) then
+			if disconnected or not (now and now[groupId]) or counts(entity, groupId) then
 				continue
 			end
 			now[groupId] = nil
 			if next(now) == nil then
 				counted[entity] = nil
+				lastZones[entity] = nil
 			end
 			local members = present[groupId]
 			members[entity] = nil
@@ -145,12 +153,13 @@ local function trackGroups(
 
 		for _, groupId in arriving or {} do
 			local now = counted[entity]
-			if (now and now[groupId]) or not counts(entity, groupId) then
+			if disconnected or (now and now[groupId]) or not counts(entity, groupId) then
 				continue
 			end
 			if not now then
 				now = {}
 				counted[entity] = now
+				lastZones[entity] = current :: Types.Zone
 			end
 			(now :: { [number]: true })[groupId] = true
 			local members = present[groupId]
@@ -164,15 +173,50 @@ local function trackGroups(
 	end
 
 	local function onEvent(_, zone: Types.Zone, entity: Types.Entity)
-		reconcile(entity, zone)
+		if not disconnected then
+			reconcile(entity, zone)
+		end
 	end
 	local disconnectEnter = self:onEnter(onEvent)
 	local disconnectTransition = self:onTransition(onEvent)
 	local disconnectExit = self:onExit(onEvent)
 
+	-- A group being destroyed leaves while it still exists. It may count entities whose exit hasn't reached
+	-- this tracker yet, when a callback ahead of it destroyed the group
+	local function dropGroup(groupId: number)
+		local members = present[groupId]
+		if not members then
+			return
+		end
+		present[groupId] = nil
+		local last, zone
+		for entity in members do
+			last = entity
+			zone = lastZones[entity]
+			local have = counted[entity]
+			if have then
+				have[groupId] = nil
+				if next(have) == nil then
+					counted[entity] = nil
+					lastZones[entity] = nil
+				end
+			end
+		end
+		local group = State.groups[groupId]
+		if group then
+			onLeave(groupId, group, zone, last)
+		end
+	end
+
 	-- Told when groups change, replaced rather than changed so a list being run never shifts
-	local function track(entity: Types.Entity)
-		reconcile(entity, nil)
+	local function track(entity: Types.Entity?, destroyedGroupId: number?)
+		if disconnected then
+			return
+		elseif destroyedGroupId then
+			dropGroup(destroyedGroupId)
+		else
+			reconcile(entity, nil)
+		end
 	end
 	local trackers = State.observerGroupTrackers[observerId]
 	local updated = if trackers then table.clone(trackers) else {}
@@ -189,6 +233,7 @@ local function trackGroups(
 	end
 
 	return function()
+		disconnected = true
 		disconnectEnter()
 		disconnectTransition()
 		disconnectExit()

@@ -503,6 +503,8 @@ function Group.destroy(self: Types.InternalGroup): ()
 		end
 	end
 
+	Memberships.groupDestroyed(self.id)
+
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil

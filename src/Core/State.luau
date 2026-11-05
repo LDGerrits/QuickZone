@@ -71,7 +71,7 @@ local State = {
 	observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } },
 	-- Group event trackers of each observer, told when an entity inside it changes groups. Only set while
 	-- an observer has some
-	observerGroupTrackers = {} :: { [number]: { (entity: any) -> () } },
+	observerGroupTrackers = {} :: { [number]: { (entity: any, destroyedGroupId: number?) -> () } },
 	observerEnabled = {} :: { [number]: boolean },
 	observerSafety = {} :: { [number]: boolean },
 	observerUpdateRate = {} :: { [number]: number },
