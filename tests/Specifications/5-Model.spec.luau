@@ -83,6 +83,11 @@ type World = {
 	containerOf: { [any]: ContainerModel },
 	-- Callbacks connected and disconnected at random
 	extras: { { dead: boolean, disconnect: () -> () } },
+	-- observe() scopes connected and disconnected at random, counted per entity
+	scopeExtras: { { model: ObserverModel, counts: { [Entity]: number }, dead: boolean, disconnect: () -> () } },
+	-- Tag of each group made from a tag, whose members are the tagged instances in the world
+	tagOf: { [any]: string },
+	tagCount: number,
 	instances: { Instance },
 	observers: { ObserverModel },
 	-- Callbacks change state while set
@@ -309,6 +314,30 @@ local function createContainerPart(world: World, rng: Random, container: Contain
 	part.Parent = if container.descendants and rng:NextNumber() < 0.5 then container.sub else container.folder
 end
 
+-- Members of groups made from a tag are its tagged instances in the world
+local function refreshTagGroups(world: World)
+	for group, tag in world.tagOf do
+		local members = {}
+		for _, entity in world.entities do
+			if typeof(entity) == 'Instance' and world.parented[entity] and entity:HasTag(tag) then
+				members[entity] = true
+			end
+		end
+		world.members[group] = members
+	end
+end
+
+-- Groups that can be changed by hand, as groups made from a tag refuse it
+local function plainGroups(world: World): { any }
+	local list = {}
+	for _, group in world.groups do
+		if not world.tagOf[group] then
+			table.insert(list, group)
+		end
+	end
+	return list
+end
+
 -- Operations. Each one calls the API and updates the model, returning false when it doesn't apply
 local runOperation: (world: World, name: string, rng: Random) -> boolean
 
@@ -394,6 +423,9 @@ local function connectObserver(world: World, model: ObserverModel)
 			'detachContainer',
 			'addContainerPart',
 			'removeContainerPart',
+			'tagEntity',
+			'retargetZone',
+			'disconnectScopes',
 		}
 		world.callbackDepth += 1
 		world.changedInCallback = true
@@ -491,7 +523,24 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 			return false
 		end
 		local zone
-		if rng:NextNumber() < 0.25 then
+		local roll = rng:NextNumber()
+		if roll < 0.1 then
+			-- A part's shape, which stays where the zone is put when the zone moves
+			local shape = ({ 'Block', 'Ball' })[rng:NextInteger(1, 2)]
+			local part = Util.createPart({
+				Shape = (Enum.PartType :: any)[shape],
+				Size = Util.randomSize(rng, shape),
+				CFrame = Util.randomCFrame(rng, world.origin, SPREAD),
+			})
+			table.insert(world.instances, part)
+			zone = Zone.new({
+				cframe = part.CFrame,
+				size = part.Size,
+				shape = 'Mesh',
+				reference = part,
+				isDynamic = rng:NextNumber() < 0.5,
+			})
+		elseif roll < 0.35 then
 			-- Follows a part
 			local shape = ({ 'Block', 'Ball', 'Cylinder' })[rng:NextInteger(1, 3)]
 			local part = Util.createPart({
@@ -607,6 +656,29 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		if #world.groups >= MAX_GROUPS then
 			return false
 		end
+		if rng:NextNumber() < 0.25 then
+			world.tagCount += 1
+			local tag = `QZModel{world.seed}_{world.tagCount}`
+			for _, entity in world.entities do
+				if typeof(entity) == 'Instance' and rng:NextNumber() < 0.4 then
+					entity:AddTag(tag)
+				end
+			end
+			local group = Group.fromTag(tag)
+			world.tagOf[group] = tag
+			world.autoClean[group] = false
+			table.insert(world.groups, group)
+			refreshTagGroups(world)
+			record(world, `create group {group:getId()} from tag {tag}`)
+			for _, model in liveObservers(world) do
+				if rng:NextNumber() < 0.5 then
+					model.observer:subscribe(group)
+					model.groups[group] = true
+					record(world, `  subscribed by observer {model.index}`)
+				end
+			end
+			return true
+		end
 		local entities = {}
 		local members = {}
 		for _, entity in world.entities do
@@ -643,12 +715,13 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		end
 		world.members[group] = nil
 		world.autoClean[group] = nil
+		world.tagOf[group] = nil
 		group:destroy()
 		return true
 	end,
 
 	addToGroup = function(world, rng)
-		local group = pick(rng, world.groups)
+		local group = pick(rng, plainGroups(world))
 		if not group then
 			return false
 		end
@@ -669,7 +742,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 	end,
 
 	removeFromGroup = function(world, rng)
-		local group = pick(rng, world.groups)
+		local group = pick(rng, plainGroups(world))
 		if not group then
 			return false
 		end
@@ -701,6 +774,12 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 
 	removeEntity = function(world, rng)
 		local entity = world.entities[rng:NextInteger(1, #world.entities)]
+		-- Groups made from a tag refuse it with a warning
+		for group in world.tagOf do
+			if world.members[group][entity] then
+				return false
+			end
+		end
 		record(world, `remove {describeEntity(world, entity)} from QuickZone`)
 		for _, members in world.members do
 			members[entity] = nil
@@ -741,6 +820,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		end
 		world.parented[entity] = false
 		entity.Parent = nil
+		refreshTagGroups(world)
 		return true
 	end,
 
@@ -752,6 +832,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		record(world, `put {describeEntity(world, entity)} back in the world`)
 		world.parented[entity] = true
 		entity.Parent = workspace
+		refreshTagGroups(world)
 		return true
 	end,
 
@@ -966,6 +1047,104 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		return true
 	end,
 
+	tagEntity = function(world, rng)
+		local tags = {}
+		for _, tag in world.tagOf do
+			table.insert(tags, tag)
+		end
+		local tag = pick(rng, tags)
+		local entity = world.entities[rng:NextInteger(1, #world.entities)]
+		if not tag or typeof(entity) ~= 'Instance' then
+			return false
+		end
+		if entity:HasTag(tag) then
+			record(world, `untag {describeEntity(world, entity)} from {tag}`)
+			entity:RemoveTag(tag)
+		else
+			record(world, `tag {describeEntity(world, entity)} with {tag}`)
+			entity:AddTag(tag)
+		end
+		refreshTagGroups(world)
+		return true
+	end,
+
+	retargetZone = function(world, rng)
+		local candidates = {}
+		for _, zone in world.zones do
+			if zone.reference and not world.containerOf[zone] and zone:getShape() ~= 'Mesh' then
+				table.insert(candidates, zone)
+			end
+		end
+		local zone = pick(rng, candidates)
+		if not zone then
+			return false
+		end
+		local kind = rng:NextInteger(1, 3)
+		if kind == 1 then
+			local autoSync = not zone.autoSync
+			record(world, `{describeZone(zone)} autoSync {autoSync}`)
+			zone:setAutoSync(autoSync)
+			if autoSync then
+				world.partOf[zone] = zone.reference
+			end
+		elseif kind == 2 then
+			local shape = ({ 'Block', 'Ball', 'Cylinder' })[rng:NextInteger(1, 3)]
+			local part = Util.createPart({
+				Shape = (Enum.PartType :: any)[shape],
+				Size = Util.randomSize(rng, shape),
+				CFrame = Util.randomCFrame(rng, world.origin, SPREAD),
+			})
+			table.insert(world.instances, part)
+			record(world, `{describeZone(zone)} follows a new part`)
+			zone:setReference(part)
+			world.partOf[zone] = part
+		else
+			record(world, `{describeZone(zone)} drops its part`)
+			zone:setReference(nil)
+			world.partOf[zone] = nil
+		end
+		return true
+	end,
+
+	observeScopes = function(world, rng)
+		local model = pick(rng, liveObservers(world))
+		if not model then
+			return false
+		end
+		record(world, `connect another observe to observer {model.index}`)
+		local extra = { model = model, counts = {}, dead = false, disconnect = function() end }
+		extra.disconnect = model.observer:observe(function(_, _, entity: any)
+			extra.counts[entity] = (extra.counts[entity] or 0) + 1
+			return function()
+				extra.counts[entity] -= 1
+			end
+		end)
+		table.insert(world.scopeExtras, extra)
+		return true
+	end,
+
+	disconnectScopes = function(world, rng)
+		local live = {}
+		for _, extra in world.scopeExtras do
+			if not extra.dead then
+				table.insert(live, extra)
+			end
+		end
+		local extra = pick(rng, live)
+		if not extra then
+			return false
+		end
+		record(world, `disconnect an observe of observer {extra.model.index}`)
+		extra.dead = true
+		extra.disconnect()
+		for entity, count in extra.counts do
+			if count ~= 0 then
+				fail(world, `disconnecting an observe left {count} scopes of {describeEntity(world, entity)}`)
+			end
+		end
+		return true
+	end,
+
 	connectCallback = function(world, rng)
 		local model = pick(rng, liveObservers(world))
 		if not model then
@@ -1090,6 +1269,22 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 				`destroying observer {model.index} left {describeEntity(world, entity)} in {describeZone(zone)}`
 			)
 		end
+		for _, extra in world.scopeExtras do
+			if extra.model == model then
+				extra.dead = true
+				for entity, count in extra.counts do
+					if count ~= 0 then
+						fail(
+							world,
+							`destroying observer {model.index} left {count} extra observe scopes of {describeEntity(
+								world,
+								entity
+							)}`
+						)
+					end
+				end
+			end
+		end
 		for entity, count in model.scopes do
 			if count ~= 0 then
 				fail(
@@ -1201,6 +1396,10 @@ local WEIGHTS: { { any } } = {
 	{ 'addContainerPart', 1 },
 	{ 'removeContainerPart', 1 },
 	{ 'tuneContainer', 0.6 },
+	{ 'tagEntity', 1.5 },
+	{ 'retargetZone', 0.8 },
+	{ 'observeScopes', 0.5 },
+	{ 'disconnectScopes', 0.5 },
 }
 
 local TOTAL_WEIGHT = 0
@@ -1298,6 +1497,22 @@ local function checkConsistency(world: World)
 		if observer:isEnabled() ~= model.enabled or observer:getPriority() ~= model.priority then
 			fail(world, `observer {model.index} reports the wrong enabled state or priority`)
 			return
+		end
+
+		-- Extra observe scopes are open only for entities inside, and at most one each
+		for _, extra in world.scopeExtras do
+			if extra.model ~= model or extra.dead then
+				continue
+			end
+			for entity, count in extra.counts do
+				if count < 0 or count > 1 or (count == 1 and model.shadow[entity] == nil) then
+					fail(
+						world,
+						`observer {model.index} has {count} extra observe scopes for {describeEntity(world, entity)}`
+					)
+					return
+				end
+			end
 		end
 
 		-- Group events add up to the subscribed groups that have a member inside
@@ -1571,6 +1786,14 @@ local function checkModel(world: World)
 				fail(world, `observer {model.index} getEntitiesInZone disagrees for {describeZone(zone)}`)
 				return
 			end
+			local iteratedInZone = {}
+			for entity in observer:iterEntitiesInZone(zone) do
+				iteratedInZone[entity] = true
+			end
+			if not sameSet(iteratedInZone, byZone[zone] or {}) then
+				fail(world, `observer {model.index} iterEntitiesInZone disagrees for {describeZone(zone)}`)
+				return
+			end
 		end
 	end
 end
@@ -1642,6 +1865,9 @@ local function run(seed: number, steps: number): string?
 		containers = {},
 		containerOf = {},
 		extras = {},
+		scopeExtras = {},
+		tagOf = {},
+		tagCount = 0,
 		instances = {},
 		observers = {},
 		mutating = false,
