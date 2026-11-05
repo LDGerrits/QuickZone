@@ -324,11 +324,9 @@ local function runTick(dt: number)
 		end
 	end
 
+	-- No return here when the rebuild used up the budget, as entities would never be checked while zones keep
+	-- moving. The loop below checks the budget every few entities, so each tick makes some progress
 	Scheduler.rebuildTrees()
-
-	if (os.clock() - start) > frameBudget then
-		return
-	end
 
 	local numBuckets = #bucketList
 	if numBuckets == 0 then
