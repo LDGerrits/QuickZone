@@ -172,6 +172,7 @@ local function processProfileChange(entity: Types.Entity)
 		data.updateRate = maxRate
 	end
 
+	-- Rates are above 0, so a rate of 0 means no observer watches the entity
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
 		entityToObservers[entity] = linkedObservers
@@ -209,12 +210,7 @@ local function processTopologyChange(entity: Types.Entity)
 end
 
 local function processObserverHit(observerId: number, zoneId: number)
-	-- Suspended observers only take part once they resume, also when another observer checks the entity
-	if
-		not ctx_linkedObservers[observerId]
-		or observerEnabled[observerId] == false
-		or observerUpdateRate[observerId] == 0
-	then
+	if not ctx_linkedObservers[observerId] or observerEnabled[observerId] == false then
 		return
 	end
 
@@ -459,10 +455,6 @@ local function runTick(dt: number)
 				for observerId in current do
 					local newPri = ctx_candidatePriority[observerId]
 					if newPri and newPri >= ctx_highestWin then
-						continue
-					end
-					-- Suspended observers keep their entities until they resume
-					if observerUpdateRate[observerId] == 0 then
 						continue
 					end
 

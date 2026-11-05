@@ -351,8 +351,8 @@ local function checkPriority(p: any): number
 end
 
 local function checkUpdateRate(hz: any): number
-	if type(hz) ~= 'number' or not (hz >= 0) then
-		Log.fatal('updateRate must be non-negative.', nil)
+	if type(hz) ~= 'number' or not (hz > 0) then
+		Log.fatal('updateRate must be greater than 0. Use setEnabled(false) to stop an observer.', nil)
 	end
 	return hz
 end
@@ -1214,7 +1214,8 @@ function Observer.setPriority(self: Types.InternalObserver, p: number): Types.Ob
 end
 
 --[=[ 
-	Updates the update frequency for this observer.
+	Updates the update frequency for this observer, in checks per second. Must be greater than 0;
+	use `setEnabled(false)` to stop an observer.
 
 	@tag Chainable
 	@method setUpdateRate
@@ -1223,15 +1224,8 @@ end
 	@return Observer
 ]=]
 function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types.Observer
-	checkUpdateRate(hz)
-
-	local wasSuspended = State.observerUpdateRate[self.id] == 0
-	State.observerUpdateRate[self.id] = hz
+	State.observerUpdateRate[self.id] = checkUpdateRate(hz)
 	updateAllEntitiesForObserver(self.id)
-	-- Entities that stood still while it was suspended are checked again
-	if wasSuspended and hz > 0 then
-		State.logicVersion += 1
-	end
 	return self
 end
 

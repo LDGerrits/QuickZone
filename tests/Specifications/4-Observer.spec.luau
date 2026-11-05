@@ -1207,53 +1207,44 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Observer:setUpdateRate', function()
-		Test('A zero rate suspends the observer from ticks, and a non-zero rate resumes it.', function()
-			local enters = 0
-			local part = CreatePart()
-			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
-			local group = Group.new({ entities = { part } })
-			local observer = Observer.new({ zones = { zone }, groups = { group }, updateRate = 0, safety = false })
+		Test('A higher rate checks more of its entities each tick.', function()
+			local position = Vector3.new(8000, 0, 8000)
+			local entities = {}
+			for i = 1, 10 do
+				entities[i] = { Position = position }
+			end
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local group = Group.new({ entities = entities, autoClean = false })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, updateRate = 1.5, safety = false })
+			QuickZone:setFrameBudget(1000)
 
-			observer:onEnter(function()
-				enters += 1
-			end)
-			QuickZone:update(1 / 10)
+			-- 1.5 checks a second over a sixtieth of a second covers one of the ten. Rates no other test uses, so
+			-- no other entity shares their bucket
+			QuickZone:update(1 / 60)
+			local slow = #observer:getEntitiesInside()
+			Expect(observer:setUpdateRate(777)).is(observer)
+			QuickZone:update(1 / 60)
+			local fast = #observer:getEntitiesInside()
+			QuickZone:setFrameBudget(1)
 
-			Expect(enters).is(0)
-			Expect(observer:setUpdateRate(30)).is(observer)
-
-			QuickZone:update(1 / 10)
-
-			Expect(enters).is(1)
+			Expect(slow).is(1)
+			Expect(observer:getUpdateRate()).is(777)
+			Expect(fast).is(10)
 
 			observer:destroy()
 			group:destroy()
 			zone:destroy()
-			part:Destroy()
 		end)
 
-		Test('Resuming re-evaluates entities that stood still in a zone created while suspended.', function()
-			local position = Vector3.new(8000, 0, 8000)
-			local entity = { Position = position }
-			local group = Group.new({ entities = { entity }, autoClean = false })
-			local observer = Observer.new({ zones = {}, groups = { group }, safety = false })
-			QuickZone:update(1)
+		Test('A rate of 0 or below is refused, and the rate stays.', function()
+			local observer = Observer.new({ zones = {}, groups = {}, updateRate = 20 })
 
-			observer:setUpdateRate(0)
-			QuickZone:update(1)
-			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
-			observer:attach(zone)
-			QuickZone:update(1)
-			QuickZone:update(1)
-
-			observer:setUpdateRate(30)
-			QuickZone:update(1)
-
-			Expect(observer:getZoneOfEntity(entity)).is(zone)
+			Expect(pcall(observer.setUpdateRate, observer, 0)).is(false)
+			Expect(pcall(observer.setUpdateRate, observer, -5)).is(false)
+			Expect(pcall(Observer.new, { zones = {}, groups = {}, updateRate = 0 })).is(false)
+			Expect(observer:getUpdateRate()).is(20)
 
 			observer:destroy()
-			group:destroy()
-			zone:destroy()
 		end)
 	end)
 
