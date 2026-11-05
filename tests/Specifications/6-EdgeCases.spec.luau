@@ -672,40 +672,6 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Update rates and budgets', function()
-		Test('A suspended observer is not entered while another observer checks the same entity.', function()
-			withCleanup(function(track)
-				local position = Vector3.new(-29000, 0, -27500)
-				local entity = { Position = position + Vector3.new(100, 0, 0) }
-				local group = track(Group.new({ entities = { entity }, autoClean = false }))
-				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
-				local suspended =
-					track(Observer.new({ zones = { zone }, groups = { group }, updateRate = 0, safety = false }))
-				local running = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
-				QuickZone:update(1)
-
-				entity.Position = position
-				QuickZone:update(1)
-				Expect(running:getZoneOfEntity(entity)).is(zone)
-				Expect(suspended:getZoneOfEntity(entity)).is(nil)
-
-				-- Resuming catches up
-				suspended:setUpdateRate(30)
-				QuickZone:update(1)
-				Expect(suspended:getZoneOfEntity(entity)).is(zone)
-
-				-- Nor does it lose the entity while suspended
-				suspended:setUpdateRate(0)
-				entity.Position = position + Vector3.new(100, 0, 0)
-				QuickZone:update(1)
-				Expect(running:getZoneOfEntity(entity)).is(nil)
-				Expect(suspended:getZoneOfEntity(entity)).is(zone)
-
-				suspended:setUpdateRate(30)
-				QuickZone:update(1)
-				Expect(suspended:getZoneOfEntity(entity)).is(nil)
-			end)
-		end)
-
 		Test('Every entity is checked eventually when the frame budget is far too small.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-29000, 0, -27400)
@@ -1570,6 +1536,9 @@ return function(Tiniest: Tiniest)
 				refuses('new rate', function()
 					track(Observer.new({ updateRate = -1 }))
 				end)
+				refuses('new rate 0', function()
+					track(Observer.new({ updateRate = 0 }))
+				end)
 				refuses('new precision', function()
 					track(Observer.new({ precision = 0 / 0 }))
 				end)
@@ -1578,6 +1547,9 @@ return function(Tiniest: Tiniest)
 				end)
 				refuses('rate', function()
 					observer:setUpdateRate(0 / 0)
+				end)
+				refuses('rate 0', function()
+					observer:setUpdateRate(0)
 				end)
 				refuses('precision', function()
 					observer:setPrecision(0 / 0)
@@ -1590,7 +1562,7 @@ return function(Tiniest: Tiniest)
 				end)
 
 				Expect(table.concat(refused, ', ')).is(
-					'new priority, new rate, new precision, priority, rate, precision, subscribe, budget'
+					'new priority, new rate, new rate 0, new precision, priority, rate, rate 0, precision, subscribe, budget'
 				)
 				Expect(observer:getPriority()).is(0)
 				Expect(#observer:getGroups()).is(0)
