@@ -1387,6 +1387,44 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('An observer given a bad zone or group is refused without leaving anything behind.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27420)
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = track(Group.new({ entities = { { Position = position } }, autoClean = false }))
+				local deadGroup = Group.new({})
+				local deadGroupId = deadGroup:getId()
+				deadGroup:destroy()
+				local deadZone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one })
+				deadZone:destroy()
+				local before = #QuickZone:getObservers()
+				local refused = {}
+				for label, config in
+					{
+						group = { zones = { zone }, groups = { group, 'oops' :: any } },
+						zone = { zones = { zone, group :: any }, groups = { group } },
+						deadGroup = { zones = { zone }, groups = { group, deadGroup } },
+						deadZone = { zones = { zone, deadZone }, groups = { group } },
+					}
+				do
+					if not pcall(Observer.new, config :: any) then
+						table.insert(refused, label)
+					end
+				end
+				table.sort(refused)
+				local observer = track(Observer.new({ zones = {}, groups = {} }))
+				local subscribeDead = pcall(observer.subscribe, observer, deadGroup)
+				local attachDead = pcall(observer.attach, observer, deadZone)
+
+				Expect(table.concat(refused, ', ')).is('deadGroup, deadZone, group, zone')
+				Expect(#QuickZone:getObservers()).is(before + 1)
+				Expect(#(State.zoneAttachedObservers[zone.slot] or {})).is(0)
+				Expect(subscribeDead).is(false)
+				Expect(attachDead).is(false)
+				Expect(State.groupToObservers[deadGroupId]).is(nil)
+			end)
+		end)
+
 		Test('Observer settings that are NaN, negative or not numbers are refused where they are given.', function()
 			withCleanup(function(track)
 				local observer = track(Observer.new({ zones = {}, groups = {} }))
