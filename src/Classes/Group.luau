@@ -504,6 +504,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	end
 
 	Memberships.groupDestroyed(self.id)
+	PlayerTracker.dropGroup(self.id)
 
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
@@ -735,6 +736,8 @@ function Group._clear(self: Types.InternalGroup): Types.Group
 			removeMember(self, entity)
 		end
 	end
+	-- Players without a character have no member to remove
+	PlayerTracker.dropGroup(self.id)
 	return self
 end
 
