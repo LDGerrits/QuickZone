@@ -815,4 +815,108 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 	end)
+
+	Describe('Shapes fill what a part of their size fills', function()
+		Test('Balls and cylinders of uneven or negative size agree with the trees and observers everywhere.', function()
+			withCleanup(function(track)
+				local origin = Vector3.new(-28000, 0, -28500)
+				local sizes = {
+					Vector3.new(10, 4, 4),
+					Vector3.new(4, 10, 6),
+					Vector3.new(6, 6, 12),
+					Vector3.new(-10, -10, -10),
+					Vector3.new(10, -2, 4),
+					Vector3.zero,
+				}
+				local zones = {}
+				for i, size in sizes do
+					for j, shape in { 'Ball', 'Cylinder' } do
+						local center = origin + Vector3.new(i * 30, j * 30, 0)
+						local cframe = CFrame.new(center) * CFrame.fromOrientation(0.3 * i, 0.5 * j, 0)
+						table.insert(zones, track(Zone.new({ cframe = cframe, size = size, shape = shape })))
+					end
+				end
+				local observer = track(Observer.new({ zones = zones, groups = {} }))
+				QuickZone:rebuild()
+
+				local mismatch
+				for _, zone in zones do
+					local center = zone:getPosition()
+					for x = -6, 6 do
+						for y = -6, 6 do
+							for z = -6, 6 do
+								local point = center + Vector3.new(x, y, z)
+								mismatch = mismatch or Util.findMismatch(zones, point, QuickZone:getZonesAtPoint(point))
+								local inside = false
+								for _, other in zones do
+									inside = inside or other:isPointInside(point)
+								end
+								if not mismatch and observer:isPointInside(point) ~= inside then
+									mismatch = `observer isPointInside disagrees at {point}`
+								end
+							end
+						end
+					end
+				end
+
+				-- A Ball fills its smallest side, a Cylinder its smallest cross-section
+				local ball = zones[1]
+				local cylinder = zones[2]
+				local ballCenter = ball:getPosition()
+				local cylinderCFrame = cylinder:getCFrame()
+				local uneven = zones[4]:getCFrame()
+
+				Expect(mismatch).is(nil)
+				Expect(ball:isPointInside(ballCenter + ball:getCFrame().RightVector * 1.9)).is_true()
+				Expect(ball:isPointInside(ballCenter + ball:getCFrame().RightVector * 2.1)).is(false)
+				Expect(cylinder:isPointInside(cylinderCFrame * Vector3.new(4.9, 0, 0))).is_true()
+				Expect(cylinder:isPointInside(cylinderCFrame * Vector3.new(0, 0, 2.1))).is(false)
+				-- 4 by 10 by 6 is 6 across
+				Expect(zones[4]:isPointInside(uneven * Vector3.new(1.9, 2.9, 0))).is_true()
+				Expect(zones[4]:isPointInside(uneven * Vector3.new(0, 3.5, 0))).is(false)
+				Expect(zones[4]:isPointInside(uneven * Vector3.new(0, 0, 3.5))).is(false)
+				Expect(zones[7]:isPointInside(zones[7]:getPosition() + Vector3.new(0.5, 0, 0))).is(false)
+			end)
+		end)
+
+		Test("A mesh zone moved or resized away from its part has the part's shape where the zone is.", function()
+			withCleanup(function(track)
+				local partPosition = Vector3.new(-28000, 0, -28300)
+				local zonePosition = partPosition + Vector3.new(0, 0, 100)
+				local part = track(Util.createPart({
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.one * 10,
+					Position = partPosition,
+				}))
+				local zone = track(Zone.new({
+					cframe = part.CFrame,
+					size = part.Size,
+					shape = 'Mesh',
+					reference = part,
+				}))
+				zone:setCFrame(CFrame.new(zonePosition))
+				local entity = { Position = zonePosition + Vector3.new(4, 0, 0) }
+				local corner = { Position = zonePosition + Vector3.new(4.5, 4.5, 0) }
+				local group = track(Group.new({ entities = { entity, corner }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+
+				local atPart = zone:isPointInside(partPosition)
+				local found = setOf(QuickZone:getZonesAtPoint(entity.Position))
+				local cornerBefore = observer:getZoneOfEntity(corner)
+
+				zone:setSize(Vector3.one * 20)
+				QuickZone:update(1)
+
+				Expect(atPart).is(false)
+				Expect(found[zone]).is_true()
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
+				-- Inside the box but outside the ball, until the ball grows
+				Expect(cornerBefore).is(nil)
+				Expect(observer:getZoneOfEntity(corner)).is(zone)
+				Expect(zone:isPointInside(zonePosition + Vector3.new(9, 0, 0))).is_true()
+				Expect(zone:isPointInside(zonePosition + Vector3.new(8, 8, 0))).is(false)
+			end)
+		end)
+	end)
 end
