@@ -505,6 +505,92 @@ return function(Tiniest: Tiniest)
 				Expect(observer:getZoneOfEntity(alone)).is(nil)
 			end)
 		end)
+
+		Test('Observer iterators survive entities entering and leaving during the loop.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27400)
+				local away = position + Vector3.new(500, 0, 0)
+				local entities = {}
+				for i = 1, 6 do
+					entities[i] = { Position = if i <= 3 then position else away }
+				end
+				local group = track(Group.new({ entities = entities, autoClean = false }))
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				local function churn()
+					-- The inside ones leave and the outside ones come in, reusing their slots
+					for i, entity in entities do
+						entity.Position = if entity.Position == position then away else position
+						if i == 1 then
+							group:remove(entity)
+							group:add(entity)
+						end
+					end
+					QuickZone:update(1)
+				end
+				local results = {}
+				for _, make in
+					{
+						function()
+							return observer:iterEntitiesInside()
+						end,
+						function()
+							return observer:iterEntitiesInZone(zone)
+						end,
+						function()
+							return observer:iterPlayersInside()
+						end,
+						function()
+							return observer:iterPlayersInZone(zone)
+						end,
+					}
+				do
+					local ok, err = pcall(function()
+						local count = 0
+						for _ in make() do
+							count += 1
+							churn()
+							if count > 20 then
+								error('never ends')
+							end
+						end
+					end)
+					table.insert(results, if ok then 'ok' else tostring(err))
+				end
+
+				Expect(table.concat(results, ', ')).is('ok, ok, ok, ok')
+			end)
+		end)
+
+		Test('Zone queries accept a Zones container, and a destroyed zone has nothing in it.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27390)
+				local a = track(Util.createPart({ Position = position, Size = Vector3.one * 4 }))
+				local b =
+					track(Util.createPart({ Position = position + Vector3.new(20, 0, 0), Size = Vector3.one * 4 }))
+				local zones = track(Zone.fromParts({ a, b }))
+				local inA = { Position = position }
+				local inB = { Position = b.Position }
+				local group = track(Group.new({ entities = { inA, inB }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zones }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				local found = setOf(observer:getEntitiesInZone(zones))
+				local iterated = 0
+				for _ in observer:iterEntitiesInZone(zones) do
+					iterated += 1
+				end
+				local players = observer:getPlayersInZone(zones)
+				local dead = Zone.new({ cframe = CFrame.new(position), size = Vector3.one })
+				dead:destroy()
+
+				Expect(found[inA]).is_true()
+				Expect(found[inB]).is_true()
+				Expect(iterated).is(2)
+				Expect(#players).is(0)
+				Expect(#observer:getEntitiesInZone(dead)).is(0)
+			end)
+		end)
 	end)
 
 	Describe('Shared and member references', function()
