@@ -540,6 +540,11 @@ return function(Tiniest: Tiniest)
 				Expect(#group:getEntities()).is(1)
 			end)
 		end)
+
+		Test('A table with only a Transform is an entity.', function()
+			local entity = { Transform = CFrame.new() }
+			Expect(QuickZone:getEntityOfReference(entity)).is(entity)
+		end)
 	end)
 
 	Describe('Update rates and budgets', function()

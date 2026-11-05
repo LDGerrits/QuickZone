@@ -304,7 +304,7 @@ function QuickZone:getEntityOfReference(reference: any): Types.Entity?
 			return entity
 		end
 	elseif typeof(entity) == 'table' then
-		if entity.Position or entity.CFrame or entity.WorldPosition or entity.GetPivot then
+		if entity.Position or entity.CFrame or entity.Transform or entity.WorldPosition or entity.GetPivot then
 			return entity
 		end
 	end
