@@ -1128,8 +1128,8 @@ function Zone.destroy(self: Types.InternalZone): ()
 		end
 	end
 
-	-- Exit while the zone object is still alive, so callbacks get it
-	Memberships.exitAllFromZone(id)
+	-- Leave while the zone object is still alive, so callbacks get it
+	Memberships.leaveZone(id)
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
