@@ -23,15 +23,30 @@ local ENTITY_COUNT = 40
 local MAX_ZONES = 40
 local MAX_GROUPS = 4
 local MAX_OBSERVERS = 4
+local MAX_CONTAINERS = 3
 local SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
 
 -- Tables with a Position or CFrame, parts and models
 type Entity = any
 
+-- A Zones built from the parts in a folder
+type ContainerModel = {
+	zones: any,
+	folder: Folder,
+	-- Parts nested one folder down, only picked up from descendants
+	sub: Folder,
+	descendants: boolean,
+	-- Parts whose zone was destroyed directly, which stay without one until they leave the folder
+	killed: { [BasePart]: true },
+	destroyed: boolean,
+}
+
 type ObserverModel = {
 	observer: any,
 	index: number,
+	-- Attached zones, including the zones of attached containers
 	zones: { [any]: true },
+	containers: { [ContainerModel]: true },
 	groups: { [any]: true },
 	enabled: boolean,
 	priority: number,
@@ -64,6 +79,8 @@ type World = {
 	parented: { [Entity]: boolean },
 	-- Zones that follow a part
 	partOf: { [any]: BasePart },
+	containers: { ContainerModel },
+	containerOf: { [any]: ContainerModel },
 	-- Callbacks connected and disconnected at random
 	extras: { { dead: boolean, disconnect: () -> () } },
 	instances: { Instance },
@@ -204,6 +221,94 @@ local function tracked(world: World, entity: Entity): boolean
 	return false
 end
 
+local function liveContainers(world: World): { ContainerModel }
+	local list = {}
+	for _, container in world.containers do
+		if not container.destroyed then
+			table.insert(list, container)
+		end
+	end
+	return list
+end
+
+-- Drops a zone that is gone from the model
+local function forgetZone(world: World, zone: any)
+	removeFrom(world.zones, zone)
+	world.partOf[zone] = nil
+	world.containerOf[zone] = nil
+	for _, model in world.observers do
+		model.zones[zone] = nil
+	end
+end
+
+-- The parts a container should have a zone for
+local function partsOf(container: ContainerModel): { [BasePart]: true }
+	local parts = {}
+	local list = if container.descendants then container.folder:GetDescendants() else container.folder:GetChildren()
+	for _, instance in list do
+		if instance:IsA('BasePart') and not container.killed[instance] then
+			parts[instance] = true
+		end
+	end
+	return parts
+end
+
+-- Checks that a container has one zone for each of its parts, and takes zones it gained or lost into the model
+local function reconcile(world: World, container: ContainerModel)
+	local current = {}
+	local expected = partsOf(container)
+	local seen = {}
+	for _, zone in container.zones:getZones() do
+		-- Read directly, as destroyed zones lose their methods
+		local part = zone.reference
+		if zone.destroyed then
+			fail(world, `container of {container.folder.Name} holds destroyed {describeZone(zone)}`)
+		elseif not part or not expected[part] then
+			fail(world, `container of {container.folder.Name} holds {describeZone(zone)} for a part it should not`)
+		elseif seen[part] then
+			fail(world, `container of {container.folder.Name} holds two zones for one part`)
+		end
+		if part then
+			seen[part] = true
+			current[zone] = part
+		end
+	end
+	for part in expected do
+		if not seen[part] then
+			fail(world, `container of {container.folder.Name} has no zone for one of its parts`)
+		end
+	end
+
+	for zone, part in current do
+		if not world.containerOf[zone] then
+			world.containerOf[zone] = container
+			world.partOf[zone] = part
+			table.insert(world.zones, zone)
+			for _, model in world.observers do
+				if model.containers[container] then
+					model.zones[zone] = true
+				end
+			end
+		end
+	end
+	for zone, owner in world.containerOf do
+		if owner == container and current[zone] == nil then
+			forgetZone(world, zone)
+		end
+	end
+end
+
+local function createContainerPart(world: World, rng: Random, container: ContainerModel)
+	local shape = ({ 'Block', 'Ball', 'Cylinder' })[rng:NextInteger(1, 3)]
+	local part = Util.createPart({
+		Shape = (Enum.PartType :: any)[shape],
+		Size = Util.randomSize(rng, shape),
+		CFrame = Util.randomCFrame(rng, world.origin, SPREAD),
+	})
+	table.insert(world.instances, part)
+	part.Parent = if container.descendants and rng:NextNumber() < 0.5 then container.sub else container.folder
+end
+
 -- Operations. Each one calls the API and updates the model, returning false when it doesn't apply
 local runOperation: (world: World, name: string, rng: Random) -> boolean
 
@@ -284,6 +389,11 @@ local function connectObserver(world: World, model: ObserverModel)
 			'connectCallback',
 			'disconnectCallback',
 			'nestedUpdate',
+			'destroyContainer',
+			'attachContainer',
+			'detachContainer',
+			'addContainerPart',
+			'removeContainerPart',
 		}
 		world.callbackDepth += 1
 		world.changedInCallback = true
@@ -417,13 +527,16 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		if not zone then
 			return false
 		end
-		record(world, `destroy {describeZone(zone)}`)
-		removeFrom(world.zones, zone)
-		world.partOf[zone] = nil
-		for _, model in world.observers do
-			model.zones[zone] = nil
+		local container = world.containerOf[zone]
+		record(world, `destroy {describeZone(zone)}{if container then ' of a container' else ''}`)
+		forgetZone(world, zone)
+		if container then
+			container.killed[zone:getReference()] = true
 		end
 		zone:destroy()
+		if container then
+			reconcile(world, container)
+		end
 		return true
 	end,
 
@@ -666,6 +779,193 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		return true
 	end,
 
+	createContainer = function(world, rng)
+		if #liveContainers(world) >= MAX_CONTAINERS then
+			return false
+		end
+		local folder = Instance.new('Folder')
+		folder.Name = `Container{#world.containers + 1}`
+		local sub = Instance.new('Folder')
+		sub.Parent = folder
+		folder.Parent = workspace
+		table.insert(world.instances, folder)
+		local container: ContainerModel = {
+			zones = nil,
+			folder = folder,
+			sub = sub,
+			descendants = rng:NextNumber() < 0.5,
+			killed = {},
+			destroyed = false,
+		}
+		for _ = 1, rng:NextInteger(1, 3) do
+			createContainerPart(world, rng, container)
+		end
+		local config = { autoSync = rng:NextNumber() < 0.5, isDynamic = rng:NextNumber() < 0.5 }
+		container.zones = if container.descendants
+			then Zone.fromDescendants(folder, config)
+			else Zone.fromChildren(folder, config)
+		table.insert(world.containers, container)
+		record(
+			world,
+			`create container of {folder.Name} from {if container.descendants then 'descendants' else 'children'}, autoSync {config.autoSync}, dynamic {config.isDynamic}`
+		)
+		reconcile(world, container)
+		for _, model in liveObservers(world) do
+			if rng:NextNumber() < 0.5 then
+				model.containers[container] = true
+				model.observer:attach(container.zones)
+				for zone, owner in world.containerOf do
+					if owner == container then
+						model.zones[zone] = true
+					end
+				end
+				record(world, `  attached to observer {model.index}`)
+			end
+		end
+		return true
+	end,
+
+	destroyContainer = function(world, rng)
+		local container = pick(rng, liveContainers(world))
+		if not container then
+			return false
+		end
+		record(world, `destroy container of {container.folder.Name}`)
+		container.destroyed = true
+		local inner = {}
+		for zone, owner in world.containerOf do
+			if owner == container then
+				table.insert(inner, zone)
+			end
+		end
+		for _, zone in inner do
+			forgetZone(world, zone)
+		end
+		for _, model in world.observers do
+			model.containers[container] = nil
+		end
+		container.zones:destroy()
+		for _, zone in inner do
+			if not zone.destroyed then
+				fail(world, `destroying container of {container.folder.Name} left {describeZone(zone)}`)
+			end
+		end
+		return true
+	end,
+
+	attachContainer = function(world, rng)
+		local model = pick(rng, liveObservers(world))
+		local container = pick(rng, liveContainers(world))
+		if not model or not container then
+			return false
+		end
+		record(world, `attach container of {container.folder.Name} to observer {model.index}`)
+		model.observer:attach(container.zones)
+		if not model.containers[container] then
+			model.containers[container] = true
+			for zone, owner in world.containerOf do
+				if owner == container then
+					model.zones[zone] = true
+				end
+			end
+		end
+		return true
+	end,
+
+	detachContainer = function(world, rng)
+		local model = pick(rng, liveObservers(world))
+		if not model then
+			return false
+		end
+		local attached = {}
+		for _, container in liveContainers(world) do
+			if model.containers[container] then
+				table.insert(attached, container)
+			end
+		end
+		local container = pick(rng, attached)
+		if not container then
+			return false
+		end
+		record(world, `detach container of {container.folder.Name} from observer {model.index}`)
+		model.containers[container] = nil
+		for zone, owner in world.containerOf do
+			if owner == container then
+				model.zones[zone] = nil
+			end
+		end
+		model.observer:detach(container.zones)
+		return true
+	end,
+
+	addContainerPart = function(world, rng)
+		local container = pick(rng, liveContainers(world))
+		if not container then
+			return false
+		end
+		record(world, `add a part to {container.folder.Name}`)
+		createContainerPart(world, rng, container)
+		reconcile(world, container)
+		return true
+	end,
+
+	removeContainerPart = function(world, rng)
+		local container = pick(rng, liveContainers(world))
+		if not container then
+			return false
+		end
+		local parts = {}
+		for _, instance in container.folder:GetDescendants() do
+			if instance:IsA('BasePart') then
+				table.insert(parts, instance)
+			end
+		end
+		local part = pick(rng, parts)
+		if not part then
+			return false
+		end
+		container.killed[part] = nil
+		local kind = rng:NextInteger(1, 3)
+		local others = liveContainers(world)
+		local other = pick(rng, others)
+		if kind == 1 then
+			record(world, `take a part out of {container.folder.Name}`)
+			part.Parent = nil
+		elseif kind == 2 or other == container or not other then
+			record(world, `destroy a part of {container.folder.Name}`)
+			part:Destroy()
+		else
+			local destination = other :: ContainerModel
+			destination.killed[part] = nil
+			record(world, `move a part from {container.folder.Name} to {destination.folder.Name}`)
+			part.Parent = destination.folder
+			reconcile(world, destination)
+		end
+		reconcile(world, container)
+		return true
+	end,
+
+	tuneContainer = function(world, rng)
+		local container = pick(rng, liveContainers(world))
+		if not container then
+			return false
+		end
+		local kind = rng:NextInteger(1, 3)
+		if kind == 1 then
+			local autoSync = rng:NextNumber() < 0.5
+			record(world, `container of {container.folder.Name} autoSync {autoSync}`)
+			container.zones:setAutoSync(autoSync)
+		elseif kind == 2 then
+			local dynamic = rng:NextNumber() < 0.5
+			record(world, `container of {container.folder.Name} dynamic {dynamic}`)
+			container.zones:setDynamic(dynamic)
+		else
+			record(world, `sync container of {container.folder.Name}`)
+			container.zones:sync()
+		end
+		return true
+	end,
+
 	connectCallback = function(world, rng)
 		local model = pick(rng, liveObservers(world))
 		if not model then
@@ -722,6 +1022,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 			observer = nil,
 			index = #world.observers + 1,
 			zones = {},
+			containers = {},
 			groups = {},
 			enabled = rng:NextNumber() < 0.85,
 			priority = rng:NextInteger(0, 2),
@@ -893,6 +1194,13 @@ local WEIGHTS: { { any } } = {
 	{ 'movePart', 2 },
 	{ 'connectCallback', 0.8 },
 	{ 'disconnectCallback', 0.8 },
+	{ 'createContainer', 0.6 },
+	{ 'destroyContainer', 0.3 },
+	{ 'attachContainer', 0.8 },
+	{ 'detachContainer', 0.6 },
+	{ 'addContainerPart', 1 },
+	{ 'removeContainerPart', 1 },
+	{ 'tuneContainer', 0.6 },
 }
 
 local TOTAL_WEIGHT = 0
@@ -1331,6 +1639,8 @@ local function run(seed: number, steps: number): string?
 		references = {},
 		parented = {},
 		partOf = {},
+		containers = {},
+		containerOf = {},
 		extras = {},
 		instances = {},
 		observers = {},
@@ -1440,6 +1750,9 @@ local function run(seed: number, steps: number): string?
 		if #liveObservers(world) > 0 then
 			table.insert(kinds, 'destroyObserver')
 		end
+		if #liveContainers(world) > 0 then
+			table.insert(kinds, 'destroyContainer')
+		end
 		if #kinds == 0 then
 			break
 		end
@@ -1461,6 +1774,9 @@ local function run(seed: number, steps: number): string?
 	end
 
 	-- Clean up after a failed run so later tests start clean
+	for _, container in liveContainers(world) do
+		pcall(container.zones.destroy, container.zones)
+	end
 	for _, zone in world.zones do
 		pcall(zone.destroy, zone)
 	end
