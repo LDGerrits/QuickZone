@@ -10,6 +10,7 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Types)
 local Config = require(script.Config)
+local PlayerTracker = require(script.Core.PlayerTracker)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
 local ZoneShapes = require(script.Core.ZoneShapes)
@@ -244,6 +245,13 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:removeEntity(entity: any): QuickZone
+	-- A player leaves the groups it was added to, also while it has no character
+	if typeof(entity) == 'Instance' and entity:IsA('Player') then
+		for _, group in PlayerTracker.groupsOf(entity) do
+			group:remove(entity)
+		end
+	end
+
 	entity = referenceToEntity[entity] or entity
 
 	local groupIds = entityToGroups[entity]

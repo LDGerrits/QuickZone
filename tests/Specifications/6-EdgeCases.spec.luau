@@ -1451,6 +1451,41 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('A player without a character is cleared or removed for good.', function()
+			withCleanup(function(track)
+				local cleared = track(Group.new({}))
+				local removed = track(Group.new({}))
+				-- removeEntity first, as it would also undo a clear that did nothing
+				local function withoutCharacter(change: () -> ())
+					Players.CharacterAutoLoads = false
+					local ok, err = pcall(function()
+						local character = player.Character
+						if character then
+							character:Destroy()
+						end
+						task.wait()
+						change()
+						player:LoadCharacter()
+					end)
+					Players.CharacterAutoLoads = true
+					if not ok then
+						error(err, 0)
+					end
+				end
+				withoutCharacter(function()
+					removed:add(player)
+					QuickZone:removeEntity(player)
+				end)
+				withoutCharacter(function()
+					cleared:add(player)
+					cleared:clear()
+				end)
+
+				Expect(cleared:contains(player)).is(false)
+				Expect(removed:contains(player)).is(false)
+			end)
+		end)
+
 		Test('A player cleared from a group or removed from QuickZone stays out after respawning.', function()
 			withCleanup(function(track)
 				local cleared = track(Group.new({ entities = { player } }))

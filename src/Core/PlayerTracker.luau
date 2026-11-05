@@ -161,6 +161,24 @@ function PlayerTracker.unsubscribe(player: Player, group: Types.InternalGroup)
 	end
 end
 
+-- The live groups the player was added to, also while it has no character
+function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
+	local list = {}
+	for groupId, group in playerSubscriptions[player] or {} do
+		if State.groups[groupId] then
+			table.insert(list, group)
+		end
+	end
+	return list
+end
+
+-- Forgets every player added to the group, also those without a character
+function PlayerTracker.dropGroup(groupId: number)
+	for _, subscriptions in playerSubscriptions do
+		subscriptions[groupId] = nil
+	end
+end
+
 Players.PlayerRemoving:Connect(function(player)
 	local cleanup = activeTrackers[player]
 	if cleanup then
