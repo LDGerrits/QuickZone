@@ -923,6 +923,54 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Groups changed from callbacks', function()
+		Test('Clearing or removing in bulk stops once an exit callback destroys the group.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27800)
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local observer = track(Observer.new({ zones = { zone }, groups = {}, safety = false }))
+				local results = {}
+				for _, call in { 'clear', 'removeBulk' } do
+					local entities = { { Position = position }, { Position = position }, { Position = position } }
+					local group = Group.new({ entities = entities, autoClean = false })
+					observer:subscribe(group)
+					QuickZone:update(1)
+					local disconnectExit = observer:onExit(function()
+						if not group.destroyed then
+							group:destroy()
+						end
+					end)
+					local ok, err = pcall(function()
+						if call == 'clear' then
+							group:clear()
+						else
+							group:removeBulk(entities)
+						end
+					end)
+					disconnectExit()
+					table.insert(results, if ok then 'ok' else `{call}: {err}`)
+				end
+
+				Expect(table.concat(results, ', ')).is('ok, ok')
+				Expect(#observer:getEntitiesInside()).is(0)
+			end)
+		end)
+
+		Test('An entity that is not valid leaves nothing behind.', function()
+			withCleanup(function(track)
+				local group = track(Group.new({ autoClean = true }))
+				local folder = track(Instance.new('Folder'))
+				local ok = pcall(function()
+					group:add(folder :: any)
+				end)
+
+				Expect(ok).is_true()
+				Expect(group:contains(folder)).is(false)
+				Expect(State.entityToGroups[folder]).is(nil)
+			end)
+		end)
+	end)
+
 	Describe('Players', function()
 		Test('A character taken out of the world and put back is tracked again.', function()
 			withCleanup(function(track)

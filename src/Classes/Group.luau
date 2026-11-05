@@ -566,6 +566,9 @@ function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 				tostring(entity)
 			)
 			State.entityToGroups[entity][self.id] = nil
+			if next(State.entityToGroups[entity]) == nil then
+				State.entityToGroups[entity] = nil
+			end
 			return self
 		end
 
@@ -694,6 +697,10 @@ end
 
 function Group._removeBulk(self: Types.InternalGroup, entities: { any }): Types.Group
 	for _, entity in entities do
+		-- An exit callback may have destroyed the group
+		if self.destroyed then
+			break
+		end
 		self:_remove(entity)
 	end
 	return self
