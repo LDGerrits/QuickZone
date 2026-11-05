@@ -112,6 +112,34 @@ Observer.__index = Observer
 	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
 ]=]
+-- Settings are checked where they are given, as a NaN would quietly break every later tick
+local function checkPriority(p: any): number
+	if type(p) ~= 'number' or p ~= p then
+		Log.fatal('priority must be a number, got %s.', nil, tostring(p))
+	end
+	return p
+end
+
+local function checkUpdateRate(hz: any): number
+	if type(hz) ~= 'number' or not (hz >= 0) then
+		Log.fatal('updateRate must be non-negative.', nil)
+	end
+	return hz
+end
+
+local function checkPrecision(n: any): number
+	if type(n) ~= 'number' or not (n >= 0) then
+		Log.fatal('precision must be non-negative.', nil)
+	end
+	return n
+end
+
+local function checkGroup(group: any)
+	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
+		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
+	end
+end
+
 function Observer.new<T>(config: {
 	groups: { Types.Group<T> }?,
 	zones: { Types.Zone | Types.Zones }?,
@@ -121,6 +149,10 @@ function Observer.new<T>(config: {
 	enabled: boolean?,
 	safety: boolean?,
 }?): Types.Observer
+	local priority = checkPriority(config and config.priority or 0)
+	local updateRate = checkUpdateRate(config and config.updateRate or Config.Observer.updateRate)
+	local precision = checkPrecision(config and config.precision or Config.Observer.precision)
+
 	local id = State.nextObserverId
 	State.nextObserverId += 1
 
@@ -128,9 +160,9 @@ function Observer.new<T>(config: {
 		id = id,
 	}, Observer) :: any
 
-	State.observerPriorityMap[id] = config and config.priority or 0
-	State.observerUpdateRate[id] = config and config.updateRate or Config.Observer.updateRate
-	State.observerPrecisionSq[id] = (config and config.precision or Config.Observer.precision) ^ 2
+	State.observerPriorityMap[id] = priority
+	State.observerUpdateRate[id] = updateRate
+	State.observerPrecisionSq[id] = precision ^ 2
 
 	State.observerEnteredCallbacks[id] = {}
 	State.observerExitedCallbacks[id] = {}
@@ -201,6 +233,7 @@ end
 	@return Observer
 ]=]
 function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	checkGroup(group)
 	hasSubscribedMap[self.id] = true
 
 	local groupId = group.id
@@ -233,6 +266,7 @@ end
 	@return Observer
 ]=]
 function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	checkGroup(group)
 	local groupId = group.id
 
 	if State.groupToObservers[groupId] then
@@ -991,7 +1025,7 @@ end
 	@return Observer
 ]=]
 function Observer.setPriority(self: Types.InternalObserver, p: number): Types.Observer
-	State.observerPriorityMap[self.id] = p
+	State.observerPriorityMap[self.id] = checkPriority(p)
 	State.logicVersion += 1
 	return self
 end
@@ -1006,9 +1040,7 @@ end
 	@return Observer
 ]=]
 function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types.Observer
-	if hz < 0 then
-		Log.fatal('updateRate must be non-negative.', nil)
-	end
+	checkUpdateRate(hz)
 
 	local wasSuspended = State.observerUpdateRate[self.id] == 0
 	State.observerUpdateRate[self.id] = hz
@@ -1030,9 +1062,7 @@ end
 	@return Observer
 ]=]
 function Observer.setPrecision(self: Types.InternalObserver, n: number): Types.Observer
-	if n < 0 then
-		Log.fatal('precision must be non-negative.', nil)
-	end
+	checkPrecision(n)
 
 	State.observerPrecisionSq[self.id] = n ^ 2
 	updateAllEntitiesForObserver(self.id)

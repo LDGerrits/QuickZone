@@ -66,6 +66,9 @@ local ctx_candidateIndex = table.create(16) :: { [number]: number }
 local ctx_candidateList = table.create(16) :: { [number]: number }
 local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
+-- The bucket and index of the entity being checked, so a tick that errors resumes after it
+local ctx_rate: number? = nil
+local ctx_index = 0
 
 local frameBudget = Config.Scheduler.frameBudget
 local autoSyncRate = Config.Scheduler.autoSyncRate
@@ -358,8 +361,9 @@ local function runTick(dt: number)
 			continue
 		end
 
+		-- At least one, also when the quota is NaN from an infinite rate and no time passed
 		local rawQuota = math.ceil(totalEntities * rate * dt)
-		local workQuota = math.clamp(rawQuota, 1, totalEntities)
+		local workQuota = if rawQuota >= totalEntities then totalEntities elseif rawQuota >= 1 then rawQuota else 1
 
 		local processed = 0
 		local idx = bucketLastProcessedIndex[rate] or 1
@@ -368,8 +372,10 @@ local function runTick(dt: number)
 		end
 
 		local budgetCheckCountdown = BUDGET_CHECK
+		ctx_rate = rate
 
 		while processed < workQuota do
+			ctx_index = idx
 			local entity = list[idx]
 			local data = entityData[entity] :: Types.EntityData
 
@@ -552,10 +558,25 @@ local function runTick(dt: number)
 		end
 
 		bucketLastProcessedIndex[rate] = idx
+		ctx_rate = nil
 
 		if (os.clock() - start) > frameBudget then
 			break
 		end
+	end
+end
+
+-- After a tick errored partway, as a bad entity or reference can make it. Without this, the candidates of the
+-- entity being checked would stay and freeze their observers, and every tick would stop at the same entity
+local function recoverFromError()
+	ctx_cCount = 0
+	table.clear(ctx_candidateList)
+	table.clear(ctx_candidatePriority)
+	table.clear(ctx_candidateIndex)
+
+	if ctx_rate then
+		bucketLastProcessedIndex[ctx_rate] = ctx_index + 1
+		ctx_rate = nil
 	end
 end
 
@@ -568,10 +589,16 @@ function Scheduler.update(dt: number)
 		return
 	end
 
+	-- A NaN or negative time step would stop auto-syncing for good
+	if not (dt >= 0) then
+		dt = 0
+	end
+
 	ticking = true
 	local ok, trace = xpcall(runTick, debug.traceback, dt)
 	ticking = false
 	if not ok then
+		recoverFromError()
 		error(trace, 0)
 	end
 end
@@ -590,7 +617,7 @@ function Scheduler.setEnabled(enabled: boolean)
 end
 
 function Scheduler.setAutoSyncRate(hz: number)
-	if hz <= 0 then
+	if not (hz > 0) then
 		autoSyncRate = 0
 	else
 		autoSyncRate = hz
@@ -598,7 +625,7 @@ function Scheduler.setAutoSyncRate(hz: number)
 end
 
 function Scheduler.setFrameBudget(n: number)
-	if n <= 0 then
+	if not (n > 0) then
 		Log.fatal('frameBudget must be greater than 0.', nil)
 	end
 
