@@ -753,5 +753,29 @@ return function(Tiniest: Tiniest)
 				Expect(synced:isDynamic()).is_true()
 			end)
 		end)
+
+		Test('Auto-syncing to something without a CFrame warns instead of breaking every tick.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -28800)
+				local model = track(Instance.new('Model'))
+				model.Parent = workspace
+				local warnings = Util.captureWarnings(function()
+					track(Zone.new({
+						cframe = CFrame.new(position),
+						size = Vector3.one,
+						reference = model :: any,
+						autoSync = true,
+					}))
+				end)
+				local part = track(Util.createPart({ Position = position }))
+				local zone = track(Zone.fromPart(part, { autoSync = true }))
+				part.Position += Vector3.new(50, 0, 0)
+				local ok, err = pcall(QuickZone.update, QuickZone, 1)
+
+				Expect(if ok then 'ran' else err).is('ran')
+				Expect(zone:getPosition()).is(part.Position)
+				Expect(#warnings).is(1)
+			end)
+		end)
 	end)
 end

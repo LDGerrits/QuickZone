@@ -102,6 +102,17 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		return
 	end
 
+	-- Each tick reads its CFrame, so anything else would make every tick error
+	if typeof(reference) ~= 'Instance' or not (reference:IsA('BasePart') or reference:IsA('Attachment')) then
+		Log.warn(
+			'Cannot autoSync Zone %d to %s. Use a BasePart, Attachment or Bone.',
+			nil,
+			zone.id,
+			if typeof(reference) == 'Instance' then reference.ClassName else typeof(reference)
+		)
+		return
+	end
+
 	State.autoSyncZones[zone.slot] = zone
 
 	local connections = zone.syncConnections or {}
