@@ -12,6 +12,9 @@ local State = require(script.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
+-- Bounds that contain nothing and widen nothing they are merged into
+local EMPTY_MIN = Vector3.one * math.huge
+local EMPTY_MAX = -EMPTY_MIN
 
 local getBounds = Geometry.getBounds
 local queryPoint = LinearBVH.queryPoint
@@ -75,15 +78,21 @@ local function refresh(slot: number)
 	local up = Vector3.new(r01, r11, r21)
 	local back = Vector3.new(r02, r12, r22)
 	local boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
+	-- A NaN position or size would spread NaN to every tree node above the leaf, hiding other zones
+	if boundsMin ~= boundsMin or boundsMax ~= boundsMax then
+		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
+	end
 
 	-- Entities in the old or new box may be affected
 	local changes = changesOf(isDynamic)
 	if not changes.all then
 		local oldMin = shapeBoundsMin[slot]
-		if oldMin then
+		if oldMin and oldMin ~= EMPTY_MIN then
 			ZoneChanges.add(changes, oldMin, shapeBoundsMax[slot])
 		end
-		ZoneChanges.add(changes, boundsMin, boundsMax)
+		if boundsMin ~= EMPTY_MIN then
+			ZoneChanges.add(changes, boundsMin, boundsMax)
+		end
 	end
 
 	shapePositions[slot] = position
