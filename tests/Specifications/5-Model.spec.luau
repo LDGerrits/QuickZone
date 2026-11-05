@@ -991,6 +991,32 @@ local function checkConsistency(world: World)
 			fail(world, `observer {model.index} reports the wrong enabled state or priority`)
 			return
 		end
+
+		-- Group events add up to the subscribed groups that have a member inside
+		for group in model.groupInside do
+			if not table.find(world.groups, group) then
+				fail(world, `observer {model.index} has a destroyed group inside`)
+				return
+			end
+		end
+		for _, group in world.groups do
+			local expected = false
+			if model.groups[group] then
+				for entity in world.members[group] do
+					if model.shadow[entity] ~= nil then
+						expected = true
+						break
+					end
+				end
+			end
+			if (model.groupInside[group] == true) ~= expected then
+				fail(
+					world,
+					`observer {model.index} has group {group:getId()} inside {model.groupInside[group] == true}, members inside {expected}`
+				)
+				return
+			end
+		end
 	end
 
 	for _, group in world.groups do

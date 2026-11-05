@@ -39,9 +39,7 @@ function Callbacks.connect(lists: CallbackLists, key: number, callback: (any, Ty
 	end
 end
 
--- Fires the callbacks in lists[key] for an entity now in zoneId, or out of the observer's zones when nil.
--- Unsafe callbacks run directly, but an error is reported instead of thrown, so it can't interrupt the
--- state change that fired it
+-- Fires the callbacks in lists[key] for an entity now in zoneId, or out of the observer's zones when nil
 function Callbacks.fire(
 	lists: CallbackLists,
 	key: number,
@@ -72,6 +70,7 @@ function Callbacks.fire(
 			end
 		end
 
+		-- Callbacks.call, inlined as events are many
 		if safety then
 			task.spawn(callback, reference, zone, entity)
 		else
@@ -79,6 +78,19 @@ function Callbacks.fire(
 			if not ok then
 				task.spawn(error, trace, 0)
 			end
+		end
+	end
+end
+
+-- Runs a callback in its own thread when safe. Unsafe callbacks run directly, but an error is reported instead
+-- of thrown, so it can't interrupt the state change that ran it
+function Callbacks.call<A...>(callback: (A...) -> ...any, safety: boolean, ...: A...)
+	if safety then
+		task.spawn(callback, ...)
+	else
+		local ok, trace = xpcall(callback, withTraceback, ...)
+		if not ok then
+			task.spawn(error, trace, 0)
 		end
 	end
 end

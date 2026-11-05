@@ -923,6 +923,164 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Group events', function()
+		Test('Group events follow entities that change groups while inside.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -28100)
+				local away = position + Vector3.new(100, 0, 0)
+				local a = { Position = position }
+				local b = { Position = away }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local first = track(Group.new({ entities = { a }, autoClean = false }))
+				local second = track(Group.new({ entities = { b }, autoClean = false }))
+				local third = track(Group.new({ autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { first, second }, safety = false }))
+				local names = { [first] = 'first', [second] = 'second', [third] = 'third' }
+				local events = {}
+				observer:onGroupEnter(function(group)
+					table.insert(events, `+{names[group]}`)
+				end)
+				observer:onGroupExit(function(group)
+					table.insert(events, `-{names[group]}`)
+				end)
+				local function step(label: string, change: () -> ())
+					change()
+					QuickZone:update(1)
+					table.insert(events, label)
+				end
+
+				step('|', function() end)
+				-- a joins second while inside
+				step('|', function()
+					second:add(a)
+				end)
+				-- b comes and goes, second stays through a
+				step('|', function()
+					b.Position = position
+				end)
+				step('|', function()
+					b.Position = away
+				end)
+				-- a leaves first while staying inside through second
+				step('|', function()
+					first:remove(a)
+				end)
+				-- Subscribing a group a is in, then dropping it again
+				step('|', function()
+					third:add(a)
+					observer:subscribe(third)
+				end)
+				step('|', function()
+					observer:unsubscribe(third)
+				end)
+				step('|', function()
+					observer:subscribe(third)
+				end)
+				step('|', function()
+					third:destroy()
+				end)
+				step('|', function()
+					a.Position = away
+				end)
+
+				Expect(table.concat(events, ' ')).is(
+					'+first | +second | | | -first | +third | -third | +third | -third | -second |'
+				)
+			end)
+		end)
+
+		Test('A group callback that errors fires again the next time.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -28000)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				local observed, entered, cleaned = 0, 0, 0
+				observer:observeGroup(function()
+					observed += 1
+					if observed == 1 then
+						error('An expected error from a test')
+					end
+					return function()
+						cleaned += 1
+					end
+				end)
+				observer:onGroupEnter(function()
+					entered += 1
+					if entered == 1 then
+						error('An expected error from a test')
+					end
+				end)
+				for _ = 1, 2 do
+					QuickZone:update(1)
+					entity.Position += Vector3.new(100, 0, 0)
+					QuickZone:update(1)
+					entity.Position = position
+				end
+
+				Expect(observed).is(2)
+				Expect(entered).is(2)
+				Expect(cleaned).is(1)
+			end)
+		end)
+
+		Test('Groups already inside arrive when the callback is connected.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27900)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				local entered, exited = 0, 0
+				observer:onGroupEnter(function()
+					entered += 1
+				end)
+				observer:onGroupExit(function()
+					exited += 1
+				end)
+				local afterConnect = entered
+				entity.Position += Vector3.new(100, 0, 0)
+				QuickZone:update(1)
+
+				Expect(afterConnect).is(1)
+				Expect(exited).is(1)
+			end)
+		end)
+	end)
+
+	Describe('Group events from calls', function()
+		Test('A safe group callback that yields does not hold up the call that brought its group in.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27950)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local first = track(Group.new({ entities = { entity }, autoClean = false }))
+				local second = track(Group.new({ autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { first, second }, safety = true }))
+				QuickZone:update(1)
+				local resumed = false
+				observer:onGroupEnter(function(group)
+					if group == second then
+						task.wait()
+						resumed = true
+					end
+				end)
+				local thread = coroutine.create(function()
+					second:add(entity)
+				end)
+				coroutine.resume(thread)
+				local status = coroutine.status(thread)
+				task.wait()
+				task.wait()
+
+				Expect(status).is('dead')
+				Expect(resumed).is_true()
+			end)
+		end)
+	end)
+
 	Describe('Groups changed from callbacks', function()
 		Test('Clearing or removing in bulk stops once an exit callback destroys the group.', function()
 			withCleanup(function(track)
@@ -953,6 +1111,33 @@ return function(Tiniest: Tiniest)
 
 				Expect(table.concat(results, ', ')).is('ok, ok')
 				Expect(#observer:getEntitiesInside()).is(0)
+			end)
+		end)
+
+		Test('Adding in bulk stops once a group enter callback destroys the group.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27850)
+				local inside = { Position = position }
+				local other = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local first = track(Group.new({ entities = { inside }, autoClean = false }))
+				local second = track(Group.new({ autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { first, second }, safety = false }))
+				QuickZone:update(1)
+				-- Joining second while inside brings second in at once
+				observer:onGroupEnter(function(group)
+					if group == second and not second.destroyed then
+						second:destroy()
+					end
+				end)
+				local ok, err = pcall(function()
+					second:addBulk({ inside, other })
+				end)
+				QuickZone:update(1)
+
+				Expect(if ok then 'ok' else err).is('ok')
+				Expect(observer:getZoneOfEntity(other)).is(nil)
+				Expect(State.entityData[other]).is(nil)
 			end)
 		end)
 
