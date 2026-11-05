@@ -206,7 +206,12 @@ local function processTopologyChange(entity: Types.Entity)
 end
 
 local function processObserverHit(observerId: number, zoneId: number)
-	if not ctx_linkedObservers[observerId] or observerEnabled[observerId] == false then
+	-- Suspended observers only take part once they resume, also when another observer checks the entity
+	if
+		not ctx_linkedObservers[observerId]
+		or observerEnabled[observerId] == false
+		or observerUpdateRate[observerId] == 0
+	then
 		return
 	end
 
@@ -448,6 +453,10 @@ local function runTick(dt: number)
 				for observerId in current do
 					local newPri = ctx_candidatePriority[observerId]
 					if newPri and newPri >= ctx_highestWin then
+						continue
+					end
+					-- Suspended observers keep their entities until they resume
+					if observerUpdateRate[observerId] == 0 then
 						continue
 					end
 
