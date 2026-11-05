@@ -177,10 +177,12 @@ end
 ]=]
 function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	local oldReference = entityToReference[entity]
+	local oldIsPlayer = typeof(oldReference) == 'Instance' and oldReference:IsA('Player')
 
 	if reference == nil then
-		if not (typeof(oldReference) == 'Instance' and oldReference:IsA('Player')) then
-			if oldReference then
+		if not oldIsPlayer then
+			-- Only if it still leads here, another entity may have taken it since
+			if oldReference ~= nil and referenceToEntity[oldReference] == entity then
 				referenceToEntity[oldReference] = nil
 			end
 			entityToReference[entity] = nil
@@ -189,6 +191,15 @@ function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	end
 
 	if not (typeof(reference) == 'Instance' and reference:IsA('Player')) then
+		-- The old reference no longer leads to this entity
+		if
+			oldReference ~= nil
+			and oldReference ~= reference
+			and not oldIsPlayer
+			and referenceToEntity[oldReference] == entity
+		then
+			referenceToEntity[oldReference] = nil
+		end
 		entityToReference[entity] = reference
 		referenceToEntity[reference] = entity
 	end
