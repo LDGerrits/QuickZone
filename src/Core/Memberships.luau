@@ -33,6 +33,14 @@ local function removeOccupant(zoneId: number)
 	end
 end
 
+-- Runs the observer's group trackers. Lists are replaced rather than changed, so this one can't shift under
+-- the loop, and a tracker disconnected meanwhile does nothing
+local function runTrackers(observerId: number, entity: Types.Entity?, destroyedGroupId: number?)
+	for _, track in observerGroupTrackers[observerId] or {} do
+		track(entity, destroyedGroupId)
+	end
+end
+
 local Memberships = {}
 
 -- Whether the observer still watches one of the entity's groups
@@ -174,11 +182,20 @@ function Memberships.groupsChanged(entity: Types.Entity, observerId: number?)
 
 	if observerIds then
 		for _, id in observerIds do
-			-- Lists are replaced rather than changed, so this one can't shift under the loop
-			for _, track in observerGroupTrackers[id] or {} do
-				track(entity)
-			end
+			runTrackers(id, entity, nil)
 		end
+	end
+end
+
+-- Tells every group tracker that a group is being destroyed. A tracker may still count entities that left
+-- before it heard, so it can't wait for their exits
+function Memberships.groupDestroyed(groupId: number)
+	local observerIds = {}
+	for id in observerGroupTrackers do
+		table.insert(observerIds, id)
+	end
+	for _, id in observerIds do
+		runTrackers(id, nil, groupId)
 	end
 end
 

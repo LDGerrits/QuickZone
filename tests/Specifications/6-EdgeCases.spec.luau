@@ -1047,6 +1047,68 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('A group destroyed by an exit callback ahead of the group events still leaves.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27920)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				observer:onExit(function()
+					group:destroy()
+				end)
+				local left, leftZone = 0, nil
+				observer:onGroupExit(function(_, exitZone)
+					left += 1
+					leftZone = exitZone
+				end)
+				QuickZone:update(1)
+				entity.Position += Vector3.new(100, 0, 0)
+				QuickZone:update(1)
+
+				Expect(left).is(1)
+				Expect(leftZone).is(zone)
+			end)
+		end)
+
+		Test('A group callback disconnected by an earlier one, or by itself, fires no further.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27910)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local first = track(Group.new({ autoClean = false }))
+				local second = track(Group.new({ autoClean = false }))
+				local third = track(Group.new({ autoClean = false }))
+				local observer =
+					track(Observer.new({ zones = { zone }, groups = { first, second, third }, safety = false }))
+				-- Entering through two groups at once
+				local own, disconnectOwn = 0, nil
+				disconnectOwn = observer:onGroupEnter(function()
+					own += 1
+					disconnectOwn()
+				end)
+				first:add(entity)
+				second:add(entity)
+				QuickZone:update(1)
+				-- Joining a group while inside, with the later callback disconnected by the earlier one
+				local late, disconnectLate = 0, nil
+				observer:onGroupEnter(function(group)
+					if group == third then
+						disconnectLate()
+					end
+				end)
+				disconnectLate = observer:onGroupEnter(function(group)
+					if group == third then
+						late += 1
+					end
+				end)
+				third:add(entity)
+
+				Expect(own).is(1)
+				Expect(late).is(0)
+			end)
+		end)
+
 		Test('Groups already inside arrive when the callback is connected.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-28000, 0, -27900)
