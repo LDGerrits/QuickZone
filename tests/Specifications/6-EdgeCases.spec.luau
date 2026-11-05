@@ -469,6 +469,29 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Shared and member references', function()
+		Test('A table reference nothing else holds survives garbage collection.', function()
+			withCleanup(function(track)
+				local part = track(Util.createPart({ Position = Vector3.new(-28000, 0, -27450) }))
+				local group = track(Group.new({ entities = { part } }))
+				QuickZone:setReference(part, { kind = 'Coin' })
+				-- Waits until a table held only weakly is collected, so a collection ran
+				local probe = setmetatable({ {} }, { __mode = 'v' })
+				local frames = 0
+				while probe[1] ~= nil and frames < 600 do
+					local _ = table.create(1e5, frames)
+					task.wait()
+					frames += 1
+				end
+				local reference = QuickZone:getReferenceOfEntity(part)
+
+				Expect(probe[1]).is(nil)
+				Expect(type(reference)).is('table')
+				Expect(group:getEntities()[1]).is(reference)
+			end)
+		end)
+	end)
+
 	Describe('Update rates and budgets', function()
 		Test('A suspended observer is not entered while another observer checks the same entity.', function()
 			withCleanup(function(track)
