@@ -971,6 +971,126 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Bad input', function()
+		Test('An entity that errors when read neither stops other entities nor freezes observers.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27700)
+				local away = position + Vector3.new(100, 0, 0)
+				local exact =
+					track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10, isDynamic = true }))
+				local ball = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10, shape = 'Ball' }))
+				local group = track(Group.new({ autoClean = false }))
+				local first = track(Observer.new({ zones = { exact }, groups = { group }, safety = false }))
+				local second = track(Observer.new({ zones = { ball }, groups = { group }, safety = false }))
+				-- A CFrame errors in the ball's check, after the exact zone already counted a hit
+				local bad = { Position = CFrame.new(position) }
+				local badPivot = {
+					GetPivot = function()
+						return nil
+					end,
+				}
+				local good = {}
+				for i = 1, 5 do
+					good[i] = { Position = position }
+				end
+				group:add(bad :: any)
+				group:add(badPivot :: any)
+				group:addBulk(good)
+				local function settle()
+					for _ = 1, 8 do
+						pcall(QuickZone.update, QuickZone, 1)
+					end
+				end
+				local function count(observer: any, zone: any): number
+					local n = 0
+					for _, entity in good do
+						if observer:getZoneOfEntity(entity) == zone then
+							n += 1
+						end
+					end
+					return n
+				end
+
+				settle()
+				local entered = count(first, exact) + count(second, ball)
+				for _, entity in good do
+					entity.Position = away
+				end
+				settle()
+				local leftWhileBad = count(first, exact) + count(second, ball)
+				group:remove(bad :: any)
+				group:remove(badPivot :: any)
+				for _, entity in good do
+					entity.Position = position
+				end
+				QuickZone:update(1)
+
+				Expect(entered).is(10)
+				Expect(leftWhileBad).is(0)
+				Expect(count(first, exact) + count(second, ball)).is(10)
+			end)
+		end)
+
+		Test('A NaN or negative time step does not stop auto-syncing.', function()
+			withCleanup(function(track)
+				local part = track(Util.createPart({ Position = Vector3.new(-28000, 0, -27600) }))
+				local zone = track(Zone.fromPart(part, { autoSync = true }))
+				QuickZone:update(0 / 0)
+				QuickZone:update(-1)
+				QuickZone:update(-math.huge)
+				part.Position += Vector3.new(50, 0, 0)
+				QuickZone:update(1)
+
+				Expect(zone:getPosition()).is(part.Position)
+			end)
+		end)
+
+		Test('Observer settings that are NaN, negative or not numbers are refused where they are given.', function()
+			withCleanup(function(track)
+				local observer = track(Observer.new({ zones = {}, groups = {} }))
+				local zone = track(Zone.new({ cframe = CFrame.new(-28000, 0, -27500), size = Vector3.one }))
+				local refused = {}
+				local function refuses(label: string, fn: () -> ())
+					if not pcall(fn) then
+						table.insert(refused, label)
+					end
+				end
+				refuses('new priority', function()
+					track(Observer.new({ priority = 0 / 0 }))
+				end)
+				refuses('new rate', function()
+					track(Observer.new({ updateRate = -1 }))
+				end)
+				refuses('new precision', function()
+					track(Observer.new({ precision = 0 / 0 }))
+				end)
+				refuses('priority', function()
+					observer:setPriority(0 / 0)
+				end)
+				refuses('rate', function()
+					observer:setUpdateRate(0 / 0)
+				end)
+				refuses('precision', function()
+					observer:setPrecision(0 / 0)
+				end)
+				refuses('subscribe', function()
+					observer:subscribe(zone :: any)
+				end)
+				refuses('budget', function()
+					QuickZone:setFrameBudget(0 / 0)
+				end)
+
+				Expect(table.concat(refused, ', ')).is(
+					'new priority, new rate, new precision, priority, rate, precision, subscribe, budget'
+				)
+				Expect(observer:getPriority()).is(0)
+				Expect(#observer:getGroups()).is(0)
+				-- A zone's id is no group's, also when a group has the same number
+				Expect((State.groupToObservers[zone:getId()] or {})[observer:getId()]).is(nil)
+			end)
+		end)
+	end)
+
 	Describe('Players', function()
 		Test('A character taken out of the world and put back is tracked again.', function()
 			withCleanup(function(track)
