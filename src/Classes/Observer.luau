@@ -1010,8 +1010,13 @@ function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types
 		Log.fatal('updateRate must be non-negative.', nil)
 	end
 
+	local wasSuspended = State.observerUpdateRate[self.id] == 0
 	State.observerUpdateRate[self.id] = hz
 	updateAllEntitiesForObserver(self.id)
+	-- Entities that stood still while it was suspended are checked again
+	if wasSuspended and hz > 0 then
+		State.logicVersion += 1
+	end
 	return self
 end
 
