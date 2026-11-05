@@ -138,7 +138,11 @@ function Geometry.isPointInShape(
 		if not part then
 			return false
 		end
-		local offset = part:GetClosestPointOnSurface(point) - point
+		-- The part's shape placed and sized where the zone is, so a zone that was moved or resized away from
+		-- its part agrees with the trees, which only know the zone
+		local localPoint = toObjectSpace(point, position, right, up, back) * (part.ExtentsSize / (halfSize * 2))
+		local query = part.CFrame:PointToWorldSpace(localPoint)
+		local offset = part:GetClosestPointOnSurface(query) - query
 		return vector.dot(offset, offset) <= MESH_TOLERANCE_SQ
 	end
 

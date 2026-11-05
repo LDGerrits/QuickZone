@@ -12,6 +12,8 @@ local State = require(script.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
+local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
+local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
 -- Bounds that contain nothing and widen nothing they are merged into
 local EMPTY_MIN = Vector3.one * math.huge
 local EMPTY_MAX = -EMPTY_MIN
@@ -22,6 +24,7 @@ local isPointInShape = Geometry.isPointInShape
 
 local shapeCFrames = State.shapeCFrames
 local shapeHalfSizes = State.shapeHalfSizes
+local shapeExtents = State.shapeExtents
 local shapeTypes = State.shapeTypes
 local shapeParts = State.shapeParts
 local shapePositions = State.shapePositions
@@ -66,11 +69,24 @@ local function markMembersChanged(isDynamic: boolean)
 	end
 end
 
+-- The half size a shape fills, like a part of that size. Negative sizes fill nothing past the center
+local function extentsOf(halfSize: Vector3, shapeType: number): Vector3
+	local extents = vector.max(halfSize, Vector3.zero)
+	if shapeType == BALL_SHAPE_VALUE then
+		local radius = math.min(extents.X, extents.Y, extents.Z)
+		return Vector3.new(radius, radius, radius)
+	elseif shapeType == CYLINDER_SHAPE_VALUE then
+		local radius = math.min(extents.Y, extents.Z)
+		return Vector3.new(extents.X, radius, radius)
+	end
+	return extents
+end
+
 -- Recomputes the world-space shape from the geometry
 local function refresh(slot: number)
 	local isDynamic = dynamicSlots[slot] == true
-	local halfSize = shapeHalfSizes[slot]
 	local shapeType = shapeTypes[slot]
+	local halfSize = extentsOf(shapeHalfSizes[slot], shapeType)
 
 	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = shapeCFrames[slot]:GetComponents()
 	local position = Vector3.new(x, y, z)
@@ -95,6 +111,7 @@ local function refresh(slot: number)
 		end
 	end
 
+	shapeExtents[slot] = halfSize
 	shapePositions[slot] = position
 	shapeRights[slot] = right
 	shapeUps[slot] = up
@@ -209,6 +226,7 @@ function ZoneShapes.remove(slot: number)
 
 	shapeCFrames[slot] = nil
 	shapeHalfSizes[slot] = nil
+	shapeExtents[slot] = nil
 	shapeTypes[slot] = nil
 	shapeParts[slot] = nil
 	shapePositions[slot] = nil
@@ -240,7 +258,7 @@ function ZoneShapes.containsPoint(slot: number, point: Vector3): boolean
 		shapeRights[slot],
 		shapeUps[slot],
 		shapeBacks[slot],
-		shapeHalfSizes[slot],
+		shapeExtents[slot],
 		shapeType,
 		shapeParts[slot]
 	)

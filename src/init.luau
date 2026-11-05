@@ -29,7 +29,7 @@ local entityToReference = State.entityToReference
 local referenceToEntity = State.referenceToEntity
 
 local shapeCFrames = State.shapeCFrames
-local shapeHalfSizes = State.shapeHalfSizes
+local shapeExtents = State.shapeExtents
 local dynamicSlots = State.dynamicSlots
 
 local queryHits = {} :: { number }
@@ -735,7 +735,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 		for slot, cframe in shapeCFrames do
 			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
-			local halfSize = shapeHalfSizes[slot]
+			-- What the shape fills, so a Ball or Cylinder is drawn at the size it detects
+			local halfSize = shapeExtents[slot]
 			local size = halfSize * 2
 
 			local observers = zoneAttachedObservers[slot]
@@ -748,10 +749,10 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			end
 
 			if visual.shape == 'Ball' then
-				box.Radius = math.max(halfSize.X, halfSize.Y, halfSize.Z)
+				box.Radius = halfSize.X
 				box.CFrame = cframe
 			elseif visual.shape == 'Cylinder' then
-				box.Radius = math.max(halfSize.X, halfSize.Z)
+				box.Radius = halfSize.Y
 				box.Height = size.X
 				box.CFrame = cframe * CFrame.Angles(0, math.rad(90), 0)
 			else

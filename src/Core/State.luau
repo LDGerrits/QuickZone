@@ -20,6 +20,8 @@ local State = {
 	-- Geometry of every zone, only written through Core/ZoneShapes
 	shapeCFrames = {} :: { [number]: CFrame },
 	shapeHalfSizes = {} :: { [number]: Vector3 },
+	-- Half size the shape fills, as a Ball fills its smallest side and a Cylinder its smallest cross-section
+	shapeExtents = {} :: { [number]: Vector3 },
 	shapeTypes = {} :: { [number]: number },
 	-- The part a Mesh zone queries
 	shapeParts = {} :: { [number]: BasePart },
