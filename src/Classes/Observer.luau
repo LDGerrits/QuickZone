@@ -247,6 +247,62 @@ local function trackGroups(
 	end
 end
 
+-- Iterates the entities the observer has in a zone, as their references. The entities are copied when the
+-- loop starts, so it survives entities entering and leaving, also when its body yields across ticks, and each
+-- is checked again when reached
+local function iterTracked(
+	observerId: number,
+	zoneIds: { [number]: true }?,
+	playersOnly: boolean
+): () -> (any?, Types.Zone?)
+	local list = {}
+	for entity in State.observerTrackingEntities[observerId] or {} do
+		table.insert(list, entity)
+	end
+
+	local i = 0
+	return function()
+		while true do
+			i += 1
+			local entity = list[i]
+			if entity == nil then
+				return nil, nil
+			end
+
+			local data = State.entityData[entity]
+			local zoneId = data and data.activeObserverMemberships[observerId]
+			if not zoneId or (zoneIds and not zoneIds[zoneId]) then
+				continue
+			end
+
+			local ref = State.entityToReference[entity] or entity
+			if playersOnly and not (typeof(ref) == 'Instance' and ref:IsA('Player')) then
+				continue
+			end
+			return ref, State.zoneIdToZoneObj[zoneId]
+		end
+	end
+end
+
+-- The ids of a Zone, or of every zone in a Zones. A destroyed one has none
+local function zoneIdsOf(zone: any): { [number]: true }
+	local ids = {}
+	if type(zone) ~= 'table' then
+		Log.fatal('Expected a Zone or Zones, got %s.', nil, tostring(zone))
+	elseif zone.destroyed then
+		return ids
+	elseif type(zone.getZones) == 'function' then
+		for _, inner in zone:getZones() do
+			ids[inner:getId()] = true
+		end
+	elseif type(zone.getId) == 'function' then
+		ids[zone:getId()] = true
+	else
+		Log.fatal('Expected a Zone or Zones, got %s.', nil, tostring(zone))
+	end
+	return ids
+end
+
 local Observer = {}
 Observer.__index = Observer
 
@@ -1421,7 +1477,7 @@ end
 	@param zone Zone
 	@return { any }
 ]=]
-function Observer.getEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone): { any }
+function Observer.getEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): { any }
 	local results = {}
 
 	for entity in self:iterEntitiesInZone(zone) do
@@ -1439,7 +1495,7 @@ end
 	@param zone Zone
 	@return { Player }
 ]=]
-function Observer.getPlayersInZone(self: Types.InternalObserver, zone: Types.Zone): { Player }
+function Observer.getPlayersInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): { Player }
 	local results = {}
 
 	for player in self:iterPlayersInZone(zone) do
@@ -1515,156 +1571,59 @@ end
 
 --[=[ 
 	Iterates over all entities currently inside zones attached to this observer.
-	Yields both the Entity and the specific Zone they are in.
+	Yields both the Entity and the specific Zone they are in. Safe to use while entities enter and leave,
+	also when the loop yields.
 
 	@method iterEntitiesInside
 	@within Observer
 	@return () -> (Entity?, Zone?)
 ]=]
 function Observer.iterEntitiesInside(self: Types.InternalObserver): () -> (any?, Types.Zone?)
-	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: number }
-	local entity: Types.Entity?
-	local observerId = self.id
-
-	return function()
-		while true do
-			entity = next(entities :: any, entity)
-			if not entity then
-				return nil
-			end
-
-			local data = State.entityData[entity :: Types.Entity]
-			if not data then
-				continue
-			end
-
-			local zoneId = data.activeObserverMemberships[observerId]
-			if not zoneId then
-				continue
-			end
-
-			local ref = State.entityToReference[entity :: Types.Entity] or entity
-			return ref, State.zoneIdToZoneObj[zoneId]
-		end
-	end
+	return iterTracked(self.id, nil, false)
 end
 
 --[=[ 
 	Iterates over all players currently inside zones attached to this observer.
-	Yields both the Player and the specific Zone they are in.
+	Yields both the Player and the specific Zone they are in. Safe to use while players enter and leave,
+	also when the loop yields.
 
 	@method iterPlayersInside
 	@within Observer
 	@return () -> (Player?, Zone?)
 ]=]
 function Observer.iterPlayersInside(self: Types.InternalObserver): () -> (Player?, Types.Zone?)
-	local entities = (State.observerTrackingEntities[self.id] or {}) :: { [Types.Entity]: number }
-	local entity: Types.Entity?
-	local observerId = self.id
-
-	return function()
-		while true do
-			entity = next(entities :: any, entity)
-			if not entity then
-				return nil, nil
-			end
-
-			local data = State.entityData[entity :: Types.Entity]
-			if not data then
-				continue
-			end
-
-			local zoneId = data.activeObserverMemberships[observerId]
-			if not zoneId then
-				continue
-			end
-
-			local ref = State.entityToReference[entity :: Types.Entity] or entity
-			if typeof(ref) == 'Instance' and ref:IsA('Player') then
-				return ref, State.zoneIdToZoneObj[zoneId]
-			end
-		end
-	end
+	return iterTracked(self.id, nil, true)
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all entities currently inside a specific zone 
-	attached to this observer.
+	Iterates over all entities currently inside a specific zone, or any zone of a Zones,
+	attached to this observer. Safe to use while entities enter and leave, also when the loop yields.
 
 	@method iterEntitiesInZone
 	@within Observer
 	@param zone Zone
 	@return () -> Entity?
 ]=]
-function Observer.iterEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone): () -> Types.Entity?
-	local entities = State.observerTrackingEntities[self.id]
-	if not entities then
-		return function()
-			return nil
-		end
-	end
-
-	local entity: Types.Entity?
-	local targetZoneId = zone:getId()
-	local observerId = self.id
-
+function Observer.iterEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): () -> Types.Entity?
+	local iterate = iterTracked(self.id, zoneIdsOf(zone), false)
 	return function(): Types.Entity?
-		while true do
-			entity = next(entities :: any, entity)
-			if not entity then
-				return nil
-			end
-
-			local data = State.entityData[entity :: Types.Entity]
-
-			if not data or data.activeObserverMemberships[observerId] ~= targetZoneId then
-				continue
-			end
-
-			return State.entityToReference[entity :: Types.Entity] or entity
-		end
+		return (iterate())
 	end
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all players currently inside a specific zone 
-	attached to this observer.
+	Iterates over all players currently inside a specific zone, or any zone of a Zones,
+	attached to this observer. Safe to use while players enter and leave, also when the loop yields.
 
 	@method iterPlayersInZone
 	@within Observer
 	@param zone Zone
 	@return () -> Player?
 ]=]
-function Observer.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zone): () -> Player?
-	local entities = State.observerTrackingEntities[self.id]
-	if not entities then
-		return function()
-			return nil
-		end
-	end
-
-	local entity: Types.Entity?
-	local targetZoneId = zone:getId()
-	local observerId = self.id
-
+function Observer.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): () -> Player?
+	local iterate = iterTracked(self.id, zoneIdsOf(zone), true)
 	return function(): Player?
-		while true do
-			entity = next(entities :: any, entity)
-			if not entity then
-				return nil
-			end
-
-			local data = State.entityData[entity :: Types.Entity]
-
-			if not data or data.activeObserverMemberships[observerId] ~= targetZoneId then
-				continue
-			end
-
-			local ref = State.entityToReference[entity :: Types.Entity] or entity
-			if typeof(ref) == 'Instance' and ref:IsA('Player') then
-				return ref
-			end
-		end
+		return (iterate())
 	end
 end
 
