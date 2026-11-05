@@ -247,26 +247,36 @@ local function trackGroups(
 	end
 end
 
+-- Lists for iterTracked, reused once a loop runs to the end, so a loop allocates nothing after the first
+local iterBuffers = {} :: { { any } }
+local MAX_ITER_BUFFERS = 4
+
 -- Iterates the entities the observer has in a zone, as their references. The entities are copied when the
 -- loop starts, so it survives entities entering and leaving, also when its body yields across ticks, and each
--- is checked again when reached
+-- is checked again when reached. A loop broken out of keeps its list, which is then collected
 local function iterTracked(
 	observerId: number,
 	zoneIds: { [number]: true }?,
 	playersOnly: boolean
 ): () -> (any?, Types.Zone?)
-	local list = {}
+	local list: { any }? = table.remove(iterBuffers) or {}
 	for entity in State.observerTrackingEntities[observerId] or {} do
-		table.insert(list, entity)
+		table.insert(list :: { any }, entity)
 	end
 
 	local i = 0
 	return function()
-		while true do
+		while list do
 			i += 1
 			local entity = list[i]
 			if entity == nil then
-				return nil, nil
+				table.clear(list)
+				if #iterBuffers < MAX_ITER_BUFFERS then
+					table.insert(iterBuffers, list)
+				end
+				-- Called again after the end, it must not read a list another loop now uses
+				list = nil
+				break
 			end
 
 			local data = State.entityData[entity]
@@ -281,6 +291,7 @@ local function iterTracked(
 			end
 			return ref, State.zoneIdToZoneObj[zoneId]
 		end
+		return nil, nil
 	end
 end
 

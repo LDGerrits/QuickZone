@@ -563,6 +563,56 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('Loops over the same observer, nested or one after another, each see every entity once.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27395)
+				local entities = {}
+				for i = 1, 5 do
+					entities[i] = { Position = position }
+				end
+				local group = track(Group.new({ entities = entities, autoClean = false }))
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+
+				-- Nested loops, then a loop broken out of
+				local pairsSeen = 0
+				for _ in observer:iterEntitiesInside() do
+					for _ in observer:iterEntitiesInZone(zone) do
+						pairsSeen += 1
+					end
+				end
+				for _ in observer:iterEntitiesInside() do
+					break
+				end
+				-- A finished loop hands its list to the next one
+				local finished = observer:iterEntitiesInside()
+				for _ in finished do
+					continue
+				end
+				local seen = {}
+				local repeats = 0
+				local iterate = observer:iterEntitiesInside()
+				local entity = iterate()
+				-- The finished iterator must not read the list this loop now uses
+				local stale = finished()
+				while entity do
+					repeats += if seen[entity] then 1 else 0
+					seen[entity] = true
+					entity = iterate()
+				end
+				local count = 0
+				for _ in seen do
+					count += 1
+				end
+
+				Expect(pairsSeen).is(25)
+				Expect(stale).is(nil)
+				Expect(count).is(5)
+				Expect(repeats).is(0)
+			end)
+		end)
+
 		Test('Zone queries accept a Zones container, and a destroyed zone has nothing in it.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-28000, 0, -27390)
