@@ -256,10 +256,12 @@ function QuickZone:removeEntity(entity: any): QuickZone
 		table.insert(idsToRemove, groupId)
 	end
 
+	-- By its reference, so a player is removed rather than only its current character
+	local reference = entityToReference[entity] or entity
 	for _, groupId in idsToRemove do
 		local group = groups[groupId]
 		if group then
-			group:remove(entity)
+			group:remove(reference)
 		end
 	end
 

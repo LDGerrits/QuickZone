@@ -16,6 +16,7 @@ local function trackPlayer(player: Player)
 	end
 
 	local charConn: RBXScriptConnection?
+	local charAncestryConn: RBXScriptConnection?
 	local hrpConn: RBXScriptConnection?
 	local currentCharacter: Model?
 	local currentHrp: BasePart?
@@ -56,6 +57,10 @@ local function trackPlayer(player: Player)
 			charConn:Disconnect()
 			charConn = nil
 		end
+		if charAncestryConn then
+			charAncestryConn:Disconnect()
+			charAncestryConn = nil
+		end
 		currentCharacter = nil
 	end
 
@@ -84,9 +89,9 @@ local function trackPlayer(player: Player)
 				end
 			end
 
-			-- Listen for the HRP streaming out or getting destroyed
-			hrpConn = hrp.AncestryChanged:Connect(function(_, parent)
-				if not parent then
+			-- Listen for the HRP streaming out or getting destroyed, also by its character leaving
+			hrpConn = hrp.AncestryChanged:Connect(function()
+				if not hrp:IsDescendantOf(game) then
 					clearHrp(hrp)
 				end
 			end)
@@ -101,6 +106,13 @@ local function trackPlayer(player: Player)
 		-- Listen for the HRP streaming in dynamically
 		charConn = character.ChildAdded:Connect(function(child)
 			if child.Name == 'HumanoidRootPart' then
+				checkHrp(character)
+			end
+		end)
+
+		-- A character taken out of the world and put back keeps its HRP, so it is picked up again
+		charAncestryConn = character.AncestryChanged:Connect(function()
+			if character:IsDescendantOf(game) then
 				checkHrp(character)
 			end
 		end)

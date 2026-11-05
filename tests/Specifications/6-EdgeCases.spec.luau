@@ -4,6 +4,7 @@
 -- events, bad input and players
 local CollectionService = game:GetService('CollectionService')
 local LogService = game:GetService('LogService')
+local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local ServerScriptService = game:GetService('ServerScriptService')
 
@@ -61,6 +62,8 @@ return function(Tiniest: Tiniest)
 	local Describe = Tiniest.describe
 	local Test = Tiniest.test
 	local Expect = Tiniest.expect
+
+	local player = Players:GetPlayers()[1] or Players.PlayerAdded:Wait()
 
 	Describe('Degenerate zones', function()
 		Test('Zones with non-finite or degenerate geometry never break queries for other zones.', function()
@@ -916,6 +919,42 @@ return function(Tiniest: Tiniest)
 				Expect(observer:getZoneOfEntity(corner)).is(zone)
 				Expect(zone:isPointInside(zonePosition + Vector3.new(9, 0, 0))).is_true()
 				Expect(zone:isPointInside(zonePosition + Vector3.new(8, 8, 0))).is(false)
+			end)
+		end)
+	end)
+
+	Describe('Players', function()
+		Test('A character taken out of the world and put back is tracked again.', function()
+			withCleanup(function(track)
+				local group = track(Group.players())
+				local character = player.Character or player.CharacterAdded:Wait()
+				local before = group:contains(player)
+				character.Parent = nil
+				task.wait()
+				local away = group:contains(player)
+				character.Parent = workspace
+				task.wait()
+
+				Expect(before).is_true()
+				Expect(away).is(false)
+				Expect(group:contains(player)).is_true()
+			end)
+		end)
+
+		Test('A player cleared from a group or removed from QuickZone stays out after respawning.', function()
+			withCleanup(function(track)
+				local cleared = track(Group.new({ entities = { player } }))
+				local removed = track(Group.new({ entities = { player } }))
+				local destroyed = Group.new({ entities = { player } })
+				local destroyedId = destroyed:getId()
+				cleared:clear()
+				QuickZone:removeEntity(player)
+				destroyed:destroy()
+				player:LoadCharacter()
+
+				Expect(cleared:contains(player)).is(false)
+				Expect(removed:contains(player)).is(false)
+				Expect(State.groups[destroyedId]).is(nil)
 			end)
 		end)
 	end)

@@ -35,6 +35,19 @@ local IS_CLIENT = RunService:IsClient()
 local Group = {}
 Group.__index = Group
 
+-- Removes a member. A character part of a player goes through the player as well, so the player's next
+-- character is not added back
+local function removeMember(group: Types.InternalGroup, entity: any)
+	local reference = State.entityToReference[entity]
+	if typeof(reference) == 'Instance' and reference:IsA('Player') then
+		group:_remove(reference)
+	end
+	-- Unless an exit callback destroyed the group meanwhile
+	if getmetatable(group :: any) then
+		group:_remove(entity)
+	end
+end
+
 --[=[ 
 	Creates a generic Group. 
 	Groups manage collections of Entities (any instance with a position in the world like BaseParts, Models, Attachments, etc.) that Observers should track.
@@ -486,7 +499,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	for idx = #self.entities, 1, -1 do
 		local entity = self.entities[idx]
 		if entity ~= nil then
-			self:_remove(entity)
+			removeMember(self, entity)
 		end
 	end
 
@@ -690,7 +703,11 @@ function Group._clear(self: Types.InternalGroup): Types.Group
 	-- Iterate backwards for safe removal
 	local entities = self.entities
 	for idx = #entities, 1, -1 do
-		self:_remove(entities[idx])
+		-- An exit callback may have removed entities after this one, or destroyed the group and all of them
+		local entity = entities[idx]
+		if entity ~= nil then
+			removeMember(self, entity)
+		end
 	end
 	return self
 end
