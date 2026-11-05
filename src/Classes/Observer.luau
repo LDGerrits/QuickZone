@@ -73,6 +73,135 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 	end
 end
 
+-- Keeps which subscribed groups have a member inside the observer, and runs onArrive and onLeave as that
+-- changes. Read from the state rather than replayed from events, as entities change groups while inside
+local function trackGroups(
+	self: Types.InternalObserver,
+	onArrive: (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> (),
+	onLeave: (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> ()
+): () -> ()
+	local observerId = self.id
+	-- Members inside of each group that is present, and the groups each entity counts for
+	local present = {} :: { [number]: { [Types.Entity]: true } }
+	local counted = {} :: { [Types.Entity]: { [number]: true } }
+
+	local function counts(entity: Types.Entity, groupId: number): boolean
+		local data = State.entityData[entity]
+		local groups = State.entityToGroups[entity]
+		local observers = State.groupToObservers[groupId]
+		return data ~= nil
+			and data.activeObserverMemberships[observerId] ~= nil
+			and groups ~= nil
+			and groups[groupId] == true
+			and observers ~= nil
+			and observers[observerId] == true
+	end
+
+	-- zone is where the entity was when it left the observer
+	local function reconcile(entity: Types.Entity, zone: Types.Zone?)
+		local data = State.entityData[entity]
+		local zoneId = data and data.activeObserverMemberships[observerId]
+		local current = if zoneId then State.zoneIdToZoneObj[zoneId] else zone
+
+		-- Collected first, as the callbacks below may change groups and memberships
+		local leaving: { number }? = nil
+		local arriving: { number }? = nil
+		local have = counted[entity]
+		if have then
+			for groupId in have do
+				if not counts(entity, groupId) then
+					leaving = leaving or {}
+					table.insert(leaving :: { number }, groupId)
+				end
+			end
+		end
+		for groupId in State.entityToGroups[entity] or {} do
+			if not (have and have[groupId]) and counts(entity, groupId) then
+				arriving = arriving or {}
+				table.insert(arriving :: { number }, groupId)
+			end
+		end
+
+		for _, groupId in leaving or {} do
+			-- A callback may have settled it already
+			local now = counted[entity]
+			if not (now and now[groupId]) or counts(entity, groupId) then
+				continue
+			end
+			now[groupId] = nil
+			if next(now) == nil then
+				counted[entity] = nil
+			end
+			local members = present[groupId]
+			members[entity] = nil
+			if next(members) == nil then
+				present[groupId] = nil
+				local group = State.groups[groupId]
+				if group then
+					onLeave(groupId, group, current :: Types.Zone, entity)
+				end
+			end
+		end
+
+		for _, groupId in arriving or {} do
+			local now = counted[entity]
+			if (now and now[groupId]) or not counts(entity, groupId) then
+				continue
+			end
+			if not now then
+				now = {}
+				counted[entity] = now
+			end
+			(now :: { [number]: true })[groupId] = true
+			local members = present[groupId]
+			if members then
+				members[entity] = true
+			else
+				present[groupId] = { [entity] = true }
+				onArrive(groupId, State.groups[groupId], current :: Types.Zone, entity)
+			end
+		end
+	end
+
+	local function onEvent(_, zone: Types.Zone, entity: Types.Entity)
+		reconcile(entity, zone)
+	end
+	local disconnectEnter = self:onEnter(onEvent)
+	local disconnectTransition = self:onTransition(onEvent)
+	local disconnectExit = self:onExit(onEvent)
+
+	-- Told when groups change, replaced rather than changed so a list being run never shifts
+	local function track(entity: Types.Entity)
+		reconcile(entity, nil)
+	end
+	local trackers = State.observerGroupTrackers[observerId]
+	local updated = if trackers then table.clone(trackers) else {}
+	table.insert(updated, track)
+	State.observerGroupTrackers[observerId] = updated
+
+	-- Groups already inside arrive now
+	local inside = {}
+	for entity in State.observerTrackingEntities[observerId] or {} do
+		table.insert(inside, entity)
+	end
+	for _, entity in inside do
+		reconcile(entity, nil)
+	end
+
+	return function()
+		disconnectEnter()
+		disconnectTransition()
+		disconnectExit()
+		local current = State.observerGroupTrackers[observerId]
+		local idx = current and table.find(current, track)
+		if idx then
+			local remaining = table.clone(current :: { (any) -> () })
+			table.remove(remaining, idx)
+			State.observerGroupTrackers[observerId] = if #remaining > 0 then remaining else nil
+		end
+	end
+end
+
 local Observer = {}
 Observer.__index = Observer
 
@@ -253,6 +382,13 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 		end
 	end
 
+	-- Members already inside through other groups bring this one in
+	if State.observerGroupTrackers[self.id] then
+		for _, entity in table.clone(group.entities) do
+			Memberships.groupsChanged(entity, self.id)
+		end
+	end
+
 	return self
 end
 
@@ -274,6 +410,13 @@ function Observer.unsubscribe(self: Types.InternalObserver, group: Types.Interna
 	end
 
 	disconnectObserverFromGroup(self.id, group)
+
+	-- Members that stay inside through other groups no longer bring this one in
+	if State.observerGroupTrackers[self.id] then
+		for _, entity in table.clone(group.entities) do
+			Memberships.groupsChanged(entity, self.id)
+		end
+	end
 
 	return self
 end
@@ -731,56 +874,46 @@ function Observer.observeGroup(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
-	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
+	local observerId = self.id
 	local cleanups = {} :: { [number]: () -> () }
+	-- Bumped each time a group arrives or leaves, so a cleanup returned after its group left still runs
+	local generations = {} :: { [number]: number }
+	local disconnected = false
 
-	return self:observe(function(_, zone, entity: any)
-		local groups = State.entityToGroups[entity]
-		if not groups then
-			return nil
-		end
-
-		for groupId, _ in groups do
-			local group = State.groups[groupId]
-			if not group or not State.groupToObservers[groupId][self.id] then
-				continue
+	local disconnectTracker = trackGroups(self, function(groupId, group, zone, entity)
+		local generation = (generations[groupId] or 0) + 1
+		generations[groupId] = generation
+		Callbacks.call(function()
+			local cleanup = callback(group, zone, entity)
+			if type(cleanup) ~= 'function' then
+				return
 			end
-
-			if not activeMembers[groupId] then
-				activeMembers[groupId] = {}
-			end
-
-			if next(activeMembers[groupId]) == nil then
-				activeMembers[groupId][entity] = true
-				local groupCleanup = callback(group, zone, entity)
-				if typeof(groupCleanup) == 'function' then
-					cleanups[groupId] = groupCleanup
-				end
+			if disconnected or generations[groupId] ~= generation then
+				cleanup()
 			else
-				activeMembers[groupId][entity] = true
+				cleanups[groupId] = cleanup
 			end
-		end
-
-		return function()
-			for groupId, members in activeMembers do
-				if not members[entity] then
-					continue
-				end
-
-				members[entity] = nil
-				if next(members) ~= nil then
-					continue
-				end
-
-				activeMembers[groupId] = nil
-				local groupCleanup = cleanups[groupId]
-				if groupCleanup then
-					groupCleanup()
-					cleanups[groupId] = nil
-				end
-			end
+		end, State.observerSafety[observerId] ~= false)
+	end, function(groupId)
+		generations[groupId] = (generations[groupId] or 0) + 1
+		local cleanup = cleanups[groupId]
+		if cleanup then
+			cleanups[groupId] = nil
+			Callbacks.call(cleanup, State.observerSafety[observerId] ~= false)
 		end
 	end)
+
+	return function()
+		if disconnected then
+			return
+		end
+		disconnected = true
+		disconnectTracker()
+		for groupId, cleanup in cleanups do
+			cleanups[groupId] = nil
+			task.spawn(cleanup)
+		end
+	end
 end
 
 --[=[ 
@@ -798,47 +931,10 @@ function Observer.onGroupEnter(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
-
-	return self:observe(function(_, zone, entity: any)
-		local groups = State.entityToGroups[entity]
-		if not groups then
-			return nil
-		end
-
-		for groupId, _ in groups do
-			if not State.groupToObservers[groupId] or not State.groupToObservers[groupId][self.id] then
-				continue
-			end
-
-			if not activeMembers[groupId] then
-				activeMembers[groupId] = {}
-			end
-
-			local isFirst = next(activeMembers[groupId]) == nil
-			activeMembers[groupId][entity] = true
-
-			if isFirst then
-				local group = State.groups[groupId]
-				if group then
-					callback(group, zone, entity)
-				end
-			end
-		end
-
-		return function()
-			for groupId, members in activeMembers do
-				if not members[entity] then
-					continue
-				end
-
-				members[entity] = nil
-				if next(members) == nil then
-					activeMembers[groupId] = nil
-				end
-			end
-		end
-	end)
+	local observerId = self.id
+	return trackGroups(self, function(_, group, zone, entity)
+		Callbacks.call(callback, State.observerSafety[observerId] ~= false, group, zone, entity)
+	end, function() end)
 end
 
 --[=[ 
@@ -855,41 +951,9 @@ function Observer.onGroupExit(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	local activeMembers = {} :: { [number]: { [Types.Entity]: boolean } }
-
-	return self:observe(function(_, zone, entity: any)
-		local groups = State.entityToGroups[entity]
-		if not groups then
-			return nil
-		end
-
-		for groupId, _ in groups do
-			if not State.groupToObservers[groupId] or not State.groupToObservers[groupId][self.id] then
-				continue
-			end
-
-			if not activeMembers[groupId] then
-				activeMembers[groupId] = {}
-			end
-			activeMembers[groupId][entity] = true
-		end
-
-		return function()
-			for groupId, members in activeMembers do
-				if not members[entity] then
-					continue
-				end
-
-				members[entity] = nil
-				if next(members) == nil then
-					activeMembers[groupId] = nil
-					local group = State.groups[groupId]
-					if group then
-						callback(group, zone, entity)
-					end
-				end
-			end
-		end
+	local observerId = self.id
+	return trackGroups(self, function() end, function(_, group, zone, entity)
+		Callbacks.call(callback, State.observerSafety[observerId] ~= false, group, zone, entity)
 	end)
 end
 
@@ -1608,6 +1672,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerEnteredCallbacks[id] = nil
 	State.observerExitedCallbacks[id] = nil
 	State.observerTransitionedCallbacks[id] = nil
+	State.observerGroupTrackers[id] = nil
 	State.observerTrackingEntities[id] = nil
 	State.observerIdToObserverObj[id] = nil
 	State.observerEnabled[id] = nil

@@ -15,6 +15,7 @@ local entityToReference = State.entityToReference
 local groupToObservers = State.groupToObservers
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks
+local observerGroupTrackers = State.observerGroupTrackers
 local observerSafety = State.observerSafety
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneOccupants = State.zoneOccupants
@@ -152,6 +153,33 @@ function Memberships.exitAllFromZone(zoneId: number)
 	end
 
 	zoneOccupants[zoneId] = nil
+end
+
+-- Tells the group trackers of the observers the entity is in that its groups, or their observers, changed.
+-- Only those of observerId when given
+function Memberships.groupsChanged(entity: Types.Entity, observerId: number?)
+	local data = entityData[entity]
+	if not data then
+		return
+	end
+
+	-- Collected first, as trackers run callbacks that may change memberships
+	local observerIds: { number }? = nil
+	for id in data.activeObserverMemberships do
+		if observerGroupTrackers[id] and (observerId == nil or id == observerId) then
+			observerIds = observerIds or {}
+			table.insert(observerIds :: { number }, id)
+		end
+	end
+
+	if observerIds then
+		for _, id in observerIds do
+			-- Lists are replaced rather than changed, so this one can't shift under the loop
+			for _, track in observerGroupTrackers[id] or {} do
+				track(entity)
+			end
+		end
+	end
 end
 
 -- Exits the entity from every observer that no longer watches one of its groups

@@ -603,11 +603,18 @@ function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 		end)
 	end
 
+	-- Its group may arrive in observers it is already in
+	Memberships.groupsChanged(entity)
+
 	return self
 end
 
 function Group._addBulk(self: Types.InternalGroup, references: { any }): Types.Group
 	for _, reference in references do
+		-- A callback may have destroyed the group
+		if self.destroyed then
+			break
+		end
 		self:_add(reference)
 	end
 	return self
@@ -653,6 +660,8 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 	data.logicVersion = -1
 
 	Memberships.exitUnsubscribed(entity, data)
+	-- Its group may leave observers it stays in through other groups
+	Memberships.groupsChanged(entity)
 
 	-- Exit callbacks may have removed the entity everywhere, or added it back
 	local groups = State.entityToGroups[entity]
