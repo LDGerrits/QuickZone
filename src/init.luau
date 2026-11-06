@@ -15,6 +15,7 @@ local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
 local ZoneShapes = require(script.Core.ZoneShapes)
 local Log = require(script.Utils.Log)
+local Snapshot = require(script.Utils.Snapshot)
 
 local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
@@ -494,73 +495,80 @@ function QuickZone:getGroupsOfEntity(entity: any): { Types.Group }
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Groups.
+	Returns an iterator for all Groups.
+	Safe to use while groups are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterGroups
 	@within QuickZone
 	@return () -> Group?
 ]=]
 function QuickZone:iterGroups(): () -> Types.Group?
-	local groupId: number? = nil
+	local nextGroup = Snapshot.keys(groups)
 	return function(): Types.Group?
-		groupId = next(groups, groupId)
-		return groupId and groups[groupId] or nil
+		local _, group = nextGroup()
+		return group
 	end
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Zones.
+	Returns an iterator for all Zones.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterZones
 	@within QuickZone
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZones(): () -> Types.Zone?
-	local zoneId: number? = nil
-
+	local nextZone = Snapshot.keys(zoneIdToZoneObj)
 	return function(): Types.Zone?
-		zoneId = next(zoneIdToZoneObj, zoneId)
-		return zoneId and zoneIdToZoneObj[zoneId] or nil
+		local _, zone = nextZone()
+		return zone
 	end
 end
 
 --[=[
-	Returns a zero-allocation iterator for all entities.
+	Returns an iterator for all entities.
+	Safe to use while entities are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterEntities
 	@within QuickZone
 	@return () -> any?
 ]=]
 function QuickZone:iterEntities(): () -> any?
-	local entity: Types.Entity? = nil
-
+	local nextEntity = Snapshot.keys(entityData)
 	return function(): any?
-		entity = next(entityData, entity)
-		if entity then
+		local entity = nextEntity()
+		if entity ~= nil then
 			return entityToReference[entity] or entity
 		end
-		return entity
+		return nil
 	end
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Observers.
+	Returns an iterator for all Observers.
+	Safe to use while observers are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterObservers
 	@within QuickZone
 	@return () -> Observer?
 ]=]
 function QuickZone:iterObservers(): () -> Types.Observer<any>?
-	local observerId: number? = nil
-
+	local nextObserver = Snapshot.keys(observerIdToObserverObj)
 	return function(): Types.Observer<any>?
-		observerId = next(observerIdToObserverObj, observerId)
-		return observerId and observerIdToObserverObj[observerId] or nil
+		local _, observer = nextObserver()
+		return observer
 	end
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all Groups that the specified entity is currently in.
+	Returns an iterator for all Groups that the specified entity is currently in.
+	Safe to use while groups are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterGroupsOfEntity
 	@within QuickZone
@@ -577,10 +585,18 @@ function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
 		end
 	end
 
-	local groupId: number? = nil
+	local nextGroupId = Snapshot.keys(groupIds)
 	return function(): Types.Group?
-		groupId = next(groupIds, groupId)
-		return groupId and groups[groupId] or nil
+		while true do
+			local groupId = nextGroupId()
+			if groupId == nil then
+				return nil
+			end
+			local group = groups[groupId]
+			if group then
+				return group
+			end
+		end
 	end
 end
 
@@ -602,19 +618,17 @@ function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
 		end
 	end
 
-	local memberships = data.activeObserverMemberships
+	local nextMembership = Snapshot.keys(data.activeObserverMemberships)
 	local seenZones: { [number]: boolean } = {}
-	local observerId: number?
 
 	return function(): Types.Zone?
 		while true do
-			observerId = next(memberships, observerId)
+			local observerId, zoneId = nextMembership()
 			if not observerId then
 				return nil
 			end
 
-			local zoneId = memberships[observerId :: number]
-			if seenZones[zoneId] then
+			if seenZones[zoneId :: number] then
 				continue
 			end
 

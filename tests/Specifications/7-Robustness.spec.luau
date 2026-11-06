@@ -773,6 +773,379 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Iterators while their tables change', function()
+		-- Starts the loop, then removes half of ours, including the one just returned when it is ours, and grows
+		-- the table enough to rehash it. Ours that stayed must each come once, removed ones never
+		local function check(
+			name: string,
+			iterate: () -> () -> any,
+			ours: { any },
+			remove: (any) -> (),
+			grow: () -> ()
+		): string
+			local isOurs = {}
+			for _, item in ours do
+				isOurs[item] = true
+			end
+
+			local nextItem = iterate()
+			local seen = {}
+			local first = nextItem()
+			if first ~= nil then
+				seen[first] = 1
+			end
+			local removed = {}
+			local removedCount = 0
+			local function take(item: any)
+				removed[item] = true
+				removedCount += 1
+				remove(item)
+			end
+			if isOurs[first] then
+				take(first)
+			end
+			for _, item in ours do
+				if removedCount >= #ours // 2 then
+					break
+				elseif not seen[item] and not removed[item] then
+					take(item)
+				end
+			end
+			grow()
+
+			local ok, err = pcall(function()
+				while true do
+					local item = nextItem()
+					if item == nil then
+						break
+					end
+					seen[item] = (seen[item] or 0) + 1
+				end
+			end)
+			if not ok then
+				return `{name}: {err}`
+			end
+			for _, item in ours do
+				local count = seen[item] or 0
+				if removed[item] and count ~= (if item == first then 1 else 0) then
+					return `{name}: a removed item came`
+				elseif not removed[item] and count ~= 1 then
+					return `{name}: an item came {count} times`
+				end
+			end
+			return `{name}: ok`
+		end
+
+		Test('Every plain iterator survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local origin = Vector3.new(-44000, 0, 41000)
+				local results = {}
+				local function spot(i: number): Vector3
+					return origin + Vector3.new(i * 20, 0, 0)
+				end
+				local function many(count: number, make: (number) -> ())
+					for i = 1, count do
+						make(i)
+					end
+				end
+
+				do -- Group:iterEntities
+					local group = track(Group.new({ autoClean = false }))
+					local ours = {}
+					for i = 1, 8 do
+						local entity = { Position = spot(i) }
+						group:add(entity)
+						table.insert(ours, entity)
+					end
+					table.insert(
+						results,
+						check(
+							'Group:iterEntities',
+							function()
+								return group:iterEntities()
+							end,
+							ours,
+							function(entity)
+								group:remove(entity)
+							end,
+							function()
+								many(300, function(i)
+									group:add({ Position = spot(i) })
+								end)
+							end
+						)
+					)
+				end
+
+				do -- QuickZone:iterEntities
+					local group = track(Group.new({ autoClean = false }))
+					local ours = {}
+					for i = 1, 8 do
+						local entity = { Position = spot(i) }
+						group:add(entity)
+						table.insert(ours, entity)
+					end
+					local entityCount = 0
+					for _ in State.entityData do
+						entityCount += 1
+					end
+					table.insert(
+						results,
+						check(
+							'QuickZone:iterEntities',
+							function()
+								return QuickZone:iterEntities()
+							end,
+							ours,
+							function(entity)
+								QuickZone:removeEntity(entity)
+							end,
+							function()
+								many(math.max(300, entityCount * 2), function(i)
+									group:add({ Position = spot(i) })
+								end)
+							end
+						)
+					)
+				end
+
+				do -- QuickZone:iterGroups
+					local ours = {}
+					for _ = 1, 8 do
+						table.insert(ours, track(Group.new()))
+					end
+					table.insert(
+						results,
+						check(
+							'QuickZone:iterGroups',
+							function()
+								return QuickZone:iterGroups()
+							end,
+							ours,
+							function(group)
+								group:destroy()
+							end,
+							function()
+								many(300, function()
+									track(Group.new())
+								end)
+							end
+						)
+					)
+				end
+
+				do -- QuickZone:iterZones
+					local ours = {}
+					for i = 1, 8 do
+						table.insert(ours, track(Zone.new(cube(spot(i), 1))))
+					end
+					table.insert(
+						results,
+						check(
+							'QuickZone:iterZones',
+							function()
+								return QuickZone:iterZones()
+							end,
+							ours,
+							function(zone)
+								zone:destroy()
+							end,
+							function()
+								many(300, function(i)
+									track(Zone.new(cube(spot(i), 1)))
+								end)
+							end
+						)
+					)
+				end
+
+				do -- QuickZone:iterObservers
+					local ours = {}
+					for _ = 1, 8 do
+						table.insert(ours, track(Observer.new({ zones = {}, groups = {} })))
+					end
+					table.insert(
+						results,
+						check(
+							'QuickZone:iterObservers',
+							function()
+								return QuickZone:iterObservers()
+							end,
+							ours,
+							function(observer)
+								observer:destroy()
+							end,
+							function()
+								many(300, function()
+									track(Observer.new({ zones = {}, groups = {} }))
+								end)
+							end
+						)
+					)
+				end
+
+				do -- QuickZone:iterGroupsOfEntity
+					local entity = { Position = spot(1) }
+					local ours = {}
+					for _ = 1, 8 do
+						table.insert(ours, track(Group.new({ entities = { entity }, autoClean = false })))
+					end
+					table.insert(
+						results,
+						check(
+							'QuickZone:iterGroupsOfEntity',
+							function()
+								return QuickZone:iterGroupsOfEntity(entity)
+							end,
+							ours,
+							function(group)
+								group:remove(entity)
+							end,
+							function()
+								many(300, function()
+									track(Group.new({ entities = { entity }, autoClean = false }))
+								end)
+							end
+						)
+					)
+				end
+
+				do -- QuickZone:iterZonesOfEntity
+					local position = spot(40)
+					local entity = { Position = position }
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local ours = {}
+					for _ = 1, 8 do
+						local zone = track(Zone.new(cube(position)))
+						table.insert(ours, zone)
+						track(Observer.new({ zones = { zone }, groups = { group } }))
+					end
+					QuickZone:update(1)
+					table.insert(
+						results,
+						check(
+							'QuickZone:iterZonesOfEntity',
+							function()
+								return QuickZone:iterZonesOfEntity(entity)
+							end,
+							ours,
+							function(zone)
+								zone:destroy()
+							end,
+							function()
+								many(100, function()
+									track(
+										Observer.new({ zones = { track(Zone.new(cube(position))) }, groups = { group } })
+									)
+								end)
+								QuickZone:update(1)
+							end
+						)
+					)
+				end
+
+				do -- Observer:iterZones
+					local observer = track(Observer.new({ zones = {}, groups = {} }))
+					local ours = {}
+					for i = 1, 8 do
+						local zone = track(Zone.new(cube(spot(i), 1)))
+						observer:attach(zone)
+						table.insert(ours, zone)
+					end
+					table.insert(
+						results,
+						check(
+							'Observer:iterZones',
+							function()
+								return observer:iterZones()
+							end,
+							ours,
+							function(zone)
+								observer:detach(zone)
+							end,
+							function()
+								many(300, function(i)
+									observer:attach(track(Zone.new(cube(spot(i), 1))))
+								end)
+							end
+						)
+					)
+				end
+
+				do -- Observer:iterGroups
+					local observer = track(Observer.new({ zones = {}, groups = {} }))
+					local ours = {}
+					for _ = 1, 8 do
+						local group = track(Group.new())
+						observer:subscribe(group)
+						table.insert(ours, group)
+					end
+					table.insert(
+						results,
+						check(
+							'Observer:iterGroups',
+							function()
+								return observer:iterGroups()
+							end,
+							ours,
+							function(group)
+								group:destroy()
+							end,
+							function()
+								many(300, function()
+									observer:subscribe(track(Group.new()))
+								end)
+							end
+						)
+					)
+				end
+
+				for _, method in { 'iterZones', 'iterReferences' } do -- Zones
+					local folder = track(Instance.new('Folder'))
+					folder.Parent = workspace
+					for i = 1, 8 do
+						Util.createPart({ CFrame = CFrame.new(spot(i)) }).Parent = folder
+					end
+					local zones = track(Zone.fromChildren(folder))
+					local ours = if method == 'iterZones' then zones:getZones() else zones:getReferences()
+					table.insert(
+						results,
+						check(
+							`Zones:{method}`,
+							function()
+								return (zones :: any)[method](zones)
+							end,
+							ours,
+							function(item)
+								local part = if method == 'iterZones' then item:getReference() else item
+								part:Destroy()
+							end,
+							function()
+								many(300, function(i)
+									Util.createPart({ CFrame = CFrame.new(spot(i)) }).Parent = folder
+								end)
+							end
+						)
+					)
+				end
+
+				Expect(table.concat(results, '\n')).is(table.concat({
+					'Group:iterEntities: ok',
+					'QuickZone:iterEntities: ok',
+					'QuickZone:iterGroups: ok',
+					'QuickZone:iterZones: ok',
+					'QuickZone:iterObservers: ok',
+					'QuickZone:iterGroupsOfEntity: ok',
+					'QuickZone:iterZonesOfEntity: ok',
+					'Observer:iterZones: ok',
+					'Observer:iterGroups: ok',
+					'Zones:iterZones: ok',
+					'Zones:iterReferences: ok',
+				}, '\n'))
+			end)
+		end)
+	end)
+
 	Describe('Zones moving between trees from callbacks', function()
 		Test(
 			'A zone made dynamic and rebuilt from a callback in the middle of a tick is found by later entities.',

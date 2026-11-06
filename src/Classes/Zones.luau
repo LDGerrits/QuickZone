@@ -11,6 +11,7 @@
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local Zones = {}
 Zones.__index = Zones
@@ -244,17 +245,18 @@ function Zones.contains(self: Types.InternalZones, zone: Types.Zone): boolean
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Zones within this group.
+	Returns an iterator for all Zones within this group.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterZones
 	@within Zones
 	@return () -> Zone?
 ]=]
 function Zones.iterZones(self: Types.InternalZones): () -> Types.Zone?
-	local currentZone = nil
+	local nextZone = Snapshot.keys(self.zones)
 	return function(): Types.Zone?
-		currentZone = next(self.zones, currentZone)
-		return currentZone
+		return (nextZone())
 	end
 end
 
@@ -277,7 +279,9 @@ function Zones.getReferences(self: Types.InternalZones): { BasePart | Attachment
 end
 
 --[=[
-	Returns a zero-allocation iterator for all references within this group of zones.
+	Returns an iterator for all references within this group of zones.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 	Yields both the reference and the specific Zone it belongs to.
 
 	@method iterReferences
@@ -285,18 +289,18 @@ end
 	@return () -> ((BasePart | Attachment | Bone)?, Zone?)
 ]=]
 function Zones.iterReferences(self: Types.InternalZones): () -> ((BasePart | Attachment | Bone)?, Types.Zone?)
-	local currentZone: Types.Zone?
+	local nextZone = Snapshot.keys(self.zones)
 
 	return function()
 		while true do
-			currentZone = next(self.zones, currentZone)
-			if not currentZone then
+			local zone = nextZone()
+			if not zone then
 				return nil, nil
 			end
 
-			local ref = (currentZone :: Types.Zone):getReference()
+			local ref = zone:getReference()
 			if ref then
-				return ref, currentZone
+				return ref, zone
 			end
 		end
 	end

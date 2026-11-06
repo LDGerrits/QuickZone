@@ -20,6 +20,7 @@ local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local State = require(script.Parent.Parent.Core.State)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -422,9 +423,9 @@ function Group.getEntities(self: Types.InternalGroup): { any }
 end
 
 --[=[ 
-	Iterates over all entities currently belonging to the group.
-	Provides a zero-allocation way to loop through entities, ideal for high-frequency 
-	checks.
+	Iterates over all entities currently belonging to the group, ideal for high-frequency checks.
+	Safe to use while entities are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	```lua
 	for entity in myGroup:iterEntities() do
@@ -437,14 +438,14 @@ end
 	@return () -> any?
 ]=]
 function Group.iterEntities(self: Types.InternalGroup): () -> any?
-	local entity = nil
+	local nextEntity = Snapshot.keys(self.entityIndices)
 
 	return function()
-		entity = next(self.entityIndices, entity)
-		if entity then
+		local entity = nextEntity()
+		if entity ~= nil then
 			return State.entityToReference[entity] or entity
 		end
-		return entity
+		return nil
 	end
 end
 
