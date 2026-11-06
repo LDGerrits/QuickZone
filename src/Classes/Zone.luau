@@ -66,7 +66,7 @@ local function getShapeEnumValue(part: BasePart): number
 end
 
 local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): BasePart?
-	if reference and reference:IsA('BasePart') then
+	if typeof(reference) == 'Instance' and reference:IsA('BasePart') then
 		return reference
 	end
 	return nil
@@ -169,6 +169,40 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 	end
 end
 
+-- Checked before a setter writes, as a bad value stored in the zone would break every later write
+local function checkCFrame(cframe: any)
+	if typeof(cframe) ~= 'CFrame' then
+		Log.fatal('Zone cframe must be a CFrame, got %s.', nil, typeof(cframe))
+	end
+end
+
+local function checkSize(size: any)
+	if typeof(size) ~= 'Vector3' then
+		Log.fatal('Zone size must be a Vector3, got %s.', nil, typeof(size))
+	end
+end
+
+local function checkReference(reference: any)
+	if reference ~= nil and typeof(reference) ~= 'Instance' then
+		Log.fatal('Zone reference must be a BasePart, Attachment or Bone, got %s.', nil, typeof(reference))
+	end
+end
+
+local function checkObservers(config: { observers: { any }? }?)
+	for _, observer in config and config.observers or {} do
+		if type(observer) ~= 'table' or type(observer.subscribe) ~= 'function' then
+			Log.fatal('Expected an Observer in observers, got %s.', nil, tostring(observer))
+		end
+	end
+end
+
+-- Attaches the observers a config lists to a new Zone or Zones
+local function attachObservers(zone: any, config: { observers: { any }? }?)
+	for _, observer in config and config.observers or {} do
+		observer:attach(zone)
+	end
+end
+
 local Zone = {}
 Zone.__index = Zone
 
@@ -182,12 +216,9 @@ local function newZoneInternal(
 	autoSync: boolean
 ): Types.Zone
 	-- Checked before anything is registered, so a bad config can't leave a broken slot in the tree
-	if typeof(cframe) ~= 'CFrame' then
-		Log.fatal('Zone cframe must be a CFrame, got %s.', nil, typeof(cframe))
-	end
-	if typeof(size) ~= 'Vector3' then
-		Log.fatal('Zone size must be a Vector3, got %s.', nil, typeof(size))
-	end
+	checkCFrame(cframe)
+	checkSize(size)
+	checkReference(reference)
 
 	local id = State.nextZoneId
 	State.nextZoneId += 1
@@ -243,7 +274,7 @@ end
 
 	@tag Constructor
 	@tag Chainable
-	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }
 	@return Zone
 ]=]
 function Zone.new(config: {
@@ -254,7 +285,13 @@ function Zone.new(config: {
 	isDynamic: boolean?,
 	metadata: any?,
 	autoSync: boolean?,
+	observers: { Types.Observer<any> }?,
 }): Types.Zone
+	if type(config) ~= 'table' then
+		Log.fatal('Zone.new expects a config table, got %s.', nil, typeof(config))
+	end
+	checkObservers(config)
+
 	local shapeType = Enum.PartType.Block.Value
 
 	if config.shape then
@@ -266,15 +303,17 @@ function Zone.new(config: {
 		end
 	end
 
-	return newZoneInternal(
+	local zone = newZoneInternal(
 		config.cframe,
 		config.size,
 		shapeType,
 		config.reference,
-		config.isDynamic or false,
+		not not config.isDynamic,
 		config.metadata,
-		config.autoSync or false
+		not not config.autoSync
 	)
+	attachObservers(zone, config)
+	return zone
 end
 
 --[=[ 
@@ -300,7 +339,7 @@ end
 	@tag Constructor
 	@tag Chainable
 	@param part BasePart -- The part to derive the zone from.
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zone
 ]=]
 function Zone.fromPart(
@@ -309,15 +348,23 @@ function Zone.fromPart(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
+		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zone
+	if typeof(part) ~= 'Instance' or not part:IsA('BasePart') then
+		Log.fatal('Zone.fromPart expects a BasePart, got %s.', nil, tostring(part))
+	end
+	checkObservers(config)
+
 	local shapeId = getShapeEnumValue(part)
 
-	local isDynamic = config and config.isDynamic or false
+	local isDynamic = config ~= nil and not not config.isDynamic
 	local metadata = config and config.metadata
-	local autoSync = config and config.autoSync or false
+	local autoSync = config ~= nil and not not config.autoSync
 
-	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
+	local zone = newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
+	attachObservers(zone, config)
+	return zone
 end
 
 --[=[
@@ -327,7 +374,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param parts { BasePart }
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromParts(
@@ -336,8 +383,10 @@ function Zone.fromParts(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
+		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
+	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -349,7 +398,7 @@ function Zone.fromParts(
 	}) :: Types.InternalZones
 
 	for _, part in parts do
-		if part:IsA('BasePart') then
+		if typeof(part) == 'Instance' and part:IsA('BasePart') then
 			local newZone = Zone.fromPart(part, {
 				isDynamic = isDynamic,
 				metadata = zones.metadata,
@@ -359,6 +408,7 @@ function Zone.fromParts(
 		end
 	end
 
+	attachObservers(zones, config)
 	return zones
 end
 
@@ -370,7 +420,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param parent Instance
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromChildren(
@@ -379,8 +429,10 @@ function Zone.fromChildren(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
+		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
+	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -429,6 +481,7 @@ function Zone.fromChildren(
 		table.clear(instanceToZone)
 	end)
 
+	attachObservers(zones, config)
 	return zones
 end
 
@@ -444,7 +497,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param parent Instance -- The container (Model, Folder, etc.) to search through.
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromDescendants(
@@ -453,8 +506,10 @@ function Zone.fromDescendants(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
+		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
+	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -503,6 +558,7 @@ function Zone.fromDescendants(
 		table.clear(instanceToZone)
 	end)
 
+	attachObservers(zones, config)
 	return zones
 end
 
@@ -514,7 +570,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param tag string
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
 	@return Zones
 ]=]
 function Zone.fromTag(
@@ -523,8 +579,10 @@ function Zone.fromTag(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
+		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
+	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -678,6 +736,7 @@ function Zone.fromTag(
 		table.clear(partClaims)
 	end)
 
+	attachObservers(zones, config)
 	return zones
 end
 
@@ -738,6 +797,7 @@ end
 	@return Zone
 ]=]
 function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zone
+	autoSync = not not autoSync
 	if self.autoSync == autoSync then
 		return self
 	end
@@ -771,6 +831,7 @@ end
 	@return Zone
 ]=]
 function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Attachment | Bone)?): Types.Zone
+	checkReference(reference)
 	self.reference = reference
 
 	if shapeTypes[self.slot] == MESH_SHAPE_VALUE then
@@ -837,6 +898,8 @@ end
 	@return Zone
 ]=]
 function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
+	-- A boolean, as the observers' zone counts below assume the zone really changes tree
+	isDynamic = not not isDynamic
 	local slot = self.slot
 	if ZoneShapes.isDynamic(slot) == isDynamic then
 		return self
@@ -873,6 +936,7 @@ end
 	@return Zone
 ]=]
 function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
+	checkCFrame(cf)
 	ZoneShapes.setCFrame(self.slot, cf)
 	return self
 end
@@ -891,6 +955,9 @@ end
 	@return Zone
 ]=]
 function Zone.setPosition(self: Types.InternalZone, pos: Vector3): Types.Zone
+	if typeof(pos) ~= 'Vector3' then
+		Log.fatal('Zone position must be a Vector3, got %s.', nil, typeof(pos))
+	end
 	return self:setCFrame(shapeCFrames[self.slot].Rotation + pos)
 end
 
@@ -908,6 +975,7 @@ end
 	@return Zone
 ]=]
 function Zone.setSize(self: Types.InternalZone, size: Vector3): Types.Zone
+	checkSize(size)
 	ZoneShapes.setHalfSize(self.slot, size * 0.5)
 	return self
 end
