@@ -41,6 +41,12 @@ function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB:
 	return vector.min(minA, minB), vector.max(maxA, maxB)
 end
 
+-- How far a half size reaches along an axis. An infinite one reaches nowhere along an axis it is
+-- perpendicular to, where the plain product would be NaN
+local function reach(direction: number, half: number): number
+	return if direction == 0 then 0 else math.abs(direction) * half
+end
+
 -- Bounds of a box from its basis vectors
 function Geometry.getBounds(
 	position: Vector3,
@@ -53,6 +59,13 @@ function Geometry.getBounds(
 	local x = math.abs(right.X) * halfSize.X + math.abs(up.X) * halfSize.Y + math.abs(back.X) * halfSize.Z
 	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(back.Y) * halfSize.Z
 	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(back.Z) * halfSize.Z
+
+	-- Only an infinite size gets here, as for a kill plane
+	if x ~= x or y ~= y or z ~= z then
+		x = reach(right.X, halfSize.X) + reach(up.X, halfSize.Y) + reach(back.X, halfSize.Z)
+		y = reach(right.Y, halfSize.X) + reach(up.Y, halfSize.Y) + reach(back.Y, halfSize.Z)
+		z = reach(right.Z, halfSize.X) + reach(up.Z, halfSize.Y) + reach(back.Z, halfSize.Z)
+	end
 
 	local extent = Vector3.new(x, y, z)
 	return position - extent, position + extent

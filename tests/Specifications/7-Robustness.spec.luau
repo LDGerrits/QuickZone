@@ -18,6 +18,7 @@ local Observer = QuickZone.Observer
 
 type Tiniest = typeof(require(TiniestFolder.tiniest_for_roblox).configure({}))
 
+local INF = math.huge
 local AWAY = Vector3.new(0, 5000, 0)
 
 -- Calls fn, then destroys whatever it registered, so a failing expectation leaves nothing behind. Every entity
@@ -454,6 +455,83 @@ return function(Tiniest: Tiniest)
 				end
 
 				Expect(table.concat(accepted, ', ')).is('')
+			end)
+		end)
+
+		Test(
+			'A zone with an infinite size, like a kill plane, is found by queries and observers everywhere on it.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-43400, -2000, 41000)
+					local flat = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.new(INF, 10, INF) }))
+					local turned = track(Zone.new({
+						cframe = CFrame.new(position - Vector3.new(0, 100, 0)) * CFrame.Angles(0, math.pi / 4, 0),
+						size = Vector3.new(INF, 10, INF),
+					}))
+					local small = track(Zone.new(cube(position + Vector3.new(0, 300, 0))))
+					local far = position + Vector3.new(1e5, 0, -1e5)
+					local entity = { Position = far }
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer =
+						track(Observer.new({ zones = { flat, turned }, groups = { group }, safety = false }))
+					QuickZone:update(1)
+					local inFlat = observer:getZoneOfEntity(entity) == flat
+					entity.Position = far - Vector3.new(0, 100, 0)
+					QuickZone:update(1)
+					local inTurned = observer:getZoneOfEntity(entity) == turned
+					entity.Position = far + Vector3.new(0, 20, 0)
+					QuickZone:update(1)
+
+					Expect(inFlat).is_true()
+					Expect(inTurned).is_true()
+					Expect(observer:getZoneOfEntity(entity)).is(nil)
+					Expect(table.find(QuickZone:getZonesAtPoint(far), flat) ~= nil).is_true()
+					Expect(table.find(QuickZone:getZonesAtPoint(position + Vector3.new(0, 300, 0)), small) ~= nil).is_true()
+					Expect(#QuickZone:getZonesAtPoint(position + Vector3.new(0, 50, 0))).is(0)
+				end)
+			end
+		)
+
+		Test('A kill plane does not slow down queries for the other zones.', function()
+			withCleanup(function(track)
+				local rng = Random.new(3)
+				local origin = Vector3.new(-48000, 0, 48000)
+				for _ = 1, 3000 do
+					local offset = Vector3.new(rng:NextNumber(0, 3000), rng:NextNumber(0, 100), rng:NextNumber(0, 3000))
+					track(Zone.new(cube(origin + offset, 8)))
+				end
+				local points = {}
+				for _ = 1, 3000 do
+					table.insert(
+						points,
+						origin + Vector3.new(rng:NextNumber(0, 3000), rng:NextNumber(0, 100), rng:NextNumber(0, 3000))
+					)
+				end
+				-- The fastest of a few runs, so a hitch doesn't decide
+				local function timeQueries(): number
+					QuickZone:rebuild()
+					local best = math.huge
+					for _ = 1, 3 do
+						local start = os.clock()
+						for _, point in points do
+							QuickZone:getZonesAtPoint(point)
+						end
+						best = math.min(best, os.clock() - start)
+					end
+					return best
+				end
+
+				local without = timeQueries()
+				track(
+					Zone.new({ cframe = CFrame.new(origin - Vector3.new(0, 500, 0)), size = Vector3.new(INF, 10, INF) })
+				)
+				local with = timeQueries()
+
+				-- An infinite size once put every zone in the same Morton cell, about six times slower
+				local ratio = with / without
+				Expect(if ratio < 3 then 'about as fast' else string.format('%.1f times slower', ratio)).is(
+					'about as fast'
+				)
 			end)
 		end)
 	end)
