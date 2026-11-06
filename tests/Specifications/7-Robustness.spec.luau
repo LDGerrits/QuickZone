@@ -2,6 +2,8 @@
 -- Misuse and odd timing that a game hits sooner or later: callbacks that destroy what fired them, zones that go
 -- away together, values of the wrong type, iterators whose tables change under them, entities that are also
 -- references, players whose parts are swapped, and a check of every shape against the engine's own geometry
+local CollectionService = game:GetService('CollectionService')
+local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local ServerScriptService = game:GetService('ServerScriptService')
 
@@ -61,6 +63,8 @@ return function(Tiniest: Tiniest)
 	local Describe = Tiniest.describe
 	local Test = Tiniest.test
 	local Expect = Tiniest.expect
+
+	local player = Players:GetPlayers()[1] or Players.PlayerAdded:Wait()
 
 	Describe('Callbacks that change what fired them', function()
 		Test(
@@ -1146,6 +1150,76 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Entities that are also references', function()
+		Test("An entity that is another entity's reference is found and removed as itself.", function()
+			withCleanup(function(track)
+				local position = Vector3.new(-45000, 0, 41000)
+				local npc = { Position = position }
+				local hitbox = { Position = position }
+				local zone = track(Zone.new(cube(position)))
+				local npcs = track(Group.new({ entities = { npc }, autoClean = false }))
+				local hitboxes = track(Group.new({ entities = { hitbox }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { npcs } }))
+				QuickZone:setReference(hitbox, npc)
+				QuickZone:update(1)
+
+				local groupsOfNpc = QuickZone:getGroupsOfEntity(npc)
+				local iterated = {}
+				for group in QuickZone:iterGroupsOfEntity(npc) do
+					table.insert(iterated, group)
+				end
+
+				Expect(npcs:contains(npc)).is_true()
+				Expect(hitboxes:contains(npc)).is(false)
+				Expect(#groupsOfNpc == 1 and groupsOfNpc[1] == npcs).is_true()
+				Expect(#iterated == 1 and iterated[1] == npcs).is_true()
+				Expect(observer:getZoneOfEntity(npc)).is(zone)
+				Expect(QuickZone:getZonesOfEntity(npc)[1]).is(zone)
+				Expect(QuickZone:iterZonesOfEntity(npc)()).is(zone)
+				-- The reference map itself still leads from the reference to its entity
+				Expect(QuickZone:getEntityOfReference(npc)).is(hitbox)
+
+				QuickZone:removeEntity(npc)
+				Expect(#npcs:getEntities()).is(0)
+				Expect(#hitboxes:getEntities()).is(1)
+				Expect(hitboxes:getEntities()[1]).is(npc)
+			end)
+		end)
+
+		Test(
+			"A tag group adds the tagged instance itself, also when it is another entity's reference, and lets it go.",
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-45100, 0, 41000)
+					local npc = track(Util.createPart({ CFrame = CFrame.new(position) }))
+					local hitbox = track(Util.createPart({ CFrame = CFrame.new(position) }))
+					track(Group.new({ entities = { hitbox }, autoClean = false }))
+					QuickZone:setReference(hitbox, npc)
+					local tag = `QuickZoneRobustness{math.random(1e9)}`
+					local tagged = track(Group.fromTag(tag))
+
+					CollectionService:AddTag(npc, tag)
+					task.wait()
+					local added = tagged:contains(npc) and not tagged:contains(hitbox)
+					CollectionService:RemoveTag(npc, tag)
+					task.wait()
+
+					Expect(added).is_true()
+					Expect(#tagged:getEntities()).is(0)
+				end)
+			end
+		)
+
+		Test('Adding nil to a group reports it and adds nothing.', function()
+			withCleanup(function(track)
+				local group = track(Group.new())
+				Expect(pcall(group.add, group, nil)).is_true()
+				Expect(pcall(group.addBulk, group, { nil, nil })).is_true()
+				Expect(#group:getEntities()).is(0)
+			end)
+		end)
+	end)
+
 	Describe('Zones moving between trees from callbacks', function()
 		Test(
 			'A zone made dynamic and rebuilt from a callback in the middle of a tick is found by later entities.',
@@ -1184,5 +1258,92 @@ return function(Tiniest: Tiniest)
 				end)
 			end
 		)
+	end)
+
+	Describe('Players', function()
+		local function waitForCharacter(): Model
+			local character = player.Character
+			while not (character and character:FindFirstChild('HumanoidRootPart')) do
+				character = player.CharacterAdded:Wait()
+				task.wait()
+			end
+			return character :: Model
+		end
+
+		Test('A HumanoidRootPart replaced by a new one added first keeps the player in its groups.', function()
+			withCleanup(function(track)
+				local character = waitForCharacter()
+				local group = track(Group.new({ entities = { player } }))
+				local old = character:FindFirstChild('HumanoidRootPart') :: BasePart
+				local before = group:contains(player)
+
+				local new = old:Clone()
+				new.Parent = character
+				old:Destroy()
+				task.wait()
+
+				Expect(before).is_true()
+				Expect(group:contains(player)).is_true()
+				Expect(QuickZone:getEntityOfReference(player)).is(new)
+				Expect(group:getEntities()[1]).is(player)
+			end)
+			player:LoadCharacter()
+		end)
+
+		Test('An exit callback adding the player to a group while its part goes leaves that part out.', function()
+			withCleanup(function(track)
+				local character = waitForCharacter()
+				local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart
+				-- Without autoClean, so the player tracker is what takes the part out, not a group seeing it go
+				local first = track(Group.new({ entities = { player }, autoClean = false }))
+				local second = track(Group.new({ autoClean = false }))
+				local zone = track(Zone.new(cube(hrp.Position, 50)))
+				local observer = track(Observer.new({ zones = { zone }, groups = { first }, safety = false }))
+				QuickZone:update(1)
+				local wasInside = observer:getZoneOfPlayer(player) == zone
+				observer:onExit(function(reference)
+					if reference == player then
+						second:add(player)
+					end
+				end)
+
+				hrp.Parent = nil
+				task.wait()
+				local secondWhileGone = #second:getEntities()
+				local groupsOfOld = #QuickZone:getGroupsOfEntity(hrp)
+
+				player:LoadCharacter()
+				waitForCharacter()
+				task.wait()
+
+				Expect(wasInside).is_true()
+				Expect(secondWhileGone).is(0)
+				Expect(groupsOfOld).is(0)
+				Expect(second:contains(player)).is_true()
+				Expect(first:contains(player)).is_true()
+			end)
+		end)
+
+		Test('removeEntity on a player in a managed group warns once and keeps it there.', function()
+			withCleanup(function(track)
+				waitForCharacter()
+				local players = track(Group.players())
+				local manual = track(Group.new({ entities = { player } }))
+				task.wait()
+				local warnings = Util.captureWarnings(function()
+					QuickZone:removeEntity(player)
+				end)
+				local managed = 0
+				for _, message in warnings do
+					if string.find(message, 'Managed Group', 1, true) then
+						managed += 1
+					end
+				end
+
+				Expect(managed).is(1)
+				Expect(players:contains(player)).is_true()
+				Expect(manual:contains(player)).is(false)
+			end)
+		end)
 	end)
 end

@@ -31,23 +31,30 @@ local function trackPlayer(player: Player)
 			hrpConn = nil
 		end
 
-		if currentHrp then
+		local hrp = currentHrp
+		if hrp then
+			-- Let go first, so an exit callback adding the player to a group doesn't add this part
+			currentHrp = nil
+			if State.referenceToEntity[player] == hrp then
+				State.referenceToEntity[player] = nil
+			end
+
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
-				for groupId, group in subscriptions do
+				-- Cloned, as exit callbacks may add the player to groups
+				for groupId, group in table.clone(subscriptions) do
 					if State.groups[groupId] then
-						group:_removeEntity(currentHrp)
+						group:_removeEntity(hrp)
 					else
 						subscriptions[groupId] = nil
 					end
 				end
 			end
 
-			State.entityToReference[currentHrp] = nil
-			if State.referenceToEntity[player] == currentHrp then
-				State.referenceToEntity[player] = nil
+			-- Unless a callback gave the part to the player again
+			if currentHrp ~= hrp then
+				State.entityToReference[hrp] = nil
 			end
-			currentHrp = nil
 		end
 	end
 
@@ -78,23 +85,30 @@ local function trackPlayer(player: Player)
 			State.entityToReference[hrp] = player
 			State.referenceToEntity[player] = hrp
 
+			-- Listen for the HRP streaming out or getting destroyed, also by its character leaving
+			hrpConn = hrp.AncestryChanged:Connect(function()
+				if not hrp:IsDescendantOf(game) then
+					clearHrp(hrp)
+					-- A new HRP may have been added before this one went
+					if currentCharacter and currentCharacter:IsDescendantOf(game) then
+						checkHrp(currentCharacter)
+					end
+				end
+			end)
+
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
-				for groupId, group in subscriptions do
-					if State.groups[groupId] then
-						group:_add(hrp)
+				-- Cloned, as enter callbacks may add the player to groups, which adds the part themselves
+				for groupId, group in table.clone(subscriptions) do
+					if currentHrp ~= hrp then
+						break
+					elseif State.groups[groupId] then
+						group:_addEntity(hrp)
 					else
 						subscriptions[groupId] = nil
 					end
 				end
 			end
-
-			-- Listen for the HRP streaming out or getting destroyed, also by its character leaving
-			hrpConn = hrp.AncestryChanged:Connect(function()
-				if not hrp:IsDescendantOf(game) then
-					clearHrp(hrp)
-				end
-			end)
 		end
 	end
 
@@ -137,6 +151,11 @@ local function trackPlayer(player: Player)
 end
 
 function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
+	-- A player that already left would never be let go, as its PlayerRemoving has fired
+	if player.Parent ~= Players then
+		return
+	end
+
 	if not playerSubscriptions[player] then
 		playerSubscriptions[player] = {}
 	end
@@ -146,7 +165,7 @@ function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
 
 	local currentHrp = State.referenceToEntity[player]
 	if currentHrp then
-		group:_add(currentHrp)
+		group:_addEntity(currentHrp)
 	end
 end
 

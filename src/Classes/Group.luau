@@ -17,6 +17,7 @@ local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
+local References = require(script.Parent.Parent.Core.References)
 local State = require(script.Parent.Parent.Core.State)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
@@ -112,7 +113,7 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 
 	local function checkAncestry(instance: BasePart | Model | Attachment | Bone | Camera)
 		if instance:IsDescendantOf(workspace) then
-			group:_add(instance)
+			group:_addEntity(instance)
 		else
 			group:_removeEntity(instance)
 		end
@@ -391,7 +392,7 @@ end
 	@return boolean
 ]=]
 function Group.contains(self: Types.InternalGroup, entity: any): boolean
-	entity = State.referenceToEntity[entity] or entity
+	entity = References.entityOf(entity)
 	local groups = State.entityToGroups[entity]
 	return groups and groups[self.id] == true or false
 end
@@ -525,7 +526,18 @@ function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 		return self
 	end
 
-	local entity: Types.Entity = State.referenceToEntity[reference] or reference
+	return self:_addEntity(References.entityOf(reference))
+end
+
+-- Adds the entity as given, never through the reference map. For internal callers that hold the instance
+function Group._addEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+	if self.destroyed then
+		return self
+	end
+	if entity == nil then
+		Log.nonFatal('Cannot add nil to Group %d.', nil, self.id)
+		return self
+	end
 
 	if not State.entityToGroups[entity] then
 		State.entityToGroups[entity] = {}
