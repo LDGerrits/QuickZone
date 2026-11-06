@@ -593,8 +593,8 @@ function Observer.attach(self: Types.InternalObserver, zone: any)
 end
 
 --[=[ 
-	Detaches the Observer from the zone. The observer will begin 
-	monitoring this area for entity overlaps.
+	Detaches the Observer from the zone. Its entities in the zone leave on the next update,
+	or move to another of its zones that holds them.
 
 	@tag Chainable
 	@method detach
@@ -1139,7 +1139,6 @@ end
 
 --[=[ 
 	Specialized event for Player entities transitioning between overlapping zones.
-	If `targetPlayer` is provided, the event will only fire for that specific player.
 	
 	@tag Event
 	@method onPlayerTransition
@@ -1380,7 +1379,7 @@ function Observer.getUpdateRate(self: Types.InternalObserver): number
 end
 
 --[=[ 
-	Updates the precision for this observer.
+	Returns the precision of this observer, in studs.
 
 	@method getPrecision
 	@within Observer

@@ -340,7 +340,7 @@ end
 
 	@method getReferenceOfEntity
 	@within QuickZone
-	@param reference any
+	@param entity Entity
 	@return any
 ]=]
 function QuickZone:getReferenceOfEntity(entity: any): any
