@@ -22,9 +22,9 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 
 	local self: Types.InternalZones = setmetatable({
 		-- Auto-synced zones are always dynamic
-		dynamic = isDynamic or autoSync,
+		dynamic = not not (isDynamic or autoSync),
 		metadata = metadata,
-		autoSync = autoSync,
+		autoSync = not not autoSync,
 		zones = {} :: { [Types.Zone]: boolean },
 		observers = {} :: { [Types.Observer<any>]: boolean },
 		onDestroyObserverCleanups = {} :: { [Types.Observer<any>]: () -> () },
@@ -89,7 +89,8 @@ function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 end
 
 --[=[ 
-	Forces all dynamic underlying zones to recalculate their spatial geometry.
+	Syncs every underlying zone to its part, as `Zone:sync` does. Static zones force a rebuild of the
+	static tree, so prefer dynamic zones for parts that move often.
 
 	@tag Chainable
 	@method sync
@@ -97,11 +98,10 @@ end
 	@return Zones
 ]=]
 function Zones.sync(self: Types.InternalZones): Types.Zones
-	if not self.dynamic then
-		return self
-	end
 	for zone, _ in self.zones do
-		zone:sync()
+		if zone:getReference() then
+			zone:sync()
+		end
 	end
 	return self
 end
@@ -161,6 +161,7 @@ end
 ]=]
 function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
 	-- Applied to every zone even when unchanged, as single zones may have been changed directly
+	autoSync = not not autoSync
 	self.autoSync = autoSync
 	if autoSync then
 		self.dynamic = true
@@ -189,6 +190,7 @@ end
 function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
 	-- Applied to every zone even when unchanged, as single zones may have been changed directly. Static
 	-- zones stop auto-syncing, as each zone does
+	isDynamic = not not isDynamic
 	self.dynamic = isDynamic
 	if not isDynamic then
 		self.autoSync = false

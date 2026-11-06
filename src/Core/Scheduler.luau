@@ -593,8 +593,8 @@ function Scheduler.update(dt: number)
 		return
 	end
 
-	-- A NaN or negative time step would stop auto-syncing for good
-	if not (dt >= 0) then
+	-- A missing, NaN or negative time step would stop auto-syncing for good
+	if type(dt) ~= 'number' or not (dt >= 0) then
 		dt = 0
 	end
 
@@ -623,19 +623,25 @@ function Scheduler.setEnabled(enabled: boolean)
 	end
 end
 
+function Scheduler.checkAutoSyncRate(hz: any)
+	if type(hz) ~= 'number' or hz ~= hz then
+		Log.fatal('autoSyncRate must be a number, got %s. Use 0 to stop auto-syncing.', nil, tostring(hz))
+	end
+end
+
 function Scheduler.setAutoSyncRate(hz: number)
-	if not (hz > 0) then
-		autoSyncRate = 0
-	else
-		autoSyncRate = hz
+	Scheduler.checkAutoSyncRate(hz)
+	autoSyncRate = if hz > 0 then hz else 0
+end
+
+function Scheduler.checkFrameBudget(n: any)
+	if type(n) ~= 'number' or not (n > 0) then
+		Log.fatal('frameBudget must be greater than 0.', nil)
 	end
 end
 
 function Scheduler.setFrameBudget(n: number)
-	if not (n > 0) then
-		Log.fatal('frameBudget must be greater than 0.', nil)
-	end
-
+	Scheduler.checkFrameBudget(n)
 	frameBudget = n
 end
 

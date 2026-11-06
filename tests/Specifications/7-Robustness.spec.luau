@@ -18,6 +18,7 @@ local Observer = QuickZone.Observer
 
 type Tiniest = typeof(require(TiniestFolder.tiniest_for_roblox).configure({}))
 
+local NAN = 0 / 0
 local INF = math.huge
 local AWAY = Vector3.new(0, 5000, 0)
 
@@ -429,6 +430,109 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Values of the wrong type', function()
+		Test('Zone setters refuse wrong types and leave the zone as it was, so later changes still apply.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-43000, 0, 41000)
+				local zone =
+					track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10, isDynamic = true }))
+				local refused = {}
+				for _, case in
+					{
+						{ 'setCFrame', nil },
+						{ 'setCFrame', position },
+						{ 'setSize', 10 },
+						{ 'setSize', nil },
+						{ 'setPosition', CFrame.new() },
+						{ 'setReference', 'Part' },
+					}
+				do
+					local method = case[1]
+					if not pcall((zone :: any)[method], zone, case[2]) then
+						table.insert(refused, method)
+					end
+				end
+
+				local unchanged = zone:getCFrame() == CFrame.new(position)
+					and zone:getSize() == Vector3.one * 10
+					and zone:getReference() == nil
+				local moved = position + Vector3.new(100, 0, 0)
+				zone:setCFrame(CFrame.new(moved))
+				zone:setSize(Vector3.one * 4)
+				QuickZone:rebuild()
+
+				Expect(table.concat(refused, ', ')).is(
+					'setCFrame, setCFrame, setSize, setSize, setPosition, setReference'
+				)
+				Expect(unchanged).is_true()
+				Expect(zone:isPointInside(moved + Vector3.new(1.9, 0, 0))).is_true()
+				Expect(zone:isPointInside(moved + Vector3.new(2.1, 0, 0))).is(false)
+				Expect(table.find(QuickZone:getZonesAtPoint(moved), zone) ~= nil).is_true()
+			end)
+		end)
+
+		Test('Zone constructors refuse bad input before taking a slot.', function()
+			withCleanup(function()
+				local position = Vector3.new(-43100, 0, 41000)
+				local function used(): number
+					return State.zoneSlotCount - #State.freeZoneSlots
+				end
+				local before = used()
+				local zoneCount = #QuickZone:getZones()
+
+				local refusals = {
+					refuses(
+						'reference',
+						Zone.new,
+						{ cframe = CFrame.new(position), size = Vector3.one, reference = 'Part' }
+					),
+					refuses(
+						'Observer',
+						Zone.new,
+						{ cframe = CFrame.new(position), size = Vector3.one, observers = { 5 } }
+					),
+					refuses('config', Zone.new, nil),
+					refuses('BasePart', Zone.fromPart, nil),
+					refuses('BasePart', Zone.fromPart, Instance.new('Folder')),
+					refuses('Observer', Zone.fromParts, {}, { observers = { 'observer' } }),
+				}
+
+				Expect(table.find(refusals, false)).is(nil)
+				Expect(used()).is(before)
+				Expect(#QuickZone:getZones()).is(zoneCount)
+			end)
+		end)
+
+		Test('Flags given as non-booleans count as true or false, and keep the observers working.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-43200, 0, 41000)
+				local entity = { Position = position }
+				local static = track(Zone.new(cube(position + AWAY)))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { static }, groups = { group } }))
+
+				-- Left static, so the observer's zone counts stay right and it finds the dynamic zone below
+				static:setDynamic(nil :: any)
+				local dynamic =
+					track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10, isDynamic = true }))
+				observer:attach(dynamic)
+				QuickZone:update(1)
+				local entered = #observer:getEntitiesInside()
+
+				static:setDynamic(1 :: any)
+				local truthy = static:isDynamic()
+
+				observer:setEnabled(nil :: any)
+				QuickZone:update(1)
+				local disabled = not observer:isEnabled() and #observer:getEntitiesInside() == 0
+				observer:setSafety(nil :: any)
+
+				Expect(static:isDynamic() == truthy and truthy).is(true)
+				Expect(entered).is(1)
+				Expect(disabled).is_true()
+				Expect(observer:isSafe()).is(false)
+			end)
+		end)
+
 		Test('Every callback method refuses what is not a function when it is connected.', function()
 			withCleanup(function(track)
 				local observer = track(Observer.new({ zones = {}, groups = {} }))
@@ -457,6 +561,56 @@ return function(Tiniest: Tiniest)
 				Expect(table.concat(accepted, ', ')).is('')
 			end)
 		end)
+
+		Test('attach and detach take only a Zone or Zones, and refuse an Observer or Group.', function()
+			withCleanup(function(track)
+				local observer = track(Observer.new({ zones = {}, groups = {} }))
+				local other = track(Observer.new({ zones = {}, groups = {} }))
+				local group = track(Group.new())
+
+				Expect(refuses('Zone', observer.attach, observer, other)).is_true()
+				Expect(refuses('Zone', observer.detach, observer, other)).is_true()
+				Expect(refuses('Zone', observer.attach, observer, group)).is_true()
+				Expect(refuses('Zone', observer.attach, observer, {})).is_true()
+				Expect(refuses('Zone', observer.getEntitiesInZone, observer, other)).is_true()
+				Expect(#observer:getZones()).is(0)
+				Expect(#other:getZones()).is(0)
+			end)
+		end)
+
+		Test(
+			'Detaching a destroyed zone and unsubscribing a destroyed group do nothing, also from callbacks.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-43300, 0, 41000)
+					local entity = { Position = position }
+					local zone = track(Zone.new(cube(position)))
+					local zones = track(Zone.fromParts({ track(Util.createPart({ CFrame = CFrame.new(position) })) }))
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer =
+						track(Observer.new({ zones = { zone, zones }, groups = { group }, safety = false }))
+					QuickZone:update(1)
+
+					-- The entity moves to the zone of zones, then the group's destroy exits it
+					local fromCallback = {}
+					observer:onExit(function()
+						table.insert(fromCallback, (pcall(observer.unsubscribe, observer, group)))
+						table.insert(fromCallback, (pcall(observer.detach, observer, zone)))
+					end)
+					zone:destroy()
+					group:destroy()
+					zones:destroy()
+
+					Expect(pcall(observer.detach, observer, zone)).is_true()
+					Expect(pcall(observer.detach, observer, zones)).is_true()
+					Expect(pcall(observer.unsubscribe, observer, group)).is_true()
+					Expect(#fromCallback).is(2)
+					Expect(table.find(fromCallback, false)).is(nil)
+					-- Subscribing a destroyed group is still a mistake
+					Expect(refuses('destroyed', observer.subscribe, observer, group)).is_true()
+				end)
+			end
+		)
 
 		Test(
 			'A zone with an infinite size, like a kill plane, is found by queries and observers everywhere on it.',
@@ -532,6 +686,89 @@ return function(Tiniest: Tiniest)
 				Expect(if ratio < 3 then 'about as fast' else string.format('%.1f times slower', ratio)).is(
 					'about as fast'
 				)
+			end)
+		end)
+
+		Test(
+			'Global settings refuse bad values without applying the others, and update takes a missing step.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-43500, 0, 41000)
+					local entity = { Position = position + AWAY }
+					local zone = track(Zone.new(cube(position)))
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+
+					local refusals = {
+						refuses('autoSyncRate', QuickZone.setAutoSyncRate, QuickZone, NAN),
+						refuses('autoSyncRate', QuickZone.setAutoSyncRate, QuickZone, 'fast'),
+						refuses('frameBudget', QuickZone.setFrameBudget, QuickZone, 'fast'),
+						refuses('frameBudget', QuickZone.setFrameBudget, QuickZone, 0),
+						refuses('frameBudget', QuickZone.configure, QuickZone, { enabled = false, frameBudget = -1 }),
+						refuses(
+							'autoSyncRate',
+							QuickZone.configure,
+							QuickZone,
+							{ enabled = false, autoSyncRate = NAN }
+						),
+					}
+					-- Off rather than refused, as 0 is
+					QuickZone:setAutoSyncRate(-1)
+					QuickZone:setAutoSyncRate(30)
+					local missingStep = pcall(QuickZone.update, QuickZone, nil)
+
+					-- Still enabled, so it updates by itself
+					entity.Position = position
+					local waited = 0
+					while #observer:getEntitiesInside() == 0 and waited < 1 do
+						waited += task.wait()
+					end
+
+					Expect(table.find(refusals, false)).is(nil)
+					Expect(missingStep).is_true()
+					Expect(#observer:getEntitiesInside()).is(1)
+				end)
+			end
+		)
+
+		Test('Zones:sync follows the parts also when the zones are static.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-43600, 0, 41000)
+				local part = track(Util.createPart({ CFrame = CFrame.new(position), Size = Vector3.one * 10 }))
+				local zones = track(Zone.fromParts({ part }))
+				local moved = position + Vector3.new(0, 100, 0)
+				part.CFrame = CFrame.new(moved)
+				zones:sync()
+
+				Expect(zones:isDynamic()).is(false)
+				Expect(zones:isPointInside(moved)).is_true()
+				Expect(zones:isPointInside(position)).is(false)
+			end)
+		end)
+
+		Test('The observers option of the zone constructors attaches them.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-43700, 0, 41000)
+				local entity = { Position = position }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = {}, groups = { group } }))
+				local zone = track(
+					Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10, observers = { observer } })
+				)
+				local part = track(Util.createPart({ CFrame = CFrame.new(position + AWAY) }))
+				local fromPart = track(Zone.fromPart(part, { observers = { observer } }))
+				local zones =
+					track(Zone.fromParts({ track(Util.createPart({ CFrame = CFrame.new(position - AWAY) })) }, {
+						observers = { observer },
+					}))
+				QuickZone:update(1)
+
+				local attached = setmetatable({}, { __mode = 'k' })
+				for _, attachedZone in observer:getZones() do
+					attached[attachedZone] = true
+				end
+				Expect(attached[zone] and attached[fromPart] and attached[zones:getZones()[1]]).is(true)
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
 			end)
 		end)
 	end)

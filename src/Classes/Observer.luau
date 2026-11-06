@@ -17,6 +17,8 @@ local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Zone = require(script.Parent.Zone)
+local Zones = require(script.Parent.Zones)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 
 local leavesAtPoint = ZoneShapes.leavesAtPoint
@@ -334,8 +336,13 @@ local function checkCallback(callback: any)
 end
 
 -- A Zone or Zones. Destroyed ones lose their methods
+local function isZone(zone: any): boolean
+	local class = getmetatable(zone)
+	return type(zone) == 'table' and (class == Zone or class == Zones)
+end
+
 local function checkZone(zone: any)
-	if type(zone) ~= 'table' or type(zone.attach) ~= 'function' then
+	if not isZone(zone) then
 		Log.fatal('Expected a live Zone or Zones, got %s.', nil, tostring(zone))
 	end
 end
@@ -343,18 +350,16 @@ end
 -- The ids of a Zone, or of every zone in a Zones. A destroyed one has none
 local function zoneIdsOf(zone: any): { [number]: true }
 	local ids = {}
-	if type(zone) ~= 'table' then
-		Log.fatal('Expected a Zone or Zones, got %s.', nil, tostring(zone))
-	elseif zone.destroyed then
+	if type(zone) == 'table' and zone.destroyed then
 		return ids
-	elseif type(zone.getZones) == 'function' then
+	end
+	checkZone(zone)
+	if getmetatable(zone) == Zones then
 		for _, inner in zone:getZones() do
 			ids[inner:getId()] = true
 		end
-	elseif type(zone.getId) == 'function' then
-		ids[zone:getId()] = true
 	else
-		Log.fatal('Expected a Zone or Zones, got %s.', nil, tostring(zone))
+		ids[zone:getId()] = true
 	end
 	return ids
 end
@@ -434,8 +439,8 @@ function Observer.new<T>(config: {
 	State.observerTransitionedCallbacks[id] = {}
 	State.observerTrackingEntities[id] = {}
 	State.observerIdToObserverObj[id] = self
-	State.observerEnabled[id] = if config and config.enabled ~= nil then config.enabled else true
-	State.observerSafety[id] = if config and config.safety ~= nil then config.safety else Config.Observer.safety
+	State.observerEnabled[id] = if config and config.enabled ~= nil then not not config.enabled else true
+	State.observerSafety[id] = if config and config.safety ~= nil then not not config.safety else Config.Observer.safety
 	State.observerStaticCount[id] = 0
 	State.observerDynamicCount[id] = 0
 
@@ -538,6 +543,10 @@ end
 	@return Observer
 ]=]
 function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
+	-- Destroying a group already unsubscribed it
+	if type(group) == 'table' and group.destroyed then
+		return self
+	end
 	checkGroup(group)
 	local groupId = group.id
 
@@ -592,6 +601,11 @@ end
 	@return Observer
 ]=]
 function Observer.detach(self: Types.InternalObserver, zone: any)
+	-- Destroying a zone already detached it
+	if type(zone) == 'table' and zone.destroyed then
+		return self
+	end
+	checkZone(zone)
 	zone:detach(self)
 	return self
 end
@@ -1182,6 +1196,7 @@ end
 	@return Observer
 ]=]
 function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Types.Observer
+	enabled = not not enabled
 	local wasEnabled = self:isEnabled()
 
 	if wasEnabled == enabled then
@@ -1227,7 +1242,7 @@ end
 	@return Observer
 ]=]
 function Observer.setSafety(self: Types.InternalObserver, enabled: boolean): Types.Observer
-	State.observerSafety[self.id] = enabled
+	State.observerSafety[self.id] = not not enabled
 	return self
 end
 

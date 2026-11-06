@@ -14,6 +14,7 @@ local PlayerTracker = require(script.Core.PlayerTracker)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
 local ZoneShapes = require(script.Core.ZoneShapes)
+local Log = require(script.Utils.Log)
 
 local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
@@ -79,6 +80,18 @@ local QuickZone = {
 	@return QuickZone
 ]=]
 function QuickZone:configure(config: { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }): QuickZone
+	if type(config) ~= 'table' then
+		Log.fatal('configure expects a config table, got %s.', nil, typeof(config))
+	end
+	-- Checked first, so a bad value doesn't leave the settings before it applied
+	if config.autoSyncRate ~= nil then
+		Scheduler.checkAutoSyncRate(config.autoSyncRate)
+	end
+	if config.frameBudget ~= nil then
+		local ms = config.frameBudget
+		Scheduler.checkFrameBudget(if type(ms) == 'number' then ms / 1000 else ms)
+	end
+
 	if config.enabled ~= nil then
 		self:setEnabled(config.enabled)
 	end
@@ -104,7 +117,7 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:setEnabled(enabled: boolean): QuickZone
-	Scheduler.setEnabled(enabled)
+	Scheduler.setEnabled(not not enabled)
 	return self
 end
 
@@ -228,8 +241,7 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:setFrameBudget(ms: number): QuickZone
-	local s = ms / 1000
-	Scheduler.setFrameBudget(s)
+	Scheduler.setFrameBudget(if type(ms) == 'number' then ms / 1000 else ms)
 	return self
 end
 
