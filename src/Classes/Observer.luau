@@ -17,6 +17,7 @@ local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 local Zone = require(script.Parent.Zone)
 local Zones = require(script.Parent.Zones)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
@@ -1548,21 +1549,21 @@ function Observer.getPlayersInZone(self: Types.InternalObserver, zone: Types.Zon
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all Zones currently attached to this observer.
+	Returns an iterator for all Zones currently attached to this observer.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterZones
 	@within Observer
 	@return () -> Zone?
 ]=]
 function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
-	local slot: number?
-	local attachedList: { number }
+	local nextSlot = Snapshot.keys(zoneAttachedObservers)
 	local observerId = self.id
 
 	return function(): Types.Zone?
 		while true do
-			slot, attachedList = next(zoneAttachedObservers, slot)
-
+			local slot, attachedList = nextSlot()
 			if not slot then
 				return nil
 			end
@@ -1571,7 +1572,7 @@ function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
 				continue
 			end
 
-			local zone = State.zoneSlotToZoneObj[slot :: number]
+			local zone = State.zoneSlotToZoneObj[slot]
 			if zone then
 				return zone
 			end
@@ -1580,30 +1581,30 @@ function Observer.iterZones(self: Types.InternalObserver): () -> Types.Zone?
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all Groups currently monitored by this observer.
+	Returns an iterator for all Groups currently monitored by this observer.
+	Safe to use while groups are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterGroups
 	@within Observer
 	@return () -> Group?
 ]=]
 function Observer.iterGroups(self: Types.InternalObserver): () -> Types.Group?
-	local groupId: number?
-	local observersMap: { [number]: boolean }
+	local nextGroupId = Snapshot.keys(State.groupToObservers)
 	local observerId = self.id
 
 	return function(): Types.Group?
 		while true do
-			groupId, observersMap = next(State.groupToObservers, groupId)
-
+			local groupId, observersMap = nextGroupId()
 			if not groupId then
 				return nil
 			end
 
-			if not observersMap[observerId] then
+			if not (observersMap :: { [number]: boolean })[observerId] then
 				continue
 			end
 
-			local group = State.groups[groupId :: number]
+			local group = State.groups[groupId]
 			if group then
 				return group
 			end
