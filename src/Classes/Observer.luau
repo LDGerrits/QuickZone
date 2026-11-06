@@ -326,6 +326,13 @@ local function checkGroup(group: any)
 	end
 end
 
+-- Checked when connected, as a tick would only fail on it at the next event
+local function checkCallback(callback: any)
+	if type(callback) ~= 'function' then
+		Log.fatal('Expected a callback function, got %s.', nil, typeof(callback))
+	end
+end
+
 -- A Zone or Zones. Destroyed ones lose their methods
 local function checkZone(zone: any)
 	if type(zone) ~= 'table' or type(zone.attach) ~= 'function' then
@@ -616,6 +623,7 @@ function Observer.observe(
 	self: Types.InternalObserver,
 	callback: (any, Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
+	checkCallback(callback)
 	local cleanups = {} :: { [Types.Entity]: () -> () }
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0
@@ -685,6 +693,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onEnter(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
+	checkCallback(callback)
 	return Callbacks.connect(State.observerEnteredCallbacks, self.id, callback)
 end
 
@@ -698,6 +707,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onExit(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
+	checkCallback(callback)
 	return Callbacks.connect(State.observerExitedCallbacks, self.id, callback)
 end
 
@@ -724,6 +734,7 @@ function Observer.observePlayer(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
+	checkCallback(callback)
 	local cleanups = {} :: { [Types.Entity]: () -> () }
 	local activeIds = {} :: { [Types.Entity]: number }
 	local nextId = 0
@@ -810,6 +821,7 @@ function Observer.onPlayerEnter(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> ()
 ): () -> ()
+	checkCallback(callback)
 	return self:onEnter(function(reference, zone, entity: any)
 		if typeof(reference) == 'Instance' and reference:IsA('Player') then
 			callback(reference, zone, entity)
@@ -831,6 +843,7 @@ function Observer.onPlayerExit(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> ()
 ): () -> ()
+	checkCallback(callback)
 	return self:onExit(function(reference, zone, entity: any)
 		if typeof(reference) == 'Instance' and reference:IsA('Player') then
 			callback(reference, zone, entity)
@@ -860,6 +873,7 @@ function Observer.observeLocalPlayer(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
+	checkCallback(callback)
 	if not IS_CLIENT then
 		Log.fatal('Observer:observeLocalPlayer can only be called on the Client.', nil)
 	end
@@ -947,6 +961,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onLocalPlayerEnter(self: Types.InternalObserver, callback: (Types.Zone, Types.Entity) -> ()): () -> ()
+	checkCallback(callback)
 	if not IS_CLIENT then
 		Log.fatal('Observer:onLocalPlayerEnter can only be called on the Client.', nil)
 	end
@@ -970,6 +985,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onLocalPlayerExit(self: Types.InternalObserver, callback: (Types.Zone, Types.Entity) -> ()): () -> ()
+	checkCallback(callback)
 	if not IS_CLIENT then
 		Log.fatal('Observer:onLocalPlayerExit can only be called on the Client.', nil)
 	end
@@ -1004,6 +1020,7 @@ function Observer.observeGroup(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
+	checkCallback(callback)
 	local observerId = self.id
 	local cleanups = {} :: { [number]: () -> () }
 	-- Bumped each time a group arrives or leaves, so a cleanup returned after its group left still runs
@@ -1061,6 +1078,7 @@ function Observer.onGroupEnter(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> ()
 ): () -> ()
+	checkCallback(callback)
 	local observerId = self.id
 	return trackGroups(self, function(_, group, zone, entity)
 		Callbacks.call(callback, State.observerSafety[observerId] ~= false, group, zone, entity)
@@ -1081,6 +1099,7 @@ function Observer.onGroupExit(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> ()
 ): () -> ()
+	checkCallback(callback)
 	local observerId = self.id
 	return trackGroups(self, function() end, function(_, group, zone, entity)
 		Callbacks.call(callback, State.observerSafety[observerId] ~= false, group, zone, entity)
@@ -1098,6 +1117,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onTransition(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
+	checkCallback(callback)
 	return Callbacks.connect(State.observerTransitionedCallbacks, self.id, callback)
 end
 
@@ -1115,6 +1135,7 @@ function Observer.onPlayerTransition(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> ()
 ): () -> ()
+	checkCallback(callback)
 	return self:onTransition(function(reference, newZone, entity: any)
 		local player = State.entityToReference[reference] or reference
 		if typeof(player) == 'Instance' and player:IsA('Player') then
@@ -1137,6 +1158,7 @@ function Observer.onLocalPlayerTransition(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Entity) -> ()
 ): () -> ()
+	checkCallback(callback)
 	if not IS_CLIENT then
 		Log.fatal('Observer:onLocalPlayerTransition can only be called on the Client.', nil)
 	end
@@ -1648,6 +1670,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onDestroy(self: Types.InternalObserver, callback: () -> ()): () -> ()
+	checkCallback(callback)
 	if not self.onDestroyCallbacks then
 		self.onDestroyCallbacks = {}
 	end
