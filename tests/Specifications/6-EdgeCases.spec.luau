@@ -3,7 +3,6 @@
 -- extreme scales, odd entities, starved ticks, callbacks that yield or disconnect each other, containers, group
 -- events, bad input and players
 local CollectionService = game:GetService('CollectionService')
-local LogService = game:GetService('LogService')
 local Players = game:GetService('Players')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local ServerScriptService = game:GetService('ServerScriptService')
@@ -986,15 +985,9 @@ return function(Tiniest: Tiniest)
 					zones:destroy()
 				end)
 				observer:attach(zones)
-				local errors = {}
-				local connection = LogService.MessageOut:Connect(function(message, kind)
-					if kind == Enum.MessageType.MessageError then
-						table.insert(errors, message)
-					end
+				local errors = Util.captureErrors(function()
+					observer:destroy()
 				end)
-				observer:destroy()
-				task.wait()
-				connection:Disconnect()
 
 				Expect(fired).is(false)
 				Expect(table.concat(errors, '\n')).is('')

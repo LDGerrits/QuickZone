@@ -1572,6 +1572,71 @@ return function(Tiniest: Tiniest)
 		)
 	end)
 
+	Describe('Objects being destroyed take on nothing new', function()
+		Test('A Zones that an exit callback attaches to during its destroy keeps no hook on the observer.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-48200, 0, 41000)
+				local part = track(Util.createPart({ Position = position, Size = Vector3.one * 10 }))
+				local zones = track(Zone.fromParts({ part }))
+				local entity = { Position = position }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local watcher = track(Observer.new({ zones = { zones }, groups = { group } }))
+				local latecomer = track(Observer.new({}))
+				QuickZone:update(1)
+				watcher:onExit(function()
+					latecomer:attach(zones)
+				end)
+
+				local errors = Util.captureErrors(function()
+					zones:destroy()
+					latecomer:destroy()
+				end)
+
+				Expect(table.concat(errors, '\n')).is('')
+			end)
+		end)
+
+		Test('An observer attaching to a Zones from its own onDestroy is not kept by the Zones.', function()
+			withCleanup(function(track)
+				local part = track(Util.createPart({ Position = Vector3.new(-48300, 0, 41000) }))
+				local zones = track(Zone.fromParts({ part }))
+				local observer = track(Observer.new({}))
+				observer:onDestroy(function()
+					observer:attach(zones)
+				end)
+
+				local errors = Util.captureErrors(function()
+					observer:destroy()
+					zones:getZones()[1]:destroy()
+				end)
+
+				Expect(table.concat(errors, '\n')).is('')
+			end)
+		end)
+
+		Test('An observer subscribing a group from its own onDestroy does not see the group enter.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-48400, 0, 41000)
+				local entity = { Position = position }
+				local first = track(Group.new({ entities = { entity }, autoClean = false }))
+				local second = track(Group.new({ entities = { entity }, autoClean = false }))
+				local zone = track(Zone.new(cube(position)))
+				local observer = track(Observer.new({ zones = { zone }, groups = { first } }))
+				local entered = {}
+				observer:onGroupEnter(function(group)
+					table.insert(entered, if group == first then 'first' else 'second')
+				end)
+				QuickZone:update(1)
+				observer:onDestroy(function()
+					observer:subscribe(second)
+				end)
+				observer:destroy()
+
+				Expect(table.concat(entered, ', ')).is('first')
+			end)
+		end)
+	end)
+
 	Describe('Players', function()
 		local function waitForCharacter(): Model
 			local character = player.Character

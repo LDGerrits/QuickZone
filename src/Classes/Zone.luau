@@ -99,6 +99,12 @@ local function resolveShape(zoneId: number, shapeType: number, part: BasePart?):
 	return shapeType, part
 end
 
+-- Sets the shape asked for. It is kept, so a Mesh zone that fell back to Block is Mesh again once it has a part
+local function applyShape(zone: Types.InternalZone, shapeType: number)
+	zone.requestedShapeType = shapeType
+	ZoneShapes.setShape(zone.slot, resolveShape(zone.id, shapeType, asQueryablePart(zone.reference)))
+end
+
 local function clearAutoSync(zone: Types.InternalZone)
 	State.autoSyncZones[zone.slot] = nil
 	if zone.syncConnections then
@@ -143,7 +149,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		table.insert(
 			connections,
 			reference:GetPropertyChangedSignal('Shape'):Connect(function()
-				ZoneShapes.setShape(zone.slot, resolveShape(zone.id, reference.Shape.Value, reference))
+				applyShape(zone, reference.Shape.Value)
 			end)
 		)
 	end
@@ -283,6 +289,7 @@ local function newZoneInternal(
 		id = id,
 		phase = 'alive',
 		slot = slot,
+		requestedShapeType = shapeType,
 		reference = reference,
 		metadata = metadata,
 		autoSync = false,
@@ -691,10 +698,10 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 	checkReference(reference)
 	self.reference = reference
 
-	if shapeTypes[self.slot] == MESH_SHAPE_VALUE then
+	if self.requestedShapeType == MESH_SHAPE_VALUE then
 		-- Mesh zones query the part directly, so the new reference has to take over.
 		-- Without a queryable part the zone falls back to its bounding box.
-		ZoneShapes.setShape(self.slot, resolveShape(self.id, MESH_SHAPE_VALUE, asQueryablePart(reference)))
+		applyShape(self, MESH_SHAPE_VALUE)
 	end
 
 	if self.autoSync then
@@ -731,7 +738,8 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 	end
 
 	if reference:IsA('BasePart') then
-		local shapeType, part = resolveShape(self.id, getShapeEnumValue(reference), reference)
+		self.requestedShapeType = getShapeEnumValue(reference)
+		local shapeType, part = resolveShape(self.id, self.requestedShapeType, reference)
 		ZoneShapes.set(self.slot, reference.CFrame, reference.ExtentsSize * 0.5, shapeType, part)
 	elseif reference:IsA('Attachment') or reference:IsA('Bone') then
 		ZoneShapes.setCFrame(self.slot, reference.WorldCFrame)
@@ -847,7 +855,7 @@ end
 	@return Zone
 ]=]
 function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.Zone
-	ZoneShapes.setShape(self.slot, resolveShape(self.id, shapeValueOf(shape), asQueryablePart(self.reference)))
+	applyShape(self, shapeValueOf(shape))
 	return self
 end
 
