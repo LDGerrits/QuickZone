@@ -23,6 +23,8 @@ local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
 local zoneOccupants = State.zoneOccupants
 local zoneSlotIds = State.zoneSlotIds
+local staleSlots = State.staleSlots
+local zonesBeingDestroyed = State.zonesBeingDestroyed
 
 local leafHits = {} :: { number }
 
@@ -104,21 +106,32 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	fire(observerExitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observerSafety[observerId])
 end
 
--- Another zone of the observer that held the entity where it was last checked, or nil
+-- Whether the zone in slot is another of the observer's zones, which stays
+local function isOtherZone(slot: number, observerId: number, zoneId: number): boolean
+	local otherId = zoneSlotIds[slot]
+	local attached = zoneAttachedObservers[slot]
+	return otherId ~= nil
+		and otherId ~= zoneId
+		and not zonesBeingDestroyed[otherId]
+		and attached ~= nil
+		and table.find(attached, observerId) ~= nil
+end
+
+-- Another zone of the observer that holds the entity where it was last checked, or nil
 local function otherZoneOf(observerId: number, data: Types.EntityData, zoneId: number): number?
 	local position = data.lastPosition
 	local hitCount = ZoneShapes.leavesAtPoint(position, leafHits)
 	for i = 1, hitCount do
 		local slot = leafHits[i]
-		local otherId = zoneSlotIds[slot]
-		local attached = zoneAttachedObservers[slot]
-		if
-			otherId ~= zoneId
-			and attached
-			and table.find(attached, observerId)
-			and ZoneShapes.leafContainsPoint(slot, position)
-		then
-			return otherId
+		if isOtherZone(slot, observerId, zoneId) and ZoneShapes.leafContainsPoint(slot, position) then
+			return zoneSlotIds[slot]
+		end
+	end
+
+	-- The trees miss zones made or moved since they were built
+	for slot in staleSlots do
+		if isOtherZone(slot, observerId, zoneId) and ZoneShapes.containsPoint(slot, position) then
+			return zoneSlotIds[slot]
 		end
 	end
 	return nil

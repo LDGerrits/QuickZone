@@ -35,6 +35,7 @@ local shapeBoundsMin = State.shapeBoundsMin
 local shapeBoundsMax = State.shapeBoundsMax
 local shapeAxisAligned = State.shapeAxisAligned
 local treeExact = State.treeExact
+local staleSlots = State.staleSlots
 local staticSlots = State.staticSlots
 local dynamicSlots = State.dynamicSlots
 local dynamicTree = State.dynamicTree
@@ -123,6 +124,7 @@ local function refresh(slot: number)
 
 	-- Leaf is stale until the next rebuild
 	treeExact[slot] = nil
+	staleSlots[slot] = true
 
 	markPending(isDynamic)
 end
@@ -191,7 +193,8 @@ function ZoneShapes.isDynamic(slot: number): boolean
 	return dynamicSlots[slot] == true
 end
 
--- Moves a zone between the static and dynamic trees. Its shape stays, so no zone change is recorded
+-- Moves a zone between the static and dynamic trees. Its shape stays, but it is recorded as a change in both,
+-- as entities only query the trees their observers have zones in
 function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	if (dynamicSlots[slot] == true) == isDynamic then
 		return
@@ -206,6 +209,13 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	end
 	markMembersChanged(true)
 	markMembersChanged(false)
+	staleSlots[slot] = true
+
+	local min = shapeBoundsMin[slot]
+	if min and min ~= EMPTY_MIN then
+		ZoneChanges.add(staticChanges, min, shapeBoundsMax[slot])
+		ZoneChanges.add(dynamicChanges, min, shapeBoundsMax[slot])
+	end
 end
 
 -- For changes that don't alter the shape, like attaching
@@ -237,12 +247,19 @@ function ZoneShapes.remove(slot: number)
 	shapeBoundsMax[slot] = nil
 	shapeAxisAligned[slot] = nil
 	treeExact[slot] = nil
+	staleSlots[slot] = nil
 end
 
 -- Called after a tree is rebuilt
 function ZoneShapes.markBuilt(slots: { [number]: any })
 	for slot in slots do
 		treeExact[slot] = shapeAxisAligned[slot]
+	end
+	-- Through the stale ones, as they are usually few and the tree many
+	for slot in staleSlots do
+		if slots[slot] then
+			staleSlots[slot] = nil
+		end
 	end
 end
 

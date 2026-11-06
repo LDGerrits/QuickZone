@@ -1140,6 +1140,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 
 	-- Reusable right away, a stale tree leaf checks the new zone's shape
 	table.insert(State.freeZoneSlots, slot)
+	State.zonesBeingDestroyed[id] = nil
 
 	setmetatable(self :: any, nil)
 end

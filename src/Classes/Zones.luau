@@ -8,6 +8,7 @@
 	When a zone is added or removed from the `Zones` instance, observers will be updated accordingly.
 ]=]
 
+local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 
@@ -341,6 +342,14 @@ function Zones.destroy(self: Types.InternalZones)
 	end
 	self.destroyed = true
 
+	-- Its zones go together, so an entity in several of them leaves once rather than moving through each
+	local zoneIds = {}
+	for zone in self.zones do
+		local id = zone:getId()
+		table.insert(zoneIds, id)
+		State.zonesBeingDestroyed[id] = true
+	end
+
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	for _, cleanup in self.onDestroyObserverCleanups do
@@ -350,6 +359,10 @@ function Zones.destroy(self: Types.InternalZones)
 	for zone, cleanup in self.onDestroyZoneCleanups do
 		cleanup()
 		zone:destroy()
+	end
+	-- Also for zones a callback took out before they were destroyed. Ids are never reused
+	for _, id in zoneIds do
+		State.zonesBeingDestroyed[id] = nil
 	end
 
 	table.clear(self.zones)
