@@ -295,6 +295,44 @@ local function iterTracked(
 	end
 end
 
+-- Settings are checked where they are given, as a NaN would quietly break every later tick
+local function checkPriority(p: any): number
+	if type(p) ~= 'number' or p ~= p then
+		Log.fatal('priority must be a number, got %s.', nil, tostring(p))
+	end
+	return p
+end
+
+local function checkUpdateRate(hz: any): number
+	if type(hz) ~= 'number' or not (hz > 0) then
+		Log.fatal('updateRate must be greater than 0. Use setEnabled(false) to stop an observer.', nil)
+	end
+	return hz
+end
+
+local function checkPrecision(n: any): number
+	if type(n) ~= 'number' or not (n >= 0) then
+		Log.fatal('precision must be non-negative.', nil)
+	end
+	return n
+end
+
+local function checkGroup(group: any)
+	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
+		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
+	end
+	if group.destroyed then
+		Log.fatal('Group %d is destroyed.', nil, group.id)
+	end
+end
+
+-- A Zone or Zones. Destroyed ones lose their methods
+local function checkZone(zone: any)
+	if type(zone) ~= 'table' or type(zone.attach) ~= 'function' then
+		Log.fatal('Expected a live Zone or Zones, got %s.', nil, tostring(zone))
+	end
+end
+
 -- The ids of a Zone, or of every zone in a Zones. A destroyed one has none
 local function zoneIdsOf(zone: any): { [number]: true }
 	local ids = {}
@@ -353,44 +391,6 @@ Observer.__index = Observer
 	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
 ]=]
--- Settings are checked where they are given, as a NaN would quietly break every later tick
-local function checkPriority(p: any): number
-	if type(p) ~= 'number' or p ~= p then
-		Log.fatal('priority must be a number, got %s.', nil, tostring(p))
-	end
-	return p
-end
-
-local function checkUpdateRate(hz: any): number
-	if type(hz) ~= 'number' or not (hz > 0) then
-		Log.fatal('updateRate must be greater than 0. Use setEnabled(false) to stop an observer.', nil)
-	end
-	return hz
-end
-
-local function checkPrecision(n: any): number
-	if type(n) ~= 'number' or not (n >= 0) then
-		Log.fatal('precision must be non-negative.', nil)
-	end
-	return n
-end
-
-local function checkGroup(group: any)
-	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
-		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
-	end
-	if group.destroyed then
-		Log.fatal('Group %d is destroyed.', nil, group.id)
-	end
-end
-
--- A Zone or Zones. Destroyed ones lose their methods
-local function checkZone(zone: any)
-	if type(zone) ~= 'table' or type(zone.attach) ~= 'function' then
-		Log.fatal('Expected a live Zone or Zones, got %s.', nil, tostring(zone))
-	end
-end
-
 function Observer.new<T>(config: {
 	groups: { Types.Group<T> }?,
 	zones: { Types.Zone | Types.Zones }?,
