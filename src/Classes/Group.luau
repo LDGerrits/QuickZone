@@ -67,7 +67,7 @@ local function removeMember(group: Types.InternalGroup, entity: any)
 		group:_remove(reference)
 	end
 	-- Unless an exit callback destroyed the group meanwhile
-	if getmetatable(group :: any) then
+	if not Destroyed.isDead(group) then
 		group:_removeEntity(entity)
 	end
 end
@@ -102,6 +102,7 @@ function Group.new<T>(config: {
 
 	local self: Types.InternalGroup<T> = setmetatable({
 		id = id,
+		phase = 'alive',
 		entities = {},
 		entityIndices = {},
 		autoClean = autoClean,
@@ -495,10 +496,9 @@ end
 ]=]
 function Group.destroy(self: Types.InternalGroup): ()
 	-- A callback below may destroy the group again
-	if self.destroyed then
+	if not Destroyed.begin(self) then
 		return
 	end
-	self.destroyed = true
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
@@ -509,12 +509,12 @@ function Group.destroy(self: Types.InternalGroup): ()
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
 function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 	-- A callback during destroy must not add entities that are never removed
-	if self.destroyed then
+	if Destroyed.isDestroyed(self) then
 		return self
 	end
 
@@ -528,7 +528,7 @@ end
 
 -- Adds the entity as given, never through the reference map. For internal callers that hold the instance
 function Group._addEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
-	if self.destroyed then
+	if Destroyed.isDestroyed(self) then
 		return self
 	end
 	if entity == nil then
@@ -621,7 +621,7 @@ end
 function Group._addBulk(self: Types.InternalGroup, references: { any }): Types.Group
 	for _, reference in references do
 		-- A callback may have destroyed the group
-		if self.destroyed then
+		if Destroyed.isDestroyed(self) then
 			break
 		end
 		self:_add(reference)
@@ -702,7 +702,7 @@ end
 function Group._removeBulk(self: Types.InternalGroup, entities: { any }): Types.Group
 	for _, entity in entities do
 		-- An exit callback may have destroyed the group
-		if self.destroyed then
+		if Destroyed.isDead(self) then
 			break
 		end
 		self:_remove(entity)

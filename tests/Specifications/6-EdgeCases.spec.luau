@@ -16,6 +16,7 @@ local withCleanup = Util.withCleanup
 local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
@@ -792,7 +793,7 @@ return function(Tiniest: Tiniest)
 					task.wait()
 					resumed += 1
 					-- By now the zone may already be gone
-					if entity == entities[1] and not zone.destroyed then
+					if entity == entities[1] and not Destroyed.isDestroyed(zone) then
 						zone:destroy()
 					end
 				end)
@@ -1360,7 +1361,7 @@ return function(Tiniest: Tiniest)
 					observer:subscribe(group)
 					QuickZone:update(1)
 					local disconnectExit = observer:onExit(function()
-						if not group.destroyed then
+						if not Destroyed.isDestroyed(group) then
 							group:destroy()
 						end
 					end)
@@ -1392,7 +1393,7 @@ return function(Tiniest: Tiniest)
 				QuickZone:update(1)
 				-- Joining second while inside brings second in at once
 				observer:onGroupEnter(function(group)
-					if group == second and not second.destroyed then
+					if group == second and not Destroyed.isDestroyed(second) then
 						second:destroy()
 					end
 				end)

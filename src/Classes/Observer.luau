@@ -307,7 +307,7 @@ local function checkGroup(group: any)
 	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
 		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
 	end
-	if group.destroyed then
+	if Destroyed.isDestroyed(group) then
 		Log.fatal('Group %d is destroyed.', nil, group.id)
 	end
 end
@@ -331,10 +331,10 @@ local function checkZone(zone: any)
 	end
 end
 
--- The ids of a Zone, or of every zone in a Zones. A destroyed one has none
+-- The ids of a Zone, or of every zone in a Zones. Its entities are found while it is destroyed, until it is dead
 local function zoneIdsOf(zone: any): { [number]: true }
 	local ids = {}
-	if type(zone) == 'table' and zone.destroyed then
+	if Destroyed.isDead(zone) then
 		return ids
 	end
 	checkZone(zone)
@@ -413,6 +413,7 @@ function Observer.new<T>(config: {
 
 	local self: Types.InternalObserver<T> = setmetatable({
 		id = id,
+		phase = 'alive',
 	}, Observer) :: any
 
 	State.observerPriorityMap[id] = priority
@@ -456,7 +457,7 @@ function Observer.new<T>(config: {
 
 		task.defer(function()
 			-- Ensure the observer wasn't destroyed or disabled
-			if not State.observerIdToObserverObj[id] or not self:isEnabled() then
+			if Destroyed.isDestroyed(self) or not self:isEnabled() then
 				return
 			end
 
@@ -529,7 +530,7 @@ end
 ]=]
 function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
 	-- Destroying a group already unsubscribed it
-	if type(group) == 'table' and group.destroyed then
+	if Destroyed.isDestroyed(group) then
 		return self
 	end
 	checkGroup(group)
@@ -587,7 +588,7 @@ end
 ]=]
 function Observer.detach(self: Types.InternalObserver, zone: any)
 	-- Destroying a zone already detached it
-	if type(zone) == 'table' and zone.destroyed then
+	if Destroyed.isDestroyed(zone) then
 		return self
 	end
 	checkZone(zone)
@@ -1566,10 +1567,9 @@ end
 ]=]
 function Observer.destroy(self: Types.InternalObserver): ()
 	-- A callback below may destroy the observer again
-	if self.destroyed then
+	if not Destroyed.begin(self) then
 		return
 	end
-	self.destroyed = true
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
@@ -1607,7 +1607,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
 return Observer

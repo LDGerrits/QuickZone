@@ -2,6 +2,7 @@
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
 
 type InstanceTree = {
@@ -105,7 +106,7 @@ function Util.withCleanup(fn: (track: (any) -> any) -> ())
 		local object = tracked[i]
 		if typeof(object) == 'Instance' then
 			object:Destroy()
-		elseif type(object) == 'table' and not object.destroyed and type(object.destroy) == 'function' then
+		elseif type(object) == 'table' and not Destroyed.isDead(object) and type(object.destroy) == 'function' then
 			pcall(object.destroy, object)
 		end
 	end

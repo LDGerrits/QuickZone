@@ -15,6 +15,7 @@ local References = require(script.Core.References)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
 local ZoneShapes = require(script.Core.ZoneShapes)
+local Destroyed = require(script.Utils.Destroyed)
 local Log = require(script.Utils.Log)
 local Snapshot = require(script.Utils.Snapshot)
 
@@ -604,7 +605,7 @@ function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
 			while true do
 				i += 1
 				local group = list[i]
-				if group == nil or not group.destroyed then
+				if group == nil or not Destroyed.isDead(group) then
 					return group
 				end
 			end
@@ -708,7 +709,7 @@ function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 		while index < count do
 			index += 1
 			local zone = candidates[index]
-			if not zone.destroyed and containsPoint(zone.slot, point) then
+			if not Destroyed.isDead(zone) and containsPoint(zone.slot, point) then
 				return zone
 			end
 		end
