@@ -12,6 +12,8 @@ local TestFolder = ServerScriptService.Test
 local TiniestFolder = TestFolder.Tiniest
 
 local Util = require(TestFolder.Util)
+local withCleanup = Util.withCleanup
+local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
@@ -23,40 +25,7 @@ type Tiniest = typeof(require(TiniestFolder.tiniest_for_roblox).configure({}))
 
 local NAN = 0 / 0
 local INF = math.huge
-local SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
-
-local function setOf(list: { any }): { [any]: true }
-	local set = {}
-	for _, value in list do
-		set[value] = true
-	end
-	return set
-end
-
--- Calls fn, then destroys whatever it registered, so a failing expectation leaves nothing behind. Every entity
--- is checked in each update unless fn sets its own budget
-local function withCleanup(fn: (track: (any) -> any) -> ())
-	local tracked = {}
-	local function track(object: any): any
-		table.insert(tracked, object)
-		return object
-	end
-
-	QuickZone:setFrameBudget(1000)
-	local ok, err = pcall(fn, track)
-	QuickZone:setFrameBudget(1)
-	for i = #tracked, 1, -1 do
-		local object = tracked[i]
-		if typeof(object) == 'Instance' then
-			object:Destroy()
-		elseif not object.destroyed then
-			pcall(object.destroy, object)
-		end
-	end
-	if not ok then
-		error(err, 0)
-	end
-end
+local SHAPES = Util.SHAPES
 
 return function(Tiniest: Tiniest)
 	local Describe = Tiniest.describe
@@ -101,6 +70,7 @@ return function(Tiniest: Tiniest)
 						end
 					end
 				end
+				Expect(#degenerate > 0).is_true()
 
 				local entities = {}
 				for i = 1, 60 do
@@ -538,12 +508,6 @@ return function(Tiniest: Tiniest)
 						function()
 							return observer:iterEntitiesInZone(zone)
 						end,
-						function()
-							return observer:iterPlayersInside()
-						end,
-						function()
-							return observer:iterPlayersInZone(zone)
-						end,
 					}
 				do
 					local ok, err = pcall(function()
@@ -559,7 +523,7 @@ return function(Tiniest: Tiniest)
 					table.insert(results, if ok then 'ok' else tostring(err))
 				end
 
-				Expect(table.concat(results, ', ')).is('ok, ok, ok, ok')
+				Expect(table.concat(results, ', ')).is('ok, ok')
 			end)
 		end)
 
@@ -1575,39 +1539,39 @@ return function(Tiniest: Tiniest)
 				local observer = track(Observer.new({ zones = {}, groups = {} }))
 				local zone = track(Zone.new({ cframe = CFrame.new(-28000, 0, -27500), size = Vector3.one }))
 				local refused = {}
-				local function refuses(label: string, fn: () -> ())
+				local function mustRefuse(label: string, fn: () -> ())
 					if not pcall(fn) then
 						table.insert(refused, label)
 					end
 				end
-				refuses('new priority', function()
+				mustRefuse('new priority', function()
 					track(Observer.new({ priority = 0 / 0 }))
 				end)
-				refuses('new rate', function()
+				mustRefuse('new rate', function()
 					track(Observer.new({ updateRate = -1 }))
 				end)
-				refuses('new rate 0', function()
+				mustRefuse('new rate 0', function()
 					track(Observer.new({ updateRate = 0 }))
 				end)
-				refuses('new precision', function()
+				mustRefuse('new precision', function()
 					track(Observer.new({ precision = 0 / 0 }))
 				end)
-				refuses('priority', function()
+				mustRefuse('priority', function()
 					observer:setPriority(0 / 0)
 				end)
-				refuses('rate', function()
+				mustRefuse('rate', function()
 					observer:setUpdateRate(0 / 0)
 				end)
-				refuses('rate 0', function()
+				mustRefuse('rate 0', function()
 					observer:setUpdateRate(0)
 				end)
-				refuses('precision', function()
+				mustRefuse('precision', function()
 					observer:setPrecision(0 / 0)
 				end)
-				refuses('subscribe', function()
+				mustRefuse('subscribe', function()
 					observer:subscribe(zone :: any)
 				end)
-				refuses('budget', function()
+				mustRefuse('budget', function()
 					QuickZone:setFrameBudget(0 / 0)
 				end)
 

@@ -8,6 +8,7 @@ local TestFolder = ServerScriptService.Test
 local TiniestFolder = TestFolder.Tiniest
 
 local Util = require(TestFolder.Util)
+local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
@@ -24,7 +25,7 @@ local MAX_ZONES = 40
 local MAX_GROUPS = 4
 local MAX_OBSERVERS = 4
 local MAX_CONTAINERS = 3
-local SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
+local SHAPES = Util.SHAPES
 
 -- Tables with a Position or CFrame, parts and models
 type Entity = any
@@ -95,7 +96,6 @@ type World = {
 	-- Set once a callback changed state in the current update
 	changedInCallback: boolean,
 	callbackDepth: number,
-	callbackCount: number,
 	failure: string?,
 }
 
@@ -383,7 +383,6 @@ local function connectObserver(world: World, model: ObserverModel)
 		if not world.mutating or world.callbackDepth > 0 then
 			return
 		end
-		world.callbackCount += 1
 		local hash = world.seed * 7919 + world.step * 104729 + model.index * 1543 + world.entityIndex[entity] * 31
 		if kind == 'exit' then
 			hash += 7
@@ -1429,14 +1428,6 @@ runOperation = function(world: World, name: string, rng: Random): boolean
 	return applied
 end
 
-local function setOf(list: { any }): { [any]: true }
-	local set = {}
-	for _, value in list do
-		set[value] = true
-	end
-	return set
-end
-
 local function sameSet(a: { [any]: any }, b: { [any]: any }): boolean
 	for key in a do
 		if b[key] == nil then
@@ -1873,7 +1864,6 @@ local function run(seed: number, steps: number): string?
 		mutating = false,
 		changedInCallback = false,
 		callbackDepth = 0,
-		callbackCount = 0,
 		failure = nil,
 	}
 	for i = 1, ENTITY_COUNT do

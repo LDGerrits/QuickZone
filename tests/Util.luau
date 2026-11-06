@@ -1,6 +1,7 @@
 --!strict
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
+local QuickZone = require(ReplicatedStorage.QuickZone)
 local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
 
 type InstanceTree = {
@@ -77,7 +78,41 @@ function Util.createParts(count: number, properties: { [string]: any }?): { Base
 	return parts
 end
 
-local SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
+Util.SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
+local SHAPES = Util.SHAPES
+
+function Util.setOf(list: { any }): { [any]: true }
+	local set = {}
+	for _, value in list do
+		set[value] = true
+	end
+	return set
+end
+
+-- Calls fn, then destroys whatever it registered, so a failing expectation leaves nothing behind. Every entity
+-- is checked in each update unless fn sets its own budget
+function Util.withCleanup(fn: (track: (any) -> any) -> ())
+	local tracked = {}
+	local function track(object: any): any
+		table.insert(tracked, object)
+		return object
+	end
+
+	QuickZone:setFrameBudget(1000)
+	local ok, err = pcall(fn, track)
+	QuickZone:setFrameBudget(1)
+	for i = #tracked, 1, -1 do
+		local object = tracked[i]
+		if typeof(object) == 'Instance' then
+			object:Destroy()
+		elseif type(object) == 'table' and not object.destroyed and type(object.destroy) == 'function' then
+			pcall(object.destroy, object)
+		end
+	end
+	if not ok then
+		error(err, 0)
+	end
+end
 
 function Util.randomOffset(rng: Random, spread: number): Vector3
 	return Vector3.new(

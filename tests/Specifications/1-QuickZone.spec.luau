@@ -374,7 +374,7 @@ return function(Tiniest: Tiniest)
 			-- Resizing and reshaping
 			for i = 1, 40 do
 				local zone = zones[rng:NextInteger(1, #zones)]
-				local shape = ({ 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' })[rng:NextInteger(1, 5)]
+				local shape = Util.SHAPES[rng:NextInteger(1, #Util.SHAPES)]
 				zone:setShape(shape)
 				zone:setSize(Util.randomSize(rng, shape))
 			end
