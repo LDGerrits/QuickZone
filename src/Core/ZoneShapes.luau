@@ -52,22 +52,15 @@ local function changesOf(isDynamic: boolean): Types.ZoneChanges
 	return if isDynamic then dynamicChanges else staticChanges
 end
 
-local function markPending(isDynamic: boolean)
-	if isDynamic then
-		State.pendingDynamicRebuild = true
-	else
-		State.pendingStaticRebuild = true
-	end
+local function treeOf(isDynamic: boolean): Types.Tree
+	return if isDynamic then dynamicTree else staticTree
 end
 
 -- Zones were added to or removed from the tree, so it must be rebuilt rather than refit
 local function markMembersChanged(isDynamic: boolean)
-	markPending(isDynamic)
-	if isDynamic then
-		dynamicTree.membersChanged = true
-	else
-		staticTree.membersChanged = true
-	end
+	local tree = treeOf(isDynamic)
+	tree.pending = true
+	tree.membersChanged = true
 end
 
 -- The half size a shape fills, like a part of that size. Negative sizes fill nothing past the center
@@ -100,16 +93,14 @@ local function refresh(slot: number)
 		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
 	end
 
-	-- Entities in the old or new box may be affected
+	-- Entities in the old or new box may be affected. Checked here too, as zones moving every frame soon fill the log
 	local changes = changesOf(isDynamic)
 	if not changes.all then
 		local oldMin = shapeBoundsMin[slot]
-		if oldMin and oldMin ~= EMPTY_MIN then
+		if oldMin then
 			ZoneChanges.add(changes, oldMin, shapeBoundsMax[slot])
 		end
-		if boundsMin ~= EMPTY_MIN then
-			ZoneChanges.add(changes, boundsMin, boundsMax)
-		end
+		ZoneChanges.add(changes, boundsMin, boundsMax)
 	end
 
 	shapeExtents[slot] = halfSize
@@ -126,7 +117,7 @@ local function refresh(slot: number)
 	treeExact[slot] = nil
 	staleSlots[slot] = true
 
-	markPending(isDynamic)
+	treeOf(isDynamic).pending = true
 end
 
 local ZoneShapes = {}
@@ -212,7 +203,7 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	staleSlots[slot] = true
 
 	local min = shapeBoundsMin[slot]
-	if min and min ~= EMPTY_MIN then
+	if min then
 		ZoneChanges.add(staticChanges, min, shapeBoundsMax[slot])
 		ZoneChanges.add(dynamicChanges, min, shapeBoundsMax[slot])
 	end
@@ -250,14 +241,11 @@ function ZoneShapes.remove(slot: number)
 	staleSlots[slot] = nil
 end
 
--- Called after a tree is rebuilt
+-- Called after a tree is rebuilt. Only stale leaves can have changed, as every write marks its slot
 function ZoneShapes.markBuilt(slots: { [number]: any })
-	for slot in slots do
-		treeExact[slot] = shapeAxisAligned[slot]
-	end
-	-- Through the stale ones, as they are usually few and the tree many
 	for slot in staleSlots do
 		if slots[slot] then
+			treeExact[slot] = shapeAxisAligned[slot]
 			staleSlots[slot] = nil
 		end
 	end

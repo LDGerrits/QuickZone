@@ -379,7 +379,7 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	end
 
 	zone:setDynamic(self.dynamic)
-	zone:setAutoSync(self.autoSync == true)
+	zone:setAutoSync(self.autoSync)
 
 	self.zones[zone] = true
 

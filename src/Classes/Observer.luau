@@ -255,51 +255,29 @@ local function trackGroups(
 	end
 end
 
--- Lists for iterTracked, reused once a loop runs to the end, so a loop allocates nothing after the first
-local iterBuffers = {} :: { { any } }
-local MAX_ITER_BUFFERS = 4
-
--- Iterates the entities the observer has in a zone, as their references. The entities are copied when the
--- loop starts, so it survives entities entering and leaving, also when its body yields across ticks, and each
--- is checked again when reached. A loop broken out of keeps its list, which is then collected
+-- Iterates the entities the observer has in a zone, as their references. Safe while entities enter and leave,
+-- also when the loop yields across ticks, as each is checked again when reached
 local function iterTracked(
 	observerId: number,
 	zoneIds: { [number]: true }?,
 	playersOnly: boolean
 ): () -> (any?, Types.Zone?)
-	local list: { any }? = table.remove(iterBuffers) or {}
-	for entity in State.observerTrackingEntities[observerId] or {} do
-		table.insert(list :: { any }, entity)
-	end
-
-	local i = 0
+	local nextEntity = Snapshot.keys(State.observerTrackingEntities[observerId] or {})
 	return function()
-		while list do
-			i += 1
-			local entity = list[i]
+		while true do
+			local entity, zoneId = nextEntity()
 			if entity == nil then
-				table.clear(list)
-				if #iterBuffers < MAX_ITER_BUFFERS then
-					table.insert(iterBuffers, list)
-				end
-				-- Called again after the end, it must not read a list another loop now uses
-				list = nil
-				break
-			end
-
-			local data = State.entityData[entity]
-			local zoneId = data and data.activeObserverMemberships[observerId]
-			if not zoneId or (zoneIds and not zoneIds[zoneId]) then
+				return nil, nil
+			elseif zoneIds and not zoneIds[zoneId :: number] then
 				continue
 			end
 
 			local ref = State.entityToReference[entity] or entity
-			if playersOnly and not (typeof(ref) == 'Instance' and ref:IsA('Player')) then
+			if playersOnly and not isPlayer(ref) then
 				continue
 			end
-			return ref, State.zoneIdToZoneObj[zoneId]
+			return ref, State.zoneIdToZoneObj[zoneId :: number]
 		end
-		return nil, nil
 	end
 end
 
@@ -755,65 +733,12 @@ function Observer.observePlayer(
 	callback: (Player, Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
 	checkCallback(callback)
-	local cleanups = {} :: { [Types.Entity]: () -> () }
-	local activeIds = {} :: { [Types.Entity]: number }
-	local nextId = 0
-
-	local cleanupEnter = self:onEnter(function(reference, zone, entity: any)
-		if not (typeof(reference) == 'Instance' and reference:IsA('Player')) then
-			return
+	return self:observe(function(reference, zone, entity)
+		if isPlayer(reference) then
+			return callback(reference, zone, entity)
 		end
-
-		nextId += 1
-		local observerId = nextId
-		activeIds[entity] = observerId
-
-		local cleanup = callback(reference, zone, entity)
-
-		if activeIds[entity] ~= observerId then
-			if type(cleanup) == 'function' then
-				cleanup()
-			end
-			return
-		end
-
-		if type(cleanup) == 'function' then
-			cleanups[entity] = cleanup
-		end
+		return nil
 	end)
-
-	local cleanupExit = self:onExit(function(_, _, entity: any)
-		if not activeIds[entity] then
-			return
-		end
-
-		activeIds[entity] = nil
-
-		local cleanup = cleanups[entity]
-		if cleanup then
-			cleanups[entity] = nil
-			cleanup()
-		end
-	end)
-
-	local function disconnect()
-		cleanupEnter()
-		cleanupExit()
-
-		table.clear(activeIds)
-
-		for entity, cleanup in cleanups do
-			cleanups[entity] = nil
-			task.spawn(cleanup)
-		end
-	end
-
-	local disconnectDestroy = self:onDestroy(disconnect)
-
-	return function()
-		disconnectDestroy()
-		disconnect()
-	end
 end
 
 --[=[ 
@@ -843,7 +768,7 @@ function Observer.onPlayerEnter(
 ): () -> ()
 	checkCallback(callback)
 	return self:onEnter(function(reference, zone, entity: any)
-		if typeof(reference) == 'Instance' and reference:IsA('Player') then
+		if isPlayer(reference) then
 			callback(reference, zone, entity)
 		end
 	end)
@@ -865,7 +790,7 @@ function Observer.onPlayerExit(
 ): () -> ()
 	checkCallback(callback)
 	return self:onExit(function(reference, zone, entity: any)
-		if typeof(reference) == 'Instance' and reference:IsA('Player') then
+		if isPlayer(reference) then
 			callback(reference, zone, entity)
 		end
 	end)
@@ -898,65 +823,12 @@ function Observer.observeLocalPlayer(
 		Log.fatal('Observer:observeLocalPlayer can only be called on the Client.', nil)
 	end
 
-	local cleanups = {} :: { [Types.Entity]: () -> () }
-	local activeIds = {} :: { [Types.Entity]: number }
-	local nextId = 0
-
-	local cleanupEnter = self:onEnter(function(reference, zone, entity: any)
-		if reference ~= Players.LocalPlayer then
-			return
+	return self:observe(function(reference, zone, entity)
+		if reference == Players.LocalPlayer then
+			return callback(zone, entity)
 		end
-
-		nextId += 1
-		local observerId = nextId
-		activeIds[entity] = observerId
-
-		local cleanup = callback(zone, entity)
-
-		if activeIds[entity] ~= observerId then
-			if type(cleanup) == 'function' then
-				cleanup()
-			end
-			return
-		end
-
-		if type(cleanup) == 'function' then
-			cleanups[entity] = cleanup
-		end
+		return nil
 	end)
-
-	local cleanupExit = self:onExit(function(_, _, entity: any)
-		if not activeIds[entity] then
-			return
-		end
-
-		activeIds[entity] = nil
-
-		local cleanup = cleanups[entity]
-		if cleanup then
-			cleanups[entity] = nil
-			cleanup()
-		end
-	end)
-
-	local function disconnect()
-		cleanupEnter()
-		cleanupExit()
-
-		table.clear(activeIds)
-
-		for entity, cleanup in cleanups do
-			cleanups[entity] = nil
-			task.spawn(cleanup)
-		end
-	end
-
-	local disconnectDestroy = self:onDestroy(disconnect)
-
-	return function()
-		disconnectDestroy()
-		disconnect()
-	end
 end
 
 --[=[ 
@@ -1399,14 +1271,9 @@ end
 	@return { any }
 ]=]
 function Observer.getEntitiesInside(self: Types.InternalObserver): { any }
-	local entities = State.observerTrackingEntities[self.id]
-	if not entities then
-		return {}
-	end
 	local results = {}
-	for entity, _ in entities do
-		local ref = State.entityToReference[entity] or entity
-		table.insert(results, ref)
+	for entity in State.observerTrackingEntities[self.id] do
+		table.insert(results, State.entityToReference[entity] or entity)
 	end
 	return results
 end
@@ -1419,18 +1286,15 @@ end
 	@return { Player }
 ]=]
 function Observer.getPlayersInside(self: Types.InternalObserver): { Player }
-	local result = {}
-	local entities = State.observerTrackingEntities[self.id]
-
-	for entity in entities do
-		local ref = State.entityToReference[entity] or entity
-		if typeof(ref) == 'Instance' and ref:IsA('Player') then
-			if not table.find(result, ref) then
-				table.insert(result, ref)
-			end
+	local results = {}
+	for entity in State.observerTrackingEntities[self.id] do
+		-- Only a player's current HumanoidRootPart has the player as its reference, so none comes twice
+		local ref = State.entityToReference[entity]
+		if isPlayer(ref) then
+			table.insert(results, ref)
 		end
 	end
-	return result
+	return results
 end
 
 --[=[ 
