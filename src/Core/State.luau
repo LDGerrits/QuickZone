@@ -45,8 +45,6 @@ local State = {
 
 	staticTree = LinearBVH.new(),
 	dynamicTree = LinearBVH.new(),
-	pendingStaticRebuild = false,
-	pendingDynamicRebuild = false,
 	staticVersion = 0,
 	dynamicVersion = 0,
 	logicVersion = 0,

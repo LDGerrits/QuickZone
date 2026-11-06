@@ -36,7 +36,7 @@ local shapeTypes = State.shapeTypes
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
 
-local SHAPE_MAP = {
+local SHAPE_MAP: { [string]: number } = {
 	Block = Enum.PartType.Block.Value,
 	Cylinder = Enum.PartType.Cylinder.Value,
 	Ball = Enum.PartType.Ball.Value,
@@ -44,6 +44,19 @@ local SHAPE_MAP = {
 	CornerWedge = Enum.PartType.CornerWedge.Value,
 	Mesh = MESH_SHAPE_VALUE,
 }
+local SHAPE_NAMES = {} :: { [number]: Types.ShapeType }
+for name, value in SHAPE_MAP do
+	SHAPE_NAMES[value] = name :: any
+end
+
+-- The shape type of a shape name, Block for one that isn't
+local function shapeValueOf(shape: any): number
+	local mapped = SHAPE_MAP[shape]
+	if not mapped then
+		Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(shape))
+	end
+	return mapped or BLOCK_SHAPE_VALUE
+end
 
 local function getShapeEnumValue(part: BasePart): number
 	if part:IsA('Part') then
@@ -191,6 +204,53 @@ end
 local Zone = {}
 Zone.__index = Zone
 
+type PartsConfig = { isDynamic: boolean?, metadata: any?, autoSync: boolean? }
+
+-- Zones for the parts among initial and the instances added reports, until removed reports them
+local function fromContainer(
+	config: PartsConfig?,
+	added: RBXScriptSignal,
+	removed: RBXScriptSignal,
+	initial: { Instance }
+): Types.Zones
+	local zones = Zones.new(config) :: Types.InternalZones
+	local instanceToZone = {} :: { [Instance]: Types.Zone }
+
+	local function onAdded(instance: Instance)
+		if instance:IsA('BasePart') and not instanceToZone[instance] then
+			local zone = Zone.fromPart(instance, { isDynamic = zones.dynamic })
+			instanceToZone[instance] = zone
+			zones:add(zone)
+		end
+	end
+
+	local function onRemoved(instance: Instance)
+		local zone = instanceToZone[instance]
+		if zone then
+			instanceToZone[instance] = nil
+			if not zone.destroyed then
+				zone:destroy()
+			end
+		end
+	end
+
+	local addedConn = added:Connect(onAdded)
+	local removedConn = removed:Connect(onRemoved)
+	for _, instance in initial do
+		onAdded(instance)
+	end
+
+	zones:onDestroy(function()
+		addedConn:Disconnect()
+		removedConn:Disconnect()
+		for instance in instanceToZone do
+			onRemoved(instance)
+		end
+	end)
+
+	return zones
+end
+
 local function newZoneInternal(
 	cframe: CFrame,
 	size: Vector3,
@@ -275,21 +335,10 @@ function Zone.new(config: {
 		Log.fatal('Zone.new expects a config table, got %s.', nil, typeof(config))
 	end
 
-	local shapeType = Enum.PartType.Block.Value
-
-	if config.shape then
-		local mapped = SHAPE_MAP[config.shape]
-		if mapped then
-			shapeType = mapped
-		else
-			Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(config.shape))
-		end
-	end
-
 	return newZoneInternal(
 		config.cframe,
 		config.size,
-		shapeType,
+		if config.shape then shapeValueOf(config.shape) else BLOCK_SHAPE_VALUE,
 		config.reference,
 		not not config.isDynamic,
 		config.metadata,
@@ -323,14 +372,7 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zone
 ]=]
-function Zone.fromPart(
-	part: BasePart,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zone
+function Zone.fromPart(part: BasePart, config: PartsConfig?): Types.Zone
 	if typeof(part) ~= 'Instance' or not part:IsA('BasePart') then
 		Log.fatal('Zone.fromPart expects a BasePart, got %s.', nil, tostring(part))
 	end
@@ -354,35 +396,13 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromParts(
-	parts: { BasePart },
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
-
+function Zone.fromParts(parts: { BasePart }, config: PartsConfig?): Types.Zones
+	local zones = Zones.new(config) :: Types.InternalZones
 	for _, part in parts do
 		if typeof(part) == 'Instance' and part:IsA('BasePart') then
-			local newZone = Zone.fromPart(part, {
-				isDynamic = isDynamic,
-				metadata = zones.metadata,
-				autoSync = autoSync,
-			})
-			zones:add(newZone)
+			zones:add(Zone.fromPart(part, { isDynamic = zones.dynamic }))
 		end
 	end
-
 	return zones
 end
 
@@ -397,63 +417,8 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromChildren(
-	parent: Instance,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
-
-	local instanceToZone = {} :: { [Instance]: Types.Zone }
-
-	local function onAdded(child: Instance)
-		if child:IsA('BasePart') and not instanceToZone[child] then
-			local newZone = Zone.fromPart(child, {
-				isDynamic = zones.dynamic,
-				metadata = zones.metadata,
-			})
-			instanceToZone[child] = newZone
-			zones:add(newZone)
-		end
-	end
-
-	local function onRemoved(child: Instance)
-		local oldZone = instanceToZone[child]
-		if oldZone then
-			instanceToZone[child] = nil
-			if not oldZone.destroyed then
-				oldZone:destroy()
-			end
-		end
-	end
-
-	local addedConn = parent.ChildAdded:Connect(onAdded)
-	local removedConn = parent.ChildRemoved:Connect(onRemoved)
-	for _, child in parent:GetChildren() do
-		onAdded(child)
-	end
-
-	zones:onDestroy(function()
-		addedConn:Disconnect()
-		removedConn:Disconnect()
-		for child, _ in instanceToZone do
-			onRemoved(child)
-		end
-		table.clear(instanceToZone)
-	end)
-
-	return zones
+function Zone.fromChildren(parent: Instance, config: PartsConfig?): Types.Zones
+	return fromContainer(config, parent.ChildAdded, parent.ChildRemoved, parent:GetChildren())
 end
 
 --[=[
@@ -471,63 +436,8 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromDescendants(
-	parent: Instance,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
-
-	local instanceToZone = {} :: { [Instance]: Types.Zone }
-
-	local function onAdded(descendant: Instance)
-		if descendant:IsA('BasePart') and not instanceToZone[descendant] then
-			local newZone = Zone.fromPart(descendant, {
-				isDynamic = zones.dynamic,
-				metadata = zones.metadata,
-			})
-			instanceToZone[descendant] = newZone
-			zones:add(newZone)
-		end
-	end
-
-	local function onRemoved(descendant: Instance)
-		local oldZone = instanceToZone[descendant]
-		if oldZone then
-			instanceToZone[descendant] = nil
-			if not oldZone.destroyed then
-				oldZone:destroy()
-			end
-		end
-	end
-
-	local addedConn = parent.DescendantAdded:Connect(onAdded)
-	local removedConn = parent.DescendantRemoving:Connect(onRemoved)
-	for _, descendant in parent:GetDescendants() do
-		onAdded(descendant)
-	end
-
-	zones:onDestroy(function()
-		addedConn:Disconnect()
-		removedConn:Disconnect()
-		for descendant, _ in instanceToZone do
-			onRemoved(descendant)
-		end
-		table.clear(instanceToZone)
-	end)
-
-	return zones
+function Zone.fromDescendants(parent: Instance, config: PartsConfig?): Types.Zones
+	return fromContainer(config, parent.DescendantAdded, parent.DescendantRemoving, parent:GetDescendants())
 end
 
 --[=[
@@ -541,23 +451,8 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromTag(
-	tag: string,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
+function Zone.fromTag(tag: string, config: PartsConfig?): Types.Zones
+	local zones = Zones.new(config) :: Types.InternalZones
 
 	local watchingAncestry = {} :: { [Instance]: RBXScriptConnection }
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
@@ -603,11 +498,7 @@ function Zone.fromTag(
 		end
 		partClaims[part] = { [claimer] = true }
 
-		local newZone = Zone.fromPart(part, {
-			isDynamic = zones.dynamic,
-			metadata = zones.metadata,
-			autoSync = zones.autoSync,
-		})
+		local newZone = Zone.fromPart(part, { isDynamic = zones.dynamic })
 		instanceToZone[part] = newZone
 		zones:add(newZone)
 
@@ -955,16 +846,7 @@ end
 	@return Zone
 ]=]
 function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.Zone
-	local shapeType = Enum.PartType.Block.Value
-
-	local mapped = SHAPE_MAP[shape]
-	if mapped then
-		shapeType = mapped
-	else
-		Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(shape))
-	end
-
-	ZoneShapes.setShape(self.slot, resolveShape(self.id, shapeType, asQueryablePart(self.reference)))
+	ZoneShapes.setShape(self.slot, resolveShape(self.id, shapeValueOf(shape), asQueryablePart(self.reference)))
 	return self
 end
 
@@ -1056,21 +938,7 @@ end
 	@return ShapeType
 ]=]
 function Zone.getShape(self: Types.InternalZone): Types.ShapeType
-	local shapeType = shapeTypes[self.slot]
-	if shapeType == Enum.PartType.Block.Value then
-		return 'Block'
-	elseif shapeType == Enum.PartType.Ball.Value then
-		return 'Ball'
-	elseif shapeType == Enum.PartType.Cylinder.Value then
-		return 'Cylinder'
-	elseif shapeType == Enum.PartType.Wedge.Value then
-		return 'Wedge'
-	elseif shapeType == Enum.PartType.CornerWedge.Value then
-		return 'CornerWedge'
-	elseif shapeType == MESH_SHAPE_VALUE then
-		return 'Mesh'
-	end
-	return 'Block'
+	return SHAPE_NAMES[shapeTypes[self.slot]] or 'Block'
 end
 
 --[=[ 

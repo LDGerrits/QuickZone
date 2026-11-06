@@ -16,13 +16,22 @@ local HISTORY = 16
 local MIN_BOXES = 64
 local MAX_BOXES = 2048
 
+-- Commit scratch space, shared by every log
+local boxCenters = {} :: { Vector3 }
+
+local function addAll(log: Types.ZoneChanges)
+	log.all = true
+	log.boxCount = 0
+	table.clear(log.boxesMin)
+	table.clear(log.boxesMax)
+end
+
 local ZoneChanges = {}
 
 function ZoneChanges.new(): Types.ZoneChanges
 	return {
 		boxesMin = {},
 		boxesMax = {},
-		boxCenters = {},
 		boxCount = 0,
 		all = false,
 		boxLimit = 0,
@@ -30,27 +39,21 @@ function ZoneChanges.new(): Types.ZoneChanges
 	}
 end
 
+-- Records a changed box. Empty ones, of zones that contain nothing, are left out
 function ZoneChanges.add(log: Types.ZoneChanges, min: Vector3, max: Vector3)
-	if log.all then
+	if log.all or min.X > max.X then
 		return
 	end
 
 	local count = log.boxCount + 1
 	if count > log.boxLimit then
-		ZoneChanges.addAll(log)
+		addAll(log)
 		return
 	end
 
 	log.boxesMin[count] = min
 	log.boxesMax[count] = max
 	log.boxCount = count
-end
-
-function ZoneChanges.addAll(log: Types.ZoneChanges)
-	log.all = true
-	log.boxCount = 0
-	table.clear(log.boxesMin)
-	table.clear(log.boxesMax)
 end
 
 -- Returns whether anything changed since the last commit
@@ -74,7 +77,7 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 	slot.version = version
 	slot.all = log.all
 
-	local boxesMin, boxesMax, boxCenters = log.boxesMin, log.boxesMax, log.boxCenters
+	local boxesMin, boxesMax = log.boxesMin, log.boxesMax
 	for i = 1, count do
 		boxCenters[i] = (boxesMin[i] + boxesMax[i]) * 0.5
 	end

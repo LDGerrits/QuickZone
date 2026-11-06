@@ -89,6 +89,23 @@ local STRAT_CFRAME = Config.Strategy.CFRAME
 local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
 local STRAT_PIVOT = Config.Strategy.PIVOT
 
+local Scheduler = {}
+
+-- Takes an entity out of the bucket of its update rate, swapping the last one into its place
+function Scheduler.leaveBucket(data: Types.EntityData)
+	local bucket = buckets[data.updateRate]
+	if not bucket then
+		return
+	end
+
+	local idx = data.bucketIndex
+	local last = #bucket
+	local lastEntity = bucket[last]
+	bucket[idx] = lastEntity
+	entityData[lastEntity].bucketIndex = idx
+	bucket[last] = nil
+end
+
 local function processProfileChange(entity: Types.Entity)
 	local groups = entityToGroups[entity]
 	if not groups then
@@ -129,29 +146,11 @@ local function processProfileChange(entity: Types.Entity)
 	end
 
 	local data = entityData[entity]
-	local currentRate = data.updateRate
 
 	-- Swap buckets
-	if currentRate ~= maxRate then
-		-- Remove from old bucket
-		if currentRate and currentRate > 0 and buckets[currentRate] then
-			local oldBucket = buckets[currentRate]
-			local idx = data.bucketIndex
-			local maxEntities = #oldBucket
-			local lastEntity = oldBucket[maxEntities]
+	if data.updateRate ~= maxRate then
+		Scheduler.leaveBucket(data)
 
-			-- We swap and then pop to avoid shifting all entities down
-			if idx ~= maxEntities then
-				oldBucket[idx] = lastEntity
-				if entityData[lastEntity] then
-					entityData[lastEntity].bucketIndex = idx
-				end
-			end
-
-			oldBucket[maxEntities] = nil
-		end
-
-		-- Add to new bucket
 		if maxRate > 0 then
 			if not buckets[maxRate] then
 				buckets[maxRate] = {}
@@ -274,8 +273,6 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 		end
 	end
 end
-
-local Scheduler = {}
 
 local function runTick(dt: number)
 	local start = os.clock()
@@ -579,17 +576,15 @@ local function recoverFromError()
 	end
 end
 
--- Set while a tick runs. A callback updating again would clobber the tick in progress,
--- so that update is skipped and its work is left to the next tick
-local ticking = false
--- The thread running the tick. Suspended rather than running, it was an unsafe callback that yielded, which
--- is warned about once per stall
+-- The thread running a tick, set while one runs. A callback updating again would clobber the tick in progress,
+-- so that update is skipped and its work is left to the next tick. Suspended rather than running, it was an
+-- unsafe callback that yielded, which is warned about once per stall
 local tickThread: thread? = nil
 local warnedYield = false
 
-function Scheduler.update(dt: number)
-	if ticking then
-		if not warnedYield and tickThread and coroutine.status(tickThread) == 'suspended' then
+function Scheduler.update(dt: number?)
+	if tickThread then
+		if not warnedYield and coroutine.status(tickThread) == 'suspended' then
 			warnedYield = true
 			Log.warn(
 				'An unsafe callback (safety = false) yielded, so QuickZone waits for it to resume before it '
@@ -601,14 +596,10 @@ function Scheduler.update(dt: number)
 	end
 
 	-- A missing, NaN or negative time step would stop auto-syncing for good
-	if type(dt) ~= 'number' or not (dt >= 0) then
-		dt = 0
-	end
+	local step = if type(dt) == 'number' and dt >= 0 then dt else 0
 
-	ticking = true
 	tickThread = coroutine.running()
-	local ok, trace = xpcall(runTick, debug.traceback, dt)
-	ticking = false
+	local ok, trace = xpcall(runTick, debug.traceback, step)
 	tickThread = nil
 	warnedYield = false
 	if not ok then
@@ -658,18 +649,17 @@ local function updateTree(tree: Types.Tree, members: { [number]: any })
 		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
 		tree.membersChanged = false
 	end
+	tree.pending = false
 	ZoneShapes.markBuilt(members)
 end
 
 function Scheduler.rebuildTrees()
-	if State.pendingDynamicRebuild then
+	if dynamicTree.pending then
 		updateTree(dynamicTree, dynamicSlots)
-		State.pendingDynamicRebuild = false
 	end
 
-	if State.pendingStaticRebuild then
+	if staticTree.pending then
 		updateTree(staticTree, staticSlots)
-		State.pendingStaticRebuild = false
 	end
 
 	-- New version for every tree that changed

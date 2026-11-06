@@ -53,7 +53,9 @@ export type Tree = {
 	cost: number,
 	-- Updates until refitting is tried again
 	refitSkips: number,
-	-- Rebuild instead of refit
+	-- Its zones changed since it was last built or refit
+	pending: boolean,
+	-- Zones were added or removed, so it must be rebuilt rather than refit
 	membersChanged: boolean,
 }
 
@@ -70,7 +72,6 @@ export type ZoneChanges = {
 	-- Boxes since the last commit
 	boxesMin: { Vector3 },
 	boxesMax: { Vector3 },
-	boxCenters: { Vector3 },
 	boxCount: number,
 	all: boolean,
 	boxLimit: number,
@@ -197,7 +198,7 @@ export type InternalZones = Zones & {
 	attach: (self: Zones, observer: any) -> Zones,
 	detach: (self: Zones, observer: any) -> Zones,
 
-	autoSync: boolean?,
+	autoSync: boolean,
 	dynamic: boolean,
 	metadata: any?,
 	zones: { [any]: boolean },

@@ -199,7 +199,7 @@ end
 ]=]
 function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	local oldReference = entityToReference[entity]
-	local oldIsPlayer = typeof(oldReference) == 'Instance' and oldReference:IsA('Player')
+	local oldIsPlayer = isPlayer(oldReference)
 
 	if reference == nil then
 		if not oldIsPlayer then
@@ -212,7 +212,7 @@ function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 		return self
 	end
 
-	if not (typeof(reference) == 'Instance' and reference:IsA('Player')) then
+	if not isPlayer(reference) then
 		-- The old reference no longer leads to this entity
 		if
 			oldReference ~= nil
@@ -272,7 +272,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 	local asked = {} :: { [any]: true }
 
 	-- A player leaves the groups it was added to, also while it has no character
-	if typeof(entity) == 'Instance' and entity:IsA('Player') then
+	if isPlayer(entity) then
 		for _, group in PlayerTracker.groupsOf(entity) do
 			asked[group] = true
 			group:remove(entity)
@@ -294,7 +294,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 	-- A player's character part goes by its player, so the player is removed rather than only this
 	-- character. Other entities go by themselves, as entities may share a reference
 	local reference = entityToReference[entity]
-	local target = if typeof(reference) == 'Instance' and reference:IsA('Player') then reference else entity
+	local target = if isPlayer(reference) then reference else entity
 	for _, groupId in idsToRemove do
 		local group = groups[groupId]
 		if group and not asked[group] then
