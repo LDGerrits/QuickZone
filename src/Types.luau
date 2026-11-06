@@ -34,6 +34,9 @@ export type EntityTable = {
 ]=]
 export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | EntityTable
 
+-- See Utils/Destroyed
+export type Phase = 'alive' | 'destroying' | 'dead'
+
 export type BoundingVolume = {
 	position: Vector3,
 	cframe: CFrame,
@@ -123,7 +126,7 @@ export type InternalGroup<T = any> = Group<T> & {
 	isManaged: boolean?,
 	autoClean: boolean,
 	onDestroyCallbacks: { () -> () }?,
-	destroyed: boolean?,
+	phase: Phase,
 }
 
 export type GroupClass = {
@@ -173,7 +176,7 @@ export type InternalZone = Zone & {
 	autoSync: boolean,
 	syncConnections: { RBXScriptConnection }?,
 	onDestroyCallbacks: { () -> () }?,
-	destroyed: boolean?,
+	phase: Phase,
 }
 
 export type Zones = {
@@ -204,7 +207,7 @@ export type InternalZones = Zones & {
 	zones: { [any]: boolean },
 	observers: { [any]: boolean },
 	onDestroyCallbacks: { () -> () }?,
-	destroyed: boolean?,
+	phase: Phase,
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
 	add: (self: InternalZones, zone: Zone) -> (),
@@ -312,7 +315,7 @@ export type ObserverClass = {
 export type InternalObserver<T = any> = Observer<T> & {
 	id: number,
 	onDestroyCallbacks: { () -> () }?,
-	destroyed: boolean?,
+	phase: Phase,
 }
 
 export type QuickZone = {

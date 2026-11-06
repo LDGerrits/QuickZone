@@ -11,6 +11,7 @@ local Util = require(TestFolder.Util)
 local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
 local ZoneShapes = require(ReplicatedStorage.QuickZone.Core.ZoneShapes)
 local Zone = QuickZone.Zone
@@ -266,7 +267,7 @@ local function reconcile(world: World, container: ContainerModel)
 	for _, zone in container.zones:getZones() do
 		-- Read directly, as destroyed zones lose their methods
 		local part = zone.reference
-		if zone.destroyed then
+		if Destroyed.isDestroyed(zone) then
 			fail(world, `container of {container.folder.Name} holds destroyed {describeZone(zone)}`)
 		elseif not part or not expected[part] then
 			fail(world, `container of {container.folder.Name} holds {describeZone(zone)} for a part it should not`)
@@ -926,7 +927,7 @@ local OPERATIONS: { [string]: (world: World, rng: Random) -> boolean } = {
 		end
 		container.zones:destroy()
 		for _, zone in inner do
-			if not zone.destroyed then
+			if not Destroyed.isDead(zone) then
 				fail(world, `destroying container of {container.folder.Name} left {describeZone(zone)}`)
 			end
 		end

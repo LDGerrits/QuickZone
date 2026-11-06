@@ -1525,6 +1525,53 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Queries see an object until its destroy ends', function()
+		Test('iterZonesAtPoint finds a zone while it is destroyed, as getZonesAtPoint does.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-48000, 0, 41000)
+				local zone = track(Zone.new(cube(position)))
+				QuickZone:rebuild()
+				local listed, iterated = false, false
+				zone:onDestroy(function()
+					listed = table.find(QuickZone:getZonesAtPoint(position), zone) ~= nil
+					for found in QuickZone:iterZonesAtPoint(position) do
+						iterated = iterated or found == zone
+					end
+				end)
+				zone:destroy()
+
+				Expect(listed).is_true()
+				Expect(iterated).is_true()
+			end)
+		end)
+
+		Test(
+			'getEntitiesInZone lists the entities still in a zone being destroyed, as getZoneOfEntity does.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-48100, 0, 41000)
+					local first = { Position = position }
+					local second = { Position = position }
+					local zone = track(Zone.new(cube(position)))
+					local group = track(Group.new({ entities = { first, second }, autoClean = false }))
+					local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+					QuickZone:update(1)
+					local seen = {}
+					observer:onExit(function(entity)
+						local other = if entity == first then second else first
+						local inside = observer:getZoneOfEntity(other) == zone
+						local listed = table.find(observer:getEntitiesInZone(zone), other) ~= nil
+						table.insert(seen, `{inside} {listed}`)
+					end)
+					zone:destroy()
+
+					-- The first to leave still sees the other inside, the last sees nobody
+					Expect(table.concat(seen, ', ')).is('true true, false false')
+				end)
+			end
+		)
+	end)
+
 	Describe('Players', function()
 		local function waitForCharacter(): Model
 			local character = player.Character
@@ -1645,6 +1692,34 @@ return function(Tiniest: Tiniest)
 				Expect(group:contains(player)).is_true()
 			end)
 		end)
+
+		Test(
+			'iterGroupsOfEntity finds the group of a player without a character while the group is destroyed.',
+			function()
+				withCleanup(function(track)
+					local character = waitForCharacter()
+					-- Tracked already, so taking the character away lets go of its part
+					track(Group.new({ entities = { player }, autoClean = false }))
+					local group = track(Group.new({ autoClean = false }))
+					character.Parent = nil
+					task.wait()
+					group:add(player)
+					local listed, iterated = false, false
+					group:onDestroy(function()
+						listed = table.find(QuickZone:getGroupsOfEntity(player), group) ~= nil
+						for found in QuickZone:iterGroupsOfEntity(player) do
+							iterated = iterated or found == group
+						end
+					end)
+					group:destroy()
+					character.Parent = workspace
+					task.wait()
+
+					Expect(listed).is_true()
+					Expect(iterated).is_true()
+				end)
+			end
+		)
 
 		Test('removeEntity on a player in a managed group warns once and keeps it there.', function()
 			withCleanup(function(track)

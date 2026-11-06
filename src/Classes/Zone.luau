@@ -111,7 +111,7 @@ end
 
 local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
 	-- A callback during destroy must not start syncing the zone again
-	if zone.destroyed then
+	if Destroyed.isDestroyed(zone) then
 		return
 	end
 
@@ -228,7 +228,7 @@ local function fromContainer(
 		local zone = instanceToZone[instance]
 		if zone then
 			instanceToZone[instance] = nil
-			if not zone.destroyed then
+			if not Destroyed.isDestroyed(zone) then
 				zone:destroy()
 			end
 		end
@@ -281,6 +281,7 @@ local function newZoneInternal(
 
 	local self: Types.InternalZone = setmetatable({
 		id = id,
+		phase = 'alive',
 		slot = slot,
 		reference = reference,
 		metadata = metadata,
@@ -467,7 +468,7 @@ function Zone.fromTag(tag: string, config: PartsConfig?): Types.Zones
 		local deadZone = instanceToZone[part]
 		if deadZone then
 			instanceToZone[part] = nil
-			if not deadZone.destroyed then
+			if not Destroyed.isDestroyed(deadZone) then
 				deadZone:destroy()
 			end
 		end
@@ -598,7 +599,7 @@ end
 
 -- private
 function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	if self.destroyed then
+	if Destroyed.isDestroyed(self) then
 		return self
 	end
 
@@ -996,10 +997,9 @@ end
 ]=]
 function Zone.destroy(self: Types.InternalZone): ()
 	-- A callback below may destroy the zone again, which would release its slot twice
-	if self.destroyed then
+	if not Destroyed.begin(self) then
 		return
 	end
-	self.destroyed = true
 
 	clearAutoSync(self)
 	self.autoSync = false
@@ -1007,7 +1007,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	local id = self.id
 	local slot = self.slot
 
-	-- Detach before any callback runs, so a callback detaching again is a no-op
+	-- Detach before any callback runs, so a callback that updates can't move entities back in
 	local attachedObservers = State.zoneAttachedObservers[slot]
 	State.zoneAttachedObservers[slot] = nil
 	State.zoneSoleObserver[slot] = nil
@@ -1032,7 +1032,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	table.insert(State.freeZoneSlots, slot)
 	State.zonesBeingDestroyed[id] = nil
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
 return Zone

@@ -22,6 +22,7 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local self: Types.InternalZones = setmetatable({
+		phase = 'alive',
 		-- Auto-synced zones are always dynamic
 		dynamic = not not (isDynamic or autoSync),
 		metadata = metadata,
@@ -316,10 +317,9 @@ end
 ]=]
 function Zones.destroy(self: Types.InternalZones)
 	-- A callback below may destroy the zones again
-	if self.destroyed then
+	if not Destroyed.begin(self) then
 		return
 	end
-	self.destroyed = true
 
 	-- Its zones go together, so an entity in several of them leaves once rather than moving through each
 	local zoneIds = {}
@@ -349,7 +349,7 @@ function Zones.destroy(self: Types.InternalZones)
 	table.clear(self.onDestroyObserverCleanups)
 	table.clear(self.onDestroyZoneCleanups)
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
 -- private

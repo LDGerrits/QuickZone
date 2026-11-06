@@ -10,6 +10,7 @@ local TiniestFolder = TestFolder.Tiniest
 local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
@@ -2992,7 +2993,7 @@ return function(Tiniest: Tiniest)
 			end
 
 			for _, object in cleanups do
-				if not object.destroyed then
+				if not Destroyed.isDestroyed(object) then
 					object:destroy()
 				end
 			end
