@@ -69,9 +69,11 @@ local buildBoundsMax = EMPTY_BOUNDS
 local buildBuffer = EMPTY_BUFFER
 local buildCost = 0
 
--- Half the surface area, the usual BVH cost
+-- Half the surface area, the usual BVH cost. 0 for a node with an infinite zone, which is huge in any layout. Its
+-- area would make the cost infinite or NaN, and the refit check never ask for a rebuild
 local function halfArea(dx: number, dy: number, dz: number): number
-	return dx * dy + dy * dz + dz * dx
+	local area = dx * dy + dy * dz + dz * dx
+	return if area < math.huge then area else 0
 end
 
 -- Grows the scratch space for count members, or shrinks it once the tree it was grown for mostly

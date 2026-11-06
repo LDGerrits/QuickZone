@@ -39,6 +39,15 @@ Group.__index = Group
 
 -- Removes a member. A character part of a player goes through the player as well, so the player's next
 -- character is not added back
+local function isPlayer(x: any): boolean
+	return typeof(x) == 'Instance' and x:IsA('Player')
+end
+
+local function isMember(group: Types.InternalGroup, entity: any): boolean
+	local groups = State.entityToGroups[entity]
+	return groups ~= nil and groups[group.id] == true
+end
+
 local function removeMember(group: Types.InternalGroup, entity: any)
 	local reference = State.entityToReference[entity]
 	if typeof(reference) == 'Instance' and reference:IsA('Player') then
@@ -392,9 +401,9 @@ end
 	@return boolean
 ]=]
 function Group.contains(self: Types.InternalGroup, entity: any): boolean
-	entity = References.entityOf(entity)
-	local groups = State.entityToGroups[entity]
-	return groups and groups[self.id] == true or false
+	-- A player is a member while it has no character too
+	return isMember(self, References.entityOf(entity))
+		or (isPlayer(entity) and PlayerTracker.isSubscribed(entity, self))
 end
 
 --[=[ 
@@ -466,18 +475,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Group.onDestroy(self: Types.InternalGroup, callback: () -> ()): () -> ()
-	if not self.onDestroyCallbacks then
-		self.onDestroyCallbacks = {}
-	end
-
-	table.insert(self.onDestroyCallbacks :: any, callback)
-
-	return function()
-		local idx = table.find(self.onDestroyCallbacks :: any, callback)
-		if idx then
-			table.remove(self.onDestroyCallbacks :: any, idx)
-		end
-	end
+	return Destroyed.connect(self, callback)
 end
 
 --[=[ 
@@ -642,12 +640,8 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 		return self
 	end
 
-	-- A member is removed itself, also when it is another entity's reference
-	local groups = State.entityToGroups[reference]
-	if groups and groups[self.id] then
-		return self:_removeEntity(reference)
-	end
-	return self:_removeEntity(State.referenceToEntity[reference] or reference)
+	-- An entity is removed itself, also when it is another entity's reference, as contains finds it
+	return self:_removeEntity(References.entityOf(reference))
 end
 
 -- Removes the entity as given, never through the reference map. For internal callers that hold the member

@@ -37,6 +37,10 @@ local queryHits = {} :: { number }
 
 local IS_CLIENT = RunService:IsClient()
 
+local function isPlayer(x: any): boolean
+	return typeof(x) == 'Instance' and x:IsA('Player')
+end
+
 local function updateAllEntitiesForObserver(observerId: number)
 	for groupId, observers in State.groupToObservers do
 		if not observers[observerId] then
@@ -1152,9 +1156,8 @@ function Observer.onPlayerTransition(
 ): () -> ()
 	checkCallback(callback)
 	return self:onTransition(function(reference, newZone, entity: any)
-		local player = State.entityToReference[reference] or reference
-		if typeof(player) == 'Instance' and player:IsA('Player') then
-			callback(player, newZone, entity)
+		if isPlayer(reference) then
+			callback(reference, newZone, entity)
 		end
 	end)
 end
@@ -1179,8 +1182,7 @@ function Observer.onLocalPlayerTransition(
 	end
 
 	return self:onTransition(function(reference, newZone, entity: any)
-		local player = State.entityToReference[reference] or reference
-		if player == Players.LocalPlayer then
+		if reference == Players.LocalPlayer then
 			callback(newZone, entity)
 		end
 	end)
@@ -1686,19 +1688,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onDestroy(self: Types.InternalObserver, callback: () -> ()): () -> ()
-	checkCallback(callback)
-	if not self.onDestroyCallbacks then
-		self.onDestroyCallbacks = {}
-	end
-
-	table.insert(self.onDestroyCallbacks :: any, callback)
-
-	return function()
-		local idx = table.find(self.onDestroyCallbacks :: any, callback)
-		if idx then
-			table.remove(self.onDestroyCallbacks :: any, idx)
-		end
-	end
+	return Destroyed.connect(self, callback)
 end
 
 --[=[ 

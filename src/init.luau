@@ -18,6 +18,10 @@ local ZoneShapes = require(script.Core.ZoneShapes)
 local Log = require(script.Utils.Log)
 local Snapshot = require(script.Utils.Snapshot)
 
+local function isPlayer(x: any): boolean
+	return typeof(x) == 'Instance' and x:IsA('Player')
+end
+
 local entityOf = References.entityOf
 
 local leavesAtPoint = ZoneShapes.leavesAtPoint
@@ -487,7 +491,8 @@ function QuickZone:getGroupsOfEntity(entity: any): { Types.Group }
 	entity = entityOf(entity)
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
-		return {}
+		-- A player without a character is still in the groups it was added to
+		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
 	end
 
 	local results = {}
@@ -590,8 +595,17 @@ function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
 
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
-		return function()
-			return nil
+		-- A player without a character is still in the groups it was added to
+		local list = if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
+		local i = 0
+		return function(): Types.Group?
+			while true do
+				i += 1
+				local group = list[i]
+				if group == nil or not group.destroyed then
+					return group
+				end
+			end
 		end
 	end
 

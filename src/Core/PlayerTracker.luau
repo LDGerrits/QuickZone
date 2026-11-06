@@ -7,6 +7,8 @@ local State = require(script.Parent.State)
 
 local activeTrackers = {} :: { [Player]: () -> () }
 local playerSubscriptions = {} :: { [Player]: { [number]: Types.InternalGroup } }
+-- Players whose PlayerRemoving has fired. Their Parent is still Players while it runs
+local leaving = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Player]: true }
 
 local PlayerTracker = {}
 
@@ -151,8 +153,8 @@ local function trackPlayer(player: Player)
 end
 
 function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
-	-- A player that already left would never be let go, as its PlayerRemoving has fired
-	if player.Parent ~= Players then
+	-- A player that is leaving or left would never be let go, as its PlayerRemoving has fired
+	if player.Parent ~= Players or leaving[player] then
 		return
 	end
 
@@ -180,6 +182,11 @@ function PlayerTracker.unsubscribe(player: Player, group: Types.InternalGroup)
 	end
 end
 
+function PlayerTracker.isSubscribed(player: Player, group: Types.InternalGroup): boolean
+	local subscriptions = playerSubscriptions[player]
+	return subscriptions ~= nil and subscriptions[group.id] ~= nil
+end
+
 -- The live groups the player was added to, also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
@@ -199,6 +206,7 @@ function PlayerTracker.dropGroup(groupId: number)
 end
 
 Players.PlayerRemoving:Connect(function(player)
+	leaving[player] = true
 	local cleanup = activeTrackers[player]
 	if cleanup then
 		cleanup()
