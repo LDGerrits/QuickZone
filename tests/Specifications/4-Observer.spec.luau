@@ -2599,7 +2599,9 @@ return function(Tiniest: Tiniest)
 			QuickZone:update(1)
 			Expect(failing:getZoneOfEntity(entity)).is(zoneA)
 
+			local exitRan = false
 			failing:onExit(function()
+				exitRan = true
 				error('exit failed')
 			end)
 			entity.Position = finish
@@ -2618,6 +2620,7 @@ return function(Tiniest: Tiniest)
 			zoneA:destroy()
 			zoneB:destroy()
 
+			Expect(exitRan).is(true)
 			Expect(entered).is(zoneB)
 			Expect(left).is(nil)
 		end)
@@ -2657,7 +2660,9 @@ return function(Tiniest: Tiniest)
 			QuickZone:update(1)
 			Expect(observer:getZoneOfEntity(entity)).is(zone)
 
+			local exitRan = false
 			observer:onExit(function()
+				exitRan = true
 				error('exit failed')
 			end)
 			local id = zone:getId()
@@ -2672,6 +2677,7 @@ return function(Tiniest: Tiniest)
 			observer:destroy()
 			group:destroy()
 
+			Expect(exitRan).is(true)
 			Expect(alive).is(false)
 			Expect(found).is(false)
 		end)

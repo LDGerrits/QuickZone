@@ -11,6 +11,7 @@ local TestFolder = ServerScriptService.Test
 local TiniestFolder = TestFolder.Tiniest
 
 local Util = require(TestFolder.Util)
+local withCleanup = Util.withCleanup
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
@@ -23,31 +24,6 @@ type Tiniest = typeof(require(TiniestFolder.tiniest_for_roblox).configure({}))
 local NAN = 0 / 0
 local INF = math.huge
 local AWAY = Vector3.new(0, 5000, 0)
-
--- Calls fn, then destroys whatever it registered, so a failing expectation leaves nothing behind. Every entity
--- is checked in each update
-local function withCleanup(fn: (track: (any) -> any) -> ())
-	local tracked = {}
-	local function track(object: any): any
-		table.insert(tracked, object)
-		return object
-	end
-
-	QuickZone:setFrameBudget(1000)
-	local ok, err = pcall(fn, track)
-	QuickZone:setFrameBudget(1)
-	for i = #tracked, 1, -1 do
-		local object = tracked[i]
-		if typeof(object) == 'Instance' then
-			object:Destroy()
-		elseif type(object) == 'table' and not object.destroyed and type(object.destroy) == 'function' then
-			pcall(object.destroy, object)
-		end
-	end
-	if not ok then
-		error(err, 0)
-	end
-end
 
 local function cube(position: Vector3, size: number?): { cframe: CFrame, size: Vector3 }
 	return { cframe = CFrame.new(position), size = Vector3.one * (size or 10) }
@@ -957,271 +933,259 @@ return function(Tiniest: Tiniest)
 			return `{name}: ok`
 		end
 
-		Test('Every plain iterator survives its table shrinking and growing during the loop.', function()
+		local origin = Vector3.new(-44000, 0, 41000)
+		local function spot(i: number): Vector3
+			return origin + Vector3.new(i * 20, 0, 0)
+		end
+		local function many(count: number, make: (number) -> ())
+			for i = 1, count do
+				make(i)
+			end
+		end
+
+		Test('Group:iterEntities survives its table shrinking and growing during the loop.', function()
 			withCleanup(function(track)
-				local origin = Vector3.new(-44000, 0, 41000)
-				local results = {}
-				local function spot(i: number): Vector3
-					return origin + Vector3.new(i * 20, 0, 0)
+				local group = track(Group.new({ autoClean = false }))
+				local ours = {}
+				for i = 1, 8 do
+					local entity = { Position = spot(i) }
+					group:add(entity)
+					table.insert(ours, entity)
 				end
-				local function many(count: number, make: (number) -> ())
-					for i = 1, count do
-						make(i)
+				Expect(check(
+					'Group:iterEntities',
+					function()
+						return group:iterEntities()
+					end,
+					ours,
+					function(entity)
+						group:remove(entity)
+					end,
+					function()
+						many(300, function(i)
+							group:add({ Position = spot(i) })
+						end)
 					end
-				end
+				)).is('Group:iterEntities: ok')
+			end)
+		end)
 
-				do -- Group:iterEntities
-					local group = track(Group.new({ autoClean = false }))
-					local ours = {}
-					for i = 1, 8 do
-						local entity = { Position = spot(i) }
-						group:add(entity)
-						table.insert(ours, entity)
-					end
-					table.insert(
-						results,
-						check(
-							'Group:iterEntities',
-							function()
-								return group:iterEntities()
-							end,
-							ours,
-							function(entity)
-								group:remove(entity)
-							end,
-							function()
-								many(300, function(i)
-									group:add({ Position = spot(i) })
-								end)
-							end
-						)
-					)
+		Test('QuickZone:iterEntities survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local group = track(Group.new({ autoClean = false }))
+				local ours = {}
+				for i = 1, 8 do
+					local entity = { Position = spot(i) }
+					group:add(entity)
+					table.insert(ours, entity)
 				end
-
-				do -- QuickZone:iterEntities
-					local group = track(Group.new({ autoClean = false }))
-					local ours = {}
-					for i = 1, 8 do
-						local entity = { Position = spot(i) }
-						group:add(entity)
-						table.insert(ours, entity)
-					end
-					local entityCount = 0
-					for _ in State.entityData do
-						entityCount += 1
-					end
-					table.insert(
-						results,
-						check(
-							'QuickZone:iterEntities',
-							function()
-								return QuickZone:iterEntities()
-							end,
-							ours,
-							function(entity)
-								QuickZone:removeEntity(entity)
-							end,
-							function()
-								many(math.max(300, entityCount * 2), function(i)
-									group:add({ Position = spot(i) })
-								end)
-							end
-						)
-					)
+				local entityCount = 0
+				for _ in State.entityData do
+					entityCount += 1
 				end
-
-				do -- QuickZone:iterGroups
-					local ours = {}
-					for _ = 1, 8 do
-						table.insert(ours, track(Group.new()))
+				Expect(check(
+					'QuickZone:iterEntities',
+					function()
+						return QuickZone:iterEntities()
+					end,
+					ours,
+					function(entity)
+						QuickZone:removeEntity(entity)
+					end,
+					function()
+						many(math.max(300, entityCount * 2), function(i)
+							group:add({ Position = spot(i) })
+						end)
 					end
-					table.insert(
-						results,
-						check(
-							'QuickZone:iterGroups',
-							function()
-								return QuickZone:iterGroups()
-							end,
-							ours,
-							function(group)
-								group:destroy()
-							end,
-							function()
-								many(300, function()
-									track(Group.new())
-								end)
-							end
-						)
-					)
-				end
+				)).is('QuickZone:iterEntities: ok')
+			end)
+		end)
 
-				do -- QuickZone:iterZones
-					local ours = {}
-					for i = 1, 8 do
-						table.insert(ours, track(Zone.new(cube(spot(i), 1))))
+		Test('QuickZone:iterGroups survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local ours = {}
+				for _ = 1, 8 do
+					table.insert(ours, track(Group.new()))
+				end
+				Expect(check(
+					'QuickZone:iterGroups',
+					function()
+						return QuickZone:iterGroups()
+					end,
+					ours,
+					function(group)
+						group:destroy()
+					end,
+					function()
+						many(300, function()
+							track(Group.new())
+						end)
 					end
-					table.insert(
-						results,
-						check(
-							'QuickZone:iterZones',
-							function()
-								return QuickZone:iterZones()
-							end,
-							ours,
-							function(zone)
-								zone:destroy()
-							end,
-							function()
-								many(300, function(i)
-									track(Zone.new(cube(spot(i), 1)))
-								end)
-							end
-						)
-					)
-				end
+				)).is('QuickZone:iterGroups: ok')
+			end)
+		end)
 
-				do -- QuickZone:iterObservers
-					local ours = {}
-					for _ = 1, 8 do
-						table.insert(ours, track(Observer.new({ zones = {}, groups = {} })))
+		Test('QuickZone:iterZones survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local ours = {}
+				for i = 1, 8 do
+					table.insert(ours, track(Zone.new(cube(spot(i), 1))))
+				end
+				Expect(check(
+					'QuickZone:iterZones',
+					function()
+						return QuickZone:iterZones()
+					end,
+					ours,
+					function(zone)
+						zone:destroy()
+					end,
+					function()
+						many(300, function(i)
+							track(Zone.new(cube(spot(i), 1)))
+						end)
 					end
-					table.insert(
-						results,
-						check(
-							'QuickZone:iterObservers',
-							function()
-								return QuickZone:iterObservers()
-							end,
-							ours,
-							function(observer)
-								observer:destroy()
-							end,
-							function()
-								many(300, function()
-									track(Observer.new({ zones = {}, groups = {} }))
-								end)
-							end
-						)
-					)
-				end
+				)).is('QuickZone:iterZones: ok')
+			end)
+		end)
 
-				do -- QuickZone:iterGroupsOfEntity
-					local entity = { Position = spot(1) }
-					local ours = {}
-					for _ = 1, 8 do
-						table.insert(ours, track(Group.new({ entities = { entity }, autoClean = false })))
+		Test('QuickZone:iterObservers survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local ours = {}
+				for _ = 1, 8 do
+					table.insert(ours, track(Observer.new({ zones = {}, groups = {} })))
+				end
+				Expect(check(
+					'QuickZone:iterObservers',
+					function()
+						return QuickZone:iterObservers()
+					end,
+					ours,
+					function(observer)
+						observer:destroy()
+					end,
+					function()
+						many(300, function()
+							track(Observer.new({ zones = {}, groups = {} }))
+						end)
 					end
-					table.insert(
-						results,
-						check(
-							'QuickZone:iterGroupsOfEntity',
-							function()
-								return QuickZone:iterGroupsOfEntity(entity)
-							end,
-							ours,
-							function(group)
-								group:remove(entity)
-							end,
-							function()
-								many(300, function()
-									track(Group.new({ entities = { entity }, autoClean = false }))
-								end)
-							end
-						)
-					)
-				end
+				)).is('QuickZone:iterObservers: ok')
+			end)
+		end)
 
-				do -- QuickZone:iterZonesOfEntity
-					local position = spot(40)
-					local entity = { Position = position }
-					local group = track(Group.new({ entities = { entity }, autoClean = false }))
-					local ours = {}
-					for _ = 1, 8 do
-						local zone = track(Zone.new(cube(position)))
-						table.insert(ours, zone)
-						track(Observer.new({ zones = { zone }, groups = { group } }))
+		Test('QuickZone:iterGroupsOfEntity survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local entity = { Position = spot(1) }
+				local ours = {}
+				for _ = 1, 8 do
+					table.insert(ours, track(Group.new({ entities = { entity }, autoClean = false })))
+				end
+				Expect(check(
+					'QuickZone:iterGroupsOfEntity',
+					function()
+						return QuickZone:iterGroupsOfEntity(entity)
+					end,
+					ours,
+					function(group)
+						group:remove(entity)
+					end,
+					function()
+						many(300, function()
+							track(Group.new({ entities = { entity }, autoClean = false }))
+						end)
 					end
-					QuickZone:update(1)
-					table.insert(
-						results,
-						check(
-							'QuickZone:iterZonesOfEntity',
-							function()
-								return QuickZone:iterZonesOfEntity(entity)
-							end,
-							ours,
-							function(zone)
-								zone:destroy()
-							end,
-							function()
-								many(100, function()
-									track(
-										Observer.new({ zones = { track(Zone.new(cube(position))) }, groups = { group } })
-									)
-								end)
-								QuickZone:update(1)
-							end
-						)
-					)
-				end
+				)).is('QuickZone:iterGroupsOfEntity: ok')
+			end)
+		end)
 
-				do -- Observer:iterZones
-					local observer = track(Observer.new({ zones = {}, groups = {} }))
-					local ours = {}
-					for i = 1, 8 do
-						local zone = track(Zone.new(cube(spot(i), 1)))
-						observer:attach(zone)
-						table.insert(ours, zone)
+		Test('QuickZone:iterZonesOfEntity survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local position = spot(40)
+				local entity = { Position = position }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local ours = {}
+				for _ = 1, 8 do
+					local zone = track(Zone.new(cube(position)))
+					table.insert(ours, zone)
+					track(Observer.new({ zones = { zone }, groups = { group } }))
+				end
+				QuickZone:update(1)
+				Expect(check(
+					'QuickZone:iterZonesOfEntity',
+					function()
+						return QuickZone:iterZonesOfEntity(entity)
+					end,
+					ours,
+					function(zone)
+						zone:destroy()
+					end,
+					function()
+						many(100, function()
+							track(Observer.new({ zones = { track(Zone.new(cube(position))) }, groups = { group } }))
+						end)
+						QuickZone:update(1)
 					end
-					table.insert(
-						results,
-						check(
-							'Observer:iterZones',
-							function()
-								return observer:iterZones()
-							end,
-							ours,
-							function(zone)
-								observer:detach(zone)
-							end,
-							function()
-								many(300, function(i)
-									observer:attach(track(Zone.new(cube(spot(i), 1))))
-								end)
-							end
-						)
-					)
-				end
+				)).is('QuickZone:iterZonesOfEntity: ok')
+			end)
+		end)
 
-				do -- Observer:iterGroups
-					local observer = track(Observer.new({ zones = {}, groups = {} }))
-					local ours = {}
-					for _ = 1, 8 do
-						local group = track(Group.new())
-						observer:subscribe(group)
-						table.insert(ours, group)
+		Test('Observer:iterZones survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local observer = track(Observer.new({ zones = {}, groups = {} }))
+				local ours = {}
+				for i = 1, 8 do
+					local zone = track(Zone.new(cube(spot(i), 1)))
+					observer:attach(zone)
+					table.insert(ours, zone)
+				end
+				Expect(check(
+					'Observer:iterZones',
+					function()
+						return observer:iterZones()
+					end,
+					ours,
+					function(zone)
+						observer:detach(zone)
+					end,
+					function()
+						many(300, function(i)
+							observer:attach(track(Zone.new(cube(spot(i), 1))))
+						end)
 					end
-					table.insert(
-						results,
-						check(
-							'Observer:iterGroups',
-							function()
-								return observer:iterGroups()
-							end,
-							ours,
-							function(group)
-								group:destroy()
-							end,
-							function()
-								many(300, function()
-									observer:subscribe(track(Group.new()))
-								end)
-							end
-						)
-					)
-				end
+				)).is('Observer:iterZones: ok')
+			end)
+		end)
 
-				for _, method in { 'iterZones', 'iterReferences' } do -- Zones
+		Test('Observer:iterGroups survives its table shrinking and growing during the loop.', function()
+			withCleanup(function(track)
+				local observer = track(Observer.new({ zones = {}, groups = {} }))
+				local ours = {}
+				for _ = 1, 8 do
+					local group = track(Group.new())
+					observer:subscribe(group)
+					table.insert(ours, group)
+				end
+				Expect(check(
+					'Observer:iterGroups',
+					function()
+						return observer:iterGroups()
+					end,
+					ours,
+					function(group)
+						group:destroy()
+					end,
+					function()
+						many(300, function()
+							observer:subscribe(track(Group.new()))
+						end)
+					end
+				)).is('Observer:iterGroups: ok')
+			end)
+		end)
+
+		for _, method in { 'iterZones', 'iterReferences' } do
+			Test(`Zones:{method} survives its table shrinking and growing during the loop.`, function()
+				withCleanup(function(track)
 					local folder = track(Instance.new('Folder'))
 					folder.Parent = workspace
 					for i = 1, 8 do
@@ -1229,42 +1193,25 @@ return function(Tiniest: Tiniest)
 					end
 					local zones = track(Zone.fromChildren(folder))
 					local ours = if method == 'iterZones' then zones:getZones() else zones:getReferences()
-					table.insert(
-						results,
-						check(
-							`Zones:{method}`,
-							function()
-								return (zones :: any)[method](zones)
-							end,
-							ours,
-							function(item)
-								local part = if method == 'iterZones' then item:getReference() else item
-								part:Destroy()
-							end,
-							function()
-								many(300, function(i)
-									Util.createPart({ CFrame = CFrame.new(spot(i)) }).Parent = folder
-								end)
-							end
-						)
-					)
-				end
-
-				Expect(table.concat(results, '\n')).is(table.concat({
-					'Group:iterEntities: ok',
-					'QuickZone:iterEntities: ok',
-					'QuickZone:iterGroups: ok',
-					'QuickZone:iterZones: ok',
-					'QuickZone:iterObservers: ok',
-					'QuickZone:iterGroupsOfEntity: ok',
-					'QuickZone:iterZonesOfEntity: ok',
-					'Observer:iterZones: ok',
-					'Observer:iterGroups: ok',
-					'Zones:iterZones: ok',
-					'Zones:iterReferences: ok',
-				}, '\n'))
+					Expect(check(
+						`Zones:{method}`,
+						function()
+							return (zones :: any)[method](zones)
+						end,
+						ours,
+						function(item)
+							local part = if method == 'iterZones' then item:getReference() else item
+							part:Destroy()
+						end,
+						function()
+							many(300, function(i)
+								Util.createPart({ CFrame = CFrame.new(spot(i)) }).Parent = folder
+							end)
+						end
+					)).is(`Zones:{method}: ok`)
+				end)
 			end)
-		end)
+		end
 	end)
 
 	Describe('Entities that are also references', function()

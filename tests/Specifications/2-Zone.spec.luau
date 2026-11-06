@@ -13,7 +13,7 @@ local QuickZone = require(ReplicatedStorage.QuickZone)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 
-local SHAPE_TYPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
+local SHAPE_TYPES = Util.SHAPES
 
 type Tiniest = typeof(require(TiniestFolder.tiniest_for_roblox).configure({}))
 
@@ -1218,11 +1218,13 @@ return function(Tiniest: Tiniest)
 			QuickZone:rebuild()
 
 			part.Size = Vector3.one * 40
+			local slot = (zone :: any).slot
 			zone:destroy()
 			QuickZone:rebuild()
 			local reused = Zone.new({ cframe = CFrame.new(12000, 0, 13100), size = Vector3.one * 2 })
 			task.wait()
 
+			Expect((reused :: any).slot).is(slot)
 			Expect(reused:getSize()).is(Vector3.one * 2)
 
 			reused:destroy()
