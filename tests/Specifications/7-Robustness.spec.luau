@@ -1220,6 +1220,52 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Observers resolve priorities and rates at the extremes', function()
+		Test('Infinite and negative priorities take entities in order.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-45200, 0, 41000)
+				local entity = { Position = position }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local zone = track(Zone.new(cube(position)))
+				local observers = {}
+				for _, priority in { -INF, -5, 0, 1e300, INF } do
+					table.insert(
+						observers,
+						track(Observer.new({ zones = { zone }, groups = { group }, priority = priority }))
+					)
+				end
+				local winners = {}
+				for i = #observers, 1, -1 do
+					QuickZone:update(1)
+					for j = 1, i do
+						if observers[j]:getZoneOfEntity(entity) then
+							table.insert(winners, j)
+						end
+					end
+					observers[i]:destroy()
+				end
+
+				Expect(table.concat(winners, ' ')).is('5 4 3 2 1')
+			end)
+		end)
+
+		Test('An entity watched at two rates is checked at the higher one.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-45300, 0, 41000)
+				local entity = { Position = position + AWAY }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local zone = track(Zone.new(cube(position)))
+				local slow = track(Observer.new({ zones = { zone }, groups = { group }, updateRate = 1 }))
+				track(Observer.new({ zones = { zone }, groups = { group }, updateRate = 60, priority = -1 }))
+				QuickZone:update(1)
+
+				entity.Position = position
+				QuickZone:update(1 / 60)
+				Expect(slow:getZoneOfEntity(entity)).is(zone)
+			end)
+		end)
+	end)
+
 	Describe('Zones moving between trees from callbacks', function()
 		Test(
 			'A zone made dynamic and rebuilt from a callback in the middle of a tick is found by later entities.',
@@ -1258,6 +1304,83 @@ return function(Tiniest: Tiniest)
 				end)
 			end
 		)
+	end)
+
+	Describe('Shapes against the engine', function()
+		Test('Every part shape holds the points the engine says the part holds.', function()
+			withCleanup(function(track)
+				local rng = Random.new(31)
+				local specs: { { any } } = {
+					{ 'Block', 'Part', Enum.PartType.Block },
+					{ 'Ball', 'Part', Enum.PartType.Ball },
+					{ 'Cylinder', 'Part', Enum.PartType.Cylinder },
+					{ 'Wedge', 'Part', Enum.PartType.Wedge },
+					{ 'CornerWedge', 'Part', Enum.PartType.CornerWedge },
+					{ 'WedgePart', 'WedgePart' },
+					{ 'CornerWedgePart', 'CornerWedgePart' },
+				}
+				local results = {}
+				for s, spec in specs do
+					local mismatch: string? = nil
+					local checked = 0
+					for trial = 1, 3 do
+						local properties: { [string]: any } = {
+							Size = Vector3.new(rng:NextNumber(2, 20), rng:NextNumber(2, 20), rng:NextNumber(2, 20)),
+							CFrame = CFrame.new(-46000 + s * 100, 200, 41000 + trial * 50) * CFrame.fromOrientation(
+								rng:NextNumber(-3, 3),
+								rng:NextNumber(-3, 3),
+								rng:NextNumber(-3, 3)
+							),
+						}
+						if spec[3] then
+							properties.Shape = spec[3]
+						end
+						local part = track(Util.create({ className = spec[2], properties = properties })) :: BasePart
+						local zone = track(Zone.fromPart(part))
+
+						local function engineHolds(point: Vector3): boolean
+							return (part:GetClosestPointOnSurface(point) - point).Magnitude < 1e-4
+						end
+						for _ = 1, 200 do
+							local offset = Vector3.new(
+								rng:NextNumber(-0.6, 0.6),
+								rng:NextNumber(-0.6, 0.6),
+								rng:NextNumber(-0.6, 0.6)
+							)
+							local point = part.CFrame * (offset * part.Size)
+							local holds = engineHolds(point)
+							-- Skipped within 0.02 studs of the surface, where float error may decide
+							local clear = true
+							for _, step in { Vector3.xAxis, Vector3.yAxis, Vector3.zAxis } do
+								for _, sign in { 0.02, -0.02 } do
+									clear = clear and engineHolds(point + step * sign) == holds
+								end
+							end
+							if clear then
+								checked += 1
+								if zone:isPointInside(point) ~= holds then
+									mismatch = mismatch or `{offset * part.Size} in {part.Size}, engine says {holds}`
+								end
+							end
+						end
+					end
+					table.insert(
+						results,
+						`{spec[1]}: {mismatch or 'agrees'}{if checked < 300 then ' (too few points)' else ''}`
+					)
+				end
+
+				Expect(table.concat(results, '\n')).is(table.concat({
+					'Block: agrees',
+					'Ball: agrees',
+					'Cylinder: agrees',
+					'Wedge: agrees',
+					'CornerWedge: agrees',
+					'WedgePart: agrees',
+					'CornerWedgePart: agrees',
+				}, '\n'))
+			end)
+		end)
 	end)
 
 	Describe('Players', function()
