@@ -36,6 +36,8 @@ local State = {
 	shapeAxisAligned = {} :: { [number]: boolean },
 	-- Zones whose leaf is exactly their shape
 	treeExact = {} :: { [number]: boolean },
+	-- Zones added, moved or changed since their tree was built, which the trees may not find where they are
+	staleSlots = {} :: { [number]: true },
 
 	-- Where zones changed per tree
 	staticChanges = ZoneChanges.new(),
@@ -88,6 +90,8 @@ local State = {
 	-- Zone id to the number of entities observers have in it, only written through Core/Memberships
 	zoneOccupants = {} :: { [number]: number },
 	zoneIdToZoneObj = {} :: { [number]: Types.InternalZone },
+	-- Ids of zones a Zones is destroying, so entities don't move from one to the next on the way out
+	zonesBeingDestroyed = {} :: { [number]: true },
 	zoneSlotToZoneObj = {} :: { [number]: Types.InternalZone },
 	observerIdToObserverObj = {} :: { [number]: Types.InternalObserver },
 }

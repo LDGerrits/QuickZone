@@ -11,6 +11,7 @@ local TiniestFolder = TestFolder.Tiniest
 local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -267,6 +268,165 @@ return function(Tiniest: Tiniest)
 		end)
 	end)
 
+	Describe('Zones going away', function()
+		Test(
+			'An entity in a destroyed zone moves to a zone made, attached or moved there since the last update.',
+			function()
+				withCleanup(function(track)
+					local results = {}
+					for i, how in { 'made', 'moved', 'made dynamic' } do
+						local position = Vector3.new(-42000 + i * 100, 0, 41000)
+						local entity = { Position = position }
+						local zoneA = track(Zone.new(cube(position)))
+						local far = track(Zone.new(cube(position + AWAY)))
+						local group = track(Group.new({ entities = { entity }, autoClean = false }))
+						local observer =
+							track(Observer.new({ zones = { zoneA, far }, groups = { group }, safety = false }))
+						QuickZone:update(1)
+
+						local events = {}
+						observer:onEnter(function()
+							table.insert(events, 'enter')
+						end)
+						observer:onExit(function()
+							table.insert(events, 'exit')
+						end)
+						observer:onTransition(function()
+							table.insert(events, 'transition')
+						end)
+
+						if how == 'made' then
+							observer:attach(track(Zone.new(cube(position))))
+						elseif how == 'moved' then
+							far:setCFrame(CFrame.new(position))
+						else
+							observer:attach(track(Zone.new({
+								cframe = CFrame.new(position),
+								size = Vector3.one * 10,
+								isDynamic = true,
+							})))
+						end
+						zoneA:destroy()
+						QuickZone:update(1)
+						table.insert(results, `{how}: {table.concat(events, ' ')}`)
+					end
+
+					Expect(table.concat(results, ', ')).is(
+						'made: transition, moved: transition, made dynamic: transition'
+					)
+				end)
+			end
+		)
+
+		Test(
+			'Destroying a Zones whose zones overlap exits once, rather than moving through zones about to go.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-42500, 0, 41000)
+					local entity = { Position = position }
+					local parts = {}
+					for _ = 1, 5 do
+						table.insert(
+							parts,
+							track(Util.createPart({ CFrame = CFrame.new(position), Size = Vector3.one * 10 }))
+						)
+					end
+					local zones = track(Zone.fromParts(parts))
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer = track(Observer.new({ zones = { zones }, groups = { group }, safety = false }))
+					QuickZone:update(1)
+
+					local events = {}
+					observer:onExit(function()
+						table.insert(events, 'exit')
+					end)
+					observer:onTransition(function()
+						table.insert(events, 'transition')
+					end)
+					zones:destroy()
+
+					Expect(table.concat(events, ' ')).is('exit')
+					Expect(next(State.zonesBeingDestroyed)).is(nil)
+				end)
+			end
+		)
+
+		Test('Destroying a Zones moves an entity to a zone of the observer outside it, once.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-42600, 0, 41000)
+				local entity = { Position = position }
+				local parts = {}
+				for _ = 1, 3 do
+					table.insert(
+						parts,
+						track(Util.createPart({ CFrame = CFrame.new(position), Size = Vector3.one * 10 }))
+					)
+				end
+				local zones = track(Zone.fromParts(parts))
+				local outside = track(Zone.new(cube(position)))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zones }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				-- Attached after the update, so the entity is in one of the container's zones
+				observer:attach(outside)
+				QuickZone:update(1)
+				local before = observer:getZoneOfEntity(entity)
+
+				local events = {}
+				observer:onExit(function()
+					table.insert(events, 'exit')
+				end)
+				observer:onTransition(function(_, zone)
+					table.insert(events, if zone == outside then 'transition outside' else 'transition inside')
+				end)
+				zones:destroy()
+
+				Expect(before ~= outside).is_true()
+				Expect(table.concat(events, ' ')).is('transition outside')
+				Expect(observer:getZoneOfEntity(entity)).is(outside)
+			end)
+		end)
+
+		Test(
+			'Destroying the folder of fromChildren or fromDescendants removes its zones, and their entities exit.',
+			function()
+				withCleanup(function(track)
+					local results = {}
+					for i, how in { 'fromChildren', 'fromDescendants' } do
+						local position = Vector3.new(-42700 + i * 100, 0, 41000)
+						local folder = track(Instance.new('Folder'))
+						folder.Parent = workspace
+						local holder = folder
+						if how == 'fromDescendants' then
+							holder = Instance.new('Folder')
+							holder.Parent = folder
+						end
+						Util.createPart({ CFrame = CFrame.new(position), Size = Vector3.one * 10 }).Parent = holder
+						local zones = track((Zone :: any)[how](folder))
+						local entity = { Position = position }
+						local group = track(Group.new({ entities = { entity }, autoClean = false }))
+						local observer = track(Observer.new({ zones = { zones }, groups = { group }, safety = false }))
+						local exits = 0
+						observer:onExit(function()
+							exits += 1
+						end)
+						QuickZone:update(1)
+						local inside = #observer:getEntitiesInside()
+
+						folder:Destroy()
+						task.wait()
+						QuickZone:update(1)
+						table.insert(results, `{how}: {inside} in, {#zones:getZones()} zones, {exits} exit`)
+					end
+
+					Expect(table.concat(results, ', ')).is(
+						'fromChildren: 1 in, 0 zones, 1 exit, fromDescendants: 1 in, 0 zones, 1 exit'
+					)
+				end)
+			end
+		)
+	end)
+
 	Describe('Values of the wrong type', function()
 		Test('Every callback method refuses what is not a function when it is connected.', function()
 			withCleanup(function(track)
@@ -296,5 +456,45 @@ return function(Tiniest: Tiniest)
 				Expect(table.concat(accepted, ', ')).is('')
 			end)
 		end)
+	end)
+
+	Describe('Zones moving between trees from callbacks', function()
+		Test(
+			'A zone made dynamic and rebuilt from a callback in the middle of a tick is found by later entities.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-45400, 0, 41000)
+					local target = position + Vector3.new(100, 0, 0)
+					local a = { Position = position + AWAY }
+					local b = { Position = position + AWAY }
+					local zone = track(Zone.new(cube(position)))
+					local keepStatic = track(Zone.new(cube(position + Vector3.new(0, 500, 0))))
+					local trigger = track(Zone.new(cube(target)))
+					local group = track(Group.new({ entities = { a, b }, autoClean = false }))
+					local watcher =
+						track(Observer.new({ zones = { zone, keepStatic }, groups = { group }, updateRate = 37.25 }))
+					local switcher = track(
+						Observer.new({ zones = { trigger }, groups = { group }, updateRate = 37.25, safety = false })
+					)
+					QuickZone:update(1)
+
+					switcher:onEnter(function()
+						if not zone:isDynamic() then
+							zone:setDynamic(true)
+							QuickZone:rebuild()
+						end
+					end)
+					-- The first in the bucket runs the callback, the second is checked after it in the same tick
+					local bucket = State.buckets[37.25]
+					bucket[1].Position = target
+					bucket[2].Position = position
+					for _ = 1, 3 do
+						QuickZone:update(1)
+					end
+
+					Expect(#watcher:getEntitiesInside()).is(1)
+				end)
+			end
+		)
 	end)
 end
