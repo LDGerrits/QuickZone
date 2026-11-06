@@ -38,7 +38,8 @@ end
 
 -- private, use Observer:attach
 function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
-	if self.observers[observer] then
+	-- Its destroy has already let go of its observers
+	if Destroyed.isDestroyed(self) or self.observers[observer] then
 		return self
 	end
 	self.observers[observer] = true
@@ -352,7 +353,8 @@ function Zones.destroy(self: Types.InternalZones)
 	Destroyed.finish(self)
 end
 
--- private
+-- private. Not checked for a destroy: it is only given zones made for it, and what makes them stops before
+-- its zones are destroyed
 function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	if self.zones[zone] then
 		return

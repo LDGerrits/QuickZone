@@ -1,4 +1,5 @@
 --!strict
+local LogService = game:GetService('LogService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
@@ -63,6 +64,28 @@ function Util.captureWarnings(callback: () -> ()): { string }
 
 	local ok, err = pcall(callback)
 	Log.warn = original
+
+	if not ok then
+		error(err, 0)
+	end
+
+	return captured
+end
+
+-- Errors printed while the callback runs, also from threads it spawns that end before the next frame. Output
+-- arrives a frame late, so what earlier tests printed is let through first
+function Util.captureErrors(callback: () -> ()): { string }
+	task.wait()
+	local captured: { string } = {}
+	local connection = LogService.MessageOut:Connect(function(message, kind)
+		if kind == Enum.MessageType.MessageError then
+			table.insert(captured, message)
+		end
+	end)
+
+	local ok, err = pcall(callback)
+	task.wait()
+	connection:Disconnect()
 
 	if not ok then
 		error(err, 0)

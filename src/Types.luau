@@ -171,6 +171,8 @@ export type InternalZone = Zone & {
 
 	id: number,
 	slot: number,
+	-- The shape asked for. Mesh without a part is Block in the tree until it gets one
+	requestedShapeType: number,
 	reference: (Attachment | BasePart | Bone)?,
 	metadata: any?,
 	autoSync: boolean,

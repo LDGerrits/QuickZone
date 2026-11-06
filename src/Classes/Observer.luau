@@ -490,6 +490,10 @@ end
 ]=]
 function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
 	checkGroup(group)
+	-- From a callback during its destroy, which has let go of its groups or is about to
+	if Destroyed.isDestroyed(self) then
+		return self
+	end
 	hasSubscribedMap[self.id] = true
 
 	local groupId = group.id
@@ -571,6 +575,10 @@ end
 ]=]
 function Observer.attach(self: Types.InternalObserver, zone: any)
 	checkZone(zone)
+	-- From a callback during its destroy, which has let go of its zones or is about to
+	if Destroyed.isDestroyed(self) then
+		return self
+	end
 	hasAttachedMap[self.id] = true
 	zone:attach(self)
 	return self

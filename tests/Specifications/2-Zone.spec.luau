@@ -749,6 +749,35 @@ return function(Tiniest: Tiniest)
 			partB:Destroy()
 		end)
 
+		Test('Mesh zones that fell back to Block are Mesh again once the reference is a part.', function()
+			local part: MeshPart = Create({
+				className = 'MeshPart',
+				properties = { CFrame = CFrame.new(500, 0, 0), Size = Vector3.one * 10 },
+			})
+			local attachment: Attachment = Create({ className = 'Attachment' })
+			local zone = Zone.fromPart(part)
+			local orphaned: Types.Zone
+
+			CaptureWarnings(function()
+				zone:setReference(attachment)
+				orphaned = Zone.new({ cframe = part.CFrame, size = part.Size, shape = 'Mesh' })
+			end)
+
+			Expect(zone:getShape()).is('Block')
+			Expect(orphaned:getShape()).is('Block')
+
+			zone:setReference(part)
+			orphaned:setReference(part)
+
+			Expect(zone:getShape()).is('Mesh')
+			Expect(orphaned:getShape()).is('Mesh')
+
+			zone:destroy()
+			orphaned:destroy()
+			part:Destroy()
+			attachment:Destroy()
+		end)
+
 		Test('Rewires autoSync to the new reference, disconnecting from the old one.', function()
 			local size = Vector3.one * 50
 			local partA = CreatePart({ Size = Vector3.one * 10 })
