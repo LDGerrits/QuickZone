@@ -13,6 +13,7 @@ local RunService = game:GetService('RunService')
 local Callbacks = require(script.Parent.Parent.Core.Callbacks)
 local Config = require(script.Parent.Parent.Config)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
+local References = require(script.Parent.Parent.Core.References)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -1486,7 +1487,7 @@ end
 	@return Zone?
 ]=]
 function Observer.getZoneOfEntity(self: Types.InternalObserver, entity: any): Types.Zone?
-	entity = State.referenceToEntity[entity] or entity
+	entity = References.entityOf(entity)
 
 	local data = State.entityData[entity]
 	if not data then

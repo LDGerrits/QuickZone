@@ -11,11 +11,14 @@ local RunService = game:GetService('RunService')
 local Types = require(script.Types)
 local Config = require(script.Config)
 local PlayerTracker = require(script.Core.PlayerTracker)
+local References = require(script.Core.References)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
 local ZoneShapes = require(script.Core.ZoneShapes)
 local Log = require(script.Utils.Log)
 local Snapshot = require(script.Utils.Snapshot)
+
+local entityOf = References.entityOf
 
 local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
@@ -249,7 +252,10 @@ end
 --[=[
 	Instantly and safely removes the entity from QuickZone. 
 	It will be removed from all Groups, resolving any active Observers 
-	and firing their `onExit` events.
+	and firing their `onExit` events. Managed groups (`Group.players`, `Group.fromTag`) keep it,
+	and warn once, as they decide their own members.
+
+	Accepts a Player, an entity, or the reference an entity was given with `setReference`.
 
 	@tag Chainable
 	@method removeEntity
@@ -258,14 +264,18 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:removeEntity(entity: any): QuickZone
+	-- Groups already asked, so a managed group warns once
+	local asked = {} :: { [any]: true }
+
 	-- A player leaves the groups it was added to, also while it has no character
 	if typeof(entity) == 'Instance' and entity:IsA('Player') then
 		for _, group in PlayerTracker.groupsOf(entity) do
+			asked[group] = true
 			group:remove(entity)
 		end
 	end
 
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
@@ -283,7 +293,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 	local target = if typeof(reference) == 'Instance' and reference:IsA('Player') then reference else entity
 	for _, groupId in idsToRemove do
 		local group = groups[groupId]
-		if group then
+		if group and not asked[group] then
 			group:remove(target)
 		end
 	end
@@ -441,7 +451,7 @@ end
 	@return { Zone }
 ]=]
 function QuickZone:getZonesOfEntity(entity: any): { Types.Zone }
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
 		return {}
@@ -474,7 +484,7 @@ end
 	@return { Group }
 ]=]
 function QuickZone:getGroupsOfEntity(entity: any): { Types.Group }
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
 		return {}
@@ -576,7 +586,7 @@ end
 	@return () -> Group?
 ]=]
 function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
@@ -609,7 +619,7 @@ end
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
