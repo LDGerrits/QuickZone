@@ -167,14 +167,13 @@ declare namespace QuickZone {
 				isDynamic?: boolean
 				metadata?: any
 				autoSync?: boolean
-				observers?: Observer[]
 			}): Zone
 
-			fromPart: (part: BasePart, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean; observers?: Observer[] }) => Zone
-			fromParts: (parts: BasePart[], config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean; observers?: Observer[] }) => Zones
-			fromChildren: (parent: Instance, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean; observers?: Observer[] }) => Zones
-			fromDescendants: (parent: Instance, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean; observers?: Observer[] }) => Zones
-			fromTag: (tag: string, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean; observers?: Observer[] }) => Zones
+			fromPart: (part: BasePart, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zone
+			fromParts: (parts: BasePart[], config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
+			fromChildren: (parent: Instance, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
+			fromDescendants: (parent: Instance, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
+			fromTag: (tag: string, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
 		}
 
 		Observer: {

@@ -188,21 +188,6 @@ local function checkReference(reference: any)
 	end
 end
 
-local function checkObservers(config: { observers: { any }? }?)
-	for _, observer in config and config.observers or {} do
-		if type(observer) ~= 'table' or type(observer.subscribe) ~= 'function' then
-			Log.fatal('Expected an Observer in observers, got %s.', nil, tostring(observer))
-		end
-	end
-end
-
--- Attaches the observers a config lists to a new Zone or Zones
-local function attachObservers(zone: any, config: { observers: { any }? }?)
-	for _, observer in config and config.observers or {} do
-		observer:attach(zone)
-	end
-end
-
 local Zone = {}
 Zone.__index = Zone
 
@@ -274,7 +259,7 @@ end
 
 	@tag Constructor
 	@tag Chainable
-	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }
+	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean? }
 	@return Zone
 ]=]
 function Zone.new(config: {
@@ -285,12 +270,10 @@ function Zone.new(config: {
 	isDynamic: boolean?,
 	metadata: any?,
 	autoSync: boolean?,
-	observers: { Types.Observer<any> }?,
 }): Types.Zone
 	if type(config) ~= 'table' then
 		Log.fatal('Zone.new expects a config table, got %s.', nil, typeof(config))
 	end
-	checkObservers(config)
 
 	local shapeType = Enum.PartType.Block.Value
 
@@ -303,7 +286,7 @@ function Zone.new(config: {
 		end
 	end
 
-	local zone = newZoneInternal(
+	return newZoneInternal(
 		config.cframe,
 		config.size,
 		shapeType,
@@ -312,8 +295,6 @@ function Zone.new(config: {
 		config.metadata,
 		not not config.autoSync
 	)
-	attachObservers(zone, config)
-	return zone
 end
 
 --[=[ 
@@ -339,7 +320,7 @@ end
 	@tag Constructor
 	@tag Chainable
 	@param part BasePart -- The part to derive the zone from.
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zone
 ]=]
 function Zone.fromPart(
@@ -348,13 +329,11 @@ function Zone.fromPart(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
-		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zone
 	if typeof(part) ~= 'Instance' or not part:IsA('BasePart') then
 		Log.fatal('Zone.fromPart expects a BasePart, got %s.', nil, tostring(part))
 	end
-	checkObservers(config)
 
 	local shapeId = getShapeEnumValue(part)
 
@@ -362,9 +341,7 @@ function Zone.fromPart(
 	local metadata = config and config.metadata
 	local autoSync = config ~= nil and not not config.autoSync
 
-	local zone = newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
-	attachObservers(zone, config)
-	return zone
+	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
 end
 
 --[=[
@@ -374,7 +351,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param parts { BasePart }
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
 function Zone.fromParts(
@@ -383,10 +360,8 @@ function Zone.fromParts(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
-		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
-	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -408,7 +383,6 @@ function Zone.fromParts(
 		end
 	end
 
-	attachObservers(zones, config)
 	return zones
 end
 
@@ -420,7 +394,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param parent Instance
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
 function Zone.fromChildren(
@@ -429,10 +403,8 @@ function Zone.fromChildren(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
-		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
-	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -481,7 +453,6 @@ function Zone.fromChildren(
 		table.clear(instanceToZone)
 	end)
 
-	attachObservers(zones, config)
 	return zones
 end
 
@@ -497,7 +468,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param parent Instance -- The container (Model, Folder, etc.) to search through.
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
 function Zone.fromDescendants(
@@ -506,10 +477,8 @@ function Zone.fromDescendants(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
-		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
-	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -558,7 +527,6 @@ function Zone.fromDescendants(
 		table.clear(instanceToZone)
 	end)
 
-	attachObservers(zones, config)
 	return zones
 end
 
@@ -570,7 +538,7 @@ end
 	@tag Chainable
 	@within Zone
 	@param tag string
-	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean?, observers: { Observer }? }?
+	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
 function Zone.fromTag(
@@ -579,10 +547,8 @@ function Zone.fromTag(
 		isDynamic: boolean?,
 		metadata: any?,
 		autoSync: boolean?,
-		observers: { Types.Observer<any> }?,
 	}?
 ): Types.Zones
-	checkObservers(config)
 	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
 	local metadata = if config and config.metadata ~= nil then config.metadata else nil
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
@@ -736,7 +702,6 @@ function Zone.fromTag(
 		table.clear(partClaims)
 	end)
 
-	attachObservers(zones, config)
 	return zones
 end
 
