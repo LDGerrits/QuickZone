@@ -1627,15 +1627,17 @@ return function(Tiniest: Tiniest)
 			withCleanup(function(track)
 				local group = track(Group.players())
 				local character = player.Character or player.CharacterAdded:Wait()
-				local before = group:contains(player)
+				local before = QuickZone:getEntityOfReference(player)
 				character.Parent = nil
 				task.wait()
-				local away = group:contains(player)
+				local away = QuickZone:getEntityOfReference(player)
 				character.Parent = workspace
 				task.wait()
 
-				Expect(before).is_true()
-				Expect(away).is(false)
+				Expect(before ~= nil).is_true()
+				Expect(away).is(nil)
+				Expect(QuickZone:getEntityOfReference(player)).is(character:FindFirstChild('HumanoidRootPart'))
+				-- Still a member while away, as it was added
 				Expect(group:contains(player)).is_true()
 			end)
 		end)

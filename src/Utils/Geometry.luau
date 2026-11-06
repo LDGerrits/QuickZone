@@ -111,18 +111,11 @@ function Geometry.isPointInShape(
 		local localPoint = vector.abs(toObjectSpace(point, position, right, up, back))
 		return vector.min(localPoint, halfSize) == localPoint
 	elseif shapeType == CYLINDER_SHAPE_VALUE then
-		local halfHeight = halfSize.X
-		local start = position - right * halfHeight
-		local toPoint = point - start
-		local axis = right
-		local projection = vector.dot(toPoint, axis)
-		if projection >= 0 and projection <= halfHeight * 2 :: number then
-			local closestPointOnAxis = start :: Vector3 + axis :: Vector3 * projection
-			local distanceSq = vector.dot(point - closestPointOnAxis, point - closestPointOnAxis)
-			local radiusSq = halfSize.Y * halfSize.Y
-			return distanceSq <= radiusSq
-		end
-		return false
+		-- Along its X axis. Compared without multiplying by the length, which would be NaN for an infinite one
+		local localPoint = toObjectSpace(point, position, right, up, back)
+		local radius = halfSize.Y
+		return math.abs(localPoint.X) <= halfSize.X
+			and localPoint.Y * localPoint.Y + localPoint.Z * localPoint.Z <= radius * radius
 	elseif shapeType == BALL_SHAPE_VALUE then
 		local radiusSq = halfSize.X * halfSize.X
 		return vector.dot(position - point, position - point) <= radiusSq

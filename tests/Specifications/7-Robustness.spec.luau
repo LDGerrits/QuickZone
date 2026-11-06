@@ -230,6 +230,85 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('Callbacks that disconnect themselves fire once each, also thousands of them on one event.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-47000, 0, 41000)
+				local entity = { Position = position + AWAY }
+				local zone = track(Zone.new(cube(position)))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+
+				local COUNT = 4000
+				local fired = 0
+				for _ = 1, COUNT do
+					local disconnect
+					disconnect = observer:onEnter(function()
+						fired += 1
+						disconnect()
+					end)
+				end
+				entity.Position = position
+				local start = os.clock()
+				QuickZone:update(1)
+				local elapsed = os.clock() - start
+				entity.Position = position + AWAY
+				QuickZone:update(1)
+				entity.Position = position
+				QuickZone:update(1)
+
+				Expect(fired).is(COUNT)
+				-- Let go of once the event ended
+				Expect(#State.observerEnteredCallbacks[observer:getId()]).is(0)
+				-- Copying the list for each disconnect took 150 ms
+				Expect(if elapsed < 0.05 then 'fast' else string.format('%.0f ms', elapsed * 1000)).is('fast')
+			end)
+		end)
+
+		Test('Callbacks disconnected during an event are skipped for it, and the rest keep their order.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-47050, 0, 41000)
+				local entity = { Position = position }
+				local zone = track(Zone.new(cube(position)))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local results = {}
+				for _, safety in { false, true } do
+					local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = safety }))
+					local events = {}
+					local disconnectSecond, disconnectThird
+					observer:onEnter(function()
+						table.insert(events, 'first')
+						disconnectSecond()
+					end)
+					disconnectSecond = observer:onEnter(function()
+						table.insert(events, 'second')
+					end)
+					disconnectThird = observer:onEnter(function()
+						table.insert(events, 'third')
+						disconnectThird()
+					end)
+					observer:onEnter(function()
+						table.insert(events, 'fourth')
+					end)
+
+					entity.Position = position
+					QuickZone:update(1)
+					table.insert(events, '|')
+					entity.Position = position + AWAY
+					QuickZone:update(1)
+					entity.Position = position
+					QuickZone:update(1)
+					observer:destroy()
+					entity.Position = position + AWAY
+					table.insert(results, table.concat(events, ' '))
+				end
+
+				Expect(table.concat(results, ', ')).is(
+					'first third fourth | first fourth, first third fourth | first fourth'
+				)
+			end)
+		end)
+
 		Test('An unsafe callback that yields holds updates back with one warning, and they resume after it.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-41400, 0, 41000)
@@ -434,6 +513,31 @@ return function(Tiniest: Tiniest)
 	end)
 
 	Describe('Values of the wrong type', function()
+		Test('onDestroy refuses anything but a function, so destroy still cleans up.', function()
+			withCleanup(function(track)
+				local zone = track(Zone.new(cube(Vector3.new(-47100, 0, 41000))))
+				local zones = track(Zone.fromParts({}))
+				local group = track(Group.new())
+				local observer = track(Observer.new({ zones = {}, groups = {} }))
+				local refused = 0
+				for _, object in { zone, zones, group, observer } do
+					if refuses('function', object.onDestroy, object, 42) then
+						refused += 1
+					end
+				end
+				local zoneId, groupId, observerId = zone:getId(), group:getId(), observer:getId()
+				zone:destroy()
+				zones:destroy()
+				group:destroy()
+				observer:destroy()
+
+				Expect(refused).is(4)
+				Expect(State.zoneIdToZoneObj[zoneId]).is(nil)
+				Expect(State.groups[groupId]).is(nil)
+				Expect(State.observerIdToObserverObj[observerId]).is(nil)
+			end)
+		end)
+
 		Test('Zone setters refuse wrong types and leave the zone as it was, so later changes still apply.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-43000, 0, 41000)
@@ -640,6 +744,51 @@ return function(Tiniest: Tiniest)
 					Expect(table.find(QuickZone:getZonesAtPoint(far), flat) ~= nil).is_true()
 					Expect(table.find(QuickZone:getZonesAtPoint(position + Vector3.new(0, 300, 0)), small) ~= nil).is_true()
 					Expect(#QuickZone:getZonesAtPoint(position + Vector3.new(0, 50, 0))).is(0)
+				end)
+			end
+		)
+
+		Test('An infinitely long Cylinder contains the points along its axis.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-47200, -2000, 41000)
+				local pole = track(Zone.new({
+					cframe = CFrame.new(position),
+					size = Vector3.new(INF, 10, 10),
+					shape = 'Cylinder',
+				}))
+				local entity = { Position = position + Vector3.new(1e5, 4, 0) }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { pole }, groups = { group } }))
+				QuickZone:update(1)
+
+				Expect(pole:isPointInside(position)).is_true()
+				Expect(pole:isPointInside(position - Vector3.new(1e5, 0, 4))).is_true()
+				Expect(pole:isPointInside(position + Vector3.new(0, 6, 0))).is(false)
+				Expect(observer:getZoneOfEntity(entity)).is(pole)
+			end)
+		end)
+
+		Test(
+			'An infinite zone leaves its tree a finite cost, so the tree is still rebuilt once it degrades.',
+			function()
+				withCleanup(function(track)
+					local position = Vector3.new(-47250, -2000, 41000)
+					track(
+						Zone.new({ cframe = CFrame.new(position), size = Vector3.new(INF, 10, INF), isDynamic = true })
+					)
+					track(
+						Zone.new({ cframe = CFrame.new(position), size = Vector3.new(INF, 0, INF), isDynamic = true })
+					)
+					for i = 1, 4 do
+						track(Zone.new({
+							cframe = CFrame.new(position + Vector3.new(i * 30, 50, 0)),
+							size = Vector3.one,
+							isDynamic = true,
+						}))
+					end
+					QuickZone:update(0)
+
+					Expect(State.dynamicTree.cost < INF).is_true()
 				end)
 			end
 		)
@@ -1178,6 +1327,34 @@ return function(Tiniest: Tiniest)
 			end
 		)
 
+		Test('remove takes the same entity contains finds.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-47350, 0, 41000)
+				local npc = { Position = position }
+				local hitbox = { Position = position }
+				local marked = { Position = position }
+				local marker = {}
+				local npcs = track(Group.new({ entities = { npc }, autoClean = false }))
+				local hitboxes = track(Group.new({ entities = { hitbox, marked }, autoClean = false }))
+				QuickZone:setReference(hitbox, npc)
+				QuickZone:setReference(marked, marker)
+
+				-- npc is an entity, so it stands for itself, not for the hitbox it is the reference of
+				local containedNpc = hitboxes:contains(npc)
+				hitboxes:remove(npc)
+				local keptHitbox = hitboxes:contains(hitbox)
+				-- marker is only a reference, so it stands for its entity
+				local containedMarker = hitboxes:contains(marker)
+				hitboxes:remove(marker)
+
+				Expect(containedNpc).is(false)
+				Expect(keptHitbox).is_true()
+				Expect(containedMarker).is_true()
+				Expect(hitboxes:contains(marked)).is(false)
+				Expect(npcs:contains(npc)).is_true()
+			end)
+		end)
+
 		Test('Adding nil to a group reports it and adds nothing.', function()
 			withCleanup(function(track)
 				local group = track(Group.new())
@@ -1214,6 +1391,56 @@ return function(Tiniest: Tiniest)
 				end
 
 				Expect(table.concat(winners, ' ')).is('5 4 3 2 1')
+			end)
+		end)
+
+		Test("An observer an entity lost earlier in the tick doesn't take it from a lower-priority one.", function()
+			withCleanup(function(track)
+				local position = Vector3.new(-47300, 0, 41000)
+				-- One rate no other test uses, so both entities share a fresh bucket and the trigger goes first
+				local RATE = 37.25
+				local trigger = { Position = position + AWAY }
+				local entity = { Position = position + Vector3.new(100, 0, 0) }
+				local triggers = track(Group.new({ entities = { trigger }, autoClean = false }))
+				local low = track(Group.new({ autoClean = false }))
+				local high = track(Group.new({ autoClean = false }))
+				local function observer(at: Vector3, priority: number, group: any)
+					local zone = track(Zone.new(cube(position + at)))
+					return track(Observer.new({
+						zones = { zone },
+						groups = { group },
+						priority = priority,
+						updateRate = RATE,
+						safety = false,
+					}))
+				end
+				local triggerObserver = observer(Vector3.zero, 0, triggers)
+				QuickZone:update(1)
+				low:add(entity)
+				high:add(entity)
+				local lowObserver = observer(Vector3.new(100, 0, 0), 0, low)
+				observer(Vector3.new(108, 0, 0), 10, high)
+				QuickZone:update(1)
+
+				local events = {}
+				lowObserver:onExit(function()
+					table.insert(events, 'exit')
+				end)
+				lowObserver:onEnter(function()
+					table.insert(events, 'enter')
+				end)
+				triggerObserver:onEnter(function()
+					high:remove(entity)
+				end)
+				-- Inside both zones, but the high one stops watching it before it is checked
+				trigger.Position = position
+				entity.Position = position + Vector3.new(104, 0, 0)
+				QuickZone:update(1)
+				QuickZone:update(1)
+
+				Expect(State.buckets[RATE][1]).is(trigger)
+				Expect(table.concat(events, ' ')).is('')
+				Expect(lowObserver:getZoneOfEntity(entity) ~= nil).is_true()
 			end)
 		end)
 
@@ -1412,6 +1639,63 @@ return function(Tiniest: Tiniest)
 				Expect(groupsOfOld).is(0)
 				Expect(second:contains(player)).is_true()
 				Expect(first:contains(player)).is_true()
+			end)
+		end)
+
+		Test('Player transitions fire only for entities whose reference is the player.', function()
+			withCleanup(function(track)
+				local character = waitForCharacter()
+				local hrp = character:FindFirstChild('HumanoidRootPart') :: BasePart
+				local position = Vector3.new(-47400, 0, 41000)
+				-- Its reference is the player's part, not the player
+				local hitbox = { Position = position }
+				local group = track(Group.new({ entities = { hitbox }, autoClean = false }))
+				QuickZone:setReference(hitbox, hrp)
+				local first = track(Zone.new(cube(position)))
+				local second = track(Zone.new(cube(position + Vector3.new(8, 0, 0))))
+				local observer = track(Observer.new({ zones = { first, second }, groups = { group }, safety = false }))
+				local events = {}
+				observer:onTransition(function(reference)
+					table.insert(events, if reference == hrp then 'transition' else 'other')
+				end)
+				observer:onPlayerEnter(function()
+					table.insert(events, 'player enter')
+				end)
+				observer:onPlayerTransition(function()
+					table.insert(events, 'player transition')
+				end)
+				QuickZone:update(1)
+				hitbox.Position = position + Vector3.new(12, 0, 0)
+				QuickZone:update(1)
+
+				Expect(table.concat(events, ', ')).is('transition')
+			end)
+		end)
+
+		Test('A player without a character is still a member of the groups it was added to.', function()
+			withCleanup(function(track)
+				local character = waitForCharacter()
+				-- Tracked already, so taking the character away lets go of its part
+				track(Group.new({ entities = { player }, autoClean = false }))
+				local group = track(Group.new({ autoClean = false }))
+				character.Parent = nil
+				task.wait()
+				local away = QuickZone:getEntityOfReference(player)
+				group:add(player)
+				local contained = group:contains(player)
+				local groups = QuickZone:getGroupsOfEntity(player)
+				local iterated = {}
+				for found in QuickZone:iterGroupsOfEntity(player) do
+					table.insert(iterated, found)
+				end
+				character.Parent = workspace
+				task.wait()
+
+				Expect(away).is(nil)
+				Expect(contained).is_true()
+				Expect(table.find(groups, group) ~= nil).is_true()
+				Expect(table.find(iterated, group) ~= nil).is_true()
+				Expect(group:contains(player)).is_true()
 			end)
 		end)
 

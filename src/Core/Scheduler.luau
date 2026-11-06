@@ -429,6 +429,13 @@ local function runTick(dt: number)
 				end
 			end
 
+			-- A callback earlier this tick changed its groups or their observers, which apply from the next tick.
+			-- Checked now, an observer it lost could still win over one it has, and make it leave that one
+			if shouldCheck and dirtyProfiles[entity] then
+				data.logicVersion = -1
+				shouldCheck = false
+			end
+
 			if shouldCheck then
 				data.lastPosition = position
 				data.dynamicVersion = dynamicVersion
