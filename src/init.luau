@@ -133,13 +133,15 @@ end
 	Manually processes the spatial queries and trigger callbacks.
 	This is only necessary if you disabled automatic updating.
 
+	Called from inside a callback, while an update is running, it does nothing: its work is done by the next update.
+
 	@tag Chainable
 	@method update
 	@within QuickZone
-	@param dt number -- Delta time
+	@param dt number? -- Delta time, 0 when left out
 	@return QuickZone
 ]=]
-function QuickZone:update(dt: number): QuickZone
+function QuickZone:update(dt: number?): QuickZone
 	Scheduler.update(dt)
 	return self
 end
@@ -668,7 +670,7 @@ end
 
 --[=[
 	Returns an iterator that returns every Zone intersecting the given point.
-	Ideal for zero-allocation ECS queries. Safe to `break` out of early.
+	Ideal for ECS queries. Safe to `break` out of early.
 
 	:::info Changes while iterating
 	The zones whose bounds hold the point are found when the iterator is created. Each is checked against
