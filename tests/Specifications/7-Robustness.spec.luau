@@ -489,15 +489,9 @@ return function(Tiniest: Tiniest)
 						Zone.new,
 						{ cframe = CFrame.new(position), size = Vector3.one, reference = 'Part' }
 					),
-					refuses(
-						'Observer',
-						Zone.new,
-						{ cframe = CFrame.new(position), size = Vector3.one, observers = { 5 } }
-					),
 					refuses('config', Zone.new, nil),
 					refuses('BasePart', Zone.fromPart, nil),
 					refuses('BasePart', Zone.fromPart, Instance.new('Folder')),
-					refuses('Observer', Zone.fromParts, {}, { observers = { 'observer' } }),
 				}
 
 				Expect(table.find(refusals, false)).is(nil)
@@ -747,32 +741,6 @@ return function(Tiniest: Tiniest)
 				Expect(zones:isDynamic()).is(false)
 				Expect(zones:isPointInside(moved)).is_true()
 				Expect(zones:isPointInside(position)).is(false)
-			end)
-		end)
-
-		Test('The observers option of the zone constructors attaches them.', function()
-			withCleanup(function(track)
-				local position = Vector3.new(-43700, 0, 41000)
-				local entity = { Position = position }
-				local group = track(Group.new({ entities = { entity }, autoClean = false }))
-				local observer = track(Observer.new({ zones = {}, groups = { group } }))
-				local zone = track(
-					Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10, observers = { observer } })
-				)
-				local part = track(Util.createPart({ CFrame = CFrame.new(position + AWAY) }))
-				local fromPart = track(Zone.fromPart(part, { observers = { observer } }))
-				local zones =
-					track(Zone.fromParts({ track(Util.createPart({ CFrame = CFrame.new(position - AWAY) })) }, {
-						observers = { observer },
-					}))
-				QuickZone:update(1)
-
-				local attached = setmetatable({}, { __mode = 'k' })
-				for _, attachedZone in observer:getZones() do
-					attached[attachedZone] = true
-				end
-				Expect(attached[zone] and attached[fromPart] and attached[zones:getZones()[1]]).is(true)
-				Expect(observer:getZoneOfEntity(entity)).is(zone)
 			end)
 		end)
 	end)
