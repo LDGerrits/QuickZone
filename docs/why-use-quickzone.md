@@ -43,7 +43,7 @@ Most Roblox libraries rely heavily on Object-Oriented Programming (OOP). QuickZo
 
 - **Low GC Pressure**: Because QuickZone reuses its arrays and tree buffers, the spatial update loop generates practically zero garbage. This avoids the micro-stutters typically caused by Luau's Garbage Collector cleaning up old tables. (Callbacks with `safety` enabled run through `task.spawn`, which creates a thread per event.)
 
-- **Iterators**: QuickZone provides iterators like `iterEntitiesInside` that walk its internal state directly instead of building result tables, which makes QuickZone a great fit for Entity Component System (ECS) workflows.
+- **Iterators**: QuickZone provides iterators like `iterEntitiesInside` that don't build result tables and reuse their memory from one loop to the next, which makes QuickZone a great fit for Entity Component System (ECS) workflows.
 
 ---
 
@@ -66,7 +66,7 @@ Because Observers are decoupled from the physics engine, they can aggregate spat
 A common issue with spatial libraries is stutter due to it processing too many things in one frame. QuickZone fixes this via its smart Scheduler.
 
 #### Frame Budgeting
-You can set a time limit (e.g., 1ms). The Scheduler checks `os.clock()` every 32 entities. Once the budget is used up, it stops and resumes where it left off in the next frame. This keeps entity processing from causing frame drops. Two things are not split across frames: pending tree rebuilds, which always run to completion, and your own callbacks, which run inside the step.
+You can set a time limit (e.g., 1ms). The Scheduler checks `os.clock()` every 32 entities. Once the budget is used up, it stops and resumes where it left off in the next frame. Each frame still checks at least 32 entities, also when a rebuild used up the budget, so entities keep being checked while zones keep changing. This keeps entity processing from causing frame drops. Two things are not split across frames: pending tree rebuilds, which always run to completion, and your own callbacks, which run inside the step.
 
 #### Workload Smearing
 The scheduler smears updates across frames. This means that, if 600 entities are tracked by a 10Hz Observer, QuickZone will process exactly 100 entities per frame at 60 fps. This ensures a flat, predictable performance profile with no peaks or valleys.

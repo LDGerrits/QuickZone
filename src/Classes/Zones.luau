@@ -4,8 +4,8 @@
 
 	Zones manages multiple individual `Zone` objects as a single, unified entity. 
 	This allows you to create complex shapes and structures by combining multiple zones together. 
-	You can attach observers to a `Zones` instance, and they will be automatically attached to all contained zones. 
-	When a zone is added or removed from the `Zones` instance, observers will be updated accordingly.
+	Attaching a `Zones` to an observer attaches every zone in it. Zones added to or removed from it later are
+	attached and detached accordingly.
 ]=]
 
 local State = require(script.Parent.Parent.Core.State)
@@ -35,15 +35,7 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	return self
 end
 
---[=[ 
-	Attaches an Observer to all underlying zones.
-
-	@tag Chainable
-	@method attach
-	@within Zones
-	@param observer Observer
-	@return Zones
-]=]
+-- private, use Observer:attach
 function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	if self.observers[observer] then
 		return self
@@ -61,15 +53,7 @@ function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	return self
 end
 
---[=[ 
-	Detaches an Observer from all underlying zones.
-
-	@tag Chainable
-	@method detach
-	@within Zones
-	@param observer Observer
-	@return Zones
-]=]
+-- private, use Observer:detach
 function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 	if not self.observers[observer] then
 		return self

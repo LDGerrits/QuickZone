@@ -367,7 +367,8 @@ Observer.__index = Observer
 	```
 
 	:::warning Safety 
-	If safety is set to false, any yielding will result in breaking QuickZone.
+	If safety is set to false, callbacks run directly and must not yield. One that yields holds back every
+	update until it resumes, and QuickZone warns about it. Errors are still reported rather than thrown.
 	Only set it to false if you do not want the overhead of virtual threads.
 	:::
 
@@ -564,7 +565,7 @@ end
 	@tag Chainable
 	@method attach
 	@within Observer
-	@param zone Zone -- The zone to link.
+	@param zone Zone | Zones -- The zone to link.
 	@return Observer
 ]=]
 function Observer.attach(self: Types.InternalObserver, zone: any)
@@ -581,7 +582,7 @@ end
 	@tag Chainable
 	@method detach
 	@within Observer
-	@param zone Zone -- The zone to unlink.
+	@param zone Zone | Zones -- The zone to unlink.
 	@return Observer
 ]=]
 function Observer.detach(self: Types.InternalObserver, zone: any)
@@ -614,7 +615,7 @@ end
 
 	@method observe
 	@within Observer
-	@param callback (entity: any, zone: Zone) -> (() -> ())?
+	@param callback (entity: any, zone: Zone, physicalEntity: Entity) -> (() -> ())?
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.observe(
@@ -687,7 +688,7 @@ end
 	@tag Event
 	@method onEnter
 	@within Observer
-	@param callback (entity: any, zone: Zone) -> ()
+	@param callback (entity: any, zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onEnter(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
@@ -701,7 +702,7 @@ end
 	@tag Event
 	@method onExit
 	@within Observer
-	@param callback (entity: any, zone: Zone) -> ()
+	@param callback (entity: any, zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onExit(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
@@ -725,7 +726,7 @@ end
 
 	@method observePlayer
 	@within Observer
-	@param callback (player: Player, zone: Zone) -> (() -> ())?
+	@param callback (player: Player, zone: Zone, physicalEntity: Entity) -> (() -> ())?
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.observePlayer(
@@ -759,7 +760,7 @@ end
 	@tag Event
 	@method onPlayerEnter
 	@within Observer
-	@param callback (player: Player, zone: Zone) -> ()
+	@param callback (player: Player, zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerEnter(
@@ -781,7 +782,7 @@ end
 	@tag Event
 	@method onPlayerExit
 	@within Observer
-	@param callback (player: Player, zone: Zone) -> ()
+	@param callback (player: Player, zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerExit(
@@ -811,7 +812,7 @@ end
 	@client
 	@method observeLocalPlayer
 	@within Observer
-	@param callback (zone: Zone) -> (() -> ())?
+	@param callback (zone: Zone, physicalEntity: Entity) -> (() -> ())?
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.observeLocalPlayer(
@@ -849,7 +850,7 @@ end
 	@tag Event
 	@method onLocalPlayerEnter
 	@within Observer
-	@param callback (zone: Zone) -> ()
+	@param callback (zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onLocalPlayerEnter(self: Types.InternalObserver, callback: (Types.Zone, Types.Entity) -> ()): () -> ()
@@ -873,7 +874,7 @@ end
 	@tag Event
 	@method onLocalPlayerExit
 	@within Observer
-	@param callback (zone: Zone) -> ()
+	@param callback (zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onLocalPlayerExit(self: Types.InternalObserver, callback: (Types.Zone, Types.Entity) -> ()): () -> ()
@@ -905,7 +906,7 @@ end
 
 	@method observeGroup
 	@within Observer
-	@param callback (group: Group, zone: Zone) -> (() -> ())?
+	@param callback (group: Group, zone: Zone, physicalEntity: Entity) -> (() -> ())?
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.observeGroup(
@@ -963,7 +964,7 @@ end
 	@tag Event
 	@method onGroupEnter
 	@within Observer
-	@param callback (group: Group, zone: Zone) -> ()
+	@param callback (group: Group, zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onGroupEnter(
@@ -984,7 +985,7 @@ end
 	@tag Event
 	@method onGroupExit
 	@within Observer
-	@param callback (group: Group, zone: Zone) -> ()
+	@param callback (group: Group, zone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onGroupExit(
@@ -1005,7 +1006,7 @@ end
 	@tag Event
 	@method onTransition
 	@within Observer
-	@param callback (entity: any, newZone: Zone) -> ()
+	@param callback (entity: any, newZone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onTransition(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
@@ -1019,7 +1020,7 @@ end
 	@tag Event
 	@method onPlayerTransition
 	@within Observer
-	@param callback (player: Player, newZone: Zone) -> ()
+	@param callback (player: Player, newZone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onPlayerTransition(
@@ -1041,7 +1042,7 @@ end
 	@tag Event
 	@method onLocalPlayerTransition
 	@within Observer
-	@param callback (newZone: Zone) -> ()
+	@param callback (newZone: Zone, physicalEntity: Entity) -> ()
 	@return () -> () -- Disconnect function
 ]=]
 function Observer.onLocalPlayerTransition(
@@ -1107,7 +1108,8 @@ end
 	Whether to wrap callbacks in task.spawn (safe) or not (unsafe).
 
 	:::warning Safety 
-	If set to unsafe, you are not allowed to yield in the callbacks anymore. If you do, QuickZone will throw errors.
+	Unsafe callbacks run directly and must not yield. One that yields holds back every update until it resumes,
+	and QuickZone warns about it.
 	:::
 
 	@tag Chainable
@@ -1383,7 +1385,7 @@ end
 
 	@method getEntitiesInZone
 	@within Observer
-	@param zone Zone
+	@param zone Zone | Zones
 	@return { any }
 ]=]
 function Observer.getEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): { any }
@@ -1401,7 +1403,7 @@ end
 
 	@method getPlayersInZone
 	@within Observer
-	@param zone Zone
+	@param zone Zone | Zones
 	@return { Player }
 ]=]
 function Observer.getPlayersInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): { Player }
@@ -1510,7 +1512,7 @@ end
 
 	@method iterEntitiesInZone
 	@within Observer
-	@param zone Zone
+	@param zone Zone | Zones
 	@return () -> Entity?
 ]=]
 function Observer.iterEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): () -> Types.Entity?
@@ -1526,7 +1528,7 @@ end
 
 	@method iterPlayersInZone
 	@within Observer
-	@param zone Zone
+	@param zone Zone | Zones
 	@return () -> Player?
 ]=]
 function Observer.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): () -> Player?

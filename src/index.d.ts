@@ -134,7 +134,7 @@ declare namespace QuickZone {
 	export interface QuickZone {
 		configure(config: { enabled?: boolean; autoSyncRate?: number; frameBudget?: number }): QuickZone
 		setEnabled(enabled: boolean): QuickZone
-		update(dt: number): QuickZone
+		update(dt?: number): QuickZone
 		setAutoSyncRate(hz: number): QuickZone
 		rebuild(): QuickZone
 		setReference(entity: Entity, reference?: any): QuickZone
