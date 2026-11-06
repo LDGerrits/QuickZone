@@ -575,9 +575,21 @@ end
 -- Set while a tick runs. A callback updating again would clobber the tick in progress,
 -- so that update is skipped and its work is left to the next tick
 local ticking = false
+-- The thread running the tick. Suspended rather than running, it was an unsafe callback that yielded, which
+-- is warned about once per stall
+local tickThread: thread? = nil
+local warnedYield = false
 
 function Scheduler.update(dt: number)
 	if ticking then
+		if not warnedYield and tickThread and coroutine.status(tickThread) == 'suspended' then
+			warnedYield = true
+			Log.warn(
+				'An unsafe callback (safety = false) yielded, so QuickZone waits for it to resume before it '
+					.. 'updates again. Unsafe callbacks must not yield.',
+				nil
+			)
+		end
 		return
 	end
 
@@ -587,8 +599,11 @@ function Scheduler.update(dt: number)
 	end
 
 	ticking = true
+	tickThread = coroutine.running()
 	local ok, trace = xpcall(runTick, debug.traceback, dt)
 	ticking = false
+	tickThread = nil
+	warnedYield = false
 	if not ok then
 		recoverFromError()
 		error(trace, 0)
