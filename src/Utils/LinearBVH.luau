@@ -260,10 +260,14 @@ function LinearBVH.build(
 	local max = NEGATIVE_HUGE_VECTOR
 	local count = 0
 
-	-- Collect members and the scene bounds
+	-- Collect members and the scene the Morton codes span, which is where their centers are. Infinite or
+	-- NaN centers are left out, as is the size, so one huge zone doesn't put every other in the same cell
 	for id in members do
-		min = vector.min(min, boundsMin[id])
-		max = vector.max(max, boundsMax[id])
+		local position = positions[id]
+		if position - position == Vector3.zero then
+			min = vector.min(min, position)
+			max = vector.max(max, position)
+		end
 
 		count += 1
 		memberIds[count] = id
@@ -276,6 +280,11 @@ function LinearBVH.build(
 		tree.count = 0
 		tree.cost = 0
 		return
+	end
+
+	-- No zone has a finite center
+	if min.X > max.X then
+		min, max = Vector3.zero, Vector3.zero
 	end
 
 	-- Add padding to avoid edge cases with flat scenes
