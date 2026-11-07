@@ -14,6 +14,7 @@ local Util = require(TestFolder.Util)
 local withCleanup = Util.withCleanup
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Scheduler = require(ReplicatedStorage.QuickZone.Core.Scheduler)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
@@ -1404,6 +1405,31 @@ return function(Tiniest: Tiniest)
 				entity.Position = position
 				QuickZone:update(1 / 60)
 				Expect(slow:getZoneOfEntity(entity)).is(zone)
+			end)
+		end)
+
+		-- No public call takes an entity out twice today; this keeps a future one from removing its neighbour
+		Test('Taking an entity out of its bucket twice leaves the other entities in it.', function()
+			withCleanup(function(track)
+				-- A rate no other test uses, so the bucket holds only these two
+				local RATE = 41.5
+				local position = Vector3.new(-45350, 0, 41000)
+				local first = { Position = position }
+				local second = { Position = position }
+				local group = track(Group.new({ entities = { first, second }, autoClean = false }))
+				local zone = track(Zone.new(cube(position)))
+				track(Observer.new({ zones = { zone }, groups = { group }, updateRate = RATE }))
+				QuickZone:update(1)
+
+				local data = State.entityData[first]
+				Scheduler.leaveBucket(first, data)
+				Scheduler.leaveBucket(first, data)
+
+				local bucket = State.buckets[RATE]
+				Expect(data.bucketIndex).is(0)
+				Expect(#bucket).is(1)
+				Expect(bucket[1]).is(second)
+				Expect(State.entityData[second].bucketIndex).is(1)
 			end)
 		end)
 	end)
