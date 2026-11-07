@@ -6,24 +6,38 @@
 -- buckets the scheduler goes through. Others mark entities to route here, only this module writes the routing
 
 local Types = require(script.Parent.Parent.Types)
-local State = require(script.Parent.State)
+local Entities = require(script.Parent.Entities)
+local Links = require(script.Parent.Links)
+local Registry = require(script.Parent.Registry)
 
-local observerPrecisionSq = State.observerPrecisionSq
-local observerUpdateRate = State.observerUpdateRate
-local observerStaticCount = State.observerStaticCount
-local observerDynamicCount = State.observerDynamicCount
+local observerPrecisionSq = Registry.observerPrecisionSq
+local observerUpdateRate = Registry.observerUpdateRate
 
-local entityData = State.entityData
-local entityToObservers = State.entityToObservers
-local entityToGroups = State.entityToGroups
-local groupToObservers = State.groupToObservers
-local dirtyProfiles = State.dirtyProfiles
-local dirtyTopology = State.dirtyTopology
-
-local bucketList = State.bucketList
-local buckets = State.buckets
+local entityData = Entities.entityData
+local entityToGroups = Entities.entityToGroups
+local groupToObservers = Links.groupToObservers
+local zoneAttachedObservers = Links.zoneAttachedObservers
 
 local Routing = {}
+
+-- Raised to check every entity again at the next tick
+Routing.logicVersion = 0
+Routing.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
+Routing.dirtyProfiles = {} :: { [Types.Entity]: boolean }
+Routing.dirtyTopology = {} :: { [Types.Entity]: boolean }
+Routing.bucketList = {} :: { number }
+Routing.buckets = {} :: { [number]: { Types.Entity } }
+-- How many static and dynamic zones each observer has, which decides the trees its entities are checked in
+Routing.observerDynamicCount = {} :: { [number]: number }
+Routing.observerStaticCount = {} :: { [number]: number }
+
+local observerStaticCount = Routing.observerStaticCount
+local observerDynamicCount = Routing.observerDynamicCount
+local entityToObservers = Routing.entityToObservers
+local dirtyProfiles = Routing.dirtyProfiles
+local dirtyTopology = Routing.dirtyTopology
+local bucketList = Routing.bucketList
+local buckets = Routing.buckets
 
 -- The entity's observers changed their settings, so its rate, precision and trees are worked out at the next tick
 function Routing.reroute(entity: Types.Entity)
@@ -161,6 +175,64 @@ end
 -- The trees the entity's observers query changed, so the entity is placed again at the next tick
 function Routing.markTopology(entity: Types.Entity)
 	dirtyTopology[entity] = true
+end
+
+-- Checks every entity again at the next tick, also those that stand still
+function Routing.recheckAll()
+	Routing.logicVersion += 1
+end
+
+function Routing.addObserver(observerId: number)
+	observerStaticCount[observerId] = 0
+	observerDynamicCount[observerId] = 0
+end
+
+-- Drops the zone counts of a destroyed observer, once its zones have detached
+function Routing.dropObserver(observerId: number)
+	observerStaticCount[observerId] = nil
+	observerDynamicCount[observerId] = nil
+end
+
+-- Counts a zone the observer gained or lost in a tree
+function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: number)
+	local dict = isDynamic and observerDynamicCount or observerStaticCount
+	local current = dict[observerId] or 0
+	local newCount = current + delta
+	dict[observerId] = newCount
+
+	-- Only flag entities dirty if the observer's topology fundamentally changed
+	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
+		-- Only force a global logic override when an observer loses its last zone
+		if current == 1 and newCount == 0 then
+			Routing.recheckAll()
+		end
+
+		for groupId, observers in groupToObservers do
+			if not observers[observerId] then
+				continue
+			end
+
+			local group = Registry.groups[groupId]
+			if not group then
+				continue
+			end
+
+			for _, entity in group.entities do
+				Routing.markTopology(entity)
+			end
+		end
+	end
+end
+
+-- Moves the zone in the slot to the other tree in its observers' counts
+function Routing.moveZoneCounts(slot: number, isDynamic: boolean)
+	local attached = zoneAttachedObservers[slot]
+	if attached then
+		for _, observerId in attached do
+			Routing.changeZoneCount(observerId, not isDynamic, -1)
+			Routing.changeZoneCount(observerId, isDynamic, 1)
+		end
+	end
 end
 
 -- Drops the routing of an entity that left its last group

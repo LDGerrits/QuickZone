@@ -2,17 +2,28 @@
 
 -- Observer enter, exit and transition callbacks, in lists keyed by observer id
 
-local State = require(script.Parent.State)
+local Entities = require(script.Parent.Entities)
+local Registry = require(script.Parent.Registry)
 local Types = require(script.Parent.Parent.Types)
 
 type CallbackLists = { [number]: { any } }
 
-local entityData = State.entityData
-local enteredLists = State.observerEnteredCallbacks
-local zoneIdToZoneObj = State.zoneIdToZoneObj
+local entityData = Entities.entityData
+local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 
 -- How many fires are going on. While any is, a disconnect blanks its entry rather than removing it, so no list
 -- shifts under a loop. The last fire to end compacts the lists that were blanked
+local Callbacks = {}
+
+Callbacks.observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
+Callbacks.observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
+Callbacks.observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
+-- Group event trackers of each observer, told when an entity inside it changes groups. Only set while
+-- an observer has some
+Callbacks.observerGroupTrackers = {} :: { [number]: { (entity: any, destroyedGroupId: number?) -> () } }
+
+local enteredLists = Callbacks.observerEnteredCallbacks
+
 local firing = 0
 local blanked = {} :: { [{ any }]: true }
 
@@ -32,8 +43,6 @@ local function compact(list: { any })
 		list[i] = nil
 	end
 end
-
-local Callbacks = {}
 
 -- Adds a callback to lists[key], returns its disconnect function
 function Callbacks.connect(lists: CallbackLists, key: number, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
@@ -124,6 +133,37 @@ function Callbacks.call<A...>(callback: (A...) -> ...any, safety: boolean, ...: 
 		if not ok then
 			task.spawn(error, trace, 0)
 		end
+	end
+end
+
+function Callbacks.addObserver(observerId: number)
+	Callbacks.observerEnteredCallbacks[observerId] = {}
+	Callbacks.observerExitedCallbacks[observerId] = {}
+	Callbacks.observerTransitionedCallbacks[observerId] = {}
+end
+
+function Callbacks.dropObserver(observerId: number)
+	Callbacks.observerEnteredCallbacks[observerId] = nil
+	Callbacks.observerExitedCallbacks[observerId] = nil
+	Callbacks.observerTransitionedCallbacks[observerId] = nil
+	Callbacks.observerGroupTrackers[observerId] = nil
+end
+
+-- Group trackers are replaced rather than changed, so a list being run never shifts
+function Callbacks.addGroupTracker(observerId: number, track: (entity: any, destroyedGroupId: number?) -> ())
+	local trackers = Callbacks.observerGroupTrackers[observerId]
+	local updated = if trackers then table.clone(trackers) else {}
+	table.insert(updated, track)
+	Callbacks.observerGroupTrackers[observerId] = updated
+end
+
+function Callbacks.removeGroupTracker(observerId: number, track: (entity: any, destroyedGroupId: number?) -> ())
+	local current = Callbacks.observerGroupTrackers[observerId]
+	local idx = current and table.find(current, track)
+	if idx then
+		local remaining = table.clone(current :: { (any) -> () })
+		table.remove(remaining, idx)
+		Callbacks.observerGroupTrackers[observerId] = if #remaining > 0 then remaining else nil
 	end
 end
 

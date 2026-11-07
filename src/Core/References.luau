@@ -3,10 +3,10 @@
 -- Owns the links between entities and the references they were given with setReference, or the player whose
 -- HumanoidRootPart they are. Others read the tables, only this module writes them
 
-local State = require(script.Parent.State)
+local Entities = require(script.Parent.Entities)
 local Types = require(script.Parent.Parent.Types)
 
-local entityData = State.entityData
+local entityData = Entities.entityData
 
 local References = {}
 

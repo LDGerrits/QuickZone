@@ -6,12 +6,6 @@
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 local Log = require(script.Parent.Parent.Utils.Log)
-local References = require(script.Parent.References)
-local Routing = require(script.Parent.Routing)
-local State = require(script.Parent.State)
-
-local entityData = State.entityData
-local entityToGroups = State.entityToGroups
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -23,6 +17,13 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local Entities = {}
+
+-- The groups each entity is in, and what the scheduler keeps on it
+Entities.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
+Entities.entityData = {} :: { [Types.Entity]: Types.EntityData }
+
+local entityData = Entities.entityData
+local entityToGroups = Entities.entityToGroups
 
 -- How the scheduler reads the entity's position, or nil when it can't be tracked
 local function strategyOf(entity: any): number?
@@ -99,7 +100,7 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 	return true
 end
 
--- Takes the entity out of the group. It stays until dropIfGroupless, as exit callbacks still see it
+-- Takes the entity out of the group. It stays until dropped, as exit callbacks still see it
 function Entities.leave(entity: Types.Entity, groupId: number)
 	local groups = entityToGroups[entity]
 	if groups then
@@ -107,17 +108,16 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	end
 end
 
--- Drops an entity that is in no group, unless exit callbacks added it back or replaced its data
-function Entities.dropIfGroupless(entity: Types.Entity, data: Types.EntityData?)
+-- Whether the entity with this data left its last group, and exit callbacks didn't add it back or replace its data
+function Entities.isGroupless(entity: Types.Entity, data: Types.EntityData?): boolean
 	local groups = entityToGroups[entity]
-	if not data or entityData[entity] ~= data or not groups or next(groups) ~= nil then
-		return
-	end
+	return data ~= nil and entityData[entity] == data and groups ~= nil and next(groups) == nil
+end
 
-	Routing.forget(entity, data)
+-- Drops an entity that left its last group, once its routing is gone
+function Entities.drop(entity: Types.Entity)
 	entityData[entity] = nil
 	entityToGroups[entity] = nil
-	References.forget(entity)
 end
 
 return Entities

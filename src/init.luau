@@ -10,10 +10,13 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Types)
 local Config = require(script.Config)
+local Entities = require(script.Core.Entities)
+local Links = require(script.Core.Links)
 local PlayerTracker = require(script.Core.PlayerTracker)
 local References = require(script.Core.References)
+local Registry = require(script.Core.Registry)
 local Scheduler = require(script.Core.Scheduler)
-local State = require(script.Core.State)
+local ZoneShapes = require(script.Core.ZoneShapes)
 local Log = require(script.Utils.Log)
 local WorldQueries = require(script.Classes.WorldQueries)
 
@@ -21,15 +24,15 @@ local isPlayer = References.isPlayer
 
 local entityOf = References.entityOf
 
-local zoneAttachedObservers = State.zoneAttachedObservers
-local zoneSlotToZoneObj = State.zoneSlotToZoneObj
-local groups = State.groups
-local entityToGroups = State.entityToGroups
+local zoneAttachedObservers = Links.zoneAttachedObservers
+local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
+local groups = Registry.groups
+local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
 
-local shapeCFrames = State.shapeCFrames
-local shapeExtents = State.shapeExtents
-local dynamicSlots = State.dynamicSlots
+local shapeCFrames = ZoneShapes.shapeCFrames
+local shapeExtents = ZoneShapes.shapeExtents
+local dynamicSlots = ZoneShapes.dynamicSlots
 
 local debugConnection: RBXScriptConnection?
 local debugFolder: Folder?
@@ -159,7 +162,7 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:rebuild(): QuickZone
-	Scheduler.rebuildTrees()
+	ZoneShapes.rebuildTrees()
 	return self
 end
 

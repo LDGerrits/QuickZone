@@ -2,8 +2,11 @@
 
 -- The Observer's queries: what is inside it, and where
 
+local Entities = require(script.Parent.Parent.Core.Entities)
+local Links = require(script.Parent.Parent.Core.Links)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
 local References = require(script.Parent.Parent.Core.References)
-local State = require(script.Parent.Parent.Core.State)
+local Registry = require(script.Parent.Parent.Core.Registry)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -16,7 +19,7 @@ local checkZone = Checks.checkZone
 local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
 
-local zoneAttachedObservers = State.zoneAttachedObservers
+local zoneAttachedObservers = Links.zoneAttachedObservers
 
 local queryHits = {} :: { number }
 
@@ -27,7 +30,7 @@ local function iterTracked(
 	zoneIds: { [number]: true }?,
 	playersOnly: boolean
 ): () -> (any?, Types.Zone?)
-	local nextEntity = Snapshot.keys(State.observerTrackingEntities[observerId] or {})
+	local nextEntity = Snapshot.keys(Memberships.observerTrackingEntities[observerId] or {})
 	return function()
 		while true do
 			local entity, zoneId = nextEntity()
@@ -41,7 +44,7 @@ local function iterTracked(
 			if playersOnly and not isPlayer(ref) then
 				continue
 			end
-			return ref, State.zoneIdToZoneObj[zoneId :: number]
+			return ref, Registry.zoneIdToZoneObj[zoneId :: number]
 		end
 	end
 end
@@ -102,7 +105,7 @@ end
 ]=]
 function ObserverQueries.getEntitiesInside(self: Types.InternalObserver): { any }
 	local results = {}
-	for entity in State.observerTrackingEntities[self.id] do
+	for entity in Memberships.observerTrackingEntities[self.id] do
 		table.insert(results, References.entityToReference[entity] or entity)
 	end
 	return results
@@ -117,7 +120,7 @@ end
 ]=]
 function ObserverQueries.getPlayersInside(self: Types.InternalObserver): { Player }
 	local results = {}
-	for entity in State.observerTrackingEntities[self.id] do
+	for entity in Memberships.observerTrackingEntities[self.id] do
 		-- Only a player's current HumanoidRootPart has the player as its reference, so none comes twice
 		local ref = References.entityToReference[entity]
 		if isPlayer(ref) then
@@ -136,12 +139,12 @@ end
 ]=]
 function ObserverQueries.getZones(self: Types.InternalObserver): { Types.Zone }
 	local results = {}
-	for slot, attachedList in State.zoneAttachedObservers do
+	for slot, attachedList in Links.zoneAttachedObservers do
 		if not table.find(attachedList, self.id) then
 			continue
 		end
 
-		local zone = State.zoneSlotToZoneObj[slot]
+		local zone = Registry.zoneSlotToZoneObj[slot]
 		if zone then
 			table.insert(results, zone)
 		end
@@ -159,12 +162,12 @@ end
 function ObserverQueries.getGroups(self: Types.InternalObserver): { Types.Group }
 	local result = {}
 
-	for groupId, observersMap in State.groupToObservers do
+	for groupId, observersMap in Links.groupToObservers do
 		if not observersMap[self.id] then
 			continue
 		end
 
-		local group = State.groups[groupId]
+		local group = Registry.groups[groupId]
 		if group then
 			table.insert(result, group)
 		end
@@ -184,14 +187,14 @@ end
 function ObserverQueries.getZoneOfEntity(self: Types.InternalObserver, entity: any): Types.Zone?
 	entity = References.entityOf(entity)
 
-	local data = State.entityData[entity]
+	local data = Entities.entityData[entity]
 	if not data then
 		return nil
 	end
 
 	local zoneId = data.activeObserverMemberships[self.id]
 	if zoneId then
-		return State.zoneIdToZoneObj[zoneId]
+		return Registry.zoneIdToZoneObj[zoneId]
 	end
 	return nil
 end
@@ -268,7 +271,7 @@ function ObserverQueries.iterZones(self: Types.InternalObserver): () -> Types.Zo
 				continue
 			end
 
-			local zone = State.zoneSlotToZoneObj[slot]
+			local zone = Registry.zoneSlotToZoneObj[slot]
 			if zone then
 				return zone
 			end
@@ -286,7 +289,7 @@ end
 	@return () -> Group?
 ]=]
 function ObserverQueries.iterGroups(self: Types.InternalObserver): () -> Types.Group?
-	local nextGroupId = Snapshot.keys(State.groupToObservers)
+	local nextGroupId = Snapshot.keys(Links.groupToObservers)
 	local observerId = self.id
 
 	return function(): Types.Group?
@@ -300,7 +303,7 @@ function ObserverQueries.iterGroups(self: Types.InternalObserver): () -> Types.G
 				continue
 			end
 
-			local group = State.groups[groupId]
+			local group = Registry.groups[groupId]
 			if group then
 				return group
 			end

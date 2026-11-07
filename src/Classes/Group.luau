@@ -20,8 +20,8 @@ local Links = require(script.Parent.Parent.Core.Links)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local References = require(script.Parent.Parent.Core.References)
+local Registry = require(script.Parent.Parent.Core.Registry)
 local Routing = require(script.Parent.Parent.Core.Routing)
-local State = require(script.Parent.Parent.Core.State)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
@@ -35,7 +35,7 @@ local isPlayer = References.isPlayer
 
 -- Removes an instance from the group once it leaves the game, while the group has autoClean on
 local function watchRemoval(group: Types.InternalGroup, entity: any)
-	local cleanups = State.groupEntityCleanups[group.id]
+	local cleanups = Registry.groupEntityCleanups[group.id]
 	if typeof(entity) == 'Instance' and not cleanups[entity] then
 		cleanups[entity] = entity.AncestryChanged:Connect(function(_, parent)
 			if not parent then
@@ -78,8 +78,8 @@ function Group.new<T>(config: {
 	entities: { T }?,
 	autoClean: boolean?,
 }?): Types.Group<T>
-	local id = State.nextGroupId
-	State.nextGroupId += 1
+	local id = Registry.nextGroupId
+	Registry.nextGroupId += 1
 
 	local autoClean = Config.Group.autoClean
 	if config and config.autoClean ~= nil then
@@ -94,9 +94,9 @@ function Group.new<T>(config: {
 		autoClean = autoClean,
 	}, Group) :: any
 
-	State.groups[id] = self
+	Registry.groups[id] = self
 	Links.addGroup(id)
-	State.groupEntityCleanups[id] = {}
+	Registry.groupEntityCleanups[id] = {}
 
 	if config and config.entities then
 		self:_addBulk(config.entities)
@@ -258,7 +258,7 @@ function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.
 	end
 
 	self.autoClean = enabled
-	local cleanups = State.groupEntityCleanups[self.id]
+	local cleanups = Registry.groupEntityCleanups[self.id]
 
 	if enabled then
 		for _, entity in self.entities do
@@ -492,8 +492,8 @@ function Group.destroy(self: Types.InternalGroup): ()
 	Memberships.groupDestroyed(self.id)
 
 	Links.dropGroup(self.id)
-	State.groups[self.id] = nil
-	State.groupEntityCleanups[self.id] = nil
+	Registry.groups[self.id] = nil
+	Registry.groupEntityCleanups[self.id] = nil
 
 	Destroyed.finish(self)
 end
@@ -571,14 +571,14 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 		return self
 	end
 
-	local cleanupConn = State.groupEntityCleanups[self.id][entity]
+	local cleanupConn = Registry.groupEntityCleanups[self.id][entity]
 	if cleanupConn then
 		cleanupConn:Disconnect()
-		State.groupEntityCleanups[self.id][entity] = nil
+		Registry.groupEntityCleanups[self.id][entity] = nil
 	end
 
 	Entities.leave(entity, self.id)
-	local data = State.entityData[entity]
+	local data = Entities.entityData[entity]
 
 	local idx = self.entityIndices[entity]
 	local lastIdx = #self.entities
@@ -600,7 +600,11 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 	Memberships.groupsChanged(entity)
 
 	-- Exit callbacks may have removed the entity everywhere, or added it back
-	Entities.dropIfGroupless(entity, data)
+	if Entities.isGroupless(entity, data) then
+		Routing.forget(entity, data :: Types.EntityData)
+		Entities.drop(entity)
+		References.forget(entity)
+	end
 
 	return self
 end

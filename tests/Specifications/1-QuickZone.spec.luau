@@ -9,7 +9,7 @@ local TiniestFolder = TestFolder.Tiniest
 local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
-local State = require(ReplicatedStorage.QuickZone.Core.State)
+local ZoneShapes = require(ReplicatedStorage.QuickZone.Core.ZoneShapes)
 local LinearBVH = require(ReplicatedStorage.QuickZone.Utils.LinearBVH)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
@@ -822,7 +822,7 @@ return function(Tiniest: Tiniest)
 			for step = 1, 10 do
 				nudge(step)
 			end
-			Expect(State.dynamicTree.refitSkips).is(0)
+			Expect(ZoneShapes.dynamicTree.refitSkips).is(0)
 
 			local iterator = QuickZone:iterZonesAtPoint(center)
 			Expect(iterator()).is(zones[1])
@@ -861,12 +861,12 @@ return function(Tiniest: Tiniest)
 
 			local reallocations = 0
 			for step = 11, 20 do
-				local before = State.dynamicTree.buffer
+				local before = ZoneShapes.dynamicTree.buffer
 				for _ in QuickZone:iterZonesAtPoint(center) do
 					break
 				end
 				nudge(step)
-				if State.dynamicTree.buffer ~= before then
+				if ZoneShapes.dynamicTree.buffer ~= before then
 					reallocations += 1
 				end
 			end
@@ -919,7 +919,7 @@ return function(Tiniest: Tiniest)
 		end)
 
 		Test('Shrinks once most zones are destroyed.', function()
-			local trees = { State.staticTree, State.dynamicTree }
+			local trees = { ZoneShapes.staticTree, ZoneShapes.dynamicTree }
 			local zones = {}
 			for i = 1, 3000 do
 				local position = Vector3.new(50000 + i * 4, 0, 0)
@@ -955,7 +955,7 @@ return function(Tiniest: Tiniest)
 			for _, tree in trees do
 				Expect(buffer.len(tree.buffer) < limit).is(true)
 			end
-			for _, changes in { State.staticChanges, State.dynamicChanges } do
+			for _, changes in { ZoneShapes.staticChanges, ZoneShapes.dynamicChanges } do
 				for _, slot in changes.history do
 					Expect(buffer.len(slot.tree.buffer) < limit).is(true)
 				end
