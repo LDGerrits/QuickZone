@@ -1071,8 +1071,8 @@ function Observer.onLocalPlayerTransition(
 end
 
 --[=[ 
-	Enables or disables the observer. When disabled, it will no longer process
-	spatial checks or fire events.
+	Enables or disables the observer. When disabled, it fires no events. Its entities are still
+	checked each update, so it stays cheap to enable again but costs about as much as an enabled one.
 
 	@tag Chainable
 	@method setEnabled
