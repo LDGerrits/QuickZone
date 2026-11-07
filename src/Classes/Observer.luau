@@ -14,6 +14,7 @@ local Callbacks = require(script.Parent.Parent.Core.Callbacks)
 local Config = require(script.Parent.Parent.Config)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local References = require(script.Parent.Parent.Core.References)
+local Scheduler = require(script.Parent.Parent.Core.Scheduler)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -29,8 +30,6 @@ local leafContainsPoint = ZoneShapes.leafContainsPoint
 local hasAttachedMap = {} :: { [number]: boolean }
 local hasSubscribedMap = {} :: { [number]: boolean }
 
-local dirtyProfiles = State.dirtyProfiles
-local dirtyTopology = State.dirtyTopology
 local zoneAttachedObservers = State.zoneAttachedObservers
 
 local queryHits = {} :: { number }
@@ -53,8 +52,7 @@ local function updateAllEntitiesForObserver(observerId: number)
 		end
 
 		for _, entity in group.entities do
-			dirtyProfiles[entity] = true
-			dirtyTopology[entity] = true
+			Scheduler.reroute(entity)
 		end
 	end
 end
@@ -67,10 +65,7 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 			continue
 		end
 
-		dirtyProfiles[entity] = true
-		dirtyTopology[entity] = true
-		-- Another observer may take over an entity that stands still
-		data.logicVersion = -1
+		Scheduler.recheck(entity)
 
 		-- Disabled observers let go of every entity
 		if State.observerEnabled[observerId] and Memberships.isSubscribed(entity, observerId) then
@@ -503,14 +498,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	State.groupToObservers[groupId][self.id] = true
 
 	for _, entity in group.entities do
-		dirtyProfiles[entity] = true
-		dirtyTopology[entity] = true
-
-		-- Entities that stand still are only re-queried near zone changes
-		local data = State.entityData[entity]
-		if data then
-			data.logicVersion = -1
-		end
+		Scheduler.recheck(entity)
 	end
 
 	-- Members already inside through other groups bring this one in
