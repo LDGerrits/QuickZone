@@ -78,6 +78,8 @@ end
 	Creates a dynamic Group that automatically tracks all instances with a specific tag.
 	Instances are only tracked while they are descendants of the Workspace.
 
+	Its members are kept for you, so `add`, `addBulk`, `remove`, `removeBulk`, `clear` and `setAutoClean` only warn.
+
 	@tag Constructor
 	@tag Chainable
 	@param tag string
@@ -105,6 +107,8 @@ end
 
 --[=[ 
 	Returns a Group that automatically tracks all Players in the server.
+
+	Its members are kept for you, so `add`, `addBulk`, `remove`, `removeBulk`, `clear` and `setAutoClean` only warn.
 
 	:::info Behavior
 	* Automatically tracks the `HumanoidRootPart` of every player.
@@ -136,6 +140,8 @@ end
 
 --[=[ 
 	Returns a Group that tracks only the LocalPlayer.
+
+	Its members are kept for you, so `add`, `addBulk`, `remove`, `removeBulk`, `clear` and `setAutoClean` only warn.
 
 	:::info Behavior
 	* Automatically tracks the `HumanoidRootPart` of the local player.
@@ -361,6 +367,8 @@ end
 --[=[ 
 	Cleans up the group, removes all tracked entities, and detaches any 
 	associated observers.
+
+	Destroying it again does nothing. Its other methods raise an error once it is destroyed.
 	
 	@tag Destructor
 	@method destroy

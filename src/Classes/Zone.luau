@@ -352,7 +352,6 @@ function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zo
 			self:setDynamic(true)
 		end
 
-		-- Without a reference it starts once setReference gives it one
 		if self.reference then
 			setupAutoSync(self, self.reference)
 		end
@@ -662,6 +661,7 @@ end
 
 --[=[ 
 	Cleans up the zone, removes it from the LBVH tree, and detaches all observers.
+	Destroying it again does nothing. Its other methods raise an error once it is destroyed.
 
 	:::caution Rebuild Request
 	Requests a rebuild of corresponding tree (batched per frame).

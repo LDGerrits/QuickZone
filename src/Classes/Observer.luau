@@ -448,6 +448,7 @@ end
 
 --[=[ 
 	Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.
+	Destroying it again does nothing. Its other methods raise an error once it is destroyed.
 	
 	@tag Destructor
 	@method destroy

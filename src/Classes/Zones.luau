@@ -321,6 +321,7 @@ end
 
 --[=[ 
 	Cleans up the zones, removes them from the LBVH tree, and detaches all observers.
+	Destroying it again does nothing. Its other methods raise an error once it is destroyed.
 
 	:::caution Rebuild Request
 	Requests a rebuild of corresponding tree (batched per frame).

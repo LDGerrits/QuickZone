@@ -8,7 +8,7 @@ local Zones = require(script.Parent.Zones)
 
 local Checks = {}
 
--- A Zone or Zones. Destroyed ones lose their methods
+-- A live Zone or Zones. Destroyed ones have another metatable
 local function isZone(zone: any): boolean
 	local class = getmetatable(zone)
 	return type(zone) == 'table' and (class == Zone or class == Zones)
