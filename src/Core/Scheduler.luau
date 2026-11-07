@@ -88,10 +88,8 @@ local function processObserverHit(observerId: number, zoneId: number)
 		return
 	end
 
-	local currentPriority = ctx_candidatePriority[observerId]
-	local priority = observerPriorityMap[observerId] or 0
-
-	if not currentPriority then -- First hit
+	if ctx_candidatePriority[observerId] == nil then -- First hit
+		local priority = observerPriorityMap[observerId] or 0
 		ctx_cCount += 1
 		ctx_candidateList[ctx_cCount] = observerId
 		ctx_candidateIndex[observerId] = zoneId
@@ -100,14 +98,8 @@ local function processObserverHit(observerId: number, zoneId: number)
 		if priority > ctx_highestWin then
 			ctx_highestWin = priority
 		end
-	elseif priority > currentPriority then -- Override previous hits
-		ctx_candidateIndex[observerId] = zoneId
-		ctx_candidatePriority[observerId] = priority
-
-		if priority > ctx_highestWin then
-			ctx_highestWin = priority
-		end
-	elseif priority == currentPriority and ctx_currentMemberships[observerId] == zoneId then -- Sticky behavior
+	elseif ctx_currentMemberships[observerId] == zoneId then
+		-- An observer's zones share its priority, so a later hit only takes over when it is the current zone
 		ctx_candidateIndex[observerId] = zoneId
 	end
 end
