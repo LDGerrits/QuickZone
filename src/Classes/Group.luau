@@ -38,9 +38,7 @@ local IS_CLIENT = RunService:IsClient()
 local Group = {}
 Group.__index = Group
 
-local function isPlayer(x: any): boolean
-	return typeof(x) == 'Instance' and x:IsA('Player')
-end
+local isPlayer = References.isPlayer
 
 local function isMember(group: Types.InternalGroup, entity: any): boolean
 	local groups = State.entityToGroups[entity]
@@ -62,7 +60,7 @@ end
 -- Removes a member. A character part of a player goes through the player as well, so the player's next
 -- character is not added back
 local function removeMember(group: Types.InternalGroup, entity: any)
-	local reference = State.entityToReference[entity]
+	local reference = References.entityToReference[entity]
 	if isPlayer(reference) then
 		group:_remove(reference)
 	end
@@ -435,7 +433,7 @@ end
 function Group.getEntities(self: Types.InternalGroup): { any }
 	local result = table.create(#self.entities)
 	for i, entity in ipairs(self.entities) do
-		result[i] = State.entityToReference[entity] or entity
+		result[i] = References.entityToReference[entity] or entity
 	end
 	return result
 end
@@ -461,7 +459,7 @@ function Group.iterEntities(self: Types.InternalGroup): () -> any?
 	return function()
 		local entity = nextEntity()
 		if entity ~= nil then
-			return State.entityToReference[entity] or entity
+			return References.entityToReference[entity] or entity
 		end
 		return nil
 	end
@@ -683,13 +681,9 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 		State.dirtyProfiles[entity] = nil
 		State.dirtyTopology[entity] = nil
 
-		local ref = State.entityToReference[entity]
+		local ref = References.entityToReference[entity]
 		if ref and not isPlayer(ref) then
-			State.entityToReference[entity] = nil
-			-- Ensure we only clear the reverse map if it still points to this exact entity
-			if State.referenceToEntity[ref] == entity then
-				State.referenceToEntity[ref] = nil
-			end
+			References.link(entity, nil)
 		end
 	end
 

@@ -9,12 +9,11 @@ local State = require(script.Parent.Parent.Core.State)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
-local Checks = require(script.Parent.Checks)
 
 type Zone = Types.Zone
 type Entity = Types.Entity
 
-local isPlayer = Checks.isPlayer
+local isPlayer = References.isPlayer
 local entityOf = References.entityOf
 
 local leavesAtPoint = ZoneShapes.leavesAtPoint
@@ -27,8 +26,8 @@ local entityData = State.entityData
 local observerIdToObserverObj = State.observerIdToObserverObj
 local groups = State.groups
 local entityToGroups = State.entityToGroups
-local entityToReference = State.entityToReference
-local referenceToEntity = State.referenceToEntity
+local entityToReference = References.entityToReference
+local referenceToEntity = References.referenceToEntity
 
 local queryHits = {} :: { number }
 -- Candidate lists of finished iterZonesAtPoint iterators, for reuse

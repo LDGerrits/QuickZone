@@ -3,6 +3,7 @@
 local Players = game:GetService('Players')
 
 local Types = require(script.Parent.Parent.Types)
+local References = require(script.Parent.References)
 local State = require(script.Parent.State)
 
 local activeTrackers = {} :: { [Player]: () -> () }
@@ -52,9 +53,7 @@ local function trackPlayer(player: Player)
 		if hrp then
 			-- Let go first, so an exit callback adding the player to a group doesn't add this part
 			currentHrp = nil
-			if State.referenceToEntity[player] == hrp then
-				State.referenceToEntity[player] = nil
-			end
+			References.release(player, hrp)
 
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
@@ -70,7 +69,7 @@ local function trackPlayer(player: Player)
 
 			-- Unless a callback gave the part to the player again
 			if currentHrp ~= hrp then
-				State.entityToReference[hrp] = nil
+				References.link(hrp, nil)
 			end
 		end
 	end
@@ -99,8 +98,7 @@ local function trackPlayer(player: Player)
 			clearHrp()
 			currentHrp = hrp
 
-			State.entityToReference[hrp] = player
-			State.referenceToEntity[player] = hrp
+			References.link(hrp, player)
 
 			-- Listen for the HRP streaming out or getting destroyed, also by its character leaving
 			hrpConn = hrp.AncestryChanged:Connect(function()
@@ -187,7 +185,7 @@ function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
 	playerSubscriptions[player][group.id] = group
 	trackPlayer(player)
 
-	local currentHrp = State.referenceToEntity[player]
+	local currentHrp = References.referenceToEntity[player]
 	if currentHrp then
 		group:_addEntity(currentHrp)
 	end
@@ -198,7 +196,7 @@ function PlayerTracker.unsubscribe(player: Player, group: Types.InternalGroup)
 		playerSubscriptions[player][group.id] = nil
 	end
 
-	local currentHrp = State.referenceToEntity[player]
+	local currentHrp = References.referenceToEntity[player]
 	if currentHrp then
 		group:_removeEntity(currentHrp)
 	end
