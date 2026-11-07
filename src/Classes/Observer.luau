@@ -8,6 +8,7 @@
 ]=]
 
 local Config = require(script.Parent.Parent.Config)
+local Links = require(script.Parent.Parent.Core.Links)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local Routing = require(script.Parent.Parent.Core.Routing)
 local State = require(script.Parent.Parent.Core.State)
@@ -169,8 +170,7 @@ function Observer.new<T>(config: {
 	State.observerIdToObserverObj[id] = self
 	State.observerEnabled[id] = if config and config.enabled ~= nil then not not config.enabled else true
 	State.observerSafety[id] = if config and config.safety ~= nil then not not config.safety else Config.Observer.safety
-	State.observerStaticCount[id] = 0
-	State.observerDynamicCount[id] = 0
+	Links.addObserver(id)
 
 	hasAttachedMap[id] = false
 	hasSubscribedMap[id] = false
@@ -239,10 +239,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	hasSubscribedMap[self.id] = true
 
 	local groupId = group.id
-	if not State.groupToObservers[groupId] then
-		State.groupToObservers[groupId] = {}
-	end
-	State.groupToObservers[groupId][self.id] = true
+	Links.subscribe(self.id, groupId)
 
 	for _, entity in group.entities do
 		Routing.recheck(entity)
@@ -275,9 +272,7 @@ function Observer.unsubscribe(self: Types.InternalObserver, group: Types.Interna
 	checkGroup(group)
 	local groupId = group.id
 
-	if State.groupToObservers[groupId] then
-		State.groupToObservers[groupId][self.id] = nil
-	end
+	Links.unsubscribe(self.id, groupId)
 
 	disconnectObserverFromGroup(self.id, group)
 
@@ -556,9 +551,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	-- Unlinked entities must be rerouted, also when the observer was already disabled
 	local id = self.id
 	updateAllEntitiesForObserver(id)
-	for _, observers in State.groupToObservers do
-		observers[id] = nil
-	end
+	Links.unsubscribeAll(id)
 
 	for slot, attached in State.zoneAttachedObservers do
 		if table.find(attached, id) then
@@ -577,8 +570,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	State.observerSafety[id] = nil
 	State.observerUpdateRate[id] = nil
 	State.observerPrecisionSq[id] = nil
-	State.observerStaticCount[id] = nil
-	State.observerDynamicCount[id] = nil
+	Links.dropObserver(id)
 
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil

@@ -16,6 +16,7 @@ local RunService = game:GetService('RunService')
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
 local Entities = require(script.Parent.Parent.Core.Entities)
+local Links = require(script.Parent.Parent.Core.Links)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local References = require(script.Parent.Parent.Core.References)
@@ -94,7 +95,7 @@ function Group.new<T>(config: {
 	}, Group) :: any
 
 	State.groups[id] = self
-	State.groupToObservers[id] = {}
+	Links.addGroup(id)
 	State.groupEntityCleanups[id] = {}
 
 	if config and config.entities then
@@ -490,7 +491,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	self:_clear()
 	Memberships.groupDestroyed(self.id)
 
-	State.groupToObservers[self.id] = nil
+	Links.dropGroup(self.id)
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil
 
