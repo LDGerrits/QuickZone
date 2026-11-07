@@ -6,13 +6,14 @@
 -- tracking and the zone's occupants in step with it. Exits re-read state, as callbacks may change it
 
 local Callbacks = require(script.Parent.Callbacks)
+local References = require(script.Parent.References)
 local State = require(script.Parent.State)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 
 local entityData = State.entityData
 local entityToGroups = State.entityToGroups
-local entityToReference = State.entityToReference
+local entityToReference = References.entityToReference
 local groupToObservers = State.groupToObservers
 local observerTrackingEntities = State.observerTrackingEntities
 local observerExitedCallbacks = State.observerExitedCallbacks

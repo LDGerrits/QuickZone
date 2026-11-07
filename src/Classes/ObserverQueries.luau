@@ -11,7 +11,7 @@ local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 local Checks = require(script.Parent.Checks)
 local Zones = require(script.Parent.Zones)
 
-local isPlayer = Checks.isPlayer
+local isPlayer = References.isPlayer
 local checkZone = Checks.checkZone
 local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
@@ -37,7 +37,7 @@ local function iterTracked(
 				continue
 			end
 
-			local ref = State.entityToReference[entity] or entity
+			local ref = References.entityToReference[entity] or entity
 			if playersOnly and not isPlayer(ref) then
 				continue
 			end
@@ -103,7 +103,7 @@ end
 function ObserverQueries.getEntitiesInside(self: Types.InternalObserver): { any }
 	local results = {}
 	for entity in State.observerTrackingEntities[self.id] do
-		table.insert(results, State.entityToReference[entity] or entity)
+		table.insert(results, References.entityToReference[entity] or entity)
 	end
 	return results
 end
@@ -119,7 +119,7 @@ function ObserverQueries.getPlayersInside(self: Types.InternalObserver): { Playe
 	local results = {}
 	for entity in State.observerTrackingEntities[self.id] do
 		-- Only a player's current HumanoidRootPart has the player as its reference, so none comes twice
-		local ref = State.entityToReference[entity]
+		local ref = References.entityToReference[entity]
 		if isPlayer(ref) then
 			table.insert(results, ref)
 		end

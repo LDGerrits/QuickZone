@@ -17,9 +17,7 @@ local State = require(script.Core.State)
 local Log = require(script.Utils.Log)
 local WorldQueries = require(script.Classes.WorldQueries)
 
-local function isPlayer(x: any): boolean
-	return typeof(x) == 'Instance' and x:IsA('Player')
-end
+local isPlayer = References.isPlayer
 
 local entityOf = References.entityOf
 
@@ -27,8 +25,7 @@ local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneSlotToZoneObj = State.zoneSlotToZoneObj
 local groups = State.groups
 local entityToGroups = State.entityToGroups
-local entityToReference = State.entityToReference
-local referenceToEntity = State.referenceToEntity
+local entityToReference = References.entityToReference
 
 local shapeCFrames = State.shapeCFrames
 local shapeExtents = State.shapeExtents
@@ -206,14 +203,7 @@ function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 		return self
 	end
 
-	-- The old reference no longer leads to this entity, unless another entity has taken it since
-	if oldReference ~= nil and oldReference ~= reference and referenceToEntity[oldReference] == entity then
-		referenceToEntity[oldReference] = nil
-	end
-	entityToReference[entity] = reference
-	if reference ~= nil then
-		referenceToEntity[reference] = entity
-	end
+	References.link(entity, reference)
 
 	return self
 end

@@ -6,12 +6,12 @@ local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
 local Callbacks = require(script.Parent.Parent.Core.Callbacks)
+local References = require(script.Parent.Parent.Core.References)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Log = require(script.Parent.Parent.Utils.Log)
-local Checks = require(script.Parent.Checks)
 
-local isPlayer = Checks.isPlayer
+local isPlayer = References.isPlayer
 
 local IS_CLIENT = RunService:IsClient()
 

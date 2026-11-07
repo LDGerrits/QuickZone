@@ -10,6 +10,7 @@ local Callbacks = require(script.Parent.Callbacks)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Memberships = require(script.Parent.Memberships)
+local References = require(script.Parent.References)
 local State = require(script.Parent.State)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local ZoneChanges = require(script.Parent.ZoneChanges)
@@ -45,7 +46,7 @@ local observerUpdateRate = State.observerUpdateRate
 local observerStaticCount = State.observerStaticCount
 local observerDynamicCount = State.observerDynamicCount
 
-local entityToReference = State.entityToReference
+local entityToReference = References.entityToReference
 local entityData = State.entityData
 local entityToObservers = State.entityToObservers
 local entityToGroups = State.entityToGroups

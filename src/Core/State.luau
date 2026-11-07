@@ -55,10 +55,6 @@ local State = {
 	entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } },
 	entityData = {} :: { [Types.Entity]: Types.EntityData },
 	entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } },
-	-- Only the entity side is weak: a reference lives as long as its entity, also when nothing else holds it,
-	-- and an entity nothing else holds can still go
-	entityToReference = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Types.Entity]: any },
-	referenceToEntity = (setmetatable({}, { __mode = 'v' }) :: any) :: { [any]: Types.Entity },
 
 	dirtyProfiles = {} :: { [Types.Entity]: boolean },
 	dirtyTopology = {} :: { [Types.Entity]: boolean },
