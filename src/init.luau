@@ -51,7 +51,6 @@ export type Zones = Types.Zones
 export type Observer<T> = Types.Observer<T>
 export type Group<T> = Types.Group<T>
 export type Entity = Types.Entity
-export type PartsConfig = Types.PartsConfig
 
 local QuickZone = {
 	Zone = require(script.Classes.Zone) :: Types.ZoneClass,
