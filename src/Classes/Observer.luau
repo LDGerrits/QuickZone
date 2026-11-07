@@ -27,7 +27,7 @@ local checkZone = Checks.checkZone
 local function retrackMembers(observerId: number, group: Types.InternalGroup)
 	if Callbacks.observerGroupTrackers[observerId] then
 		-- Cloned, as tracker callbacks may change the group
-		for _, entity in table.clone(group.entities) do
+		for _, entity in table.clone(Entities.groupEntities[group.id] :: { Types.Entity }) do
 			Memberships.groupsChanged(entity, observerId)
 		end
 	end
@@ -38,7 +38,7 @@ local hasSubscribedMap = {} :: { [number]: boolean }
 
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
 	-- Cloned, as exit callbacks may remove entities from the group, swapping later ones into visited slots
-	for _, entity in table.clone(group.entities) do
+	for _, entity in table.clone(Entities.groupEntities[group.id] :: { Types.Entity }) do
 		local data = Entities.entityData[entity]
 		if not data then
 			continue
@@ -78,7 +78,11 @@ local function checkPrecision(n: any): number
 end
 
 local function checkGroup(group: any)
-	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
+	-- A destroyed group is no longer registered, and gets its own error below
+	local isGroup = type(group) == 'table'
+		and type(group.id) == 'number'
+		and (Registry.groups[group.id] == group or Destroyed.isDestroyed(group))
+	if not isGroup then
 		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
 	end
 	if Destroyed.isDestroyed(group) then
@@ -237,7 +241,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	local groupId = group.id
 	Links.subscribe(self.id, groupId)
 
-	for _, entity in group.entities do
+	for _, entity in Entities.groupEntities[groupId] do
 		Routing.recheck(entity)
 	end
 

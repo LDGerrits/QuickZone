@@ -16,6 +16,7 @@ local observerUpdateRate = Registry.observerUpdateRate
 
 local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
+local groupEntities = Entities.groupEntities
 local groupToObservers = Links.groupToObservers
 local zoneAttachedObservers = Links.zoneAttachedObservers
 
@@ -175,9 +176,12 @@ end
 
 -- The observer's settings changed, so every entity it watches is routed again
 function Routing.rerouteObserver(observerId: number)
-	for _, group in Links.groupsOf(observerId) do
-		for _, entity in group.entities do
-			Routing.reroute(entity)
+	for groupId, observers in groupToObservers do
+		local members = groupEntities[groupId]
+		if members and observers[observerId] then
+			for _, entity in members do
+				Routing.reroute(entity)
+			end
 		end
 	end
 end
@@ -213,8 +217,12 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 			Routing.recheckAll()
 		end
 
-		for _, group in Links.groupsOf(observerId) do
-			for _, entity in group.entities do
+		for groupId, observers in groupToObservers do
+			local members = groupEntities[groupId]
+			if not (members and observers[observerId]) then
+				continue
+			end
+			for _, entity in members do
 				dirtyTopology[entity] = true
 			end
 		end

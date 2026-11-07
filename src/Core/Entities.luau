@@ -1,7 +1,8 @@
 --!strict
 
--- Owns which groups each entity is in and the data the scheduler keeps on it. An entity exists while it is in a
--- group, and Group drops it once its routing is gone. Others read the tables, only this module writes them
+-- Owns which groups each entity is in, the members of each group, and the data the scheduler keeps on each
+-- entity. An entity exists while it is in a group, and Members drops it once its routing is gone. Others read the
+-- tables, only this module writes them
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
@@ -21,9 +22,14 @@ local Entities = {}
 -- The groups each entity is in, and what the scheduler keeps on it
 Entities.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 Entities.entityData = {} :: { [Types.Entity]: Types.EntityData }
+-- The members of each group in the order they joined, swap-removed when they leave, and each member's index
+Entities.groupEntities = {} :: { [number]: { Types.Entity } }
+Entities.groupEntityIndices = {} :: { [number]: { [Types.Entity]: number } }
 
 local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
+local groupEntities = Entities.groupEntities
+local groupEntityIndices = Entities.groupEntityIndices
 
 -- How the scheduler reads the entity's position, or nil when it can't be tracked
 local function strategyOf(entity: any): number?
@@ -56,6 +62,22 @@ end
 -- Whether x is something QuickZone can track as an entity
 function Entities.canTrack(x: any): boolean
 	return strategyOf(x) ~= nil
+end
+
+function Entities.addGroup(groupId: number)
+	groupEntities[groupId] = {}
+	groupEntityIndices[groupId] = {}
+end
+
+-- Forgets a destroyed group once its members are gone. Its list is emptied in place, so a loop still holding it
+-- ends rather than finding a missing list
+function Entities.dropGroup(groupId: number)
+	local members = groupEntities[groupId]
+	if members then
+		table.clear(members)
+	end
+	groupEntities[groupId] = nil
+	groupEntityIndices[groupId] = nil
 end
 
 function Entities.isIn(entity: Types.Entity, groupId: number): boolean
@@ -102,6 +124,11 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 		entityToGroups[entity] = groups
 	end
 	groups[groupId] = true
+
+	local members = groupEntities[groupId]
+	local idx = #members + 1
+	members[idx] = entity
+	groupEntityIndices[groupId][entity] = idx
 	return true
 end
 
@@ -111,6 +138,19 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	if groups then
 		groups[groupId] = nil
 	end
+
+	local indices = groupEntityIndices[groupId]
+	local idx = indices and indices[entity]
+	if idx then
+		-- Swaps the last member into its place. Also right when it is the last, as its own entries are cleared after
+		local members = groupEntities[groupId]
+		local lastIdx = #members
+		local lastEntity = members[lastIdx]
+		members[idx] = lastEntity
+		indices[lastEntity] = idx
+		members[lastIdx] = nil
+		indices[entity] = nil
+	end
 end
 
 -- Whether the entity with this data left its last group, and exit callbacks didn't add it back or replace its data
@@ -119,7 +159,7 @@ function Entities.isGroupless(entity: Types.Entity, data: Types.EntityData?): bo
 	return data ~= nil and entityData[entity] == data and groups ~= nil and next(groups) == nil
 end
 
--- Drops an entity that left its last group, once its routing is gone
+-- Drops an entity that left its last group, once its routing is gone. Members calls it, after Routing.forget
 function Entities.drop(entity: Types.Entity)
 	entityData[entity] = nil
 	entityToGroups[entity] = nil

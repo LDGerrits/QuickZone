@@ -3,9 +3,6 @@
 -- Owns the links between observers and the groups and zones they watch. Others read the tables, only this module
 -- writes them
 
-local Registry = require(script.Parent.Registry)
-local Types = require(script.Parent.Parent.Types)
-
 local Links = {}
 
 -- Observers of each group
@@ -27,15 +24,12 @@ function Links.dropGroup(groupId: number)
 	groupToObservers[groupId] = nil
 end
 
--- The live groups the observer watches, as a new list
-function Links.groupsOf(observerId: number): { Types.InternalGroup }
+-- The ids of the groups the observer watches, as a new list
+function Links.groupIdsOf(observerId: number): { number }
 	local list = {}
 	for groupId, observers in groupToObservers do
 		if observers[observerId] then
-			local group = Registry.groups[groupId]
-			if group then
-				table.insert(list, group)
-			end
+			table.insert(list, groupId)
 		end
 	end
 	return list

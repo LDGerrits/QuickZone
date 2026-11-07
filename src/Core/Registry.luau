@@ -14,7 +14,6 @@ Registry.nextGroupId = 1
 
 -- Written by Group
 Registry.groups = {} :: { [number]: Types.InternalGroup }
-Registry.groupEntityCleanups = {} :: { [number]: { [any]: RBXScriptConnection } }
 
 -- Written by Zone
 Registry.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }
