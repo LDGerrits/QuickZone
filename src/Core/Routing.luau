@@ -1,3 +1,5 @@
+--!native
+--!optimize 2
 --!strict
 
 -- Works out which observers watch each entity, at what rate and precision, and in which trees, and keeps the
