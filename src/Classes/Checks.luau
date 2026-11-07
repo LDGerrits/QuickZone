@@ -13,13 +13,13 @@ function Checks.isPlayer(x: any): boolean
 end
 
 -- A Zone or Zones. Destroyed ones lose their methods
-function Checks.isZone(zone: any): boolean
+local function isZone(zone: any): boolean
 	local class = getmetatable(zone)
 	return type(zone) == 'table' and (class == Zone or class == Zones)
 end
 
 function Checks.checkZone(zone: any)
-	if not Checks.isZone(zone) then
+	if not isZone(zone) then
 		Log.fatal('Expected a live Zone or Zones, got %s.', nil, tostring(zone))
 	end
 end

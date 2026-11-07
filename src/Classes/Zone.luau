@@ -788,7 +788,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 end
 
 -- The constructors that keep a Zones in step with a set of parts are kept in their own file
-ZoneContainers.setFromPart(Zone.fromPart)
+ZoneContainers.setZone(Zone)
 Zone.fromParts = ZoneContainers.fromParts
 Zone.fromChildren = ZoneContainers.fromChildren
 Zone.fromDescendants = ZoneContainers.fromDescendants
