@@ -9,12 +9,14 @@ local Types = require(script.Parent.Parent.Types)
 local Callbacks = require(script.Parent.Callbacks)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Entities = require(script.Parent.Entities)
+local Links = require(script.Parent.Links)
 local Memberships = require(script.Parent.Memberships)
 local References = require(script.Parent.References)
+local Registry = require(script.Parent.Registry)
 local Routing = require(script.Parent.Routing)
-local State = require(script.Parent.State)
-local ZoneShapes = require(script.Parent.ZoneShapes)
 local ZoneChanges = require(script.Parent.ZoneChanges)
+local ZoneShapes = require(script.Parent.ZoneShapes)
 
 local queryPoint = LinearBVH.queryPoint
 local touches = ZoneChanges.touches
@@ -24,34 +26,29 @@ local moveMembership = Memberships.move
 local exitMembership = Memberships.exit
 local isSubscribed = Memberships.isSubscribed
 
-local staticSlots = State.staticSlots
-local dynamicSlots = State.dynamicSlots
-local shapeBoundsMin = State.shapeBoundsMin
-local shapeBoundsMax = State.shapeBoundsMax
-local shapePositions = State.shapePositions
-local treeExact = State.treeExact
-local zoneIdToZoneObj = State.zoneIdToZoneObj
-local zoneSlotIds = State.zoneSlotIds
-local zoneAttachedObservers = State.zoneAttachedObservers
-local zoneSoleObserver = State.zoneSoleObserver
-local autoSyncZones = State.autoSyncZones
+local treeExact = ZoneShapes.treeExact
+local zoneIdToZoneObj = Registry.zoneIdToZoneObj
+local zoneSlotIds = ZoneShapes.zoneSlotIds
+local zoneAttachedObservers = Links.zoneAttachedObservers
+local zoneSoleObserver = Links.zoneSoleObserver
+local autoSyncZones = Registry.autoSyncZones
 
-local observerPriorityMap = State.observerPriorityMap
-local observerTrackingEntities = State.observerTrackingEntities
-local observerEnteredCallbacks = State.observerEnteredCallbacks
-local observerTransitionedCallbacks = State.observerTransitionedCallbacks
-local observerEnabled = State.observerEnabled
-local observerSafety = State.observerSafety
+local observerPriorityMap = Registry.observerPriorityMap
+local observerTrackingEntities = Memberships.observerTrackingEntities
+local observerEnteredCallbacks = Callbacks.observerEnteredCallbacks
+local observerTransitionedCallbacks = Callbacks.observerTransitionedCallbacks
+local observerEnabled = Registry.observerEnabled
+local observerSafety = Registry.observerSafety
 
 local entityToReference = References.entityToReference
-local entityData = State.entityData
-local entityToObservers = State.entityToObservers
-local dirtyProfiles = State.dirtyProfiles
+local entityData = Entities.entityData
+local entityToObservers = Routing.entityToObservers
+local dirtyProfiles = Routing.dirtyProfiles
 
-local staticTree = State.staticTree
-local dynamicTree = State.dynamicTree
-local staticChanges = State.staticChanges
-local dynamicChanges = State.dynamicChanges
+local staticTree = ZoneShapes.staticTree
+local dynamicTree = ZoneShapes.dynamicTree
+local staticChanges = ZoneShapes.staticChanges
+local dynamicChanges = ZoneShapes.dynamicChanges
 
 local ctx_hits = table.create(64) :: { number }
 local ctx_cCount: number = 0
@@ -70,8 +67,8 @@ local autoSyncRate = Config.Scheduler.autoSyncRate
 local autoSyncTimer = 0
 local autoUpdateConnection: RBXScriptConnection?
 
-local bucketList = State.bucketList
-local buckets = State.buckets
+local bucketList = Routing.bucketList
+local buckets = Routing.buckets
 local nextBucketIndex = 1 -- Round-robin pointer
 local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
@@ -184,7 +181,7 @@ local function runTick(dt: number)
 
 	-- No return here when the rebuild used up the budget, as entities would never be checked while zones keep
 	-- moving. The loop below checks the budget every few entities, so each tick makes some progress
-	Scheduler.rebuildTrees()
+	ZoneShapes.rebuildTrees()
 
 	local numBuckets = #bucketList
 	if numBuckets == 0 then
@@ -196,9 +193,9 @@ local function runTick(dt: number)
 		nextBucketIndex = 1
 	end
 
-	local dynamicVersion = State.dynamicVersion
-	local staticVersion = State.staticVersion
-	local logicVersion = State.logicVersion
+	local dynamicVersion = ZoneShapes.dynamicVersion
+	local staticVersion = ZoneShapes.staticVersion
+	local logicVersion = Routing.logicVersion
 
 	-- Round-robin scheduling to prevent starvation
 	for _ = 1, numBuckets do
@@ -498,35 +495,6 @@ end
 function Scheduler.setFrameBudget(n: number)
 	Scheduler.checkFrameBudget(n)
 	frameBudget = n
-end
-
--- Refit if only shapes changed, rebuild if zones were added or removed or the tree degraded
-local function updateTree(tree: Types.Tree, members: { [number]: any })
-	if tree.membersChanged or not LinearBVH.refit(tree, shapeBoundsMin, shapeBoundsMax) then
-		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
-		tree.membersChanged = false
-	end
-	tree.pending = false
-	ZoneShapes.markBuilt(members)
-end
-
-function Scheduler.rebuildTrees()
-	if dynamicTree.pending then
-		updateTree(dynamicTree, dynamicSlots)
-	end
-
-	if staticTree.pending then
-		updateTree(staticTree, staticSlots)
-	end
-
-	-- New version for every tree that changed
-	if ZoneChanges.commit(dynamicChanges, State.dynamicVersion + 1, (dynamicTree.count + 1) // 2) then
-		State.dynamicVersion += 1
-	end
-
-	if ZoneChanges.commit(staticChanges, State.staticVersion + 1, (staticTree.count + 1) // 2) then
-		State.staticVersion += 1
-	end
 end
 
 Scheduler.setEnabled(Config.Scheduler.enabled)

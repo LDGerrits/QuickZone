@@ -8,7 +8,7 @@
 	attached and detached accordingly.
 ]=]
 
-local State = require(script.Parent.Parent.Core.State)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
@@ -327,7 +327,7 @@ function Zones.destroy(self: Types.InternalZones)
 	for zone in self.zones do
 		local id = zone:getId()
 		table.insert(zoneIds, id)
-		State.zonesBeingDestroyed[id] = true
+		Memberships.setZoneDestroying(id, true)
 	end
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
@@ -342,7 +342,7 @@ function Zones.destroy(self: Types.InternalZones)
 	end
 	-- Also for zones a callback took out before they were destroyed. Ids are never reused
 	for _, id in zoneIds do
-		State.zonesBeingDestroyed[id] = nil
+		Memberships.setZoneDestroying(id, false)
 	end
 
 	table.clear(self.zones)

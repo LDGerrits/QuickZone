@@ -8,7 +8,6 @@
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local ZoneChanges = require(script.Parent.ZoneChanges)
-local State = require(script.Parent.State)
 local Types = require(script.Parent.Parent.Types)
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
@@ -22,26 +21,63 @@ local getBounds = Geometry.getBounds
 local queryPoint = LinearBVH.queryPoint
 local isPointInShape = Geometry.isPointInShape
 
-local shapeCFrames = State.shapeCFrames
-local shapeHalfSizes = State.shapeHalfSizes
-local shapeExtents = State.shapeExtents
-local shapeTypes = State.shapeTypes
-local shapeParts = State.shapeParts
-local shapePositions = State.shapePositions
-local shapeRights = State.shapeRights
-local shapeUps = State.shapeUps
-local shapeBacks = State.shapeBacks
-local shapeBoundsMin = State.shapeBoundsMin
-local shapeBoundsMax = State.shapeBoundsMax
-local shapeAxisAligned = State.shapeAxisAligned
-local treeExact = State.treeExact
-local staleSlots = State.staleSlots
-local staticSlots = State.staticSlots
-local dynamicSlots = State.dynamicSlots
-local dynamicTree = State.dynamicTree
-local staticTree = State.staticTree
-local staticChanges = State.staticChanges
-local dynamicChanges = State.dynamicChanges
+local ZoneShapes = {}
+
+-- Keyed by slot instead of id, slots are reused
+ZoneShapes.zoneSlotCount = 0
+ZoneShapes.freeZoneSlots = {} :: { number }
+ZoneShapes.zoneSlotIds = {} :: { [number]: number }
+-- Slots of the zones in each tree
+ZoneShapes.staticSlots = {} :: { [number]: true }
+ZoneShapes.dynamicSlots = {} :: { [number]: true }
+-- Geometry of every zone
+ZoneShapes.shapeCFrames = {} :: { [number]: CFrame }
+ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
+-- Half size the shape fills, as a Ball fills its smallest side and a Cylinder its smallest cross-section
+ZoneShapes.shapeExtents = {} :: { [number]: Vector3 }
+ZoneShapes.shapeTypes = {} :: { [number]: number }
+-- The part a Mesh zone queries
+ZoneShapes.shapeParts = {} :: { [number]: BasePart }
+-- World-space shape derived from the geometry
+ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
+ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
+ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
+ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
+ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
+ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
+ZoneShapes.shapeAxisAligned = {} :: { [number]: boolean }
+-- Zones whose leaf is exactly their shape
+ZoneShapes.treeExact = {} :: { [number]: boolean }
+-- Zones added, moved or changed since their tree was built, which the trees may not find where they are
+ZoneShapes.staleSlots = {} :: { [number]: true }
+-- Where zones changed per tree
+ZoneShapes.staticChanges = ZoneChanges.new()
+ZoneShapes.dynamicChanges = ZoneChanges.new()
+ZoneShapes.staticTree = LinearBVH.new()
+ZoneShapes.dynamicTree = LinearBVH.new()
+ZoneShapes.staticVersion = 0
+ZoneShapes.dynamicVersion = 0
+
+local shapeCFrames = ZoneShapes.shapeCFrames
+local shapeHalfSizes = ZoneShapes.shapeHalfSizes
+local shapeExtents = ZoneShapes.shapeExtents
+local shapeTypes = ZoneShapes.shapeTypes
+local shapeParts = ZoneShapes.shapeParts
+local shapePositions = ZoneShapes.shapePositions
+local shapeRights = ZoneShapes.shapeRights
+local shapeUps = ZoneShapes.shapeUps
+local shapeBacks = ZoneShapes.shapeBacks
+local shapeBoundsMin = ZoneShapes.shapeBoundsMin
+local shapeBoundsMax = ZoneShapes.shapeBoundsMax
+local shapeAxisAligned = ZoneShapes.shapeAxisAligned
+local treeExact = ZoneShapes.treeExact
+local staleSlots = ZoneShapes.staleSlots
+local staticSlots = ZoneShapes.staticSlots
+local dynamicSlots = ZoneShapes.dynamicSlots
+local dynamicTree = ZoneShapes.dynamicTree
+local staticTree = ZoneShapes.staticTree
+local staticChanges = ZoneShapes.staticChanges
+local dynamicChanges = ZoneShapes.dynamicChanges
 
 local function isAxis(direction: Vector3): boolean
 	local magnitude = vector.abs(direction)
@@ -120,7 +156,22 @@ local function refresh(slot: number)
 	treeOf(isDynamic).pending = true
 end
 
-local ZoneShapes = {}
+-- A slot for a new zone. Keyed by slot, which is reused, so the tables stay arrays
+function ZoneShapes.allocateSlot(zoneId: number): number
+	local slot = table.remove(ZoneShapes.freeZoneSlots)
+	if not slot then
+		slot = ZoneShapes.zoneSlotCount + 1
+		ZoneShapes.zoneSlotCount = slot
+	end
+	ZoneShapes.zoneSlotIds[slot] = zoneId
+	return slot
+end
+
+-- Frees the slot of a removed zone. Reusable right away, a stale tree leaf checks the new zone's shape
+function ZoneShapes.freeSlot(slot: number)
+	ZoneShapes.zoneSlotIds[slot] = nil
+	table.insert(ZoneShapes.freeZoneSlots, slot)
+end
 
 -- Adds a zone to the static or dynamic tree. part is the part a Mesh zone queries
 function ZoneShapes.add(
@@ -279,6 +330,36 @@ end
 function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 	local hitCount = queryPoint(dynamicTree, point, hits, 0)
 	return queryPoint(staticTree, point, hits, hitCount)
+end
+
+-- Refit if only shapes changed, rebuild if zones were added or removed or the tree degraded
+local function updateTree(tree: Types.Tree, members: { [number]: any })
+	if tree.membersChanged or not LinearBVH.refit(tree, shapeBoundsMin, shapeBoundsMax) then
+		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		tree.membersChanged = false
+	end
+	tree.pending = false
+	ZoneShapes.markBuilt(members)
+end
+
+-- Brings both trees up to date with their zones, and raises the version of each that changed
+function ZoneShapes.rebuildTrees()
+	if dynamicTree.pending then
+		updateTree(dynamicTree, dynamicSlots)
+	end
+
+	if staticTree.pending then
+		updateTree(staticTree, staticSlots)
+	end
+
+	-- New version for every tree that changed
+	if ZoneChanges.commit(dynamicChanges, ZoneShapes.dynamicVersion + 1, (dynamicTree.count + 1) // 2) then
+		ZoneShapes.dynamicVersion += 1
+	end
+
+	if ZoneChanges.commit(staticChanges, ZoneShapes.staticVersion + 1, (staticTree.count + 1) // 2) then
+		ZoneShapes.staticVersion += 1
+	end
 end
 
 return ZoneShapes

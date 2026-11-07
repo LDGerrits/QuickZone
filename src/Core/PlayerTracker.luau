@@ -4,7 +4,7 @@ local Players = game:GetService('Players')
 
 local Types = require(script.Parent.Parent.Types)
 local References = require(script.Parent.References)
-local State = require(script.Parent.State)
+local Registry = require(script.Parent.Registry)
 
 local activeTrackers = {} :: { [Player]: () -> () }
 local playerSubscriptions = {} :: { [Player]: { [number]: Types.InternalGroup } }
@@ -18,7 +18,7 @@ local function isInAnyGroup(player: Player): boolean
 	local subscriptions = playerSubscriptions[player]
 	if subscriptions then
 		for groupId in subscriptions do
-			if State.groups[groupId] then
+			if Registry.groups[groupId] then
 				return true
 			end
 		end
@@ -59,7 +59,7 @@ local function trackPlayer(player: Player)
 			if subscriptions then
 				-- Cloned, as exit callbacks may add the player to groups
 				for groupId, group in table.clone(subscriptions) do
-					if State.groups[groupId] then
+					if Registry.groups[groupId] then
 						group:_removeEntity(hrp)
 					else
 						subscriptions[groupId] = nil
@@ -117,7 +117,7 @@ local function trackPlayer(player: Player)
 				for groupId, group in table.clone(subscriptions) do
 					if currentHrp ~= hrp then
 						break
-					elseif State.groups[groupId] then
+					elseif Registry.groups[groupId] then
 						group:_addEntity(hrp)
 					else
 						subscriptions[groupId] = nil
@@ -211,7 +211,7 @@ end
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
 	for groupId, group in playerSubscriptions[player] or {} do
-		if State.groups[groupId] then
+		if Registry.groups[groupId] then
 			table.insert(list, group)
 		end
 	end

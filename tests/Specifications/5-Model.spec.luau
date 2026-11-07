@@ -12,7 +12,12 @@ local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
-local State = require(ReplicatedStorage.QuickZone.Core.State)
+local Callbacks = require(ReplicatedStorage.QuickZone.Core.Callbacks)
+local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
+local Links = require(ReplicatedStorage.QuickZone.Core.Links)
+local Memberships = require(ReplicatedStorage.QuickZone.Core.Memberships)
+local Registry = require(ReplicatedStorage.QuickZone.Core.Registry)
+local Routing = require(ReplicatedStorage.QuickZone.Core.Routing)
 local ZoneShapes = require(ReplicatedStorage.QuickZone.Core.ZoneShapes)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
@@ -1548,7 +1553,7 @@ local function checkConsistency(world: World)
 	-- Memberships, the observers' tracked maps and the zones' occupant counts
 	local occupants = {}
 	for _, entity in world.entities do
-		local data = State.entityData[entity]
+		local data = Entities.entityData[entity]
 		if (data ~= nil) ~= tracked(world, entity) then
 			fail(
 				world,
@@ -1560,7 +1565,7 @@ local function checkConsistency(world: World)
 			continue
 		end
 		for observerId, zoneId in data.activeObserverMemberships do
-			local trackedMap = State.observerTrackingEntities[observerId]
+			local trackedMap = Memberships.observerTrackingEntities[observerId]
 			if not trackedMap or trackedMap[entity] ~= zoneId then
 				fail(
 					world,
@@ -1568,7 +1573,7 @@ local function checkConsistency(world: World)
 				)
 				return
 			end
-			if not State.zoneIdToZoneObj[zoneId] then
+			if not Registry.zoneIdToZoneObj[zoneId] then
 				fail(world, `{describeEntity(world, entity)} is in destroyed zone {zoneId}`)
 				return
 			end
@@ -1577,8 +1582,8 @@ local function checkConsistency(world: World)
 	end
 	for _, model in liveObservers(world) do
 		local observerId = model.observer:getId()
-		for entity, zoneId in State.observerTrackingEntities[observerId] or {} do
-			local data = State.entityData[entity]
+		for entity, zoneId in Memberships.observerTrackingEntities[observerId] or {} do
+			local data = Entities.entityData[entity]
 			if not data or data.activeObserverMemberships[observerId] ~= zoneId then
 				fail(world, `observer {model.index} tracks an entity in zone {zoneId} that has no such membership`)
 				return
@@ -1587,8 +1592,8 @@ local function checkConsistency(world: World)
 	end
 	for _, zone in world.zones do
 		local id = zone:getId()
-		if State.zoneOccupants[id] ~= occupants[id] then
-			fail(world, `{describeZone(zone)} counts {State.zoneOccupants[id]} occupants, has {occupants[id]}`)
+		if Memberships.zoneOccupants[id] ~= occupants[id] then
+			fail(world, `{describeZone(zone)} counts {Memberships.zoneOccupants[id]} occupants, has {occupants[id]}`)
 			return
 		end
 	end
@@ -1621,16 +1626,16 @@ local function describeLeaves(zones: { [any]: any }, point: Vector3): string
 			parts,
 			`{describeZone(zone)} ({zone:getShape()}, dynamic {zone:isDynamic()}, slot {slot}, cframe {zone:getCFrame()}, size {zone:getSize()}): shape {zone:isPointInside(
 				point
-			)}, leaf {leaf}, exact leaf {State.treeExact[slot]}`
+			)}, leaf {leaf}, exact leaf {ZoneShapes.treeExact[slot]}`
 		)
 		hitSlots[slot] = nil
 	end
 	for slot in hitSlots do
-		local zone = State.zoneSlotToZoneObj[slot]
+		local zone = Registry.zoneSlotToZoneObj[slot]
 		table.insert(
 			parts,
 			`other leaf at slot {slot} ({if zone then describeZone(zone) else 'no zone'}, attached to observer ids {table.concat(
-				State.zoneAttachedObservers[slot] or {},
+				Links.zoneAttachedObservers[slot] or {},
 				','
 			)}): leaf {ZoneShapes.leafContainsPoint(slot, point)}`
 		)
@@ -1815,24 +1820,35 @@ local function moveEntities(world: World)
 	end
 end
 
--- Keys of every plain State table, to find what a run leaves behind
+-- Keys of every plain table the core modules keep, to find what a run leaves behind
 local function snapshotState(): { [string]: { [any]: true } }
 	local snapshot = {}
-	for name, value in State :: any do
-		if type(value) ~= 'table' or getmetatable(value) ~= nil then
-			continue
+	local modules = {
+		Callbacks = Callbacks,
+		Entities = Entities,
+		Links = Links,
+		Memberships = Memberships,
+		Registry = Registry,
+		Routing = Routing,
+		ZoneShapes = ZoneShapes,
+	}
+	for moduleName, module in modules do
+		for name, value in module :: any do
+			if type(value) ~= 'table' or getmetatable(value) ~= nil then
+				continue
+			end
+			if name == 'freeZoneSlots' or name == 'staticTree' or name == 'dynamicTree' then
+				continue
+			end
+			if name == 'staticChanges' or name == 'dynamicChanges' then
+				continue
+			end
+			local keys = {}
+			for key in value do
+				keys[key] = true
+			end
+			snapshot[`{moduleName}.{name}`] = keys
 		end
-		if name == 'freeZoneSlots' or name == 'staticTree' or name == 'dynamicTree' then
-			continue
-		end
-		if name == 'staticChanges' or name == 'dynamicChanges' then
-			continue
-		end
-		local keys = {}
-		for key in value do
-			keys[key] = true
-		end
-		snapshot[name] = keys
 	end
 	return snapshot
 end
@@ -1983,7 +1999,7 @@ local function run(seed: number, steps: number): string?
 		for name, keys in snapshotState() do
 			for key in keys do
 				if not (before[name] and before[name][key]) then
-					fail(world, `State.{name}[{key}] is left behind after everything was destroyed`)
+					fail(world, `{name}[{key}] is left behind after everything was destroyed`)
 					break
 				end
 			end

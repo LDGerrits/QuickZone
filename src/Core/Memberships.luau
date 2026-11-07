@@ -6,26 +6,38 @@
 -- tracking and the zone's occupants in step with it. Exits re-read state, as callbacks may change it
 
 local Callbacks = require(script.Parent.Callbacks)
+local Entities = require(script.Parent.Entities)
+local Links = require(script.Parent.Links)
 local References = require(script.Parent.References)
-local State = require(script.Parent.State)
+local Registry = require(script.Parent.Registry)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 
-local entityData = State.entityData
-local entityToGroups = State.entityToGroups
+local entityData = Entities.entityData
+local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
-local groupToObservers = State.groupToObservers
-local observerTrackingEntities = State.observerTrackingEntities
-local observerExitedCallbacks = State.observerExitedCallbacks
-local observerGroupTrackers = State.observerGroupTrackers
-local observerSafety = State.observerSafety
-local observerTransitionedCallbacks = State.observerTransitionedCallbacks
-local zoneAttachedObservers = State.zoneAttachedObservers
-local zoneIdToZoneObj = State.zoneIdToZoneObj
-local zoneOccupants = State.zoneOccupants
-local zoneSlotIds = State.zoneSlotIds
-local staleSlots = State.staleSlots
-local zonesBeingDestroyed = State.zonesBeingDestroyed
+local groupToObservers = Links.groupToObservers
+local observerExitedCallbacks = Callbacks.observerExitedCallbacks
+local observerGroupTrackers = Callbacks.observerGroupTrackers
+local observerSafety = Registry.observerSafety
+local observerTransitionedCallbacks = Callbacks.observerTransitionedCallbacks
+local zoneAttachedObservers = Links.zoneAttachedObservers
+local zoneIdToZoneObj = Registry.zoneIdToZoneObj
+local zoneSlotIds = ZoneShapes.zoneSlotIds
+local staleSlots = ZoneShapes.staleSlots
+
+local Memberships = {}
+
+-- Entity to the id of its zone
+Memberships.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: number } }
+-- Zone id to the number of entities observers have in it
+Memberships.zoneOccupants = {} :: { [number]: number }
+-- Ids of zones a Zones is destroying, so entities don't move from one to the next on the way out
+Memberships.zonesBeingDestroyed = {} :: { [number]: true }
+
+local observerTrackingEntities = Memberships.observerTrackingEntities
+local zoneOccupants = Memberships.zoneOccupants
+local zonesBeingDestroyed = Memberships.zonesBeingDestroyed
 
 local leafHits = {} :: { number }
 
@@ -49,8 +61,6 @@ local function runTrackers(observerId: number, entity: Types.Entity?, destroyedG
 		track(entity, destroyedGroupId)
 	end
 end
-
-local Memberships = {}
 
 -- Whether the observer still watches one of the entity's groups
 function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boolean
@@ -274,6 +284,23 @@ function Memberships.exitUnsubscribed(entity: Types.Entity, data: Types.EntityDa
 				Memberships.exit(observerId, entity, data)
 			end
 		end
+	end
+end
+
+function Memberships.addObserver(observerId: number)
+	observerTrackingEntities[observerId] = {}
+end
+
+function Memberships.dropObserver(observerId: number)
+	observerTrackingEntities[observerId] = nil
+end
+
+-- Marks a zone a Zones is destroying, so entities don't move into it from the zones going with it
+function Memberships.setZoneDestroying(zoneId: number, destroying: boolean)
+	if destroying then
+		zonesBeingDestroyed[zoneId] = true
+	else
+		zonesBeingDestroyed[zoneId] = nil
 	end
 end
 

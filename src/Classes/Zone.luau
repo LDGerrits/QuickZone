@@ -18,9 +18,10 @@
 	:::
 ]=]
 
-local Memberships = require(script.Parent.Parent.Core.Memberships)
 local Links = require(script.Parent.Parent.Core.Links)
-local State = require(script.Parent.Parent.Core.State)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
+local Registry = require(script.Parent.Parent.Core.Registry)
+local Routing = require(script.Parent.Parent.Core.Routing)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -28,9 +29,9 @@ local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local Log = require(script.Parent.Parent.Utils.Log)
 local ZoneContainers = require(script.Parent.ZoneContainers)
 
-local shapeCFrames = State.shapeCFrames
-local shapeHalfSizes = State.shapeHalfSizes
-local shapeTypes = State.shapeTypes
+local shapeCFrames = ZoneShapes.shapeCFrames
+local shapeHalfSizes = ZoneShapes.shapeHalfSizes
+local shapeTypes = ZoneShapes.shapeTypes
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
@@ -105,7 +106,7 @@ local function applyShape(zone: Types.InternalZone, shapeType: number)
 end
 
 local function clearAutoSync(zone: Types.InternalZone)
-	State.autoSyncZones[zone.slot] = nil
+	Registry.autoSyncZones[zone.slot] = nil
 	if zone.syncConnections then
 		for _, conn in zone.syncConnections do
 			conn:Disconnect()
@@ -131,7 +132,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		return
 	end
 
-	State.autoSyncZones[zone.slot] = zone
+	Registry.autoSyncZones[zone.slot] = zone
 
 	local connections = zone.syncConnections or {}
 
@@ -195,16 +196,10 @@ local function newZoneInternal(
 	checkSize(size)
 	checkReference(reference)
 
-	local id = State.nextZoneId
-	State.nextZoneId += 1
+	local id = Registry.nextZoneId
+	Registry.nextZoneId += 1
 
-	-- Keyed by slot, which is reused, so the tables stay arrays
-	local slot = table.remove(State.freeZoneSlots)
-	if not slot then
-		slot = State.zoneSlotCount + 1
-		State.zoneSlotCount = slot
-	end
-	State.zoneSlotIds[slot] = id
+	local slot = ZoneShapes.allocateSlot(id)
 
 	local resolvedType, part = resolveShape(id, shapeType, asQueryablePart(reference))
 	ZoneShapes.add(slot, isDynamic, cframe, size * 0.5, resolvedType, part)
@@ -218,8 +213,8 @@ local function newZoneInternal(
 		metadata = metadata,
 		autoSync = false,
 	}, Zone) :: any
-	State.zoneIdToZoneObj[id] = self
-	State.zoneSlotToZoneObj[slot] = self
+	Registry.zoneIdToZoneObj[id] = self
+	Registry.zoneSlotToZoneObj[slot] = self
 
 	if autoSync then
 		self:setAutoSync(true)
@@ -324,7 +319,8 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 		return self
 	end
 
-	if Links.attach(self.slot, observer.id, ZoneShapes.isDynamic(self.slot)) then
+	if Links.attach(self.slot, observer.id) then
+		Routing.changeZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), 1)
 		ZoneShapes.touch(self.slot)
 	end
 
@@ -333,7 +329,8 @@ end
 
 -- private
 function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	if Links.detach(self.slot, observer.id, ZoneShapes.isDynamic(self.slot)) then
+	if Links.detach(self.slot, observer.id) then
+		Routing.changeZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), -1)
 		-- Its entities leave on the next tick, unless the zone is destroyed first
 		ZoneShapes.touch(self.slot)
 	end
@@ -464,7 +461,7 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 
 	ZoneShapes.setDynamic(slot, isDynamic)
 
-	Links.moveZoneCounts(slot, isDynamic)
+	Routing.moveZoneCounts(slot, isDynamic)
 
 	if not isDynamic and self.autoSync then
 		self:setAutoSync(false)
@@ -702,21 +699,23 @@ function Zone.destroy(self: Types.InternalZone): ()
 	local slot = self.slot
 
 	-- Detach before any callback runs, so a callback that updates can't move entities back in
-	Links.detachAll(slot, ZoneShapes.isDynamic(slot))
+	local attachedObservers = Links.detachAll(slot)
+	if attachedObservers then
+		for _, observerId in attachedObservers do
+			Routing.changeZoneCount(observerId, ZoneShapes.isDynamic(slot), -1)
+		end
+	end
 
 	-- Leave while the zone object is still alive, so callbacks get it
 	Memberships.leaveZone(id)
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
-	State.zoneIdToZoneObj[id] = nil
-	State.zoneSlotToZoneObj[slot] = nil
-	State.zoneSlotIds[slot] = nil
+	Registry.zoneIdToZoneObj[id] = nil
+	Registry.zoneSlotToZoneObj[slot] = nil
 	ZoneShapes.remove(slot)
-
-	-- Reusable right away, a stale tree leaf checks the new zone's shape
-	table.insert(State.freeZoneSlots, slot)
-	State.zonesBeingDestroyed[id] = nil
+	ZoneShapes.freeSlot(slot)
+	Memberships.setZoneDestroying(id, false)
 
 	Destroyed.finish(self)
 end

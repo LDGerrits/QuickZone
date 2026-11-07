@@ -10,7 +10,8 @@ local Util = require(TestFolder.Util)
 
 local Types = require(ReplicatedStorage.QuickZone.Types)
 local QuickZone = require(ReplicatedStorage.QuickZone)
-local State = require(ReplicatedStorage.QuickZone.Core.State)
+local Registry = require(ReplicatedStorage.QuickZone.Core.Registry)
+local ZoneShapes = require(ReplicatedStorage.QuickZone.Core.ZoneShapes)
 local Zone = QuickZone.Zone
 
 local SHAPE_TYPES = Util.SHAPES
@@ -1355,19 +1356,19 @@ return function(Tiniest: Tiniest)
 				zone:setReference(part)
 			end)
 			zone:destroy()
-			local stillSyncing = State.autoSyncZones[slot] ~= nil
+			local stillSyncing = Registry.autoSyncZones[slot] ~= nil
 
 			part.Size = Vector3.one * 20
 			part.CFrame = CFrame.new(0, 3100, 0)
 			task.wait() -- Deferred property signals
-			local resized = State.shapeHalfSizes[slot] ~= nil
+			local resized = ZoneShapes.shapeHalfSizes[slot] ~= nil
 			local updated = pcall(QuickZone.update, QuickZone, 1)
-			local moved = State.shapeCFrames[slot] ~= nil
+			local moved = ZoneShapes.shapeCFrames[slot] ~= nil
 
 			-- Leave no broken state behind for later tests
-			State.autoSyncZones[slot] = nil
-			State.shapeHalfSizes[slot] = nil
-			State.shapeCFrames[slot] = nil
+			Registry.autoSyncZones[slot] = nil
+			ZoneShapes.shapeHalfSizes[slot] = nil
+			ZoneShapes.shapeCFrames[slot] = nil
 			part:Destroy()
 			QuickZone:rebuild()
 

@@ -3,9 +3,10 @@
 -- QuickZone's queries over everything that exists: entities, groups, observers and zones
 
 local Types = require(script.Parent.Parent.Types)
+local Entities = require(script.Parent.Parent.Core.Entities)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local References = require(script.Parent.Parent.Core.References)
-local State = require(script.Parent.Parent.Core.State)
+local Registry = require(script.Parent.Parent.Core.Registry)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
@@ -20,12 +21,12 @@ local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
 local containsPoint = ZoneShapes.containsPoint
 
-local zoneIdToZoneObj = State.zoneIdToZoneObj
-local zoneSlotToZoneObj = State.zoneSlotToZoneObj
-local entityData = State.entityData
-local observerIdToObserverObj = State.observerIdToObserverObj
-local groups = State.groups
-local entityToGroups = State.entityToGroups
+local zoneIdToZoneObj = Registry.zoneIdToZoneObj
+local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
+local entityData = Entities.entityData
+local observerIdToObserverObj = Registry.observerIdToObserverObj
+local groups = Registry.groups
+local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
 local referenceToEntity = References.referenceToEntity
 
