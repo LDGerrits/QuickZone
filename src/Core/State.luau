@@ -50,12 +50,14 @@ local State = {
 	logicVersion = 0,
 
 	groups = {} :: { [number]: Types.InternalGroup },
+	-- Only written through Core/Links
 	groupToObservers = {} :: { [number]: { [number]: boolean } },
 	groupEntityCleanups = {} :: { [number]: { [any]: RBXScriptConnection } },
+	-- Entries only added and dropped through Core/Entities
 	entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } },
 	entityData = {} :: { [Types.Entity]: Types.EntityData },
+	-- Routing, only written through Core/Routing
 	entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } },
-
 	dirtyProfiles = {} :: { [Types.Entity]: boolean },
 	dirtyTopology = {} :: { [Types.Entity]: boolean },
 	bucketList = {} :: { number },
@@ -74,12 +76,14 @@ local State = {
 	observerSafety = {} :: { [number]: boolean },
 	observerUpdateRate = {} :: { [number]: number },
 	observerPrecisionSq = {} :: { [number]: number },
+	-- Zone counts, only written through Core/Links
 	observerDynamicCount = {} :: { [number]: number },
 	observerStaticCount = {} :: { [number]: number },
 
 	autoSyncZones = {} :: { [number]: Types.InternalZone },
+	-- Only written through Core/Links
 	zoneAttachedObservers = {} :: { [number]: { number } },
-	-- Observer of zones attached to exactly one
+	-- Observer of zones attached to exactly one, only written through Core/Links
 	zoneSoleObserver = {} :: { [number]: number },
 	-- Zone id to the number of entities observers have in it, only written through Core/Memberships
 	zoneOccupants = {} :: { [number]: number },

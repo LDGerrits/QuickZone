@@ -138,7 +138,7 @@ function Links.detachAll(slot: number, isDynamic: boolean)
 end
 
 -- Moves the zone in the slot to the other tree in its observers' counts
-function Links.changeTree(slot: number, isDynamic: boolean)
+function Links.moveZoneCounts(slot: number, isDynamic: boolean)
 	local attached = zoneAttachedObservers[slot]
 	if attached then
 		for _, observerId in attached do

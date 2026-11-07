@@ -464,7 +464,7 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 
 	ZoneShapes.setDynamic(slot, isDynamic)
 
-	Links.changeTree(slot, isDynamic)
+	Links.moveZoneCounts(slot, isDynamic)
 
 	if not isDynamic and self.autoSync then
 		self:setAutoSync(false)
