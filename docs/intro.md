@@ -90,7 +90,7 @@ Add the following to your wally.toml file:
 
 ```toml
 [dependencies]
-QuickZone = "ldgerrits/quickzone@1.5.1"
+QuickZone = "ldgerrits/quickzone@1.6.0"
 ```
 
 ### NPM
