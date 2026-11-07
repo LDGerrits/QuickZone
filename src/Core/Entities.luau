@@ -117,11 +117,7 @@ function Entities.dropIfGroupless(entity: Types.Entity, data: Types.EntityData?)
 	Routing.forget(entity, data)
 	entityData[entity] = nil
 	entityToGroups[entity] = nil
-
-	local ref = References.entityToReference[entity]
-	if ref and not References.isPlayer(ref) then
-		References.link(entity, nil)
-	end
+	References.forget(entity)
 end
 
 return Entities

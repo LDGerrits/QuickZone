@@ -44,6 +44,14 @@ function References.link(entity: Types.Entity, reference: any?)
 	end
 end
 
+-- Drops the reference of an entity that is gone. A player's part keeps its player, as the player tracker lets go
+-- of it itself
+function References.forget(entity: Types.Entity)
+	if not References.isPlayer(entityToReference[entity]) then
+		References.link(entity, nil)
+	end
+end
+
 -- The reference no longer leads to the entity, while the entity keeps it for the callbacks it still fires
 function References.release(reference: any, entity: Types.Entity)
 	if referenceToEntity[reference] == entity then

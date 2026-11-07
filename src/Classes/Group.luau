@@ -32,11 +32,6 @@ Group.__index = Group
 
 local isPlayer = References.isPlayer
 
-local function isMember(group: Types.InternalGroup, entity: any): boolean
-	local groups = State.entityToGroups[entity]
-	return groups ~= nil and groups[group.id] == true
-end
-
 -- Removes an instance from the group once it leaves the game, while the group has autoClean on
 local function watchRemoval(group: Types.InternalGroup, entity: any)
 	local cleanups = State.groupEntityCleanups[group.id]
@@ -400,7 +395,7 @@ end
 ]=]
 function Group.contains(self: Types.InternalGroup, entity: any): boolean
 	-- A player is a member while it has no character too
-	return isMember(self, References.entityOf(entity))
+	return Entities.isIn(References.entityOf(entity), self.id)
 		or (isPlayer(entity) and PlayerTracker.isSubscribed(entity, self))
 end
 
