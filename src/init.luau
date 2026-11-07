@@ -10,16 +10,28 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Types)
 local Config = require(script.Config)
+local PlayerTracker = require(script.Core.PlayerTracker)
+local References = require(script.Core.References)
 local Scheduler = require(script.Core.Scheduler)
 local State = require(script.Core.State)
-local Geometry = require(script.Utils.Geometry)
-local LinearBVH = require(script.Utils.LinearBVH)
+local ZoneShapes = require(script.Core.ZoneShapes)
+local Destroyed = require(script.Utils.Destroyed)
+local Log = require(script.Utils.Log)
+local Snapshot = require(script.Utils.Snapshot)
 
-local queryPoint = LinearBVH.queryPoint
-local isPointInShape = Geometry.isPointInShape
+local function isPlayer(x: any): boolean
+	return typeof(x) == 'Instance' and x:IsA('Player')
+end
+
+local entityOf = References.entityOf
+
+local leavesAtPoint = ZoneShapes.leavesAtPoint
+local leafContainsPoint = ZoneShapes.leafContainsPoint
+local containsPoint = ZoneShapes.containsPoint
 
 local zoneAttachedObservers = State.zoneAttachedObservers
 local zoneIdToZoneObj = State.zoneIdToZoneObj
+local zoneSlotToZoneObj = State.zoneSlotToZoneObj
 local entityData = State.entityData
 local observerIdToObserverObj = State.observerIdToObserverObj
 local groups = State.groups
@@ -27,16 +39,13 @@ local entityToGroups = State.entityToGroups
 local entityToReference = State.entityToReference
 local referenceToEntity = State.referenceToEntity
 
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local staticMeshes = State.staticMeshes
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
-local dynamicMeshes = State.dynamicMeshes
-local dynamicTree = State.dynamicTree
-local staticTree = State.staticTree
+local shapeCFrames = State.shapeCFrames
+local shapeExtents = State.shapeExtents
+local dynamicSlots = State.dynamicSlots
+
+local queryHits = {} :: { number }
+-- Candidate lists of finished iterZonesAtPoint iterators, for reuse
+local spareCandidates = {} :: { { Types.InternalZone } }
 
 local debugConnection: RBXScriptConnection?
 local debugFolder: Folder?
@@ -44,6 +53,7 @@ local debugFolder: Folder?
 type DebugVisual = {
 	adornment: any,
 	shape: Types.ShapeType,
+	zone: Types.Zone,
 }
 
 local debugVisuals = {} :: { [number]: DebugVisual }
@@ -79,6 +89,18 @@ local QuickZone = {
 	@return QuickZone
 ]=]
 function QuickZone:configure(config: { enabled: boolean?, autoSyncRate: number?, frameBudget: number? }): QuickZone
+	if type(config) ~= 'table' then
+		Log.fatal('configure expects a config table, got %s.', nil, typeof(config))
+	end
+	-- Checked first, so a bad value doesn't leave the settings before it applied
+	if config.autoSyncRate ~= nil then
+		Scheduler.checkAutoSyncRate(config.autoSyncRate)
+	end
+	if config.frameBudget ~= nil then
+		local ms = config.frameBudget
+		Scheduler.checkFrameBudget(if type(ms) == 'number' then ms / 1000 else ms)
+	end
+
 	if config.enabled ~= nil then
 		self:setEnabled(config.enabled)
 	end
@@ -104,7 +126,7 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:setEnabled(enabled: boolean): QuickZone
-	Scheduler.setEnabled(enabled)
+	Scheduler.setEnabled(not not enabled)
 	return self
 end
 
@@ -112,13 +134,15 @@ end
 	Manually processes the spatial queries and trigger callbacks.
 	This is only necessary if you disabled automatic updating.
 
+	Called from inside a callback, while an update is running, it does nothing: its work is done by the next update.
+
 	@tag Chainable
 	@method update
 	@within QuickZone
-	@param dt number -- Delta time
+	@param dt number? -- Delta time, 0 when left out
 	@return QuickZone
 ]=]
-function QuickZone:update(dt: number): QuickZone
+function QuickZone:update(dt: number?): QuickZone
 	Scheduler.update(dt)
 	return self
 end
@@ -178,10 +202,12 @@ end
 ]=]
 function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	local oldReference = entityToReference[entity]
+	local oldIsPlayer = isPlayer(oldReference)
 
 	if reference == nil then
-		if not (typeof(oldReference) == 'Instance' and oldReference:IsA('Player')) then
-			if oldReference then
+		if not oldIsPlayer then
+			-- Only if it still leads here, another entity may have taken it since
+			if oldReference ~= nil and referenceToEntity[oldReference] == entity then
 				referenceToEntity[oldReference] = nil
 			end
 			entityToReference[entity] = nil
@@ -189,7 +215,16 @@ function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 		return self
 	end
 
-	if not (typeof(reference) == 'Instance' and reference:IsA('Player')) then
+	if not isPlayer(reference) then
+		-- The old reference no longer leads to this entity
+		if
+			oldReference ~= nil
+			and oldReference ~= reference
+			and not oldIsPlayer
+			and referenceToEntity[oldReference] == entity
+		then
+			referenceToEntity[oldReference] = nil
+		end
 		entityToReference[entity] = reference
 		referenceToEntity[reference] = entity
 	end
@@ -217,15 +252,17 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:setFrameBudget(ms: number): QuickZone
-	local s = ms / 1000
-	Scheduler.setFrameBudget(s)
+	Scheduler.setFrameBudget(if type(ms) == 'number' then ms / 1000 else ms)
 	return self
 end
 
 --[=[
 	Instantly and safely removes the entity from QuickZone. 
 	It will be removed from all Groups, resolving any active Observers 
-	and firing their `onExit` events.
+	and firing their `onExit` events. Managed groups (`Group.players`, `Group.fromTag`) keep it,
+	and warn once, as they decide their own members.
+
+	Accepts a Player, an entity, or the reference an entity was given with `setReference`.
 
 	@tag Chainable
 	@method removeEntity
@@ -234,7 +271,18 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:removeEntity(entity: any): QuickZone
-	entity = referenceToEntity[entity] or entity
+	-- Groups already asked, so a managed group warns once
+	local asked = {} :: { [any]: true }
+
+	-- A player leaves the groups it was added to, also while it has no character
+	if isPlayer(entity) then
+		for _, group in PlayerTracker.groupsOf(entity) do
+			asked[group] = true
+			group:remove(entity)
+		end
+	end
+
+	entity = entityOf(entity)
 
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
@@ -246,10 +294,14 @@ function QuickZone:removeEntity(entity: any): QuickZone
 		table.insert(idsToRemove, groupId)
 	end
 
+	-- A player's character part goes by its player, so the player is removed rather than only this
+	-- character. Other entities go by themselves, as entities may share a reference
+	local reference = entityToReference[entity]
+	local target = if isPlayer(reference) then reference else entity
 	for _, groupId in idsToRemove do
 		local group = groups[groupId]
-		if group then
-			group:remove(entity)
+		if group and not asked[group] then
+			group:remove(target)
 		end
 	end
 
@@ -282,7 +334,7 @@ function QuickZone:getEntityOfReference(reference: any): Types.Entity?
 			return entity
 		end
 	elseif typeof(entity) == 'table' then
-		if entity.Position or entity.CFrame or entity.WorldPosition or entity.GetPivot then
+		if entity.Position or entity.CFrame or entity.Transform or entity.WorldPosition or entity.GetPivot then
 			return entity
 		end
 	end
@@ -295,7 +347,7 @@ end
 
 	@method getReferenceOfEntity
 	@within QuickZone
-	@param reference any
+	@param entity Entity
 	@return any
 ]=]
 function QuickZone:getReferenceOfEntity(entity: any): any
@@ -381,41 +433,17 @@ function QuickZone:getZonesAtPoint(position: Vector3): { Zone }
 	local results = {}
 	local count = 0
 
-	queryPoint(dynamicTree, position, function(zoneId)
-		if
-			isPointInShape(
-				position,
-				dynamicCFrames[zoneId],
-				dynamicHalfSizes[zoneId],
-				dynamicTypes[zoneId],
-				dynamicMeshes[zoneId]
-			)
-		then
-			local zone = zoneIdToZoneObj[zoneId]
+	local hitCount = leavesAtPoint(position, queryHits)
+	for i = 1, hitCount do
+		local slot = queryHits[i]
+		if leafContainsPoint(slot, position) then
+			local zone = zoneSlotToZoneObj[slot]
 			if zone then
 				count += 1
 				results[count] = zone
 			end
 		end
-	end)
-
-	queryPoint(staticTree, position, function(zoneId)
-		if
-			isPointInShape(
-				position,
-				staticCFrames[zoneId],
-				staticHalfSizes[zoneId],
-				staticTypes[zoneId],
-				staticMeshes[zoneId]
-			)
-		then
-			local zone = zoneIdToZoneObj[zoneId]
-			if zone then
-				count += 1
-				results[count] = zone
-			end
-		end
-	end)
+	end
 
 	return results
 end
@@ -430,7 +458,7 @@ end
 	@return { Zone }
 ]=]
 function QuickZone:getZonesOfEntity(entity: any): { Types.Zone }
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
 		return {}
@@ -463,10 +491,11 @@ end
 	@return { Group }
 ]=]
 function QuickZone:getGroupsOfEntity(entity: any): { Types.Group }
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
-		return {}
+		-- A player without a character is still in the groups it was added to
+		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
 	end
 
 	local results = {}
@@ -484,73 +513,80 @@ function QuickZone:getGroupsOfEntity(entity: any): { Types.Group }
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Groups.
+	Returns an iterator for all Groups.
+	Safe to use while groups are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterGroups
 	@within QuickZone
 	@return () -> Group?
 ]=]
 function QuickZone:iterGroups(): () -> Types.Group?
-	local groupId: number? = nil
+	local nextGroup = Snapshot.keys(groups)
 	return function(): Types.Group?
-		groupId = next(groups, groupId)
-		return groupId and groups[groupId] or nil
+		local _, group = nextGroup()
+		return group
 	end
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Zones.
+	Returns an iterator for all Zones.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterZones
 	@within QuickZone
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZones(): () -> Types.Zone?
-	local zoneId: number? = nil
-
+	local nextZone = Snapshot.keys(zoneIdToZoneObj)
 	return function(): Types.Zone?
-		zoneId = next(zoneIdToZoneObj, zoneId)
-		return zoneId and zoneIdToZoneObj[zoneId] or nil
+		local _, zone = nextZone()
+		return zone
 	end
 end
 
 --[=[
-	Returns a zero-allocation iterator for all entities.
+	Returns an iterator for all entities.
+	Safe to use while entities are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterEntities
 	@within QuickZone
 	@return () -> any?
 ]=]
 function QuickZone:iterEntities(): () -> any?
-	local entity: Types.Entity? = nil
-
+	local nextEntity = Snapshot.keys(entityData)
 	return function(): any?
-		entity = next(entityData, entity)
-		if entity then
+		local entity = nextEntity()
+		if entity ~= nil then
 			return entityToReference[entity] or entity
 		end
-		return entity
+		return nil
 	end
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Observers.
+	Returns an iterator for all Observers.
+	Safe to use while observers are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterObservers
 	@within QuickZone
 	@return () -> Observer?
 ]=]
 function QuickZone:iterObservers(): () -> Types.Observer<any>?
-	local observerId: number? = nil
-
+	local nextObserver = Snapshot.keys(observerIdToObserverObj)
 	return function(): Types.Observer<any>?
-		observerId = next(observerIdToObserverObj, observerId)
-		return observerId and observerIdToObserverObj[observerId] or nil
+		local _, observer = nextObserver()
+		return observer
 	end
 end
 
 --[=[ 
-	Returns a zero-allocation iterator for all Groups that the specified entity is currently in.
+	Returns an iterator for all Groups that the specified entity is currently in.
+	Safe to use while groups are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterGroupsOfEntity
 	@within QuickZone
@@ -558,19 +594,36 @@ end
 	@return () -> Group?
 ]=]
 function QuickZone:iterGroupsOfEntity(entity: any): () -> Types.Group?
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
-		return function()
-			return nil
+		-- A player without a character is still in the groups it was added to
+		local list = if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
+		local i = 0
+		return function(): Types.Group?
+			while true do
+				i += 1
+				local group = list[i]
+				if group == nil or not Destroyed.isDead(group) then
+					return group
+				end
+			end
 		end
 	end
 
-	local groupId: number? = nil
+	local nextGroupId = Snapshot.keys(groupIds)
 	return function(): Types.Group?
-		groupId = next(groupIds, groupId)
-		return groupId and groups[groupId] or nil
+		while true do
+			local groupId = nextGroupId()
+			if groupId == nil then
+				return nil
+			end
+			local group = groups[groupId]
+			if group then
+				return group
+			end
+		end
 	end
 end
 
@@ -583,7 +636,7 @@ end
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
-	entity = referenceToEntity[entity] or entity
+	entity = entityOf(entity)
 
 	local data = entityData[entity]
 	if not data or not data.activeObserverMemberships then
@@ -592,19 +645,17 @@ function QuickZone:iterZonesOfEntity(entity: any): () -> Types.Zone?
 		end
 	end
 
-	local memberships = data.activeObserverMemberships
+	local nextMembership = Snapshot.keys(data.activeObserverMemberships)
 	local seenZones: { [number]: boolean } = {}
-	local observerId: number?
 
 	return function(): Types.Zone?
 		while true do
-			observerId = next(memberships, observerId)
+			local observerId, zoneId = nextMembership()
 			if not observerId then
 				return nil
 			end
 
-			local zoneId = memberships[observerId :: number]
-			if seenZones[zoneId] then
+			if seenZones[zoneId :: number] then
 				continue
 			end
 
@@ -620,7 +671,14 @@ end
 
 --[=[
 	Returns an iterator that returns every Zone intersecting the given point.
-	Ideal for zero-allocation ECS queries. Safe to `break` out of early.
+	Ideal for ECS queries. Safe to `break` out of early.
+
+	:::info Changes while iterating
+	The zones whose bounds hold the point are found when the iterator is created. Each is checked against
+	the point when it is reached, so zones destroyed or moved away in between are skipped, and zones that
+	arrive in between are not yielded. Finishing the loop lets the next iterator reuse its memory, so prefer
+	that in hot paths.
+	:::
 
 	@method iterZonesAtPoint
 	@within QuickZone
@@ -628,76 +686,38 @@ end
 	@return () -> Zone?
 ]=]
 function QuickZone:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
-	local dynamicNodes = dynamicTree.nodes
-	local dynamicCount = dynamicTree.count or 0
+	local list = table.remove(spareCandidates) or {}
+	local count = 0
 
-	local staticNodes = staticTree.nodes
-	local staticCount = staticTree.count or 0
+	local hitCount = leavesAtPoint(point, queryHits)
+	for i = 1, hitCount do
+		local zone = zoneSlotToZoneObj[queryHits[i]]
+		if zone then
+			count += 1
+			list[count] = zone
+		end
+	end
 
-	local px, py, pz = point.X, point.Y, point.Z
-
-	local index = 1
-	local checkingDynamic = true
+	local candidates: { Types.InternalZone }? = list
+	local index = 0
 
 	return function(): Types.Zone?
-		if checkingDynamic then
-			while index <= dynamicCount do
-				local node = dynamicNodes[index]
-				local min, max = node.min, node.max
-
-				if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
-					index = node.skipIndex
-					continue
-				end
-
-				index += 1
-				local hitId = node.id
-
-				if
-					hitId > 0
-					and isPointInShape(
-						point,
-						dynamicCFrames[hitId],
-						dynamicHalfSizes[hitId],
-						dynamicTypes[hitId],
-						dynamicMeshes[hitId]
-					)
-				then
-					return zoneIdToZoneObj[hitId]
-				end
-			end
-
-			checkingDynamic = false
-			index = 1
+		if not candidates then
+			return nil
 		end
 
-		if not checkingDynamic then
-			while index <= staticCount do
-				local node = staticNodes[index]
-				local min, max = node.min, node.max
-
-				if px < min.X or px > max.X or py < min.Y or py > max.Y or pz < min.Z or pz > max.Z then
-					index = node.skipIndex
-					continue
-				end
-
-				index += 1
-				local hitId = node.id
-
-				if
-					hitId > 0
-					and isPointInShape(
-						point,
-						staticCFrames[hitId],
-						staticHalfSizes[hitId],
-						staticTypes[hitId],
-						staticMeshes[hitId]
-					)
-				then
-					return zoneIdToZoneObj[hitId]
-				end
+		while index < count do
+			index += 1
+			local zone = candidates[index]
+			if not Destroyed.isDead(zone) and containsPoint(zone.slot, point) then
+				return zone
 			end
 		end
+
+		-- Finished, so the list can be reused
+		table.clear(candidates)
+		table.insert(spareCandidates, candidates)
+		candidates = nil
 
 		return nil
 	end
@@ -733,14 +753,16 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	newDebugFolder.Parent = workspace
 	debugFolder = newDebugFolder
 
-	local function getOrCreateVisual(id: number): DebugVisual
-		local visual = debugVisuals[id]
-		local zone = zoneIdToZoneObj[id]
+	-- Keyed by slot, which a new zone may take over
+	local function getOrCreateVisual(slot: number): DebugVisual
+		local visual = debugVisuals[slot]
+		local zone = zoneSlotToZoneObj[slot]
 		local shape = zone:getShape()
 
-		if visual and visual.shape ~= shape then
+		if visual and (visual.shape ~= shape or visual.zone ~= zone) then
 			visual.adornment:Destroy()
-			debugVisuals[id] = nil
+			debugVisuals[slot] = nil
+			visual = nil
 		end
 
 		if not visual then
@@ -752,7 +774,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			else
 				adornment = Instance.new('BoxHandleAdornment')
 			end
-			adornment.Name = 'Zone_' .. id
+			adornment.Name = 'Zone_' .. zone:getId()
 			adornment.Adornee = workspace.Terrain
 			adornment.Transparency = Config.Debug.transparency
 			adornment.AlwaysOnTop = true
@@ -761,8 +783,9 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			visual = {
 				adornment = adornment,
 				shape = shape,
+				zone = zone,
 			}
-			debugVisuals[id] = visual
+			debugVisuals[slot] = visual
 		end
 		return visual
 	end
@@ -774,47 +797,27 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			return
 		end
 
-		-- Draw static zones
-		for id, cframe in staticCFrames do
-			local visual = getOrCreateVisual(id)
+		for slot, cframe in shapeCFrames do
+			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
-			local halfSize = staticHalfSizes[id]
+			-- What the shape fills, so a Ball or Cylinder is drawn at the size it detects
+			local halfSize = shapeExtents[slot]
 			local size = halfSize * 2
 
-			local observers = zoneAttachedObservers[id]
+			local observers = zoneAttachedObservers[slot]
 			local isActive = observers and next(observers) ~= nil
-			local color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
-
-			if visual.shape == 'Ball' then
-				box.Radius = math.max(halfSize.X, halfSize.Y, halfSize.Z)
-				box.CFrame = cframe
-			elseif visual.shape == 'Cylinder' then
-				box.Radius = math.max(halfSize.X, halfSize.Z)
-				box.Height = size.X
-				box.CFrame = cframe * CFrame.Angles(0, math.rad(90), 0)
+			local color
+			if dynamicSlots[slot] then
+				color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
 			else
-				box.Size = size
-				box.CFrame = cframe
+				color = isActive and Config.Debug.staticActive or Config.Debug.staticInactive
 			end
-			box.Color3 = color
-		end
-
-		-- Draw dynamic zones
-		for id, cframe in dynamicCFrames do
-			local visual = getOrCreateVisual(id)
-			local box = visual.adornment
-			local halfSize = dynamicHalfSizes[id]
-			local size = halfSize * 2
-
-			local observers = zoneAttachedObservers[id]
-			local isActive = observers and next(observers) ~= nil
-			local color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive
 
 			if visual.shape == 'Ball' then
-				box.Radius = math.max(halfSize.X, halfSize.Y, halfSize.Z)
+				box.Radius = halfSize.X
 				box.CFrame = cframe
 			elseif visual.shape == 'Cylinder' then
-				box.Radius = math.max(halfSize.X, halfSize.Z)
+				box.Radius = halfSize.Y
 				box.Height = size.X
 				box.CFrame = cframe * CFrame.Angles(0, math.rad(90), 0)
 			else
@@ -826,7 +829,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 
 		-- Destroy removed zones
 		for id, box in debugVisuals do
-			if not staticCFrames[id] and not dynamicCFrames[id] then
+			if not shapeCFrames[id] then
 				box.adornment:Destroy()
 				debugVisuals[id] = nil
 			end

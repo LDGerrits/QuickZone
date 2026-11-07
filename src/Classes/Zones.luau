@@ -4,11 +4,14 @@
 
 	Zones manages multiple individual `Zone` objects as a single, unified entity. 
 	This allows you to create complex shapes and structures by combining multiple zones together. 
-	You can attach observers to a `Zones` instance, and they will be automatically attached to all contained zones. 
-	When a zone is added or removed from the `Zones` instance, observers will be updated accordingly.
+	Attaching a `Zones` to an observer attaches every zone in it. Zones added to or removed from it later are
+	attached and detached accordingly.
 ]=]
 
+local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local Zones = {}
 Zones.__index = Zones
@@ -19,9 +22,11 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
 
 	local self: Types.InternalZones = setmetatable({
-		dynamic = isDynamic,
+		phase = 'alive',
+		-- Auto-synced zones are always dynamic
+		dynamic = not not (isDynamic or autoSync),
 		metadata = metadata,
-		autoSync = autoSync,
+		autoSync = not not autoSync,
 		zones = {} :: { [Types.Zone]: boolean },
 		observers = {} :: { [Types.Observer<any>]: boolean },
 		onDestroyObserverCleanups = {} :: { [Types.Observer<any>]: () -> () },
@@ -31,17 +36,10 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	return self
 end
 
---[=[ 
-	Attaches an Observer to all underlying zones.
-
-	@tag Chainable
-	@method attach
-	@within Zones
-	@param observer Observer
-	@return Zones
-]=]
+-- private, use Observer:attach
 function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
-	if self.observers[observer] then
+	-- Its destroy has already let go of its observers
+	if Destroyed.isDestroyed(self) or self.observers[observer] then
 		return self
 	end
 	self.observers[observer] = true
@@ -57,15 +55,7 @@ function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	return self
 end
 
---[=[ 
-	Detaches an Observer from all underlying zones.
-
-	@tag Chainable
-	@method detach
-	@within Zones
-	@param observer Observer
-	@return Zones
-]=]
+-- private, use Observer:detach
 function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 	if not self.observers[observer] then
 		return self
@@ -86,7 +76,8 @@ function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 end
 
 --[=[ 
-	Forces all dynamic underlying zones to recalculate their spatial geometry.
+	Syncs every underlying zone to its part, as `Zone:sync` does. Static zones force a rebuild of the
+	static tree, so prefer dynamic zones for parts that move often.
 
 	@tag Chainable
 	@method sync
@@ -94,11 +85,10 @@ end
 	@return Zones
 ]=]
 function Zones.sync(self: Types.InternalZones): Types.Zones
-	if not self.dynamic then
-		return self
-	end
 	for zone, _ in self.zones do
-		zone:sync()
+		if zone:getReference() then
+			zone:sync()
+		end
 	end
 	return self
 end
@@ -157,11 +147,12 @@ end
 	@return Zones
 ]=]
 function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
-	if self.autoSync == autoSync then
-		return self
-	end
-
+	-- Applied to every zone even when unchanged, as single zones may have been changed directly
+	autoSync = not not autoSync
 	self.autoSync = autoSync
+	if autoSync then
+		self.dynamic = true
+	end
 
 	for zone, _ in self.zones do
 		zone:setAutoSync(autoSync)
@@ -184,11 +175,13 @@ end
 	@return Zones
 ]=]
 function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
-	if self.dynamic == isDynamic then
-		return self
-	end
-
+	-- Applied to every zone even when unchanged, as single zones may have been changed directly. Static
+	-- zones stop auto-syncing, as each zone does
+	isDynamic = not not isDynamic
 	self.dynamic = isDynamic
+	if not isDynamic then
+		self.autoSync = false
+	end
 
 	for zone, _ in self.zones do
 		zone:setDynamic(isDynamic)
@@ -238,17 +231,18 @@ function Zones.contains(self: Types.InternalZones, zone: Types.Zone): boolean
 end
 
 --[=[
-	Returns a zero-allocation iterator for all Zones within this group.
+	Returns an iterator for all Zones within this group.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	@method iterZones
 	@within Zones
 	@return () -> Zone?
 ]=]
 function Zones.iterZones(self: Types.InternalZones): () -> Types.Zone?
-	local currentZone = nil
+	local nextZone = Snapshot.keys(self.zones)
 	return function(): Types.Zone?
-		currentZone = next(self.zones, currentZone)
-		return currentZone
+		return (nextZone())
 	end
 end
 
@@ -271,7 +265,9 @@ function Zones.getReferences(self: Types.InternalZones): { BasePart | Attachment
 end
 
 --[=[
-	Returns a zero-allocation iterator for all references within this group of zones.
+	Returns an iterator for all references within this group of zones.
+	Safe to use while zones are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 	Yields both the reference and the specific Zone it belongs to.
 
 	@method iterReferences
@@ -279,18 +275,18 @@ end
 	@return () -> ((BasePart | Attachment | Bone)?, Zone?)
 ]=]
 function Zones.iterReferences(self: Types.InternalZones): () -> ((BasePart | Attachment | Bone)?, Types.Zone?)
-	local currentZone: Types.Zone?
+	local nextZone = Snapshot.keys(self.zones)
 
 	return function()
 		while true do
-			currentZone = next(self.zones, currentZone)
-			if not currentZone then
+			local zone = nextZone()
+			if not zone then
 				return nil, nil
 			end
 
-			local ref = (currentZone :: Types.Zone):getReference()
+			local ref = zone:getReference()
 			if ref then
-				return ref, currentZone
+				return ref, zone
 			end
 		end
 	end
@@ -306,18 +302,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Zones.onDestroy(self: Types.InternalZones, callback: () -> ()): () -> ()
-	if not self.onDestroyCallbacks then
-		self.onDestroyCallbacks = {}
-	end
-
-	table.insert(self.onDestroyCallbacks :: any, callback)
-
-	return function()
-		local idx = table.find(self.onDestroyCallbacks :: any, callback)
-		if idx then
-			table.remove(self.onDestroyCallbacks :: any, idx)
-		end
-	end
+	return Destroyed.connect(self, callback)
 end
 
 --[=[ 
@@ -332,12 +317,20 @@ end
 	@within Zones
 ]=]
 function Zones.destroy(self: Types.InternalZones)
-	if self.onDestroyCallbacks then
-		for _, callback in self.onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
+	-- A callback below may destroy the zones again
+	if not Destroyed.begin(self) then
+		return
 	end
+
+	-- Its zones go together, so an entity in several of them leaves once rather than moving through each
+	local zoneIds = {}
+	for zone in self.zones do
+		local id = zone:getId()
+		table.insert(zoneIds, id)
+		State.zonesBeingDestroyed[id] = true
+	end
+
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	for _, cleanup in self.onDestroyObserverCleanups do
 		cleanup()
@@ -347,16 +340,21 @@ function Zones.destroy(self: Types.InternalZones)
 		cleanup()
 		zone:destroy()
 	end
+	-- Also for zones a callback took out before they were destroyed. Ids are never reused
+	for _, id in zoneIds do
+		State.zonesBeingDestroyed[id] = nil
+	end
 
 	table.clear(self.zones)
 	table.clear(self.observers)
 	table.clear(self.onDestroyObserverCleanups)
 	table.clear(self.onDestroyZoneCleanups)
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
--- private
+-- private. Not checked for a destroy: it is only given zones made for it, and what makes them stops before
+-- its zones are destroyed
 function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	if self.zones[zone] then
 		return
@@ -366,13 +364,8 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 		zone:setMetadata(self.metadata)
 	end
 
-	if self.dynamic and not zone:isDynamic() then
-		zone:setDynamic(true)
-	end
-
-	if self.autoSync then
-		zone:setAutoSync(true)
-	end
+	zone:setDynamic(self.dynamic)
+	zone:setAutoSync(self.autoSync)
 
 	self.zones[zone] = true
 

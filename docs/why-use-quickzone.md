@@ -35,15 +35,15 @@ Writing performant code shouldn't mean writing complicated code. QuickZone is de
 ### 3. Data-Oriented Design (DOD)
 Most Roblox libraries rely heavily on Object-Oriented Programming (OOP). QuickZone is built entirely around Data-Oriented Design, prioritizing how the CPU actually reads memory.
 
-- **Structure of Arrays (SoA)**: Zone geometry (CFrames, half-sizes and shape types) is stored in parallel tables indexed by zone id instead of inside zone objects, so the hot loop never touches the objects themselves.
+- **Structure of Arrays (SoA)**: Zone geometry (CFrames, half-sizes and shape types) is stored in parallel tables indexed by zone instead of inside zone objects, so the hot loop never touches the objects themselves.
 
-- **Flattened Tree**: The LBVH is stored as a single flat array in depth-first order. Every node stores a skip index, so a query is a linear, stackless walk through the array with no recursion. Node tables are reused between rebuilds instead of being recreated.
+- **Flattened Tree**: The LBVH is stored as a single flat buffer in depth-first order, 32 bytes per node. Every node stores a skip offset, so a query is a linear, stackless walk through the buffer with no recursion. The buffer is reused between rebuilds instead of being recreated.
 
 - **Bitwise Spatial Sorting**: To build the tree, QuickZone sorts zones along **Morton Codes (Z-Order Curves)**. Transforming 3D coordinates into integers via bitwise operations places zones that are close in space close together in the array, which keeps the tree tight and cheap to build.
 
-- **Low GC Pressure**: Because QuickZone reuses its arrays and tree nodes, the spatial update loop generates practically zero garbage. This avoids the micro-stutters typically caused by Luau's Garbage Collector cleaning up old tables. (Callbacks with `safety` enabled run through `task.spawn`, which creates a thread per event.)
+- **Low GC Pressure**: Because QuickZone reuses its arrays and tree buffers, the spatial update loop generates practically zero garbage. This avoids the micro-stutters typically caused by Luau's Garbage Collector cleaning up old tables. (Callbacks with `safety` enabled run through `task.spawn`, which creates a thread per event.)
 
-- **Iterators**: QuickZone provides iterators like `iterEntitiesInside` that walk its internal state directly instead of building result tables, which makes QuickZone a great fit for Entity Component System (ECS) workflows.
+- **Iterators**: QuickZone provides iterators like `iterEntitiesInside` that don't build result tables and reuse their memory from one loop to the next, which makes QuickZone a great fit for Entity Component System (ECS) workflows.
 
 ---
 
@@ -66,7 +66,7 @@ Because Observers are decoupled from the physics engine, they can aggregate spat
 A common issue with spatial libraries is stutter due to it processing too many things in one frame. QuickZone fixes this via its smart Scheduler.
 
 #### Frame Budgeting
-You can set a time limit (e.g., 1ms). The Scheduler checks `os.clock()` every 32 entities. Once the budget is used up, it stops and resumes where it left off in the next frame. This keeps entity processing from causing frame drops. Two things are not split across frames: pending tree rebuilds, which always run to completion, and your own callbacks, which run inside the step.
+You can set a time limit (e.g., 1ms). The Scheduler checks `os.clock()` every 32 entities. Once the budget is used up, it stops and resumes where it left off in the next frame. Each frame still checks at least 32 entities, also when a rebuild used up the budget, so entities keep being checked while zones keep changing. This keeps entity processing from causing frame drops. Two things are not split across frames: pending tree rebuilds, which always run to completion, and your own callbacks, which run inside the step.
 
 #### Workload Smearing
 The scheduler smears updates across frames. This means that, if 600 entities are tracked by a 10Hz Observer, QuickZone will process exactly 100 entities per frame at 60 fps. This ensures a flat, predictable performance profile with no peaks or valleys.
@@ -92,6 +92,9 @@ By separating static and dynamic zones, QuickZone minimizes the workload of the 
 :::info Frame budget
 Rebuilding the LBVHs counts towards the frame budget. Thus, rebuilding will result in less time for processing the groups of entities. A rebuild itself is never interrupted, so rebuilding a large static tree can take longer than the budget.
 :::
+
+#### Change-Aware Re-evaluation
+An entity that hasn't moved is only queried again if a zone changed around it. A few moving platforms or short-lived hitboxes won't make every idle entity re-query.
 
 #### Demand-Driven Queries
 QuickZone will only perform a spatial query for an entity against the Dynamic LBVH if it is tracked by an Observer that is explicitly attached to a dynamic zone. If your observers only care about static zones, the dynamic tree is bypassed entirely for those entities, saving potentially thousands of unnecessary checks per second.

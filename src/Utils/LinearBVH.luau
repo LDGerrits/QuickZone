@@ -9,29 +9,176 @@ local HUGE_VECTOR = vector.one * math.huge
 local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
 local unionBounds = Geometry.unionBounds
-local getObjectBounds = Geometry.getObjectBounds
 local getMortonScale = Geometry.getMortonScale
 local positionToMortonCode = Geometry.positionToMortonCode
 
-type ListEntity = {
-	id: number,
-	mortonCode: number,
-}
+local readf32 = buffer.readf32
+local readu32 = buffer.readu32
+local writef32 = buffer.writef32
+local writeu32 = buffer.writeu32
+local extract = bit32.extract
+
+-- Nodes are stored depth-first in one buffer, 32 bytes each:
+--   0  min X, Y, Z (f32)
+--   12 max X, Y, Z (f32)
+--   24 byte offset of the node after this subtree (u32)
+--   28 zone id, 0 for branches (u32)
+local NODE_SIZE = 32
+local SKIP_OFFSET = 24
+local ID_OFFSET = 28
+
+-- Morton codes are 30 bits, sorted in three 10-bit radix passes
+local RADIX_BITS = 10
+local RADIX_SIZE = 1024
+local RADIX_PASSES = 3
+local INSERTION_SORT_LIMIT = 32
+
+-- Rebuild once the cost passes this factor of the built cost
+-- Teleporting zones skip refitting for REFIT_BACKOFF updates
+local REFIT_LIMIT = 1.5
+local REFIT_BACKOFF = 8
+
+-- Buffers above this many nodes shrink once less than a quarter is used
+local SHRINK_MIN_NODES = 64
+local SHRINK_FACTOR = 4
 
 local LinearBVH = {}
 
-local listCache = {} :: { ListEntity }
-local entryPool = {} :: { ListEntity }
-local objMinCache = {} :: { [number]: Vector3 }
-local objMaxCache = {} :: { [number]: Vector3 }
+function LinearBVH.new(): Types.Tree
+	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, pending = false, membersChanged = false }
+end
 
-local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: number): number
+local EMPTY_BUFFER = buffer.create(0)
+local EMPTY_BOUNDS = table.freeze({}) :: { [number]: Vector3 }
+
+-- Build scratch space, shared by every tree
+local memberIds = {} :: { number }
+local codesA = EMPTY_BUFFER
+local idsA = EMPTY_BUFFER
+local codesB = EMPTY_BUFFER
+local idsB = EMPTY_BUFFER
+local radixCounts = table.create(RADIX_SIZE, 0) :: { number }
+-- The tree the scratch space was grown for, the only one that shrinks it
+local scratchOwner: Types.Tree? = nil
+
+-- Set during a build
+local sortedCodes = codesA
+local sortedIds = idsA
+local buildBoundsMin = EMPTY_BOUNDS
+local buildBoundsMax = EMPTY_BOUNDS
+local buildBuffer = EMPTY_BUFFER
+local buildCost = 0
+
+-- Half the surface area, the usual BVH cost. 0 for a node with an infinite zone, which is huge in any layout. Its
+-- area would make the cost infinite or NaN, and the refit check never ask for a rebuild
+local function halfArea(dx: number, dy: number, dz: number): number
+	local area = dx * dy + dy * dz + dz * dx
+	return if area < math.huge then area else 0
+end
+
+-- Grows the scratch space for count members, or shrinks it once the tree it was grown for mostly
+-- shrank. Other trees don't shrink it, so a small tree can't make a large one allocate every build
+local function prepareScratch(tree: Types.Tree, count: number)
+	local capacity = buffer.len(codesA) // 4
+	if capacity >= count then
+		if tree ~= scratchOwner or capacity <= SHRINK_MIN_NODES or capacity <= count * SHRINK_FACTOR then
+			return
+		end
+	end
+
+	scratchOwner = tree
+	local size = (count + count // 2) * 4
+	codesA = buffer.create(size)
+	idsA = buffer.create(size)
+	codesB = buffer.create(size)
+	idsB = buffer.create(size)
+	sortedCodes, sortedIds = codesA, idsA
+
+	-- Keep only the ids of this build
+	if #memberIds > count then
+		memberIds = table.move(memberIds, 1, count, 1, table.create(count))
+	end
+end
+
+-- Bytes in each build scratch buffer
+function LinearBVH.scratchSize(): number
+	return buffer.len(codesA)
+end
+
+-- Stable insertion sort for small counts
+local function insertionSort(count: number)
+	for i = 1, count - 1 do
+		local code = readu32(codesA, i * 4)
+		local id = readu32(idsA, i * 4)
+		local j = i - 1
+		while j >= 0 and readu32(codesA, j * 4) > code do
+			writeu32(codesA, (j + 1) * 4, readu32(codesA, j * 4))
+			writeu32(idsA, (j + 1) * 4, readu32(idsA, j * 4))
+			j -= 1
+		end
+		writeu32(codesA, (j + 1) * 4, code)
+		writeu32(idsA, (j + 1) * 4, id)
+	end
+
+	sortedCodes, sortedIds = codesA, idsA
+end
+
+-- Stable radix sort, the result ends up in sortedCodes/sortedIds
+local function radixSort(count: number)
+	if count <= INSERTION_SORT_LIMIT then
+		insertionSort(count)
+		return
+	end
+
+	local srcCodes, srcIds, dstCodes, dstIds = codesA, idsA, codesB, idsB
+
+	for pass = 0, RADIX_PASSES - 1 do
+		local shift = pass * RADIX_BITS
+
+		for digit = 1, RADIX_SIZE do
+			radixCounts[digit] = 0
+		end
+		for i = 0, count - 1 do
+			local digit = extract(readu32(srcCodes, i * 4), shift, RADIX_BITS) + 1
+			radixCounts[digit] += 1
+		end
+
+		-- Skip passes where every code shares the digit
+		local first = extract(readu32(srcCodes, 0), shift, RADIX_BITS) + 1
+		if radixCounts[first] == count then
+			continue
+		end
+
+		local sum = 0
+		for digit = 1, RADIX_SIZE do
+			local digitCount = radixCounts[digit]
+			radixCounts[digit] = sum
+			sum += digitCount
+		end
+
+		for i = 0, count - 1 do
+			local code = readu32(srcCodes, i * 4)
+			local digit = extract(code, shift, RADIX_BITS) + 1
+			local position = radixCounts[digit]
+			radixCounts[digit] = position + 1
+			writeu32(dstCodes, position * 4, code)
+			writeu32(dstIds, position * 4, readu32(srcIds, i * 4))
+		end
+
+		srcCodes, srcIds, dstCodes, dstIds = dstCodes, dstIds, srcCodes, srcIds
+	end
+
+	sortedCodes, sortedIds = srcCodes, srcIds
+end
+
+-- First code whose highest differing bit is set
+local function getSplitPos(beginIndex: number, endIndex: number): number
 	if endIndex == beginIndex + 1 then
 		return beginIndex + 1
 	end
 
-	local first = list[beginIndex].mortonCode
-	local last = list[endIndex].mortonCode
+	local first = readu32(sortedCodes, beginIndex * 4)
+	local last = readu32(sortedCodes, endIndex * 4)
 
 	if first == last then
 		return (beginIndex + endIndex) // 2
@@ -45,7 +192,7 @@ local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: n
 	local left, right = beginIndex, endIndex
 	while right - left > 1 do
 		local m = (left + right) // 2
-		if bit32.band(list[m].mortonCode, mask) == first_mask then
+		if bit32.band(readu32(sortedCodes, m * 4), mask) == first_mask then
 			left = m
 		else
 			right = m
@@ -54,99 +201,92 @@ local function getSplitPos(list: { ListEntity }, beginIndex: number, endIndex: n
 	return left + 1
 end
 
-local function buildFlatTree(
-	list: { ListEntity },
-	boundsMin: { Vector3 },
-	boundsMax: { Vector3 },
-	beginIndex: number,
-	endIndex: number,
-	tree: Types.Tree,
-	currentIndex: number
-): (number, Vector3, Vector3)
-	local node = tree.nodes[currentIndex]
-	if not node then
-		node = {} :: Types.Node
-		tree.nodes[currentIndex] = node
-	end
+local function writeNode(buf: buffer, offset: number, min: Vector3, max: Vector3, skip: number, id: number)
+	writef32(buf, offset, min.X)
+	writef32(buf, offset + 4, min.Y)
+	writef32(buf, offset + 8, min.Z)
+	writef32(buf, offset + 12, max.X)
+	writef32(buf, offset + 16, max.Y)
+	writef32(buf, offset + 20, max.Z)
+	writeu32(buf, offset + SKIP_OFFSET, skip)
+	writeu32(buf, offset + ID_OFFSET, id)
+end
 
+local function buildFlatTree(beginIndex: number, endIndex: number, offset: number): (number, Vector3, Vector3)
 	if beginIndex == endIndex then -- Leaf node
-		local id = list[beginIndex].id
-		local min, max = boundsMin[id], boundsMax[id]
+		local id = readu32(sortedIds, beginIndex * 4)
+		local min, max = buildBoundsMin[id], buildBoundsMax[id]
+		local nextOffset = offset + NODE_SIZE
 
-		node.min = min
-		node.max = max
-		node.id = id
-		node.skipIndex = currentIndex + 1
+		writeNode(buildBuffer, offset, min, max, nextOffset, id)
 
-		return currentIndex + 1, min, max
+		return nextOffset, min, max
 	else -- Branch node
-		local mid = getSplitPos(list, beginIndex, endIndex)
-		node.id = -1
+		local mid = getSplitPos(beginIndex, endIndex)
 
-		local rightIndex, lMin, lMax =
-			buildFlatTree(list, boundsMin, boundsMax, beginIndex, mid - 1, tree, currentIndex + 1)
-		local nextIndex, rMin, rMax = buildFlatTree(list, boundsMin, boundsMax, mid, endIndex, tree, rightIndex)
+		local rightOffset, lMin, lMax = buildFlatTree(beginIndex, mid - 1, offset + NODE_SIZE)
+		local nextOffset, rMin, rMax = buildFlatTree(mid, endIndex, rightOffset)
 
 		local min, max = unionBounds(lMin, lMax, rMin, rMax)
-		node.min = min
-		node.max = max
-		node.skipIndex = nextIndex -- If the point is not in this branch, we skip both subtrees
+		-- If the point is not in this branch, we skip both subtrees
+		writeNode(buildBuffer, offset, min, max, nextOffset, 0)
 
-		return nextIndex, min, max
+		local extent = max - min
+		buildCost += halfArea(extent.X, extent.Y, extent.Z)
+
+		return nextOffset, min, max
 	end
 end
 
-function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSizes: { [number]: Vector3 }): ()
-	table.clear(objMinCache)
-	table.clear(objMaxCache)
+-- The buffer to build nodeCount nodes into. A new one if it is too small or mostly unused
+local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
+	local buf = tree.buffer
+	local capacity = buffer.len(buf) // NODE_SIZE
+	if capacity < nodeCount or (capacity > SHRINK_MIN_NODES and capacity > nodeCount * SHRINK_FACTOR) then
+		-- Grow with headroom
+		buf = buffer.create((nodeCount + nodeCount // 2) * NODE_SIZE)
+		tree.buffer = buf
+	end
+	return buf
+end
 
+-- Builds the tree from the zones in members
+function LinearBVH.build(
+	tree: Types.Tree,
+	members: { [number]: any },
+	boundsMin: { [number]: Vector3 },
+	boundsMax: { [number]: Vector3 },
+	positions: { [number]: Vector3 }
+): ()
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
 	local count = 0
 
-	-- Calculate bounds and update listCache
-	for id, cframe in cframes do
-		local halfSize = halfSizes[id]
-
-		local bMin, bMax = getObjectBounds(cframe, halfSize)
-
-		objMinCache[id] = bMin
-		objMaxCache[id] = bMax
-
-		min = vector.min(min, bMin)
-		max = vector.max(max, bMax)
-
-		count += 1
-
-		local entry = listCache[count]
-		if not entry then
-			local poolSize = #entryPool
-			if poolSize > 0 then
-				entry = entryPool[poolSize]
-				entryPool[poolSize] = nil
-			else
-				entry = { id = 0, mortonCode = 0 }
-			end
-			listCache[count] = entry
+	-- Collect members and the scene the Morton codes span, which is where their centers are. Infinite or
+	-- NaN centers are left out, as is the size, so one huge zone doesn't put every other in the same cell
+	for id in members do
+		local position = positions[id]
+		if position - position == Vector3.zero then
+			min = vector.min(min, position)
+			max = vector.max(max, position)
 		end
 
-		entry.id = id
+		count += 1
+		memberIds[count] = id
 	end
 
+	prepareScratch(tree, count)
+
 	if count == 0 then
+		prepareBuffer(tree, 0)
 		tree.count = 0
+		tree.cost = 0
 		return
 	end
 
-	-- Push unused entries from the tail into the pool
-	local cacheSize = #listCache
-	if cacheSize > count then
-		local poolSize = #entryPool
-		for i = count + 1, cacheSize do
-			poolSize += 1
-			entryPool[poolSize] = listCache[i]
-			listCache[i] = nil
-		end
+	-- No zone has a finite center
+	if min.X > max.X then
+		min, max = Vector3.zero, Vector3.zero
 	end
 
 	-- Add padding to avoid edge cases with flat scenes
@@ -155,39 +295,141 @@ function LinearBVH.build(tree: Types.Tree, cframes: { [number]: CFrame }, halfSi
 	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
 
 	for i = 1, count do
-		local entry = listCache[i]
-		local pos = cframes[entry.id].Position -- Fast property access
-		entry.mortonCode = positionToMortonCode(pos, sceneMin, scaleX, scaleY, scaleZ)
+		local id = memberIds[i]
+		local offset = (i - 1) * 4
+		writeu32(codesA, offset, positionToMortonCode(positions[id], sceneMin, scaleX, scaleY, scaleZ))
+		writeu32(idsA, offset, id)
 	end
+	radixSort(count)
 
-	table.sort(listCache, function(a: ListEntity, b: ListEntity)
-		return a.mortonCode < b.mortonCode
-	end)
+	local nodeCount = 2 * count - 1
+	buildBuffer = prepareBuffer(tree, nodeCount)
+	buildBoundsMin = boundsMin
+	buildBoundsMax = boundsMax
+	buildCost = 0
 
-	local nextAvailableIndex = buildFlatTree(listCache, objMinCache, objMaxCache, 1, count, tree, 1)
+	buildFlatTree(0, count - 1, 0)
 
-	tree.count = nextAvailableIndex - 1
+	-- Don't keep the tree's buffer or the bounds alive once they are replaced
+	buildBuffer = EMPTY_BUFFER
+	buildBoundsMin = EMPTY_BOUNDS
+	buildBoundsMax = EMPTY_BOUNDS
+
+	tree.count = nodeCount
+	tree.cost = buildCost
 end
 
-function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, callback: (id: number) -> ())
-	local nodes = tree.nodes
-	local count = tree.count
-	local px, py, pz = point.X, point.Y, point.Z
+-- Updates node bounds for moved zones. Returns false if the tree should be rebuilt instead
+function LinearBVH.refit(tree: Types.Tree, boundsMin: { [number]: Vector3 }, boundsMax: { [number]: Vector3 }): boolean
+	if tree.refitSkips > 0 then
+		tree.refitSkips -= 1
+		return false
+	end
 
-	local index = 1
-	while index <= count do
-		local node = nodes[index]
-		local min, max = node.min, node.max
-		if px >= min.X and px <= max.X and py >= min.Y and py <= max.Y and pz >= min.Z and pz <= max.Z then
-			index += 1
-			local nodeId = node.id
-			if nodeId > 0 then
-				callback(nodeId)
+	local buf = tree.buffer
+	local cost = 0
+
+	-- Children follow their parent, so go backwards
+	for offset = (tree.count - 1) * NODE_SIZE, 0, -NODE_SIZE do
+		local id = readu32(buf, offset + ID_OFFSET)
+		if id ~= 0 then
+			local min, max = boundsMin[id], boundsMax[id]
+			if not min then
+				return false
 			end
+
+			writef32(buf, offset, min.X)
+			writef32(buf, offset + 4, min.Y)
+			writef32(buf, offset + 8, min.Z)
+			writef32(buf, offset + 12, max.X)
+			writef32(buf, offset + 16, max.Y)
+			writef32(buf, offset + 20, max.Z)
 		else
-			index = node.skipIndex -- Skip branch
+			local left = offset + NODE_SIZE
+			local right = readu32(buf, left + SKIP_OFFSET)
+
+			local minX = math.min(readf32(buf, left), readf32(buf, right))
+			local minY = math.min(readf32(buf, left + 4), readf32(buf, right + 4))
+			local minZ = math.min(readf32(buf, left + 8), readf32(buf, right + 8))
+			local maxX = math.max(readf32(buf, left + 12), readf32(buf, right + 12))
+			local maxY = math.max(readf32(buf, left + 16), readf32(buf, right + 16))
+			local maxZ = math.max(readf32(buf, left + 20), readf32(buf, right + 20))
+
+			writef32(buf, offset, minX)
+			writef32(buf, offset + 4, minY)
+			writef32(buf, offset + 8, minZ)
+			writef32(buf, offset + 12, maxX)
+			writef32(buf, offset + 16, maxY)
+			writef32(buf, offset + 20, maxZ)
+
+			cost += halfArea(maxX - minX, maxY - minY, maxZ - minZ)
 		end
 	end
+
+	if cost > tree.cost * REFIT_LIMIT then
+		tree.refitSkips = REFIT_BACKOFF
+		return false
+	end
+
+	return true
+end
+
+-- Appends the ids of leaves containing the point to the hitCount ids in hits, returns the new count
+function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, hits: { number }, hitCount: number): number
+	local buf = tree.buffer
+	local endOffset = tree.count * NODE_SIZE
+	local px, py, pz = point.X, point.Y, point.Z
+
+	local offset = 0
+	while offset < endOffset do
+		if
+			px >= readf32(buf, offset)
+			and px <= readf32(buf, offset + 12)
+			and py >= readf32(buf, offset + 4)
+			and py <= readf32(buf, offset + 16)
+			and pz >= readf32(buf, offset + 8)
+			and pz <= readf32(buf, offset + 20)
+		then
+			local id = readu32(buf, offset + ID_OFFSET)
+			if id ~= 0 then
+				hitCount += 1
+				hits[hitCount] = id
+			end
+			offset += NODE_SIZE
+		else
+			offset = readu32(buf, offset + SKIP_OFFSET) -- Skip branch
+		end
+	end
+
+	return hitCount
+end
+
+-- Whether any leaf contains the point
+function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
+	local buf = tree.buffer
+	local endOffset = tree.count * NODE_SIZE
+	local px, py, pz = point.X, point.Y, point.Z
+
+	local offset = 0
+	while offset < endOffset do
+		if
+			px >= readf32(buf, offset)
+			and px <= readf32(buf, offset + 12)
+			and py >= readf32(buf, offset + 4)
+			and py <= readf32(buf, offset + 16)
+			and pz >= readf32(buf, offset + 8)
+			and pz <= readf32(buf, offset + 20)
+		then
+			if readu32(buf, offset + ID_OFFSET) ~= 0 then
+				return true
+			end
+			offset += NODE_SIZE
+		else
+			offset = readu32(buf, offset + SKIP_OFFSET) -- Skip branch
+		end
+	end
+
+	return false
 end
 
 return LinearBVH

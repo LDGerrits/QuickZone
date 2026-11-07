@@ -15,9 +15,14 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
+local References = require(script.Parent.Parent.Core.References)
+local Scheduler = require(script.Parent.Parent.Core.Scheduler)
 local State = require(script.Parent.Parent.Core.State)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -32,6 +37,40 @@ local IS_CLIENT = RunService:IsClient()
 
 local Group = {}
 Group.__index = Group
+
+-- Removes a member. A character part of a player goes through the player as well, so the player's next
+-- character is not added back
+local function isPlayer(x: any): boolean
+	return typeof(x) == 'Instance' and x:IsA('Player')
+end
+
+local function isMember(group: Types.InternalGroup, entity: any): boolean
+	local groups = State.entityToGroups[entity]
+	return groups ~= nil and groups[group.id] == true
+end
+
+-- Removes an instance from the group once it leaves the game, while the group has autoClean on
+local function watchRemoval(group: Types.InternalGroup, entity: any)
+	local cleanups = State.groupEntityCleanups[group.id]
+	if typeof(entity) == 'Instance' and not cleanups[entity] then
+		cleanups[entity] = entity.AncestryChanged:Connect(function(_, parent)
+			if not parent then
+				group:_removeEntity(entity)
+			end
+		end)
+	end
+end
+
+local function removeMember(group: Types.InternalGroup, entity: any)
+	local reference = State.entityToReference[entity]
+	if isPlayer(reference) then
+		group:_remove(reference)
+	end
+	-- Unless an exit callback destroyed the group meanwhile
+	if not Destroyed.isDead(group) then
+		group:_removeEntity(entity)
+	end
+end
 
 --[=[ 
 	Creates a generic Group. 
@@ -63,6 +102,7 @@ function Group.new<T>(config: {
 
 	local self: Types.InternalGroup<T> = setmetatable({
 		id = id,
+		phase = 'alive',
 		entities = {},
 		entityIndices = {},
 		autoClean = autoClean,
@@ -96,9 +136,9 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 
 	local function checkAncestry(instance: BasePart | Model | Attachment | Bone | Camera)
 		if instance:IsDescendantOf(workspace) then
-			group:_add(instance)
+			group:_addEntity(instance)
 		else
-			group:_remove(instance)
+			group:_removeEntity(instance)
 		end
 	end
 
@@ -132,7 +172,7 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 			conn:Disconnect()
 			watchingInstances[instance] = nil
 		end
-		group:_remove(instance :: any)
+		group:_removeEntity(instance :: any)
 	end
 
 	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
@@ -236,13 +276,7 @@ function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.
 
 	if enabled then
 		for _, entity in self.entities do
-			if typeof(entity) == 'Instance' and not cleanups[entity] then
-				cleanups[entity] = (entity :: Instance).AncestryChanged:Connect(function(_, parent)
-					if not parent then
-						self:_remove(entity)
-					end
-				end)
-			end
+			watchRemoval(self, entity)
 		end
 	else
 		for entity, conn in cleanups do
@@ -375,9 +409,9 @@ end
 	@return boolean
 ]=]
 function Group.contains(self: Types.InternalGroup, entity: any): boolean
-	entity = State.referenceToEntity[entity] or entity
-	local groups = State.entityToGroups[entity]
-	return groups and groups[self.id] == true or false
+	-- A player is a member while it has no character too
+	return isMember(self, References.entityOf(entity))
+		or (isPlayer(entity) and PlayerTracker.isSubscribed(entity, self))
 end
 
 --[=[ 
@@ -407,9 +441,9 @@ function Group.getEntities(self: Types.InternalGroup): { any }
 end
 
 --[=[ 
-	Iterates over all entities currently belonging to the group.
-	Provides a zero-allocation way to loop through entities, ideal for high-frequency 
-	checks.
+	Iterates over all entities currently belonging to the group, ideal for high-frequency checks.
+	Safe to use while entities are added and removed: those removed before the loop reaches them
+	are skipped, those added are not visited. Finishing the loop lets the next one reuse its memory.
 
 	```lua
 	for entity in myGroup:iterEntities() do
@@ -422,14 +456,14 @@ end
 	@return () -> any?
 ]=]
 function Group.iterEntities(self: Types.InternalGroup): () -> any?
-	local entity = nil
+	local nextEntity = Snapshot.keys(self.entityIndices)
 
 	return function()
-		entity = next(self.entityIndices, entity)
-		if entity then
+		local entity = nextEntity()
+		if entity ~= nil then
 			return State.entityToReference[entity] or entity
 		end
-		return entity
+		return nil
 	end
 end
 
@@ -449,18 +483,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Group.onDestroy(self: Types.InternalGroup, callback: () -> ()): () -> ()
-	if not self.onDestroyCallbacks then
-		self.onDestroyCallbacks = {}
-	end
-
-	table.insert(self.onDestroyCallbacks :: any, callback)
-
-	return function()
-		local idx = table.find(self.onDestroyCallbacks :: any, callback)
-		if idx then
-			table.remove(self.onDestroyCallbacks :: any, idx)
-		end
-	end
+	return Destroyed.connect(self, callback)
 end
 
 --[=[ 
@@ -472,31 +495,46 @@ end
 	@within Group
 ]=]
 function Group.destroy(self: Types.InternalGroup): ()
-	if self.onDestroyCallbacks then
-		for _, callback in self.onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
+	-- A callback below may destroy the group again
+	if not Destroyed.begin(self) then
+		return
 	end
 
-	for idx = #self.entities, 1, -1 do
-		self:_remove(self.entities[idx])
-	end
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
+
+	self:_clear()
+	Memberships.groupDestroyed(self.id)
 
 	State.groupToObservers[self.id] = nil
 	State.groups[self.id] = nil
 	State.groupEntityCleanups[self.id] = nil
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
 function Group._add(self: Types.InternalGroup, reference: any): Types.Group
-	if typeof(reference) == 'Instance' and reference:IsA('Player') then
+	-- A callback during destroy must not add entities that are never removed
+	if Destroyed.isDestroyed(self) then
+		return self
+	end
+
+	if isPlayer(reference) then
 		PlayerTracker.subscribe(reference, self)
 		return self
 	end
 
-	local entity: Types.Entity = State.referenceToEntity[reference] or reference
+	return self:_addEntity(References.entityOf(reference))
+end
+
+-- Adds the entity as given, never through the reference map. For internal callers that hold the instance
+function Group._addEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
+	if Destroyed.isDestroyed(self) then
+		return self
+	end
+	if entity == nil then
+		Log.nonFatal('Cannot add nil to Group %d.', nil, self.id)
+		return self
+	end
 
 	if not State.entityToGroups[entity] then
 		State.entityToGroups[entity] = {}
@@ -541,6 +579,9 @@ function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 				tostring(entity)
 			)
 			State.entityToGroups[entity][self.id] = nil
+			if next(State.entityToGroups[entity]) == nil then
+				State.entityToGroups[entity] = nil
+			end
 			return self
 		end
 
@@ -567,32 +608,39 @@ function Group._add(self: Types.InternalGroup, reference: any): Types.Group
 	State.dirtyTopology[entity] = true
 	State.entityData[entity].logicVersion = -1
 
-	if self.autoClean and typeof(entity) == 'Instance' and not State.groupEntityCleanups[self.id][entity] then
-		State.groupEntityCleanups[self.id][entity] = (entity :: Instance).AncestryChanged:Connect(function(_, parent)
-			if not parent then
-				self:_remove(entity)
-			end
-		end)
+	if self.autoClean then
+		watchRemoval(self, entity)
 	end
+
+	-- Its group may arrive in observers it is already in
+	Memberships.groupsChanged(entity)
 
 	return self
 end
 
 function Group._addBulk(self: Types.InternalGroup, references: { any }): Types.Group
 	for _, reference in references do
+		-- A callback may have destroyed the group
+		if Destroyed.isDestroyed(self) then
+			break
+		end
 		self:_add(reference)
 	end
 	return self
 end
 
 function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
-	if typeof(reference) == 'Instance' and reference:IsA('Player') then
+	if isPlayer(reference) then
 		PlayerTracker.unsubscribe(reference, self)
 		return self
 	end
 
-	local entity: Types.Entity = State.referenceToEntity[reference] or reference
+	-- An entity is removed itself, also when it is another entity's reference, as contains finds it
+	return self:_removeEntity(References.entityOf(reference))
+end
 
+-- Removes the entity as given, never through the reference map. For internal callers that hold the member
+function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
 	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
 		return self
 	end
@@ -621,63 +669,17 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 
 	State.dirtyProfiles[entity] = true
 	State.dirtyTopology[entity] = true
+	-- Another observer may take over an entity that stands still
+	data.logicVersion = -1
 
-	for observerId, oldZoneId in data.activeObserverMemberships do
-		local stillTracked = false
-		for remainingGroupId in State.entityToGroups[entity] do
-			if State.groupToObservers[remainingGroupId] and State.groupToObservers[remainingGroupId][observerId] then
-				stillTracked = true
-				break
-			end
-		end
+	Memberships.exitUnsubscribed(entity, data)
+	-- Its group may leave observers it stays in through other groups
+	Memberships.groupsChanged(entity)
 
-		if stillTracked then
-			continue
-		end
-
-		data.activeObserverMemberships[observerId] = nil
-
-		if State.observerTrackingEntities[observerId] then
-			State.observerTrackingEntities[observerId][entity] = nil
-		end
-
-		local cbs = State.observerExitedCallbacks[observerId]
-		if not cbs then
-			continue
-		end
-
-		local safety = State.observerSafety[observerId]
-		local z = State.zoneIdToZoneObj[oldZoneId]
-		local ref = State.entityToReference[entity] or entity
-		for _, fn in cbs do
-			if safety then
-				task.spawn(fn, ref, z, entity)
-			else
-				fn(ref, z, entity)
-			end
-		end
-	end
-
-	if next(State.entityToGroups[entity]) == nil then
-		-- Remove from bucket
-		local currentRate = data.updateRate
-		if currentRate and currentRate > 0 and State.buckets[currentRate] then
-			local bucket = State.buckets[currentRate]
-			local bucketIdx = data.bucketIndex
-			local maxEntities = #bucket
-			local lastEntity = bucket[maxEntities]
-
-			-- We swap and then pop to avoid shifting all entities down
-			if bucketIdx ~= maxEntities then
-				bucket[bucketIdx] = lastEntity
-				if State.entityData[lastEntity] then
-					State.entityData[lastEntity].bucketIndex = bucketIdx
-				end
-			end
-
-			bucket[maxEntities] = nil
-		end
-
+	-- Exit callbacks may have removed the entity everywhere, or added it back
+	local groups = State.entityToGroups[entity]
+	if State.entityData[entity] == data and groups and next(groups) == nil then
+		Scheduler.leaveBucket(data)
 		State.entityData[entity] = nil
 		State.entityToGroups[entity] = nil
 		State.entityToObservers[entity] = nil
@@ -685,7 +687,7 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 		State.dirtyTopology[entity] = nil
 
 		local ref = State.entityToReference[entity]
-		if ref and not (typeof(ref) == 'Instance' and ref:IsA('Player')) then
+		if ref and not isPlayer(ref) then
 			State.entityToReference[entity] = nil
 			-- Ensure we only clear the reverse map if it still points to this exact entity
 			if State.referenceToEntity[ref] == entity then
@@ -699,6 +701,10 @@ end
 
 function Group._removeBulk(self: Types.InternalGroup, entities: { any }): Types.Group
 	for _, entity in entities do
+		-- An exit callback may have destroyed the group
+		if Destroyed.isDead(self) then
+			break
+		end
 		self:_remove(entity)
 	end
 	return self
@@ -708,8 +714,14 @@ function Group._clear(self: Types.InternalGroup): Types.Group
 	-- Iterate backwards for safe removal
 	local entities = self.entities
 	for idx = #entities, 1, -1 do
-		self:_remove(entities[idx])
+		-- An exit callback may have removed entities after this one, or destroyed the group and all of them
+		local entity = entities[idx]
+		if entity ~= nil then
+			removeMember(self, entity)
+		end
 	end
+	-- Players without a character have no member to remove
+	PlayerTracker.dropGroup(self.id)
 	return self
 end
 

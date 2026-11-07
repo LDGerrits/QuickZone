@@ -20,27 +20,23 @@
 
 local CollectionService = game:GetService('CollectionService')
 
+local Memberships = require(script.Parent.Parent.Core.Memberships)
 local State = require(script.Parent.Parent.Core.State)
+local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Zones = require(script.Parent.Zones)
 
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
-local staticMeshes = State.staticMeshes
-local dynamicMeshes = State.dynamicMeshes
-
-local isPointInShape = Geometry.isPointInShape
+local shapeCFrames = State.shapeCFrames
+local shapeHalfSizes = State.shapeHalfSizes
+local shapeTypes = State.shapeTypes
 
 local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
 
-local SHAPE_MAP = {
+local SHAPE_MAP: { [string]: number } = {
 	Block = Enum.PartType.Block.Value,
 	Cylinder = Enum.PartType.Cylinder.Value,
 	Ball = Enum.PartType.Ball.Value,
@@ -48,6 +44,19 @@ local SHAPE_MAP = {
 	CornerWedge = Enum.PartType.CornerWedge.Value,
 	Mesh = MESH_SHAPE_VALUE,
 }
+local SHAPE_NAMES = {} :: { [number]: Types.ShapeType }
+for name, value in SHAPE_MAP do
+	SHAPE_NAMES[value] = name :: any
+end
+
+-- The shape type of a shape name, Block for one that isn't
+local function shapeValueOf(shape: any): number
+	local mapped = SHAPE_MAP[shape]
+	if not mapped then
+		Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(shape))
+	end
+	return mapped or BLOCK_SHAPE_VALUE
+end
 
 local function getShapeEnumValue(part: BasePart): number
 	if part:IsA('Part') then
@@ -70,31 +79,34 @@ local function getShapeEnumValue(part: BasePart): number
 end
 
 local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): BasePart?
-	if reference and reference:IsA('BasePart') then
+	if typeof(reference) == 'Instance' and reference:IsA('BasePart') then
 		return reference
 	end
 	return nil
 end
 
-local function applyShapeType(id: number, isDynamic: boolean, shapeType: number, part: BasePart?)
-	if shapeType == MESH_SHAPE_VALUE and not part then
-		Log.warn("Shape 'Mesh' requires a BasePart reference. Defaulting Zone %d to Block.", nil, id)
-		shapeType = BLOCK_SHAPE_VALUE
+-- The shape type and the part it queries. Mesh zones need a part, and fall back to Block without one
+local function resolveShape(zoneId: number, shapeType: number, part: BasePart?): (number, BasePart?)
+	if shapeType ~= MESH_SHAPE_VALUE then
+		return shapeType, nil
 	end
 
-	local meshPart = if shapeType == MESH_SHAPE_VALUE then part else nil
-
-	if isDynamic then
-		dynamicTypes[id] = shapeType
-		dynamicMeshes[id] = meshPart
-	else
-		staticTypes[id] = shapeType
-		staticMeshes[id] = meshPart
+	if not part then
+		Log.warn("Shape 'Mesh' requires a BasePart reference. Defaulting Zone %d to Block.", nil, zoneId)
+		return BLOCK_SHAPE_VALUE, nil
 	end
+
+	return shapeType, part
+end
+
+-- Sets the shape asked for. It is kept, so a Mesh zone that fell back to Block is Mesh again once it has a part
+local function applyShape(zone: Types.InternalZone, shapeType: number)
+	zone.requestedShapeType = shapeType
+	ZoneShapes.setShape(zone.slot, resolveShape(zone.id, shapeType, asQueryablePart(zone.reference)))
 end
 
 local function clearAutoSync(zone: Types.InternalZone)
-	State.autoSyncZones[zone.id] = nil
+	State.autoSyncZones[zone.slot] = nil
 	if zone.syncConnections then
 		for _, conn in zone.syncConnections do
 			conn:Disconnect()
@@ -104,7 +116,23 @@ local function clearAutoSync(zone: Types.InternalZone)
 end
 
 local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
-	State.autoSyncZones[zone.id] = zone
+	-- A callback during destroy must not start syncing the zone again
+	if Destroyed.isDestroyed(zone) then
+		return
+	end
+
+	-- Each tick reads its CFrame, so anything else would make every tick error
+	if typeof(reference) ~= 'Instance' or not (reference:IsA('BasePart') or reference:IsA('Attachment')) then
+		Log.warn(
+			'Cannot autoSync Zone %d to %s. Use a BasePart, Attachment or Bone.',
+			nil,
+			zone.id,
+			if typeof(reference) == 'Instance' then reference.ClassName else typeof(reference)
+		)
+		return
+	end
+
+	State.autoSyncZones[zone.slot] = zone
 
 	local connections = zone.syncConnections or {}
 
@@ -112,11 +140,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		table.insert(
 			connections,
 			reference:GetPropertyChangedSignal('Size'):Connect(function()
-				local newHalfSize = reference.ExtentsSize * 0.5
-				if dynamicHalfSizes[zone.id] ~= newHalfSize then
-					dynamicHalfSizes[zone.id] = newHalfSize
-					State.pendingDynamicRebuild = true
-				end
+				ZoneShapes.setHalfSize(zone.slot, reference.ExtentsSize * 0.5)
 			end)
 		)
 	end
@@ -125,11 +149,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		table.insert(
 			connections,
 			reference:GetPropertyChangedSignal('Shape'):Connect(function()
-				local newShape = reference.Shape.Value
-				if dynamicTypes[zone.id] ~= newShape then
-					dynamicTypes[zone.id] = newShape
-					State.pendingDynamicRebuild = true
-				end
+				applyShape(zone, reference.Shape.Value)
 			end)
 		)
 	end
@@ -168,8 +188,74 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 	end
 end
 
+-- Checked before a setter writes, as a bad value stored in the zone would break every later write
+local function checkCFrame(cframe: any)
+	if typeof(cframe) ~= 'CFrame' then
+		Log.fatal('Zone cframe must be a CFrame, got %s.', nil, typeof(cframe))
+	end
+end
+
+local function checkSize(size: any)
+	if typeof(size) ~= 'Vector3' then
+		Log.fatal('Zone size must be a Vector3, got %s.', nil, typeof(size))
+	end
+end
+
+local function checkReference(reference: any)
+	if reference ~= nil and typeof(reference) ~= 'Instance' then
+		Log.fatal('Zone reference must be a BasePart, Attachment or Bone, got %s.', nil, typeof(reference))
+	end
+end
+
 local Zone = {}
 Zone.__index = Zone
+
+type PartsConfig = { isDynamic: boolean?, metadata: any?, autoSync: boolean? }
+
+-- Zones for the parts among initial and the instances added reports, until removed reports them
+local function fromContainer(
+	config: PartsConfig?,
+	added: RBXScriptSignal,
+	removed: RBXScriptSignal,
+	initial: { Instance }
+): Types.Zones
+	local zones = Zones.new(config) :: Types.InternalZones
+	local instanceToZone = {} :: { [Instance]: Types.Zone }
+
+	local function onAdded(instance: Instance)
+		if instance:IsA('BasePart') and not instanceToZone[instance] then
+			local zone = Zone.fromPart(instance, { isDynamic = zones.dynamic })
+			instanceToZone[instance] = zone
+			zones:add(zone)
+		end
+	end
+
+	local function onRemoved(instance: Instance)
+		local zone = instanceToZone[instance]
+		if zone then
+			instanceToZone[instance] = nil
+			if not Destroyed.isDestroyed(zone) then
+				zone:destroy()
+			end
+		end
+	end
+
+	local addedConn = added:Connect(onAdded)
+	local removedConn = removed:Connect(onRemoved)
+	for _, instance in initial do
+		onAdded(instance)
+	end
+
+	zones:onDestroy(function()
+		addedConn:Disconnect()
+		removedConn:Disconnect()
+		for instance in instanceToZone do
+			onRemoved(instance)
+		end
+	end)
+
+	return zones
+end
 
 local function newZoneInternal(
 	cframe: CFrame,
@@ -180,30 +266,36 @@ local function newZoneInternal(
 	metadata: any?,
 	autoSync: boolean
 ): Types.Zone
+	-- Checked before anything is registered, so a bad config can't leave a broken slot in the tree
+	checkCFrame(cframe)
+	checkSize(size)
+	checkReference(reference)
+
 	local id = State.nextZoneId
 	State.nextZoneId += 1
 
-	local halfSize = size * 0.5
-	if isDynamic then
-		State.dynamicCFrames[id] = cframe
-		State.dynamicHalfSizes[id] = halfSize
-		State.pendingDynamicRebuild = true
-	else
-		State.staticCFrames[id] = cframe
-		State.staticHalfSizes[id] = halfSize
-		State.pendingStaticRebuild = true
+	-- Keyed by slot, which is reused, so the tables stay arrays
+	local slot = table.remove(State.freeZoneSlots)
+	if not slot then
+		slot = State.zoneSlotCount + 1
+		State.zoneSlotCount = slot
 	end
+	State.zoneSlotIds[slot] = id
 
-	applyShapeType(id, isDynamic, shapeType, asQueryablePart(reference))
+	local resolvedType, part = resolveShape(id, shapeType, asQueryablePart(reference))
+	ZoneShapes.add(slot, isDynamic, cframe, size * 0.5, resolvedType, part)
 
 	local self: Types.InternalZone = setmetatable({
 		id = id,
+		phase = 'alive',
+		slot = slot,
+		requestedShapeType = shapeType,
 		reference = reference,
-		dynamic = isDynamic,
 		metadata = metadata,
 		autoSync = false,
 	}, Zone) :: any
 	State.zoneIdToZoneObj[id] = self
+	State.zoneSlotToZoneObj[slot] = self
 
 	if autoSync then
 		self:setAutoSync(true)
@@ -235,7 +327,7 @@ end
 
 	@tag Constructor
 	@tag Chainable
-	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
+	@param config { cframe: CFrame, size: Vector3, shape: Types.ShapeType?, reference: (BasePart | Attachment | Bone)?, isDynamic: boolean?, metadata: any?, autoSync: boolean? }
 	@return Zone
 ]=]
 function Zone.new(config: {
@@ -247,25 +339,18 @@ function Zone.new(config: {
 	metadata: any?,
 	autoSync: boolean?,
 }): Types.Zone
-	local shapeType = Enum.PartType.Block.Value
-
-	if config.shape then
-		local mapped = SHAPE_MAP[config.shape]
-		if mapped then
-			shapeType = mapped
-		else
-			Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(config.shape))
-		end
+	if type(config) ~= 'table' then
+		Log.fatal('Zone.new expects a config table, got %s.', nil, typeof(config))
 	end
 
 	return newZoneInternal(
 		config.cframe,
 		config.size,
-		shapeType,
+		if config.shape then shapeValueOf(config.shape) else BLOCK_SHAPE_VALUE,
 		config.reference,
-		config.isDynamic or false,
+		not not config.isDynamic,
 		config.metadata,
-		config.autoSync or false
+		not not config.autoSync
 	)
 end
 
@@ -295,19 +380,16 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zone
 ]=]
-function Zone.fromPart(
-	part: BasePart,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zone
+function Zone.fromPart(part: BasePart, config: PartsConfig?): Types.Zone
+	if typeof(part) ~= 'Instance' or not part:IsA('BasePart') then
+		Log.fatal('Zone.fromPart expects a BasePart, got %s.', nil, tostring(part))
+	end
+
 	local shapeId = getShapeEnumValue(part)
 
-	local isDynamic = config and config.isDynamic or false
+	local isDynamic = config ~= nil and not not config.isDynamic
 	local metadata = config and config.metadata
-	local autoSync = config and config.autoSync or false
+	local autoSync = config ~= nil and not not config.autoSync
 
 	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
 end
@@ -322,35 +404,13 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromParts(
-	parts: { BasePart },
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
-
+function Zone.fromParts(parts: { BasePart }, config: PartsConfig?): Types.Zones
+	local zones = Zones.new(config) :: Types.InternalZones
 	for _, part in parts do
-		if part:IsA('BasePart') then
-			local newZone = Zone.fromPart(part, {
-				isDynamic = isDynamic,
-				metadata = zones.metadata,
-				autoSync = autoSync,
-			})
-			zones:add(newZone)
+		if typeof(part) == 'Instance' and part:IsA('BasePart') then
+			zones:add(Zone.fromPart(part, { isDynamic = zones.dynamic }))
 		end
 	end
-
 	return zones
 end
 
@@ -365,61 +425,8 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromChildren(
-	parent: Instance,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
-
-	local instanceToZone = {} :: { [Instance]: Types.Zone }
-
-	local function onAdded(child: Instance)
-		if child:IsA('BasePart') and not instanceToZone[child] then
-			local newZone = Zone.fromPart(child, {
-				isDynamic = isDynamic,
-				metadata = zones.metadata,
-			})
-			instanceToZone[child] = newZone
-			zones:add(newZone)
-		end
-	end
-
-	local function onRemoved(child: Instance)
-		local oldZone = instanceToZone[child]
-		if oldZone then
-			instanceToZone[child] = nil
-			oldZone:destroy()
-		end
-	end
-
-	local addedConn = parent.ChildAdded:Connect(onAdded)
-	local removedConn = parent.ChildRemoved:Connect(onRemoved)
-	for _, child in parent:GetChildren() do
-		onAdded(child)
-	end
-
-	zones:onDestroy(function()
-		addedConn:Disconnect()
-		removedConn:Disconnect()
-		for child, _ in instanceToZone do
-			onRemoved(child)
-		end
-		table.clear(instanceToZone)
-	end)
-
-	return zones
+function Zone.fromChildren(parent: Instance, config: PartsConfig?): Types.Zones
+	return fromContainer(config, parent.ChildAdded, parent.ChildRemoved, parent:GetChildren())
 end
 
 --[=[
@@ -437,61 +444,8 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromDescendants(
-	parent: Instance,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
-
-	local instanceToZone = {} :: { [Instance]: Types.Zone }
-
-	local function onAdded(descendant: Instance)
-		if descendant:IsA('BasePart') and not instanceToZone[descendant] then
-			local newZone = Zone.fromPart(descendant, {
-				isDynamic = isDynamic,
-				metadata = zones.metadata,
-			})
-			instanceToZone[descendant] = newZone
-			zones:add(newZone)
-		end
-	end
-
-	local function onRemoved(descendant: Instance)
-		local oldZone = instanceToZone[descendant]
-		if oldZone then
-			instanceToZone[descendant] = nil
-			oldZone:destroy()
-		end
-	end
-
-	local addedConn = parent.DescendantAdded:Connect(onAdded)
-	local removedConn = parent.DescendantRemoving:Connect(onRemoved)
-	for _, descendant in parent:GetDescendants() do
-		onAdded(descendant)
-	end
-
-	zones:onDestroy(function()
-		addedConn:Disconnect()
-		removedConn:Disconnect()
-		for descendant, _ in instanceToZone do
-			onRemoved(descendant)
-		end
-		table.clear(instanceToZone)
-	end)
-
-	return zones
+function Zone.fromDescendants(parent: Instance, config: PartsConfig?): Types.Zones
+	return fromContainer(config, parent.DescendantAdded, parent.DescendantRemoving, parent:GetDescendants())
 end
 
 --[=[
@@ -505,113 +459,102 @@ end
 	@param config { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
 	@return Zones
 ]=]
-function Zone.fromTag(
-	tag: string,
-	config: {
-		isDynamic: boolean?,
-		metadata: any?,
-		autoSync: boolean?,
-	}?
-): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config and config.metadata ~= nil then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
-
-	local zones = Zones.new({
-		isDynamic = isDynamic,
-		metadata = metadata,
-		autoSync = autoSync,
-	}) :: Types.InternalZones
+function Zone.fromTag(tag: string, config: PartsConfig?): Types.Zones
+	local zones = Zones.new(config) :: Types.InternalZones
 
 	local watchingAncestry = {} :: { [Instance]: RBXScriptConnection }
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
 	local partDestroyingConnections = {} :: { [BasePart]: RBXScriptConnection }
 	local instanceToZone = {} :: { [BasePart]: Types.Zone }
-	local partRefCount = {} :: { [BasePart]: number }
+	-- The tagged instances that claim each part, the part itself or a tagged container. A set rather than a
+	-- count, as a tagged instance reports itself again each time it moves
+	local partClaims = {} :: { [BasePart]: { [Instance]: true } }
 
-	local function removePart(part: BasePart)
-		local count = (partRefCount[part] or 0) - 1
-
-		if count <= 0 then -- No more active tags claim this part, so safe to destroy
-			partRefCount[part] = nil
-			local deadZone = instanceToZone[part]
-			if deadZone then
-				instanceToZone[part] = nil
+	local function dropPart(part: BasePart)
+		partClaims[part] = nil
+		local deadZone = instanceToZone[part]
+		if deadZone then
+			instanceToZone[part] = nil
+			if not Destroyed.isDestroyed(deadZone) then
 				deadZone:destroy()
 			end
-			local destroyingConn = partDestroyingConnections[part]
-			if destroyingConn then
-				destroyingConn:Disconnect()
-				partDestroyingConnections[part] = nil
-			end
-		else
-			partRefCount[part] = count
+		end
+		local destroyingConn = partDestroyingConnections[part]
+		if destroyingConn then
+			destroyingConn:Disconnect()
+			partDestroyingConnections[part] = nil
 		end
 	end
 
-	local function addPart(part: BasePart)
-		local count = (partRefCount[part] or 0) + 1
-		partRefCount[part] = count
+	local function releasePart(part: BasePart, claimer: Instance)
+		local claims = partClaims[part]
+		if not claims or not claims[claimer] then
+			return
+		end
+		claims[claimer] = nil
+		-- No more active tags claim this part, so safe to destroy
+		if next(claims) == nil then
+			dropPart(part)
+		end
+	end
 
-		-- Only create the zone if this is the first time
-		if count == 1 then
-			local newZone = Zone.fromPart(part, {
-				isDynamic = isDynamic,
-				metadata = zones.metadata,
-				autoSync = autoSync,
-			})
-			instanceToZone[part] = newZone
-			zones:add(newZone)
+	local function claimPart(part: BasePart, claimer: Instance)
+		local claims = partClaims[part]
+		if claims then
+			claims[claimer] = true
+			return
+		end
+		partClaims[part] = { [claimer] = true }
 
-			if partDestroyingConnections[part] == nil then
-				partDestroyingConnections[part] = part.Destroying:Connect(function()
-					partRefCount[part] = 1
-					removePart(part)
-				end)
+		local newZone = Zone.fromPart(part, { isDynamic = zones.dynamic })
+		instanceToZone[part] = newZone
+		zones:add(newZone)
+
+		partDestroyingConnections[part] = part.Destroying:Connect(function()
+			dropPart(part)
+		end)
+	end
+
+	-- Releases what a tagged instance claimed, as it left the workspace or lost its tag
+	local function releaseInstance(instance: Instance)
+		if instance:IsA('BasePart') then
+			releasePart(instance, instance)
+			return
+		end
+		local conns = containerConnections[instance]
+		if conns then
+			conns[1]:Disconnect()
+			conns[2]:Disconnect()
+			containerConnections[instance] = nil
+		end
+		for _, descendant in instance:GetDescendants() do
+			if descendant:IsA('BasePart') then
+				releasePart(descendant, instance)
 			end
 		end
 	end
 
 	local function processTaggedInstance(instance: Instance)
-		local inWorkspace = instance:IsDescendantOf(workspace)
-		if inWorkspace then
-			if instance:IsA('BasePart') then
-				addPart(instance)
-			else
-				if not containerConnections[instance] then
-					local addedConn = instance.DescendantAdded:Connect(function(descendant)
-						if descendant:IsA('BasePart') then
-							addPart(descendant)
-						end
-					end)
-					local removedConn = instance.DescendantRemoving:Connect(function(descendant)
-						if descendant:IsA('BasePart') then
-							removePart(descendant)
-						end
-					end)
-					containerConnections[instance] = { addedConn, removedConn }
+		if not instance:IsDescendantOf(workspace) then
+			releaseInstance(instance)
+		elseif instance:IsA('BasePart') then
+			claimPart(instance, instance)
+		elseif not containerConnections[instance] then
+			local addedConn = instance.DescendantAdded:Connect(function(descendant)
+				if descendant:IsA('BasePart') then
+					claimPart(descendant, instance)
+				end
+			end)
+			local removedConn = instance.DescendantRemoving:Connect(function(descendant)
+				if descendant:IsA('BasePart') then
+					releasePart(descendant, instance)
+				end
+			end)
+			containerConnections[instance] = { addedConn, removedConn }
 
-					for _, descendant in instance:GetDescendants() do
-						if descendant:IsA('BasePart') then
-							addPart(descendant)
-						end
-					end
-				end
-			end
-		else
-			if instance:IsA('BasePart') then
-				removePart(instance)
-			else
-				local conns = containerConnections[instance]
-				if conns then
-					conns[1]:Disconnect()
-					conns[2]:Disconnect()
-					containerConnections[instance] = nil
-				end
-				for _, descendant in instance:GetDescendants() do
-					if descendant:IsA('BasePart') then
-						removePart(descendant)
-					end
+			for _, descendant in instance:GetDescendants() do
+				if descendant:IsA('BasePart') then
+					claimPart(descendant, instance)
 				end
 			end
 		end
@@ -633,22 +576,7 @@ function Zone.fromTag(
 			conn:Disconnect()
 			watchingAncestry[instance] = nil
 		end
-
-		if instance:IsA('BasePart') then
-			removePart(instance)
-		else
-			local conns = containerConnections[instance]
-			if conns then
-				conns[1]:Disconnect()
-				conns[2]:Disconnect()
-				containerConnections[instance] = nil
-			end
-			for _, descendant in instance:GetDescendants() do
-				if descendant:IsA('BasePart') then
-					removePart(descendant)
-				end
-			end
-		end
+		releaseInstance(instance)
 	end
 
 	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
@@ -670,7 +598,7 @@ function Zone.fromTag(
 		table.clear(containerConnections)
 		table.clear(partDestroyingConnections)
 		table.clear(instanceToZone)
-		table.clear(partRefCount)
+		table.clear(partClaims)
 	end)
 
 	return zones
@@ -678,18 +606,18 @@ end
 
 -- private
 function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	local attached = State.zoneAttachedObservers[self.id] or {}
-	State.zoneAttachedObservers[self.id] = attached
+	if Destroyed.isDestroyed(self) then
+		return self
+	end
+
+	local attached = State.zoneAttachedObservers[self.slot] or {}
+	State.zoneAttachedObservers[self.slot] = attached
 
 	if not table.find(attached, observer.id) then
 		table.insert(attached, observer.id)
-		updateObserverZoneCount(observer.id, self.dynamic, 1)
-	end
-
-	if self.dynamic then
-		State.dynamicVersion += 1
-	else
-		State.staticVersion += 1
+		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
+		updateObserverZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), 1)
+		ZoneShapes.touch(self.slot)
 	end
 
 	return self
@@ -697,7 +625,7 @@ end
 
 -- private
 function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	local attached = State.zoneAttachedObservers[self.id]
+	local attached = State.zoneAttachedObservers[self.slot]
 	if not attached then
 		return self
 	end
@@ -709,17 +637,14 @@ function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver)
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
-		updateObserverZoneCount(observer.id, self.dynamic, -1)
+		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
+		updateObserverZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), -1)
+		-- Its entities leave on the next tick, unless the zone is destroyed first
+		ZoneShapes.touch(self.slot)
 	end
 
 	if #attached == 0 then
-		State.zoneAttachedObservers[self.id] = nil
-	end
-
-	if self.dynamic then
-		State.dynamicVersion += 1
-	else
-		State.staticVersion += 1
+		State.zoneAttachedObservers[self.slot] = nil
 	end
 
 	return self
@@ -736,13 +661,14 @@ end
 	@return Zone
 ]=]
 function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zone
+	autoSync = not not autoSync
 	if self.autoSync == autoSync then
 		return self
 	end
 
 	self.autoSync = autoSync
 	if autoSync then
-		if not self.dynamic then
+		if not ZoneShapes.isDynamic(self.slot) then
 			self:setDynamic(true)
 		end
 
@@ -769,13 +695,13 @@ end
 	@return Zone
 ]=]
 function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Attachment | Bone)?): Types.Zone
+	checkReference(reference)
 	self.reference = reference
 
-	local currentShape = if self.dynamic then dynamicTypes[self.id] else staticTypes[self.id]
-	if currentShape == MESH_SHAPE_VALUE then
+	if self.requestedShapeType == MESH_SHAPE_VALUE then
 		-- Mesh zones query the part directly, so the new reference has to take over.
 		-- Without a queryable part the zone falls back to its bounding box.
-		applyShapeType(self.id, self.dynamic, MESH_SHAPE_VALUE, asQueryablePart(reference))
+		applyShape(self, MESH_SHAPE_VALUE)
 	end
 
 	if self.autoSync then
@@ -811,79 +737,12 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 		return self
 	end
 
-	local id = self.id
-
 	if reference:IsA('BasePart') then
-		local newCFrame = reference.CFrame
-		local newHalfSize = reference.ExtentsSize * 0.5
-		local newShape = getShapeEnumValue(reference)
-
-		if self.dynamic then
-			local needsUpdate = false
-
-			if dynamicCFrames[id] ~= newCFrame then
-				dynamicCFrames[id] = newCFrame
-				needsUpdate = true
-			end
-
-			if dynamicHalfSizes[id] ~= newHalfSize then
-				dynamicHalfSizes[id] = newHalfSize
-				needsUpdate = true
-			end
-
-			if dynamicTypes[id] ~= newShape or (newShape == MESH_SHAPE_VALUE and dynamicMeshes[id] ~= reference) then
-				applyShapeType(id, true, newShape, reference)
-				needsUpdate = true
-			end
-
-			if needsUpdate then
-				State.pendingDynamicRebuild = true
-			end
-		else
-			local needsUpdate = false
-
-			if staticCFrames[id] ~= newCFrame then
-				staticCFrames[id] = newCFrame
-				needsUpdate = true
-			end
-
-			if staticHalfSizes[id] ~= newHalfSize then
-				staticHalfSizes[id] = newHalfSize
-				needsUpdate = true
-			end
-
-			if staticTypes[id] ~= newShape or (newShape == MESH_SHAPE_VALUE and staticMeshes[id] ~= reference) then
-				applyShapeType(id, false, newShape, reference)
-				needsUpdate = true
-			end
-
-			if needsUpdate then
-				State.pendingStaticRebuild = true
-			end
-		end
-
-		return self
-	end
-
-	if reference:IsA('Attachment') or reference:IsA('Bone') then
-		local newCFrame = reference.WorldCFrame
-		if self.dynamic then
-			if dynamicCFrames[id] == newCFrame then
-				return self
-			end
-
-			dynamicCFrames[id] = newCFrame
-			State.pendingDynamicRebuild = true
-		else
-			if staticCFrames[id] == newCFrame then
-				return self
-			end
-
-			staticCFrames[id] = newCFrame
-			State.pendingStaticRebuild = true
-		end
-
-		return self
+		self.requestedShapeType = getShapeEnumValue(reference)
+		local shapeType, part = resolveShape(self.id, self.requestedShapeType, reference)
+		ZoneShapes.set(self.slot, reference.CFrame, reference.ExtentsSize * 0.5, shapeType, part)
+	elseif reference:IsA('Attachment') or reference:IsA('Bone') then
+		ZoneShapes.setCFrame(self.slot, reference.WorldCFrame)
 	end
 
 	return self
@@ -904,14 +763,16 @@ end
 	@return Zone
 ]=]
 function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
-	if self.dynamic == isDynamic then
+	-- A boolean, as the observers' zone counts below assume the zone really changes tree
+	isDynamic = not not isDynamic
+	local slot = self.slot
+	if ZoneShapes.isDynamic(slot) == isDynamic then
 		return self
 	end
 
-	local id = self.id
-	self.dynamic = isDynamic
+	ZoneShapes.setDynamic(slot, isDynamic)
 
-	local attached = State.zoneAttachedObservers[id]
+	local attached = State.zoneAttachedObservers[slot]
 	if attached then
 		for _, obsId in attached do
 			updateObserverZoneCount(obsId, not isDynamic, -1)
@@ -919,34 +780,9 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 		end
 	end
 
-	if isDynamic then
-		dynamicCFrames[id] = staticCFrames[id]
-		dynamicHalfSizes[id] = staticHalfSizes[id]
-		dynamicTypes[id] = staticTypes[id]
-		dynamicMeshes[id] = staticMeshes[id]
-
-		staticCFrames[id] = nil
-		staticHalfSizes[id] = nil
-		staticTypes[id] = nil
-		staticMeshes[id] = nil
-	else
-		if self.autoSync then
-			self:setAutoSync(false)
-		end
-
-		staticCFrames[id] = dynamicCFrames[id]
-		staticHalfSizes[id] = dynamicHalfSizes[id]
-		staticTypes[id] = dynamicTypes[id]
-		staticMeshes[id] = dynamicMeshes[id]
-
-		dynamicCFrames[id] = nil
-		dynamicHalfSizes[id] = nil
-		dynamicTypes[id] = nil
-		dynamicMeshes[id] = nil
+	if not isDynamic and self.autoSync then
+		self:setAutoSync(false)
 	end
-
-	State.pendingStaticRebuild = true
-	State.pendingDynamicRebuild = true
 
 	return self
 end
@@ -965,13 +801,8 @@ end
 	@return Zone
 ]=]
 function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
-	if self.dynamic then
-		dynamicCFrames[self.id] = cf
-		State.pendingDynamicRebuild = true
-	else
-		staticCFrames[self.id] = cf
-		State.pendingStaticRebuild = true
-	end
+	checkCFrame(cf)
+	ZoneShapes.setCFrame(self.slot, cf)
 	return self
 end
 
@@ -989,9 +820,10 @@ end
 	@return Zone
 ]=]
 function Zone.setPosition(self: Types.InternalZone, pos: Vector3): Types.Zone
-	local currentCF = self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
-	local newCF = currentCF.Rotation + pos
-	return self:setCFrame(newCF)
+	if typeof(pos) ~= 'Vector3' then
+		Log.fatal('Zone position must be a Vector3, got %s.', nil, typeof(pos))
+	end
+	return self:setCFrame(shapeCFrames[self.slot].Rotation + pos)
 end
 
 --[=[ 
@@ -1008,15 +840,8 @@ end
 	@return Zone
 ]=]
 function Zone.setSize(self: Types.InternalZone, size: Vector3): Types.Zone
-	local halfSize = size * 0.5
-
-	if self.dynamic then
-		dynamicHalfSizes[self.id] = halfSize
-		State.pendingDynamicRebuild = true
-	else
-		staticHalfSizes[self.id] = halfSize
-		State.pendingStaticRebuild = true
-	end
+	checkSize(size)
+	ZoneShapes.setHalfSize(self.slot, size * 0.5)
 	return self
 end
 
@@ -1030,23 +855,7 @@ end
 	@return Zone
 ]=]
 function Zone.setShape(self: Types.InternalZone, shape: Types.ShapeType): Types.Zone
-	local shapeType = Enum.PartType.Block.Value
-
-	local mapped = SHAPE_MAP[shape]
-	if mapped then
-		shapeType = mapped
-	else
-		Log.warn("Invalid shape '%s'. Defaulting to Block.", nil, tostring(shape))
-	end
-
-	applyShapeType(self.id, self.dynamic, shapeType, asQueryablePart(self.reference))
-
-	if self.dynamic then
-		State.dynamicVersion += 1
-	else
-		State.staticVersion += 1
-	end
-
+	applyShape(self, shapeValueOf(shape))
 	return self
 end
 
@@ -1105,8 +914,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getPosition(self: Types.InternalZone): Vector3
-	local cf = self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
-	return cf.Position
+	return shapeCFrames[self.slot].Position
 end
 
 --[=[
@@ -1117,7 +925,7 @@ end
 	@return CFrame
 ]=]
 function Zone.getCFrame(self: Types.InternalZone): CFrame
-	return self.dynamic and dynamicCFrames[self.id] or staticCFrames[self.id]
+	return shapeCFrames[self.slot]
 end
 
 --[=[
@@ -1128,8 +936,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getSize(self: Types.InternalZone): Vector3
-	local halfSize = self.dynamic and dynamicHalfSizes[self.id] or staticHalfSizes[self.id]
-	return halfSize * 2
+	return shapeHalfSizes[self.slot] * 2
 end
 
 --[=[ 
@@ -1140,21 +947,7 @@ end
 	@return ShapeType
 ]=]
 function Zone.getShape(self: Types.InternalZone): Types.ShapeType
-	local shapeType = self.dynamic and dynamicTypes[self.id] or staticTypes[self.id]
-	if shapeType == Enum.PartType.Block.Value then
-		return 'Block'
-	elseif shapeType == Enum.PartType.Ball.Value then
-		return 'Ball'
-	elseif shapeType == Enum.PartType.Cylinder.Value then
-		return 'Cylinder'
-	elseif shapeType == Enum.PartType.Wedge.Value then
-		return 'Wedge'
-	elseif shapeType == Enum.PartType.CornerWedge.Value then
-		return 'CornerWedge'
-	elseif shapeType == MESH_SHAPE_VALUE then
-		return 'Mesh'
-	end
-	return 'Block'
+	return SHAPE_NAMES[shapeTypes[self.slot]] or 'Block'
 end
 
 --[=[ 
@@ -1166,12 +959,7 @@ end
 	@return boolean
 ]=]
 function Zone.isPointInside(self: Types.InternalZone, point: Vector3): boolean
-	local id = self.id
-	if self.dynamic then
-		return isPointInShape(point, dynamicCFrames[id], dynamicHalfSizes[id], dynamicTypes[id], dynamicMeshes[id])
-	else
-		return isPointInShape(point, staticCFrames[id], staticHalfSizes[id], staticTypes[id], staticMeshes[id])
-	end
+	return ZoneShapes.containsPoint(self.slot, point)
 end
 
 --[=[ 
@@ -1182,7 +970,7 @@ end
 	@return boolean
 ]=]
 function Zone.isDynamic(self: Types.InternalZone): boolean
-	return self.dynamic
+	return ZoneShapes.isDynamic(self.slot)
 end
 
 --[=[ 
@@ -1201,18 +989,7 @@ end
 	@return () -> () -- Disconnect function
 ]=]
 function Zone.onDestroy(self: Types.InternalZone, callback: () -> ()): () -> ()
-	if not self.onDestroyCallbacks then
-		self.onDestroyCallbacks = {}
-	end
-
-	table.insert(self.onDestroyCallbacks :: any, callback)
-
-	return function()
-		local idx = table.find(self.onDestroyCallbacks :: any, callback)
-		if idx then
-			table.remove(self.onDestroyCallbacks :: any, idx)
-		end
-	end
+	return Destroyed.connect(self, callback)
 end
 
 --[=[ 
@@ -1227,79 +1004,43 @@ end
 	@within Zone
 ]=]
 function Zone.destroy(self: Types.InternalZone): ()
-	clearAutoSync(self)
+	-- A callback below may destroy the zone again, which would release its slot twice
+	if not Destroyed.begin(self) then
+		return
+	end
 
-	-- Force flush so the zone object will not be nil when spatial query is done in the Scheduler
+	clearAutoSync(self)
+	self.autoSync = false
+
 	local id = self.id
-	local attachedObservers = State.zoneAttachedObservers[id]
+	local slot = self.slot
+
+	-- Detach before any callback runs, so a callback that updates can't move entities back in
+	local attachedObservers = State.zoneAttachedObservers[slot]
+	State.zoneAttachedObservers[slot] = nil
+	State.zoneSoleObserver[slot] = nil
+
 	if attachedObservers then
 		for _, observerId in attachedObservers do
-			updateObserverZoneCount(observerId, self.dynamic, -1)
-
-			local trackedEntities = State.observerTrackingEntities[observerId]
-			if not trackedEntities then
-				continue
-			end
-
-			for entity, _ in trackedEntities do
-				local data = State.entityData[entity]
-
-				if not data or data.activeObserverMemberships[observerId] ~= id then
-					continue
-				end
-
-				data.activeObserverMemberships[observerId] = nil
-				trackedEntities[entity] = nil
-
-				local cbs = State.observerExitedCallbacks[observerId]
-				if not cbs then
-					continue
-				end
-
-				local safety = State.observerSafety[observerId]
-				local ref = State.entityToReference[entity] or entity
-				for _, fn in cbs do
-					if safety then
-						task.spawn(fn, ref, self, entity)
-					else
-						fn(ref, self, entity)
-					end
-				end
-			end
+			updateObserverZoneCount(observerId, ZoneShapes.isDynamic(slot), -1)
 		end
 	end
 
-	-- Clear the reference before the onDestroyCallbacks are fired.
-	-- This is to ensure that, when the callback attempts to detach the observer manually,
-	-- it safely early-returns without double-decrementing the count.
-	State.zoneAttachedObservers[id] = nil
+	-- Leave while the zone object is still alive, so callbacks get it
+	Memberships.leaveZone(id)
 
-	if self.onDestroyCallbacks then
-		-- The table must be cloned to avoid iterator shifts
-		local onDestroyCallbacks = table.clone(self.onDestroyCallbacks)
-		for _, callback in onDestroyCallbacks do
-			task.spawn(callback)
-		end
-		table.clear(self.onDestroyCallbacks)
-	end
+	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	State.zoneIdToZoneObj[id] = nil
+	State.zoneSlotToZoneObj[slot] = nil
+	State.zoneSlotIds[slot] = nil
+	ZoneShapes.remove(slot)
 
-	if self.dynamic then
-		dynamicCFrames[id] = nil
-		dynamicHalfSizes[id] = nil
-		dynamicTypes[id] = nil
-		dynamicMeshes[id] = nil
-		State.pendingDynamicRebuild = true
-	else
-		staticCFrames[id] = nil
-		staticHalfSizes[id] = nil
-		staticTypes[id] = nil
-		staticMeshes[id] = nil
-		State.pendingStaticRebuild = true
-	end
+	-- Reusable right away, a stale tree leaf checks the new zone's shape
+	table.insert(State.freeZoneSlots, slot)
+	State.zonesBeingDestroyed[id] = nil
 
-	setmetatable(self :: any, nil)
+	Destroyed.finish(self)
 end
 
 return Zone
