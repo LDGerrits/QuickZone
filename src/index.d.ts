@@ -52,6 +52,12 @@ declare namespace QuickZone {
 		destroy(): void
 	}
 
+	export interface PartsConfig {
+		isDynamic?: boolean
+		metadata?: any
+		autoSync?: boolean
+	}
+
 	export interface ObserverConfig {
 		groups?: Group[]
 		zones?: (Zone | Zones)[]
@@ -169,11 +175,11 @@ declare namespace QuickZone {
 				autoSync?: boolean
 			}): Zone
 
-			fromPart: (part: BasePart, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zone
-			fromParts: (parts: BasePart[], config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
-			fromChildren: (parent: Instance, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
-			fromDescendants: (parent: Instance, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
-			fromTag: (tag: string, config?: { isDynamic?: boolean; metadata?: any; autoSync?: boolean }) => Zones
+			fromPart: (part: BasePart, config?: PartsConfig) => Zone
+			fromParts: (parts: BasePart[], config?: PartsConfig) => Zones
+			fromChildren: (parent: Instance, config?: PartsConfig) => Zones
+			fromDescendants: (parent: Instance, config?: PartsConfig) => Zones
+			fromTag: (tag: string, config?: PartsConfig) => Zones
 		}
 
 		Observer: {

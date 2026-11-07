@@ -178,6 +178,15 @@ local function markTopology(entity: Types.Entity)
 	dirtyTopology[entity] = true
 end
 
+-- The observer's settings changed, so every entity it watches is routed again
+function Routing.rerouteObserver(observerId: number)
+	for _, group in Links.groupsOf(observerId) do
+		for _, entity in group.entities do
+			Routing.reroute(entity)
+		end
+	end
+end
+
 -- Checks every entity again at the next tick, also those that stand still
 function Routing.recheckAll()
 	Routing.logicVersion += 1
@@ -209,16 +218,7 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 			Routing.recheckAll()
 		end
 
-		for groupId, observers in groupToObservers do
-			if not observers[observerId] then
-				continue
-			end
-
-			local group = Registry.groups[groupId]
-			if not group then
-				continue
-			end
-
+		for _, group in Links.groupsOf(observerId) do
 			for _, entity in group.entities do
 				markTopology(entity)
 			end

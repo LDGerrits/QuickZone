@@ -23,25 +23,18 @@ local ObserverQueries = require(script.Parent.ObserverQueries)
 
 local checkZone = Checks.checkZone
 
-local hasAttachedMap = {} :: { [number]: boolean }
-local hasSubscribedMap = {} :: { [number]: boolean }
-
-local function updateAllEntitiesForObserver(observerId: number)
-	for groupId, observers in Links.groupToObservers do
-		if not observers[observerId] then
-			continue
-		end
-
-		local group = Registry.groups[groupId]
-		if not group then
-			continue
-		end
-
-		for _, entity in group.entities do
-			Routing.reroute(entity)
+-- Tells the observer's group trackers that the group's members may count for it now, or no longer
+local function retrackMembers(observerId: number, group: Types.InternalGroup)
+	if Callbacks.observerGroupTrackers[observerId] then
+		-- Cloned, as tracker callbacks may change the group
+		for _, entity in table.clone(group.entities) do
+			Memberships.groupsChanged(entity, observerId)
 		end
 	end
 end
+
+local hasAttachedMap = {} :: { [number]: boolean }
+local hasSubscribedMap = {} :: { [number]: boolean }
 
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
 	-- Cloned, as exit callbacks may remove entities from the group, swapping later ones into visited slots
@@ -249,11 +242,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	end
 
 	-- Members already inside through other groups bring this one in
-	if Callbacks.observerGroupTrackers[self.id] then
-		for _, entity in table.clone(group.entities) do
-			Memberships.groupsChanged(entity, self.id)
-		end
-	end
+	retrackMembers(self.id, group)
 
 	return self
 end
@@ -280,11 +269,7 @@ function Observer.unsubscribe(self: Types.InternalObserver, group: Types.Interna
 	disconnectObserverFromGroup(self.id, group)
 
 	-- Members that stay inside through other groups no longer bring this one in
-	if Callbacks.observerGroupTrackers[self.id] then
-		for _, entity in table.clone(group.entities) do
-			Memberships.groupsChanged(entity, self.id)
-		end
-	end
+	retrackMembers(self.id, group)
 
 	return self
 end
@@ -375,7 +360,7 @@ function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Ty
 		end
 	end
 
-	updateAllEntitiesForObserver(self.id)
+	Routing.rerouteObserver(self.id)
 
 	return self
 end
@@ -426,7 +411,7 @@ end
 ]=]
 function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types.Observer
 	Registry.observerUpdateRate[self.id] = checkUpdateRate(hz)
-	updateAllEntitiesForObserver(self.id)
+	Routing.rerouteObserver(self.id)
 	return self
 end
 
@@ -443,7 +428,7 @@ function Observer.setPrecision(self: Types.InternalObserver, n: number): Types.O
 	checkPrecision(n)
 
 	Registry.observerPrecisionSq[self.id] = n ^ 2
-	updateAllEntitiesForObserver(self.id)
+	Routing.rerouteObserver(self.id)
 	return self
 end
 
@@ -553,7 +538,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 
 	-- Unlinked entities must be rerouted, also when the observer was already disabled
 	local id = self.id
-	updateAllEntitiesForObserver(id)
+	Routing.rerouteObserver(id)
 	Links.unsubscribeAll(id)
 
 	for slot, attached in Links.zoneAttachedObservers do

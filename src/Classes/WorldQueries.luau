@@ -50,24 +50,7 @@ function WorldQueries:getEntityOfReference(reference: any): Types.Entity?
 		return entity
 	end
 
-	entity = reference
-	if typeof(entity) == 'Instance' then
-		if
-			entity:IsA('BasePart')
-			or entity:IsA('Attachment')
-			or entity:IsA('Bone')
-			or entity:IsA('Camera')
-			or entity:IsA('Model')
-		then
-			return entity
-		end
-	elseif typeof(entity) == 'table' then
-		if entity.Position or entity.CFrame or entity.Transform or entity.WorldPosition or entity.GetPivot then
-			return entity
-		end
-	end
-
-	return nil
+	return if Entities.canTrack(reference) then reference else nil
 end
 
 --[=[

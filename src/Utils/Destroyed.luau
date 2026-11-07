@@ -42,9 +42,7 @@ end
 -- Connects an onDestroy callback, returns its disconnect function. Checked here, as destroy would only fail on it
 -- halfway through
 function Destroyed.connect(object: Destroyable, callback: () -> ()): () -> ()
-	if type(callback) ~= 'function' then
-		Log.fatal('Expected a callback function, got %s.', nil, typeof(callback))
-	end
+	Log.checkCallback(callback)
 
 	local callbacks = object.onDestroyCallbacks or {}
 	object.onDestroyCallbacks = callbacks

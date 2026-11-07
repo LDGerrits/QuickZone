@@ -2,13 +2,12 @@
 
 -- The Zone constructors that keep a Zones in step with a set of parts
 
-local CollectionService = game:GetService('CollectionService')
-
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
+local TagWatcher = require(script.Parent.Parent.Utils.TagWatcher)
 local Zones = require(script.Parent.Zones)
 
-export type PartsConfig = { isDynamic: boolean?, metadata: any?, autoSync: boolean? }
+type PartsConfig = Types.PartsConfig
 
 local ZoneContainers = {}
 
@@ -135,7 +134,6 @@ end
 function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	local zones = Zones.new(config) :: Types.InternalZones
 
-	local watchingAncestry = {} :: { [Instance]: RBXScriptConnection }
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
 	local partDestroyingConnections = {} :: { [BasePart]: RBXScriptConnection }
 	local instanceToZone = {} :: { [BasePart]: Types.Zone }
@@ -243,41 +241,13 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 		end
 	end
 
-	local function startWatching(instance: Instance)
-		if watchingAncestry[instance] then
-			return
-		end
-		watchingAncestry[instance] = instance.AncestryChanged:Connect(function()
-			processTaggedInstance(instance)
-		end)
-		processTaggedInstance(instance)
-	end
-
-	local function stopWatching(instance: Instance)
-		local conn = watchingAncestry[instance]
-		if conn then
-			conn:Disconnect()
-			watchingAncestry[instance] = nil
-		end
-		releaseInstance(instance)
-	end
-
-	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
-	local removedConn = CollectionService:GetInstanceRemovedSignal(tag):Connect(stopWatching)
-	for _, instance in CollectionService:GetTagged(tag) do
-		startWatching(instance)
-	end
+	local stopWatch = TagWatcher.watch(tag, nil, processTaggedInstance, releaseInstance)
 
 	zones:onDestroy(function()
-		addedConn:Disconnect()
-		removedConn:Disconnect()
-		for inst in watchingAncestry do
-			stopWatching(inst)
-		end
+		stopWatch()
 		for _, conn in partDestroyingConnections do
 			conn:Disconnect()
 		end
-		table.clear(watchingAncestry)
 		table.clear(containerConnections)
 		table.clear(partDestroyingConnections)
 		table.clear(instanceToZone)

@@ -33,15 +33,15 @@ local shapeCFrames = ZoneShapes.shapeCFrames
 local shapeHalfSizes = ZoneShapes.shapeHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
 
-local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
+local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
 
 local SHAPE_MAP: { [string]: number } = {
-	Block = Enum.PartType.Block.Value,
-	Cylinder = Enum.PartType.Cylinder.Value,
-	Ball = Enum.PartType.Ball.Value,
-	Wedge = Enum.PartType.Wedge.Value,
-	CornerWedge = Enum.PartType.CornerWedge.Value,
+	Block = BLOCK_SHAPE_VALUE,
+	Cylinder = Geometry.CYLINDER_SHAPE_VALUE,
+	Ball = Geometry.BALL_SHAPE_VALUE,
+	Wedge = Geometry.WEDGE_SHAPE_VALUE,
+	CornerWedge = Geometry.CORNER_WEDGE_SHAPE_VALUE,
 	Mesh = MESH_SHAPE_VALUE,
 }
 local SHAPE_NAMES = {} :: { [number]: Types.ShapeType }
@@ -68,14 +68,14 @@ local function getShapeEnumValue(part: BasePart): number
 	end
 
 	if part:IsA('WedgePart') then
-		return Enum.PartType.Wedge.Value
+		return Geometry.WEDGE_SHAPE_VALUE
 	end
 
 	if part:IsA('CornerWedgePart') then
-		return Enum.PartType.CornerWedge.Value
+		return Geometry.CORNER_WEDGE_SHAPE_VALUE
 	end
 
-	return Enum.PartType.Block.Value
+	return BLOCK_SHAPE_VALUE
 end
 
 local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): BasePart?
@@ -180,7 +180,7 @@ end
 local Zone = {}
 Zone.__index = Zone
 
-type PartsConfig = ZoneContainers.PartsConfig
+type PartsConfig = Types.PartsConfig
 
 local function newZoneInternal(
 	cframe: CFrame,

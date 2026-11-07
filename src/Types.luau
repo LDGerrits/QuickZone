@@ -205,6 +205,9 @@ export type InternalZones = Zones & {
 	remove: (self: InternalZones, zone: Zone) -> (),
 }
 
+-- Options of the Zone constructors that make zones from parts
+export type PartsConfig = { isDynamic: boolean?, metadata: any?, autoSync: boolean? }
+
 export type ZoneClass = {
 	new: (
 		config: {
@@ -217,20 +220,11 @@ export type ZoneClass = {
 			autoSync: boolean?,
 		}
 	) -> Zone,
-	fromPart: (part: BasePart, config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zone,
-	fromParts: (
-		parts: { BasePart },
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
-	) -> Zones,
-	fromTag: (tag: string, config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?) -> Zones,
-	fromDescendants: (
-		parent: Instance,
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
-	) -> Zones,
-	fromChildren: (
-		parent: Instance,
-		config: { isDynamic: boolean?, metadata: any?, autoSync: boolean? }?
-	) -> Zones,
+	fromPart: (part: BasePart, config: PartsConfig?) -> Zone,
+	fromParts: (parts: { BasePart }, config: PartsConfig?) -> Zones,
+	fromTag: (tag: string, config: PartsConfig?) -> Zones,
+	fromDescendants: (parent: Instance, config: PartsConfig?) -> Zones,
+	fromChildren: (parent: Instance, config: PartsConfig?) -> Zones,
 }
 
 export type Observer<T = any> = {

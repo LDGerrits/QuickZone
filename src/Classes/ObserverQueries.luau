@@ -160,20 +160,7 @@ end
 	@return { Group }
 ]=]
 function ObserverQueries.getGroups(self: Types.InternalObserver): { Types.Group }
-	local result = {}
-
-	for groupId, observersMap in Links.groupToObservers do
-		if not observersMap[self.id] then
-			continue
-		end
-
-		local group = Registry.groups[groupId]
-		if group then
-			table.insert(result, group)
-		end
-	end
-
-	return result
+	return Links.groupsOf(self.id) :: { any }
 end
 
 --[=[ 

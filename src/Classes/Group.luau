@@ -9,7 +9,6 @@
 	:::
 ]=]
 
-local CollectionService = game:GetService('CollectionService')
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
@@ -25,6 +24,7 @@ local Routing = require(script.Parent.Parent.Core.Routing)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
+local TagWatcher = require(script.Parent.Parent.Utils.TagWatcher)
 
 local IS_CLIENT = RunService:IsClient()
 
@@ -118,63 +118,17 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Types.Entity>
 	group.isManaged = true
 
-	local watchingInstances = {} :: { [Instance]: RBXScriptConnection }
-
-	local function checkAncestry(instance: BasePart | Model | Attachment | Bone | Camera)
+	local stopWatch = TagWatcher.watch(tag, Entities.canTrack, function(instance)
 		if instance:IsDescendantOf(workspace) then
-			group:_addEntity(instance)
+			group:_addEntity(instance :: any)
 		else
-			group:_removeEntity(instance)
+			group:_removeEntity(instance :: any)
 		end
-	end
-
-	local function startWatching(instance: Instance)
-		if watchingInstances[instance] then
-			return
-		end
-
-		if
-			not (
-				instance:IsA('BasePart')
-				or instance:IsA('Model')
-				or instance:IsA('Attachment')
-				or instance:IsA('Bone')
-				or instance:IsA('Camera')
-			)
-		then
-			return
-		end
-
-		watchingInstances[instance] = instance.AncestryChanged:Connect(function()
-			checkAncestry(instance)
-		end)
-
-		checkAncestry(instance)
-	end
-
-	local function stopWatching(instance: Instance)
-		local conn = watchingInstances[instance]
-		if conn then
-			conn:Disconnect()
-			watchingInstances[instance] = nil
-		end
+	end, function(instance)
 		group:_removeEntity(instance :: any)
-	end
-
-	local addedConn = CollectionService:GetInstanceAddedSignal(tag):Connect(startWatching)
-	local removedConn = CollectionService:GetInstanceRemovedSignal(tag):Connect(stopWatching)
-
-	for _, instance in CollectionService:GetTagged(tag) do
-		startWatching(instance)
-	end
-
-	group:onDestroy(function()
-		addedConn:Disconnect()
-		removedConn:Disconnect()
-		for instance, _ in watchingInstances do
-			stopWatching(instance)
-		end
 	end)
+
+	group:onDestroy(stopWatch)
 
 	return group
 end

@@ -10,9 +10,9 @@ local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local ZoneChanges = require(script.Parent.ZoneChanges)
 local Types = require(script.Parent.Parent.Types)
 
-local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
-local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
-local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
+local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
+local BALL_SHAPE_VALUE = Geometry.BALL_SHAPE_VALUE
+local CYLINDER_SHAPE_VALUE = Geometry.CYLINDER_SHAPE_VALUE
 -- Bounds that contain nothing and widen nothing they are merged into
 local EMPTY_MIN = Vector3.one * math.huge
 local EMPTY_MAX = -EMPTY_MIN

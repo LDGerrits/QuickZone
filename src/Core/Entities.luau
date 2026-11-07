@@ -53,6 +53,11 @@ local function strategyOf(entity: any): number?
 	return nil
 end
 
+-- Whether x is something QuickZone can track as an entity
+function Entities.canTrack(x: any): boolean
+	return strategyOf(x) ~= nil
+end
+
 function Entities.isIn(entity: Types.Entity, groupId: number): boolean
 	local groups = entityToGroups[entity]
 	return groups ~= nil and groups[groupId] == true
