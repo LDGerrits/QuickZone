@@ -35,13 +35,15 @@ local shapeTypes = ZoneShapes.shapeTypes
 
 local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
+local WEDGE_SHAPE_VALUE = Geometry.WEDGE_SHAPE_VALUE
+local CORNER_WEDGE_SHAPE_VALUE = Geometry.CORNER_WEDGE_SHAPE_VALUE
 
 local SHAPE_MAP: { [string]: number } = {
 	Block = BLOCK_SHAPE_VALUE,
 	Cylinder = Geometry.CYLINDER_SHAPE_VALUE,
 	Ball = Geometry.BALL_SHAPE_VALUE,
-	Wedge = Geometry.WEDGE_SHAPE_VALUE,
-	CornerWedge = Geometry.CORNER_WEDGE_SHAPE_VALUE,
+	Wedge = WEDGE_SHAPE_VALUE,
+	CornerWedge = CORNER_WEDGE_SHAPE_VALUE,
 	Mesh = MESH_SHAPE_VALUE,
 }
 local SHAPE_NAMES = {} :: { [number]: Types.ShapeType }
@@ -68,11 +70,11 @@ local function getShapeEnumValue(part: BasePart): number
 	end
 
 	if part:IsA('WedgePart') then
-		return Geometry.WEDGE_SHAPE_VALUE
+		return WEDGE_SHAPE_VALUE
 	end
 
 	if part:IsA('CornerWedgePart') then
-		return Geometry.CORNER_WEDGE_SHAPE_VALUE
+		return CORNER_WEDGE_SHAPE_VALUE
 	end
 
 	return BLOCK_SHAPE_VALUE

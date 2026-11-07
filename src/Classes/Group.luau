@@ -118,7 +118,7 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Types.Entity>
 	group.isManaged = true
 
-	local stopWatch = TagWatcher.watch(tag, Entities.canTrack, function(instance)
+	local stopWatch = TagWatcher.watch(tag, function(instance)
 		if instance:IsDescendantOf(workspace) then
 			group:_addEntity(instance :: any)
 		else
@@ -126,7 +126,7 @@ function Group.fromTag(tag: string): Types.Group<Types.Entity>
 		end
 	end, function(instance)
 		group:_removeEntity(instance :: any)
-	end)
+	end, Entities.canTrack)
 
 	group:onDestroy(stopWatch)
 

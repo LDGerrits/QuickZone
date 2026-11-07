@@ -173,11 +173,6 @@ local function processTopologyChange(entity: Types.Entity)
 	data.needsDynamic = needsDynamic
 end
 
--- The trees the entity's observers query changed, so the entity is placed again at the next tick
-local function markTopology(entity: Types.Entity)
-	dirtyTopology[entity] = true
-end
-
 -- The observer's settings changed, so every entity it watches is routed again
 function Routing.rerouteObserver(observerId: number)
 	for _, group in Links.groupsOf(observerId) do
@@ -220,7 +215,7 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 
 		for _, group in Links.groupsOf(observerId) do
 			for _, entity in group.entities do
-				markTopology(entity)
+				dirtyTopology[entity] = true
 			end
 		end
 	end

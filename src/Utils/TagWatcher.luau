@@ -7,13 +7,13 @@ local CollectionService = game:GetService('CollectionService')
 local TagWatcher = {}
 
 -- Calls onChange when an instance gets the tag and each time its ancestry changes, and onRemoved when it loses the
--- tag or the watch stops. Only instances accept passes are followed, but onRemoved hears of every instance losing
--- the tag. Returns the function that stops the watch
+-- tag or the watch stops. When accept is given, only the instances it accepts are followed, but onRemoved still
+-- hears of every instance that loses the tag. Returns the function that stops the watch
 function TagWatcher.watch(
 	tag: string,
-	accept: ((instance: Instance) -> boolean)?,
 	onChange: (instance: Instance) -> (),
-	onRemoved: (instance: Instance) -> ()
+	onRemoved: (instance: Instance) -> (),
+	accept: ((instance: Instance) -> boolean)?
 ): () -> ()
 	local watching = {} :: { [Instance]: RBXScriptConnection }
 

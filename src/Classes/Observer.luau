@@ -186,7 +186,7 @@ function Observer.new<T>(config: {
 	local explicitlyPassedZones = config and config.zones ~= nil
 	local explicitlyPassedGroups = config and config.groups ~= nil
 
-	-- Nothing was attached or subscribed above without a table, so only a later attach or subscribe can fix it
+	-- Without a table nothing was attached or subscribed above, so whether one came later is checked when deferred
 	local missingZones = not explicitlyPassedZones
 	local missingGroups = not explicitlyPassedGroups
 

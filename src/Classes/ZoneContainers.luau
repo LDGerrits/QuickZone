@@ -241,7 +241,7 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 		end
 	end
 
-	local stopWatch = TagWatcher.watch(tag, nil, processTaggedInstance, releaseInstance)
+	local stopWatch = TagWatcher.watch(tag, processTaggedInstance, releaseInstance)
 
 	zones:onDestroy(function()
 		stopWatch()

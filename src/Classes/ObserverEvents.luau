@@ -183,10 +183,10 @@ local function trackGroups(
 	end
 end
 
--- Checked when connected, as a tick would only fail on it at the next event
 local checkCallback = Log.checkCallback
 
--- Whether the observer runs callbacks in their own thread. Unset counts as safe, as for the observer's own events
+-- Whether the observer runs callbacks in their own thread. Also true once it is destroyed and its setting is gone,
+-- so a cleanup that runs late is still kept apart
 local function isSafe(observerId: number): boolean
 	return Registry.observerSafety[observerId] ~= false
 end
