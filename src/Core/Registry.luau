@@ -1,7 +1,15 @@
 --!strict
 
--- Every QuickZone object by id, and the settings of each observer. Each table is written only by the class whose
--- objects it holds, the core reads them
+-- Every QuickZone object by id, and the settings of each observer. Each table has one writer and is kept here, low
+-- in Core, so the modules that read it every tick can hold it as a local:
+--
+--   tables                                  writer      hot readers
+--   groups                                  Group       Routing, Memberships, ObserverEvents
+--   zoneIdToZoneObj, zoneSlotToZoneObj      Zone        Scheduler, Memberships, Callbacks
+--   autoSyncZones                           Zone        Scheduler
+--   observerIdToObserverObj                 Observer    WorldQueries
+--   observer settings (priority, enabled,   Wiring      Scheduler, Routing, Memberships
+--     safety, updateRate, precisionSq)
 
 local Types = require(script.Parent.Parent.Types)
 
@@ -22,6 +30,8 @@ Registry.autoSyncZones = {} :: { [number]: Types.InternalZone }
 
 -- Written by Observer
 Registry.observerIdToObserverObj = {} :: { [number]: Types.InternalObserver }
+
+-- Written by Wiring
 Registry.observerPriorityMap = {} :: { [number]: number }
 Registry.observerEnabled = {} :: { [number]: boolean }
 Registry.observerSafety = {} :: { [number]: boolean }

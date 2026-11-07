@@ -1,5 +1,8 @@
 --!strict
 
+-- Follows each player added to a group through its characters: the HumanoidRootPart of its current character is
+-- the member, through Members, and the player its reference. Keeps which groups each player was added to
+
 local Players = game:GetService('Players')
 
 local Types = require(script.Parent.Parent.Types)

@@ -22,10 +22,12 @@ local autoCleanGroups = Members.autoCleanGroups
 local cleanups = Members.cleanups
 
 -- Whether the group's destroy has begun. A group takes on nothing new from then on
-local function isDestroyed(groupId: number): boolean
+function Members.isGroupDestroyed(groupId: number): boolean
 	local group = Registry.groups[groupId]
 	return group == nil or Destroyed.isDestroyed(group)
 end
+
+local isDestroyed = Members.isGroupDestroyed
 
 -- Removes an instance from the group once it leaves the game
 local function watchRemoval(groupId: number, entity: Types.Entity)

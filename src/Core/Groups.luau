@@ -1,8 +1,8 @@
 --!strict
 
 -- The group operations the Group class offers, by group id. A member is given as the user gives it: a player,
--- followed through its characters, or a reference or entity, resolved to its entity. Classes reach group
--- membership only through here
+-- followed through its characters, or a reference or entity, resolved to its entity. Classes change group
+-- membership only through here, and read it from Entities
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
@@ -18,11 +18,7 @@ local isPlayer = References.isPlayer
 
 local Groups = {}
 
--- Whether the group's destroy has begun. A group takes on nothing new from then on
-local function isDestroyed(groupId: number): boolean
-	local group = Registry.groups[groupId]
-	return group == nil or Destroyed.isDestroyed(group)
-end
+local isDestroyed = Members.isGroupDestroyed
 
 -- Whether the group's destroy has ended
 local function isDead(groupId: number): boolean
@@ -94,7 +90,8 @@ function Groups.removeBulk(groupId: number, references: { any })
 	end
 end
 
--- Adds or removes the entity as given, never through the reference map, for groups that follow instances
+-- Adds or removes the entity as given, never through the reference map, for groups that follow instances. These
+-- are Members' own, so the classes can keep to this one module
 Groups.addEntity = Members.add
 Groups.removeEntity = Members.remove
 Groups.setAutoClean = Members.setAutoClean
