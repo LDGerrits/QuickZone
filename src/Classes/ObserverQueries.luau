@@ -4,8 +4,8 @@
 
 local References = require(script.Parent.Parent.Core.References)
 local State = require(script.Parent.Parent.Core.State)
-local Types = require(script.Parent.Parent.Types)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
+local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 local Checks = require(script.Parent.Checks)

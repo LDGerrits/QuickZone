@@ -12,11 +12,14 @@ export type PartsConfig = { isDynamic: boolean?, metadata: any?, autoSync: boole
 
 local ZoneContainers = {}
 
--- Builds the zone of each part. Zone.fromPart, given by Zone, which requires this module
-local fromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone
+type ZoneClass = { fromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone }
 
-function ZoneContainers.setFromPart(zoneFromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone)
-	fromPart = zoneFromPart
+-- Builds the zone of each part with Zone.fromPart, looked up when called. Zone gives itself, as it requires
+-- this module
+local Zone: ZoneClass
+
+function ZoneContainers.setZone(zone: ZoneClass)
+	Zone = zone
 end
 
 -- Zones for the parts among initial and the instances added reports, until removed reports them
@@ -31,7 +34,7 @@ local function fromContainer(
 
 	local function onAdded(instance: Instance)
 		if instance:IsA('BasePart') and not instanceToZone[instance] then
-			local zone = fromPart(instance, { isDynamic = zones.dynamic })
+			local zone = Zone.fromPart(instance, { isDynamic = zones.dynamic })
 			instanceToZone[instance] = zone
 			zones:add(zone)
 		end
@@ -78,7 +81,7 @@ function ZoneContainers.fromParts(parts: { BasePart }, config: PartsConfig?): Ty
 	local zones = Zones.new(config) :: Types.InternalZones
 	for _, part in parts do
 		if typeof(part) == 'Instance' and part:IsA('BasePart') then
-			zones:add(fromPart(part, { isDynamic = zones.dynamic }))
+			zones:add(Zone.fromPart(part, { isDynamic = zones.dynamic }))
 		end
 	end
 	return zones
@@ -169,7 +172,7 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	end
 
 	local function addZone(part: BasePart)
-		local newZone = fromPart(part, { isDynamic = zones.dynamic })
+		local newZone = Zone.fromPart(part, { isDynamic = zones.dynamic })
 		instanceToZone[part] = newZone
 		zones:add(newZone)
 	end
