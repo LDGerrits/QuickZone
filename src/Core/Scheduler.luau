@@ -6,30 +6,37 @@ local RunService = game:GetService('RunService')
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
-local Geometry = require(script.Parent.Parent.Utils.Geometry)
+local Callbacks = require(script.Parent.Callbacks)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Memberships = require(script.Parent.Memberships)
 local State = require(script.Parent.State)
+local ZoneShapes = require(script.Parent.ZoneShapes)
+local ZoneChanges = require(script.Parent.ZoneChanges)
 
 local queryPoint = LinearBVH.queryPoint
-local isPointInShape = Geometry.isPointInShape
+local touches = ZoneChanges.touches
+local containsPoint = ZoneShapes.containsPoint
+local fireCallback = Callbacks.fire
+local moveMembership = Memberships.move
+local exitMembership = Memberships.exit
+local isSubscribed = Memberships.isSubscribed
 
-local staticCFrames = State.staticCFrames
-local staticHalfSizes = State.staticHalfSizes
-local staticTypes = State.staticTypes
-local staticMeshes = State.staticMeshes
-local dynamicCFrames = State.dynamicCFrames
-local dynamicHalfSizes = State.dynamicHalfSizes
-local dynamicTypes = State.dynamicTypes
-local dynamicMeshes = State.dynamicMeshes
+local staticSlots = State.staticSlots
+local dynamicSlots = State.dynamicSlots
+local shapeBoundsMin = State.shapeBoundsMin
+local shapeBoundsMax = State.shapeBoundsMax
+local shapePositions = State.shapePositions
+local treeExact = State.treeExact
 local zoneIdToZoneObj = State.zoneIdToZoneObj
+local zoneSlotIds = State.zoneSlotIds
 local zoneAttachedObservers = State.zoneAttachedObservers
+local zoneSoleObserver = State.zoneSoleObserver
 local autoSyncZones = State.autoSyncZones
 
 local observerPriorityMap = State.observerPriorityMap
 local observerTrackingEntities = State.observerTrackingEntities
 local observerEnteredCallbacks = State.observerEnteredCallbacks
-local observerExitedCallbacks = State.observerExitedCallbacks
 local observerTransitionedCallbacks = State.observerTransitionedCallbacks
 local observerEnabled = State.observerEnabled
 local observerSafety = State.observerSafety
@@ -48,8 +55,10 @@ local dirtyTopology = State.dirtyTopology
 
 local staticTree = State.staticTree
 local dynamicTree = State.dynamicTree
+local staticChanges = State.staticChanges
+local dynamicChanges = State.dynamicChanges
 
-local ctx_pos: Vector3
+local ctx_hits = table.create(64) :: { number }
 local ctx_cCount: number = 0
 local ctx_highestWin: number
 local ctx_candidatePriority = table.create(16) :: { [number]: number }
@@ -57,6 +66,9 @@ local ctx_candidateIndex = table.create(16) :: { [number]: number }
 local ctx_candidateList = table.create(16) :: { [number]: number }
 local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
+-- The bucket and index of the entity being checked, so a tick that errors resumes after it
+local ctx_rate: number? = nil
+local ctx_index = 0
 
 local frameBudget = Config.Scheduler.frameBudget
 local autoSyncRate = Config.Scheduler.autoSyncRate
@@ -68,6 +80,7 @@ local buckets = State.buckets
 local nextBucketIndex = 1 -- Round-robin pointer
 local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
+local NOWHERE = Vector3.new(0 / 0, 0 / 0, 0 / 0)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -75,6 +88,23 @@ local STRAT_WORLD = Config.Strategy.WORLD
 local STRAT_CFRAME = Config.Strategy.CFRAME
 local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
 local STRAT_PIVOT = Config.Strategy.PIVOT
+
+local Scheduler = {}
+
+-- Takes an entity out of the bucket of its update rate, swapping the last one into its place
+function Scheduler.leaveBucket(data: Types.EntityData)
+	local bucket = buckets[data.updateRate]
+	if not bucket then
+		return
+	end
+
+	local idx = data.bucketIndex
+	local last = #bucket
+	local lastEntity = bucket[last]
+	bucket[idx] = lastEntity
+	entityData[lastEntity].bucketIndex = idx
+	bucket[last] = nil
+end
 
 local function processProfileChange(entity: Types.Entity)
 	local groups = entityToGroups[entity]
@@ -116,38 +146,11 @@ local function processProfileChange(entity: Types.Entity)
 	end
 
 	local data = entityData[entity]
-	local currentRate = data.updateRate
 
 	-- Swap buckets
-	if currentRate ~= maxRate then
-		-- Remove from old bucket
-		if currentRate and currentRate > 0 and buckets[currentRate] then
-			local oldBucket = buckets[currentRate]
-			local idx = data.bucketIndex
-			local maxEntities = #oldBucket
-			local lastEntity = oldBucket[maxEntities]
+	if data.updateRate ~= maxRate then
+		Scheduler.leaveBucket(data)
 
-			-- We swap and then pop to avoid shifting all entities down
-			if idx ~= maxEntities then
-				oldBucket[idx] = lastEntity
-				if entityData[lastEntity] then
-					entityData[lastEntity].bucketIndex = idx
-				end
-			end
-
-			oldBucket[maxEntities] = nil
-
-			-- If the bucket is now empty, remove it and update the bucket list
-			if #oldBucket == 0 then
-				buckets[currentRate] = nil
-				local listIdx = table.find(bucketList, currentRate)
-				if listIdx then
-					table.remove(bucketList, listIdx)
-				end
-			end
-		end
-
-		-- Add to new bucket
 		if maxRate > 0 then
 			if not buckets[maxRate] then
 				buckets[maxRate] = {}
@@ -168,6 +171,7 @@ local function processProfileChange(entity: Types.Entity)
 		data.updateRate = maxRate
 	end
 
+	-- Rates are above 0, so a rate of 0 means no observer watches the entity
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
 		entityToObservers[entity] = linkedObservers
@@ -204,89 +208,73 @@ local function processTopologyChange(entity: Types.Entity)
 	data.needsDynamic = needsDynamic
 end
 
-local function processZoneHit(zoneId: number)
-	local observers = zoneAttachedObservers[zoneId]
+local function processObserverHit(observerId: number, zoneId: number)
+	if not ctx_linkedObservers[observerId] or observerEnabled[observerId] == false then
+		return
+	end
+
+	local currentPriority = ctx_candidatePriority[observerId]
+	local priority = observerPriorityMap[observerId] or 0
+
+	if not currentPriority then -- First hit
+		ctx_cCount += 1
+		ctx_candidateList[ctx_cCount] = observerId
+		ctx_candidateIndex[observerId] = zoneId
+		ctx_candidatePriority[observerId] = priority
+
+		if priority > ctx_highestWin then
+			ctx_highestWin = priority
+		end
+	elseif priority > currentPriority then -- Override previous hits
+		ctx_candidateIndex[observerId] = zoneId
+		ctx_candidatePriority[observerId] = priority
+
+		if priority > ctx_highestWin then
+			ctx_highestWin = priority
+		end
+	elseif priority == currentPriority and ctx_currentMemberships[observerId] == zoneId then -- Sticky behavior
+		ctx_candidateIndex[observerId] = zoneId
+	end
+end
+
+local function processZoneHit(slot: number)
+	local observers = zoneAttachedObservers[slot]
 	if not observers then
 		return
 	end
 
+	local zoneId = zoneSlotIds[slot]
 	for _, observerId in observers do
-		if ctx_linkedObservers[observerId] and observerEnabled[observerId] ~= false then
-			local currentPriority = ctx_candidatePriority[observerId]
-			local priority = observerPriorityMap[observerId] or 0
+		processObserverHit(observerId, zoneId)
+	end
+end
 
-			if not currentPriority then -- First hit
-				ctx_cCount += 1
-				ctx_candidateList[ctx_cCount] = observerId
-				ctx_candidateIndex[observerId] = zoneId
-				ctx_candidatePriority[observerId] = priority
+local function queryTree(tree: Types.Tree, position: Vector3)
+	local hitCount = queryPoint(tree, position, ctx_hits, 0)
+	for i = 1, hitCount do
+		local slot = ctx_hits[i]
+		local observerId = zoneSoleObserver[slot]
 
-				if priority > ctx_highestWin then
-					ctx_highestWin = priority
+		if observerId then
+			if ctx_candidatePriority[observerId] ~= nil then
+				-- An observer's zones share a priority, so only the current zone can take over
+				if ctx_currentMemberships[observerId] ~= zoneSlotIds[slot] then
+					continue
 				end
-			elseif priority > currentPriority then -- Override previous hits
-				ctx_candidateIndex[observerId] = zoneId
-				ctx_candidatePriority[observerId] = priority
-
-				if priority > ctx_highestWin then
-					ctx_highestWin = priority
-				end
-			elseif priority == currentPriority and ctx_currentMemberships[observerId] == zoneId then -- Sticky behavior
-				ctx_candidateIndex[observerId] = zoneId
+			elseif not ctx_linkedObservers[observerId] then
+				continue
 			end
+
+			if treeExact[slot] or containsPoint(slot, position) then
+				processObserverHit(observerId, zoneSlotIds[slot])
+			end
+		elseif treeExact[slot] or containsPoint(slot, position) then
+			processZoneHit(slot)
 		end
 	end
 end
 
-local function queryCallbackStatic(zoneId: number)
-	if
-		isPointInShape(
-			ctx_pos,
-			staticCFrames[zoneId],
-			staticHalfSizes[zoneId],
-			staticTypes[zoneId],
-			staticMeshes[zoneId]
-		)
-	then
-		processZoneHit(zoneId)
-	end
-end
-
-local function queryCallbackDynamic(zoneId: number)
-	if
-		isPointInShape(
-			ctx_pos,
-			dynamicCFrames[zoneId],
-			dynamicHalfSizes[zoneId],
-			dynamicTypes[zoneId],
-			dynamicMeshes[zoneId]
-		)
-	then
-		processZoneHit(zoneId)
-	end
-end
-
-local function fireCallback(
-	callbacks: { (any, Types.Zone, Types.Entity) -> () },
-	reference: any,
-	zone: Types.Zone,
-	entity: any,
-	safety: boolean
-)
-	if safety then
-		for _, callback in callbacks do
-			task.spawn(callback, reference, zone, entity)
-		end
-	else
-		for _, callback in callbacks do
-			callback(reference, zone, entity)
-		end
-	end
-end
-
-local Scheduler = {}
-
-function Scheduler.update(dt: number)
+local function runTick(dt: number)
 	local start = os.clock()
 
 	-- Route entities that have changed groups or observers since the last update
@@ -306,6 +294,17 @@ function Scheduler.update(dt: number)
 		end
 	end
 
+	-- Drop buckets left empty by entities that changed rate or were removed. Only done here, as removals
+	-- from callbacks can't shrink the list while a tick goes through it
+	for i = #bucketList, 1, -1 do
+		local rate = bucketList[i]
+		if #buckets[rate] == 0 then
+			buckets[rate] = nil
+			bucketLastProcessedIndex[rate] = nil
+			table.remove(bucketList, i)
+		end
+	end
+
 	-- Auto-sync zone positions if enabled
 	if autoSyncRate > 0 then
 		local syncInterval = 1 / autoSyncRate
@@ -313,36 +312,22 @@ function Scheduler.update(dt: number)
 
 		if autoSyncTimer >= syncInterval then
 			autoSyncTimer = 0
-			local needsRebuild = false
 
-			for id, zone in autoSyncZones do
+			for slot, zone in autoSyncZones do
 				local reference = zone.reference
-				if not reference then
-					continue
+				if reference then
+					ZoneShapes.setCFrame(
+						slot,
+						if reference:IsA('Attachment') then reference.WorldCFrame else reference.CFrame
+					)
 				end
-
-				local newCF = reference:IsA('Attachment') and reference.WorldCFrame or reference.CFrame
-				local oldCF = dynamicCFrames[id]
-
-				if oldCF == newCF then
-					continue
-				end
-
-				dynamicCFrames[id] = newCF
-				needsRebuild = true
-			end
-
-			if needsRebuild then
-				State.pendingDynamicRebuild = true
 			end
 		end
 	end
 
+	-- No return here when the rebuild used up the budget, as entities would never be checked while zones keep
+	-- moving. The loop below checks the budget every few entities, so each tick makes some progress
 	Scheduler.rebuildTrees()
-
-	if (os.clock() - start) > frameBudget then
-		return
-	end
 
 	local numBuckets = #bucketList
 	if numBuckets == 0 then
@@ -369,8 +354,9 @@ function Scheduler.update(dt: number)
 			continue
 		end
 
+		-- At least one, also when the quota is NaN from an infinite rate and no time passed
 		local rawQuota = math.ceil(totalEntities * rate * dt)
-		local workQuota = math.clamp(rawQuota, 1, totalEntities)
+		local workQuota = if rawQuota >= totalEntities then totalEntities elseif rawQuota >= 1 then rawQuota else 1
 
 		local processed = 0
 		local idx = bucketLastProcessedIndex[rate] or 1
@@ -379,8 +365,10 @@ function Scheduler.update(dt: number)
 		end
 
 		local budgetCheckCountdown = BUDGET_CHECK
+		ctx_rate = rate
 
 		while processed < workQuota do
+			ctx_index = idx
 			local entity = list[idx]
 			local data = entityData[entity] :: Types.EntityData
 
@@ -392,35 +380,57 @@ function Scheduler.update(dt: number)
 			elseif strategy == STRAT_WORLD then
 				position = (entity :: Attachment).WorldPosition
 			elseif strategy == STRAT_CFRAME then
-				position = (entity :: BasePart).CFrame.Position
+				local cframe = (entity :: BasePart).CFrame
+				position = cframe and cframe.Position
 			elseif strategy == STRAT_TRANSFORM then
-				position = (entity :: any).Transform.Position
+				local transform = (entity :: any).Transform
+				position = transform and transform.Position
 			elseif strategy == STRAT_PRIM then
 				local prim = (entity :: Model).PrimaryPart
 				position = prim and prim.Position or (entity :: Model):GetPivot().Position
 			elseif strategy == STRAT_PIVOT then
 				position = (entity :: any):GetPivot().Position
 			end
+			-- A table entity without a position is nowhere, rather than an error that stops every entity after it
+			if not position then
+				position = NOWHERE
+			end
 
 			local needsStatic = data.needsStatic
 			local needsDynamic = data.needsDynamic
 
-			local shouldCheck = false
-			if
-				data.logicVersion ~= logicVersion
-				or (needsDynamic and data.dynamicVersion ~= dynamicVersion)
-				or (needsStatic and data.staticVersion ~= staticVersion)
-			then
-				shouldCheck = true
-			else
-				local lastPosition = data.lastPosition
+			local lastPosition = data.lastPosition
+			local shouldCheck = data.logicVersion ~= logicVersion
+
+			if not shouldCheck then
 				local dx = position.X - lastPosition.X
 				local dy = position.Y - lastPosition.Y
 				local dz = position.Z - lastPosition.Z
 
-				if (dx * dx + dy * dy + dz * dz) >= data.precisionSq then
-					shouldCheck = true
+				-- A NaN position counts as moved, so the entity leaves its zone instead of keeping it forever
+				shouldCheck = not ((dx * dx + dy * dy + dz * dz) < data.precisionSq)
+			end
+
+			-- Standing still, so only zone changes at either position matter
+			if not shouldCheck and needsDynamic and data.dynamicVersion ~= dynamicVersion then
+				shouldCheck = touches(dynamicChanges, data.dynamicVersion, dynamicVersion, position, lastPosition)
+				if not shouldCheck then
+					data.dynamicVersion = dynamicVersion
 				end
+			end
+
+			if not shouldCheck and needsStatic and data.staticVersion ~= staticVersion then
+				shouldCheck = touches(staticChanges, data.staticVersion, staticVersion, position, lastPosition)
+				if not shouldCheck then
+					data.staticVersion = staticVersion
+				end
+			end
+
+			-- A callback earlier this tick changed its groups or their observers, which apply from the next tick.
+			-- Checked now, an observer it lost could still win over one it has, and make it leave that one
+			if shouldCheck and dirtyProfiles[entity] then
+				data.logicVersion = -1
+				shouldCheck = false
 			end
 
 			if shouldCheck then
@@ -432,41 +442,27 @@ function Scheduler.update(dt: number)
 				ctx_linkedObservers = entityToObservers[entity]
 				ctx_currentMemberships = data.activeObserverMemberships
 
-				ctx_pos = position
 				ctx_cCount = 0
 				ctx_highestWin = -math.huge
 
 				if needsDynamic then
-					queryPoint(dynamicTree, position, queryCallbackDynamic)
+					queryTree(dynamicTree, position)
 				end
 
 				if needsStatic then
-					queryPoint(staticTree, position, queryCallbackStatic)
+					queryTree(staticTree, position)
 				end
 
 				local current = data.activeObserverMemberships
 
 				-- Exits
-				for observerId, oldZoneId in current do
+				for observerId in current do
 					local newPri = ctx_candidatePriority[observerId]
 					if newPri and newPri >= ctx_highestWin then
 						continue
 					end
 
-					current[observerId] = nil
-					if observerTrackingEntities[observerId] then
-						observerTrackingEntities[observerId][entity] = nil
-					end
-
-					local cbs = observerExitedCallbacks[observerId]
-					if not cbs then
-						continue
-					end
-
-					local safety = observerSafety[observerId]
-					local zone = zoneIdToZoneObj[oldZoneId]
-					local reference = entityToReference[entity] or entity
-					fireCallback(cbs, reference, zone, entity, safety)
+					exitMembership(observerId, entity, data)
 				end
 
 				-- Entries & Transitions
@@ -487,40 +483,61 @@ function Scheduler.update(dt: number)
 						continue
 					end
 
+					-- Already in this zone, so nothing to enter
 					local currentZoneId = current[observerId]
 					if currentZoneId == zoneIdx then
 						continue
 					end
 
-					-- Update the tracker.
-					current[observerId] = zoneIdx
-					local safety = observerSafety[observerId]
-
-					if not currentZoneId then -- New entry
-						observerTrackingEntities[observerId][entity] = true
-
-						local cbs = observerEnteredCallbacks[observerId]
-						if not cbs then
-							continue
-						end
-
-						local zone = zoneIdToZoneObj[zoneIdx]
-						local reference = entityToReference[entity] or entity
-						fireCallback(cbs, reference, zone, entity, safety)
-					else -- Transition
-						local cbs = observerTransitionedCallbacks[observerId]
-						if not cbs then
-							continue
-						end
-
-						local zone = zoneIdToZoneObj[zoneIdx]
-						local reference = entityToReference[entity] or entity
-						fireCallback(cbs, reference, zone, entity, safety)
+					-- An earlier callback may have removed the entity or destroyed the zone
+					local zone = zoneIdToZoneObj[zoneIdx]
+					if entityData[entity] ~= data or not zone then
+						continue
 					end
+
+					-- Or changed the observer, so the entity is checked again next tick. Changes to its groups
+					-- leave its profile dirty, and a clean profile means the observer still watches one of them
+					local attached = zoneAttachedObservers[zone.slot]
+					if
+						observerEnabled[observerId] == false
+						or not attached
+						or not table.find(attached, observerId)
+						or (dirtyProfiles[entity] and not isSubscribed(entity, observerId))
+					then
+						data.logicVersion = -1
+						continue
+					end
+
+					moveMembership(observerId, entity, data, zoneIdx)
+
+					-- Entry if it was in none of the observer's zones, transition otherwise
+					local reference = entityToReference[entity] or entity
+					fireCallback(
+						if currentZoneId then observerTransitionedCallbacks else observerEnteredCallbacks,
+						observerId,
+						reference,
+						zone,
+						entity,
+						observerSafety[observerId],
+						zoneIdx
+					)
+				end
+
+				-- A callback changed its groups or their observers, which only applies from the next tick,
+				-- so it is checked again then even when standing still
+				if dirtyProfiles[entity] then
+					data.logicVersion = -1
 				end
 			end
 
-			idx += 1
+			-- Callbacks may have removed entities, swapping another into this index
+			if list[idx] == entity then
+				idx += 1
+			end
+			totalEntities = #list
+			if totalEntities == 0 then
+				break
+			end
 			if idx > totalEntities then
 				idx = 1
 			end
@@ -537,10 +554,57 @@ function Scheduler.update(dt: number)
 		end
 
 		bucketLastProcessedIndex[rate] = idx
+		ctx_rate = nil
 
 		if (os.clock() - start) > frameBudget then
 			break
 		end
+	end
+end
+
+-- After a tick errored partway, as a bad entity or reference can make it. Without this, the candidates of the
+-- entity being checked would stay and freeze their observers, and every tick would stop at the same entity
+local function recoverFromError()
+	ctx_cCount = 0
+	table.clear(ctx_candidateList)
+	table.clear(ctx_candidatePriority)
+	table.clear(ctx_candidateIndex)
+
+	if ctx_rate then
+		bucketLastProcessedIndex[ctx_rate] = ctx_index + 1
+		ctx_rate = nil
+	end
+end
+
+-- The thread running a tick, set while one runs. A callback updating again would clobber the tick in progress,
+-- so that update is skipped and its work is left to the next tick. Suspended rather than running, it was an
+-- unsafe callback that yielded, which is warned about once per stall
+local tickThread: thread? = nil
+local warnedYield = false
+
+function Scheduler.update(dt: number?)
+	if tickThread then
+		if not warnedYield and coroutine.status(tickThread) == 'suspended' then
+			warnedYield = true
+			Log.warn(
+				'An unsafe callback (safety = false) yielded, so QuickZone waits for it to resume before it '
+					.. 'updates again. Unsafe callbacks must not yield.',
+				nil
+			)
+		end
+		return
+	end
+
+	-- A missing, NaN or negative time step would stop auto-syncing for good
+	local step = if type(dt) == 'number' and dt >= 0 then dt else 0
+
+	tickThread = coroutine.running()
+	local ok, trace = xpcall(runTick, debug.traceback, step)
+	tickThread = nil
+	warnedYield = false
+	if not ok then
+		recoverFromError()
+		error(trace, 0)
 	end
 end
 
@@ -557,32 +621,53 @@ function Scheduler.setEnabled(enabled: boolean)
 	end
 end
 
+function Scheduler.checkAutoSyncRate(hz: any)
+	if type(hz) ~= 'number' or hz ~= hz then
+		Log.fatal('autoSyncRate must be a number, got %s. Use 0 to stop auto-syncing.', nil, tostring(hz))
+	end
+end
+
 function Scheduler.setAutoSyncRate(hz: number)
-	if hz <= 0 then
-		autoSyncRate = 0
-	else
-		autoSyncRate = hz
+	Scheduler.checkAutoSyncRate(hz)
+	autoSyncRate = if hz > 0 then hz else 0
+end
+
+function Scheduler.checkFrameBudget(n: any)
+	if type(n) ~= 'number' or not (n > 0) then
+		Log.fatal('frameBudget must be greater than 0.', nil)
 	end
 end
 
 function Scheduler.setFrameBudget(n: number)
-	if n <= 0 then
-		Log.fatal('frameBudget must be greater than 0.', nil)
-	end
-
+	Scheduler.checkFrameBudget(n)
 	frameBudget = n
 end
 
+-- Refit if only shapes changed, rebuild if zones were added or removed or the tree degraded
+local function updateTree(tree: Types.Tree, members: { [number]: any })
+	if tree.membersChanged or not LinearBVH.refit(tree, shapeBoundsMin, shapeBoundsMax) then
+		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		tree.membersChanged = false
+	end
+	tree.pending = false
+	ZoneShapes.markBuilt(members)
+end
+
 function Scheduler.rebuildTrees()
-	if State.pendingDynamicRebuild then
-		LinearBVH.build(dynamicTree, dynamicCFrames, dynamicHalfSizes)
-		State.pendingDynamicRebuild = false
+	if dynamicTree.pending then
+		updateTree(dynamicTree, dynamicSlots)
+	end
+
+	if staticTree.pending then
+		updateTree(staticTree, staticSlots)
+	end
+
+	-- New version for every tree that changed
+	if ZoneChanges.commit(dynamicChanges, State.dynamicVersion + 1, (dynamicTree.count + 1) // 2) then
 		State.dynamicVersion += 1
 	end
 
-	if State.pendingStaticRebuild then
-		LinearBVH.build(staticTree, staticCFrames, staticHalfSizes)
-		State.pendingStaticRebuild = false
+	if ZoneChanges.commit(staticChanges, State.staticVersion + 1, (staticTree.count + 1) // 2) then
 		State.staticVersion += 1
 	end
 end

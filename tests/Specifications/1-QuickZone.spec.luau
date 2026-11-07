@@ -9,6 +9,8 @@ local TiniestFolder = TestFolder.Tiniest
 local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local State = require(ReplicatedStorage.QuickZone.Core.State)
+local LinearBVH = require(ReplicatedStorage.QuickZone.Utils.LinearBVH)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -43,6 +45,39 @@ return function(Tiniest: Tiniest)
 			group:destroy()
 			zone:destroy()
 			part:Destroy()
+		end)
+
+		Test('Keeps ticking when callbacks remove entities from the bucket being ticked.', function()
+			local position = Vector3.new(9000, 0, -9000)
+			local entities = {}
+			for i = 1, 6 do
+				entities[i] = { Position = position + Vector3.new(i, 0, 0) }
+			end
+			local group = Group.new({ entities = entities, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 20 })
+			local observer = Observer.new({ zones = { zone }, groups = { group }, safety = false })
+			local entered = {}
+			observer:onEnter(function(entity)
+				entered[entity] = true
+				group:remove(entity)
+			end)
+
+			-- Every entity is evaluated in one tick
+			QuickZone:setFrameBudget(1000)
+			local ok, err = pcall(function()
+				QuickZone:update(1)
+				QuickZone:update(1)
+			end)
+			QuickZone:setFrameBudget(1)
+
+			Expect(if ok then true else err).is(true)
+			for _, entity in entities do
+				Expect(entered[entity]).is(true)
+			end
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
 		end)
 	end)
 
@@ -272,6 +307,188 @@ return function(Tiniest: Tiniest)
 			staticZone:destroy()
 			dynamicZone:destroy()
 		end)
+
+		Test('Agrees with every zone checked on its own while zones are moved, reshaped, added and removed.', function()
+			local rng = Random.new(20260930)
+			local origin = Vector3.new(-7000, 0, 3000)
+			local zones = {}
+			local observer = Observer.new()
+
+			local function addZone(isDynamic: boolean)
+				local zone = Zone.new(Util.randomZoneConfig(rng, origin, 60, isDynamic))
+				observer:attach(zone)
+				table.insert(zones, zone)
+			end
+
+			local function checkPoints()
+				QuickZone:rebuild()
+				for _ = 1, 200 do
+					local point = origin + Util.randomOffset(rng, 75)
+
+					Expect(Util.findMismatch(zones, point, QuickZone:getZonesAtPoint(point))).is(nil)
+
+					local iterated = {}
+					for zone in QuickZone:iterZonesAtPoint(point) do
+						table.insert(iterated, zone)
+					end
+					Expect(Util.findMismatch(zones, point, iterated)).is(nil)
+
+					local insideAny = false
+					for _, zone in zones do
+						insideAny = insideAny or zone:isPointInside(point)
+					end
+					Expect(observer:isPointInside(point)).is(insideAny)
+				end
+			end
+
+			for i = 1, 160 do
+				addZone(i % 2 == 0)
+			end
+			checkPoints()
+
+			-- Small moves, like a moving platform
+			for _ = 1, 5 do
+				for _, zone in zones do
+					if zone:isDynamic() then
+						zone:setCFrame(zone:getCFrame() + Util.randomOffset(rng, 2))
+					end
+				end
+				checkPoints()
+			end
+
+			-- Teleports
+			for _, zone in zones do
+				if zone:isDynamic() then
+					zone:setCFrame(Util.randomCFrame(rng, origin, 60))
+				end
+			end
+			checkPoints()
+
+			-- Moving a few static zones
+			for i = 1, 20 do
+				local zone = zones[i * 2 - 1]
+				zone:setCFrame(Util.randomCFrame(rng, origin, 60))
+			end
+			checkPoints()
+
+			-- Resizing and reshaping
+			for i = 1, 40 do
+				local zone = zones[rng:NextInteger(1, #zones)]
+				local shape = Util.SHAPES[rng:NextInteger(1, #Util.SHAPES)]
+				zone:setShape(shape)
+				zone:setSize(Util.randomSize(rng, shape))
+			end
+			checkPoints()
+
+			-- Removing and adding zones
+			for _ = 1, 30 do
+				table.remove(zones, rng:NextInteger(1, #zones)):destroy()
+			end
+			for i = 1, 30 do
+				addZone(i % 2 == 0)
+			end
+			checkPoints()
+
+			-- Switching trees
+			for i = 1, 20 do
+				local zone = zones[i]
+				zone:setDynamic(not zone:isDynamic())
+			end
+			checkPoints()
+
+			observer:destroy()
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
+
+		Test('Finds zones created after others were destroyed, and never the destroyed ones.', function()
+			local rng = Random.new(1001)
+			local origin = Vector3.new(-7000, 0, -3000)
+			local zones = {}
+			local destroyed = {}
+			local ids = {}
+			local observer = Observer.new()
+
+			local function addZone(isDynamic: boolean)
+				local zone = Zone.new(Util.randomZoneConfig(rng, origin, 60, isDynamic))
+				Expect(ids[zone:getId()]).is(nil)
+				ids[zone:getId()] = true
+				observer:attach(zone)
+				table.insert(zones, zone)
+			end
+
+			local function checkPoints(rebuilt: boolean)
+				for _ = 1, 150 do
+					local point = origin + Util.randomOffset(rng, 75)
+					local found = QuickZone:getZonesAtPoint(point)
+					local iterated = {}
+					for zone in QuickZone:iterZonesAtPoint(point) do
+						table.insert(iterated, zone)
+					end
+
+					for _, list in { found, iterated } do
+						for _, zone in list do
+							Expect(destroyed[zone]).is(nil)
+							Expect(zone:isPointInside(point)).is(true)
+						end
+						if rebuilt then
+							Expect(Util.findMismatch(zones, point, list)).is(nil)
+						end
+					end
+
+					if rebuilt then
+						local insideAny = false
+						for _, zone in zones do
+							insideAny = insideAny or zone:isPointInside(point)
+						end
+						Expect(observer:isPointInside(point)).is(insideAny)
+					end
+				end
+
+				local live = {}
+				for _, zone in zones do
+					live[zone] = true
+				end
+				for _, list in { QuickZone:getZones(), observer:getZones() } do
+					local count = 0
+					for _, zone in list do
+						if live[zone] then
+							count += 1
+						end
+						Expect(destroyed[zone]).is(nil)
+					end
+					Expect(count).is(#zones)
+				end
+			end
+
+			for i = 1, 90 do
+				addZone(i % 3 == 0)
+			end
+			QuickZone:rebuild()
+			checkPoints(true)
+
+			for _ = 1, 5 do
+				for _ = 1, 30 do
+					local zone = table.remove(zones, rng:NextInteger(1, #zones))
+					destroyed[zone] = true
+					zone:destroy()
+				end
+				QuickZone:rebuild()
+
+				for i = 1, 30 do
+					addZone(i % 3 == 0)
+				end
+				checkPoints(false)
+				QuickZone:rebuild()
+				checkPoints(true)
+			end
+
+			observer:destroy()
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
 	end)
 
 	Describe('QuickZone:getZonesOfEntity', function()
@@ -496,6 +713,256 @@ return function(Tiniest: Tiniest)
 			Expect(sawDynamic).is_true()
 			staticZone:destroy()
 			dynamicZone:destroy()
+		end)
+
+		Test('Never yields a zone that moved away from the point while iterating.', function()
+			local center = Vector3.new(30000, 0, 0)
+			local zoneA = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			local farZones = {}
+
+			QuickZone:rebuild()
+			local iterator = QuickZone:iterZonesAtPoint(center)
+			local first = iterator()
+			local other = if first == zoneA then zoneB else zoneA
+
+			-- Move the other zone away and grow the tree so it gets a new buffer
+			other:setCFrame(CFrame.new(center + Vector3.new(0, 500, 0)))
+			for i = 1, 1000 do
+				table.insert(
+					farZones,
+					Zone.new({ cframe = CFrame.new(center + Vector3.new(i * 20, 1000, 0)), size = Vector3.one })
+				)
+			end
+			QuickZone:rebuild()
+
+			for zone in iterator do
+				Expect(zone).never_is(other)
+			end
+
+			zoneA:destroy()
+			zoneB:destroy()
+			for _, zone in farZones do
+				zone:destroy()
+			end
+		end)
+
+		Test(
+			'Yields every zone at the point exactly once when the trees are rebuilt in place mid-iteration.',
+			function()
+				local center = Vector3.new(-30000, 0, 0)
+				local zoneA = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10, isDynamic = true })
+				local zoneB =
+					Zone.new({ cframe = CFrame.new(center + Vector3.one), size = Vector3.one * 10, isDynamic = true })
+				local otherZones = {}
+				-- Sort after both zones, so the first walk covers enough nodes
+				for i = 1, 20 do
+					table.insert(
+						otherZones,
+						Zone.new({
+							cframe = CFrame.new(center + Vector3.one * (i * 50)),
+							size = Vector3.one,
+							isDynamic = true,
+						})
+					)
+				end
+				QuickZone:rebuild()
+
+				local iterator = QuickZone:iterZonesAtPoint(center)
+				local seen = {}
+				local first = iterator() :: any
+				seen[first] = 1
+
+				-- Sort before both zones, small enough to reuse the buffer
+				for i = 1, 3 do
+					table.insert(
+						otherZones,
+						Zone.new({
+							cframe = CFrame.new(center - Vector3.one * (i * 50)),
+							size = Vector3.one,
+							isDynamic = true,
+						})
+					)
+				end
+				QuickZone:rebuild()
+
+				for zone in iterator do
+					seen[zone] = (seen[zone] or 0) + 1
+				end
+
+				Expect(seen[zoneA]).is(1)
+				Expect(seen[zoneB]).is(1)
+
+				zoneA:destroy()
+				zoneB:destroy()
+				for _, zone in otherZones do
+					zone:destroy()
+				end
+			end
+		)
+
+		Test('Leaves the tree correct when zones move slightly during an unfinished iteration.', function()
+			local center = Vector3.new(-30000, 0, 3000)
+			local zones = {}
+			for i = 0, 9 do
+				local offset = Vector3.new(i * 20, 0, 0)
+				table.insert(
+					zones,
+					Zone.new({ cframe = CFrame.new(center + offset), size = Vector3.one * 10, isDynamic = true })
+				)
+			end
+			local function nudge(step: number)
+				for i, zone in zones do
+					zone:setCFrame(CFrame.new(center + Vector3.new((i - 1) * 20, step * 0.01, 0)))
+				end
+				QuickZone:rebuild()
+			end
+
+			-- Small moves refit the tree, after any backoff from earlier tests runs out
+			for step = 1, 10 do
+				nudge(step)
+			end
+			Expect(State.dynamicTree.refitSkips).is(0)
+
+			local iterator = QuickZone:iterZonesAtPoint(center)
+			Expect(iterator()).is(zones[1])
+			nudge(11)
+			Expect(iterator()).is(nil)
+
+			for i, zone in zones do
+				local found = QuickZone:getZonesAtPoint(center + Vector3.new((i - 1) * 20, 0, 0))
+				Expect(table.find(found, zone)).never_is(nil)
+			end
+
+			for _, zone in zones do
+				zone:destroy()
+			end
+		end)
+
+		Test('Breaking out of an iteration does not make the next tree update allocate.', function()
+			local center = Vector3.new(-30000, 0, 6000)
+			local zones = {}
+			for i = 0, 9 do
+				local offset = Vector3.new(i * 20, 0, 0)
+				table.insert(
+					zones,
+					Zone.new({ cframe = CFrame.new(center + offset), size = Vector3.one * 10, isDynamic = true })
+				)
+			end
+			local function nudge(step: number)
+				for i, zone in zones do
+					zone:setCFrame(CFrame.new(center + Vector3.new((i - 1) * 20, step * 0.01, 0)))
+				end
+				QuickZone:rebuild()
+			end
+			for step = 1, 10 do
+				nudge(step)
+			end
+
+			local reallocations = 0
+			for step = 11, 20 do
+				local before = State.dynamicTree.buffer
+				for _ in QuickZone:iterZonesAtPoint(center) do
+					break
+				end
+				nudge(step)
+				if State.dynamicTree.buffer ~= before then
+					reallocations += 1
+				end
+			end
+
+			for _, zone in zones do
+				zone:destroy()
+			end
+			Expect(reallocations).is(0)
+		end)
+
+		Test('Never yields a zone destroyed while iterating.', function()
+			local center = Vector3.new(-30000, 0, 9000)
+			local zoneA = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+			QuickZone:rebuild()
+
+			local iterator = QuickZone:iterZonesAtPoint(center)
+			local first = iterator()
+			local other = if first == zoneA then zoneB else zoneA
+			other:destroy()
+			QuickZone:rebuild()
+			-- Takes the destroyed zone's slot
+			local replacement = Zone.new({ cframe = CFrame.new(center), size = Vector3.one * 10 })
+
+			local rest = {}
+			for zone in iterator do
+				table.insert(rest, zone)
+			end
+
+			Expect(#rest).is(0)
+			first:destroy()
+			replacement:destroy()
+		end)
+	end)
+
+	Describe('Tree memory', function()
+		Test('Build scratch space shrinks once most zones are destroyed.', function()
+			local zones = {}
+			for i = 1, 20000 do
+				table.insert(zones, Zone.new({ cframe = CFrame.new(60000 + i * 4, 0, 0), size = Vector3.one }))
+			end
+			QuickZone:rebuild()
+			for _, zone in zones do
+				zone:destroy()
+			end
+			QuickZone:rebuild()
+
+			-- 20000 zones need about 120 KB per scratch buffer
+			Expect(LinearBVH.scratchSize() < 32 * 1024).is(true)
+		end)
+
+		Test('Shrinks once most zones are destroyed.', function()
+			local trees = { State.staticTree, State.dynamicTree }
+			local zones = {}
+			for i = 1, 3000 do
+				local position = Vector3.new(50000 + i * 4, 0, 0)
+				table.insert(
+					zones,
+					Zone.new({ cframe = CFrame.new(position), size = Vector3.one, isDynamic = i % 2 == 0 })
+				)
+			end
+			QuickZone:rebuild()
+
+			-- One commit with a box per moved zone, building a large change tree
+			for i = 1, 900 do
+				zones[i]:setCFrame(zones[i]:getCFrame() + Vector3.yAxis)
+			end
+			QuickZone:rebuild()
+
+			for _, zone in zones do
+				zone:destroy()
+			end
+			QuickZone:rebuild()
+
+			-- Every change slot gets overwritten by a small change
+			local zone = Zone.new({ cframe = CFrame.new(50000, 0, 0), size = Vector3.one })
+			local mover = Zone.new({ cframe = CFrame.new(50000, 0, 0), size = Vector3.one, isDynamic = true })
+			for i = 1, 20 do
+				zone:setCFrame(CFrame.new(50000, i, 0))
+				mover:setCFrame(CFrame.new(50000, i, 0))
+				QuickZone:rebuild()
+			end
+
+			-- The 3000-zone trees took about 144 KB, one zone needs a few bytes
+			local limit = 64 * 1024
+			for _, tree in trees do
+				Expect(buffer.len(tree.buffer) < limit).is(true)
+			end
+			for _, changes in { State.staticChanges, State.dynamicChanges } do
+				for _, slot in changes.history do
+					Expect(buffer.len(slot.tree.buffer) < limit).is(true)
+				end
+			end
+
+			zone:destroy()
+			mover:destroy()
 		end)
 	end)
 end

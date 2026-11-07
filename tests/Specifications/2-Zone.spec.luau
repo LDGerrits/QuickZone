@@ -10,9 +10,10 @@ local Util = require(TestFolder.Util)
 
 local Types = require(ReplicatedStorage.QuickZone.Types)
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 
-local SHAPE_TYPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
+local SHAPE_TYPES = Util.SHAPES
 
 type Tiniest = typeof(require(TiniestFolder.tiniest_for_roblox).configure({}))
 
@@ -748,6 +749,35 @@ return function(Tiniest: Tiniest)
 			partB:Destroy()
 		end)
 
+		Test('Mesh zones that fell back to Block are Mesh again once the reference is a part.', function()
+			local part: MeshPart = Create({
+				className = 'MeshPart',
+				properties = { CFrame = CFrame.new(500, 0, 0), Size = Vector3.one * 10 },
+			})
+			local attachment: Attachment = Create({ className = 'Attachment' })
+			local zone = Zone.fromPart(part)
+			local orphaned: Types.Zone
+
+			CaptureWarnings(function()
+				zone:setReference(attachment)
+				orphaned = Zone.new({ cframe = part.CFrame, size = part.Size, shape = 'Mesh' })
+			end)
+
+			Expect(zone:getShape()).is('Block')
+			Expect(orphaned:getShape()).is('Block')
+
+			zone:setReference(part)
+			orphaned:setReference(part)
+
+			Expect(zone:getShape()).is('Mesh')
+			Expect(orphaned:getShape()).is('Mesh')
+
+			zone:destroy()
+			orphaned:destroy()
+			part:Destroy()
+			attachment:Destroy()
+		end)
+
 		Test('Rewires autoSync to the new reference, disconnecting from the old one.', function()
 			local size = Vector3.one * 50
 			local partA = CreatePart({ Size = Vector3.one * 10 })
@@ -973,6 +1003,22 @@ return function(Tiniest: Tiniest)
 		local size = Vector3.one * 10
 		local rotation = CFrame.Angles(0, math.pi / 4, 0)
 
+		Test('Block: a skewed, scaled CFrame agrees with PointToObjectSpace.', function()
+			local cframe =
+				CFrame.fromMatrix(Vector3.zero, Vector3.new(2, 0, 0), Vector3.new(1, 1, 0), Vector3.new(0, 0, 1))
+			local zone = Zone.new({ cframe = cframe, size = size })
+			local rng = Random.new(9)
+			for _ = 1, 200 do
+				local point = Util.randomOffset(rng, 12)
+				local localPoint = cframe:PointToObjectSpace(point)
+				local expected = math.abs(localPoint.X) <= 5
+					and math.abs(localPoint.Y) <= 5
+					and math.abs(localPoint.Z) <= 5
+				Expect(zone:isPointInside(point)).is(expected)
+			end
+			zone:destroy()
+		end)
+
 		Test('Block: checks points of aligned and rotated zones.', function()
 			local zoneA = Zone.new({ cframe = CFrame.identity, size = size })
 			local zoneB = Zone.new({ cframe = rotation, size = size })
@@ -1167,6 +1213,124 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 			Expect(firedA).is(1)
 			Expect(firedB).is(0)
+		end)
+	end)
+
+	Describe('Zone:destroy', function()
+		Test('Zones created right after others are destroyed reuse their storage.', function()
+			local zones, slots = {}, {}
+			for i = 1, 50 do
+				zones[i] = Zone.new({ cframe = CFrame.new(12000 + i * 20, 0, 13400), size = Vector3.one })
+				slots[(zones[i] :: any).slot] = true
+			end
+			for _, zone in zones do
+				zone:destroy()
+			end
+
+			-- No tick in between, as when a map is torn down and rebuilt in one frame
+			local reused = 0
+			for i = 1, 50 do
+				zones[i] = Zone.new({ cframe = CFrame.new(12000 + i * 20, 0, 13400), size = Vector3.one })
+				if slots[(zones[i] :: any).slot] then
+					reused += 1
+				end
+			end
+			for _, zone in zones do
+				zone:destroy()
+			end
+			Expect(reused).is(50)
+		end)
+
+		Test('A late reference Size signal after destroy does not resize the zone that reused its storage.', function()
+			local part = CreatePart({ CFrame = CFrame.new(12000, 0, 13000), Size = Vector3.one * 4 })
+			local zone = Zone.fromPart(part, { autoSync = true })
+			QuickZone:rebuild()
+
+			part.Size = Vector3.one * 40
+			local slot = (zone :: any).slot
+			zone:destroy()
+			QuickZone:rebuild()
+			local reused = Zone.new({ cframe = CFrame.new(12000, 0, 13100), size = Vector3.one * 2 })
+			task.wait()
+
+			Expect((reused :: any).slot).is(slot)
+			Expect(reused:getSize()).is(Vector3.one * 2)
+
+			reused:destroy()
+			part:Destroy()
+		end)
+
+		Test('A zone created without a CFrame errors without breaking later tree updates.', function()
+			local ok = pcall(function()
+				Zone.new({ size = Vector3.one } :: any)
+			end)
+			Expect(ok).is(false)
+
+			local rebuilt, err = pcall(function()
+				QuickZone:rebuild()
+			end)
+			Expect(if rebuilt then true else err).is(true)
+
+			local position = Vector3.new(12000, 0, 13200)
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 4 })
+			QuickZone:rebuild()
+			Expect(table.find(QuickZone:getZonesAtPoint(position), zone)).never_is(nil)
+			zone:destroy()
+		end)
+
+		Test('Destroying a zone again while it is being destroyed does nothing.', function()
+			local fired = 0
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+			zone:onDestroy(function()
+				fired += 1
+				if fired == 1 then
+					zone:destroy()
+				end
+			end)
+			zone:destroy()
+			QuickZone:rebuild()
+
+			-- New zones must not share the destroyed zone's storage
+			local positionA, positionB = Vector3.new(100, 0, 0), Vector3.new(-100, 0, 0)
+			local zoneA = Zone.new({ cframe = CFrame.new(positionA), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(positionB), size = Vector3.one * 10 })
+
+			Expect(zoneA:getPosition()).is(positionA)
+			Expect(zoneB:getPosition()).is(positionB)
+			zoneA:destroy()
+			Expect(zoneB:isPointInside(positionB)).is(true)
+			zoneB:destroy()
+			Expect(fired).is(1)
+		end)
+
+		Test('A callback during destroy cannot keep a destroyed zone auto-syncing.', function()
+			local part = CreatePart({ CFrame = CFrame.new(0, 3000, 0), Size = Vector3.one * 10 })
+			local zone = Zone.fromPart(part, { isDynamic = true, autoSync = true })
+			local slot = (zone :: any).slot
+			zone:onDestroy(function()
+				zone:setReference(part)
+			end)
+			zone:destroy()
+			local stillSyncing = State.autoSyncZones[slot] ~= nil
+
+			part.Size = Vector3.one * 20
+			part.CFrame = CFrame.new(0, 3100, 0)
+			task.wait() -- Deferred property signals
+			local resized = State.shapeHalfSizes[slot] ~= nil
+			local updated = pcall(QuickZone.update, QuickZone, 1)
+			local moved = State.shapeCFrames[slot] ~= nil
+
+			-- Leave no broken state behind for later tests
+			State.autoSyncZones[slot] = nil
+			State.shapeHalfSizes[slot] = nil
+			State.shapeCFrames[slot] = nil
+			part:Destroy()
+			QuickZone:rebuild()
+
+			Expect(stillSyncing).is(false)
+			Expect(resized).is(false)
+			Expect(updated).is(true)
+			Expect(moved).is(false)
 		end)
 	end)
 

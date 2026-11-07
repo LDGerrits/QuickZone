@@ -34,6 +34,9 @@ export type EntityTable = {
 ]=]
 export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | EntityTable
 
+-- See Utils/Destroyed
+export type Phase = 'alive' | 'destroying' | 'dead'
+
 export type BoundingVolume = {
 	position: Vector3,
 	cframe: CFrame,
@@ -45,16 +48,38 @@ export type BoundingVolume = {
 	axisLength: number?,
 }
 
-export type Node = {
-	min: Vector3,
-	max: Vector3,
-	id: number,
-	skipIndex: number,
+-- Flat LBVH, see Utils/LinearBVH for the node layout
+export type Tree = {
+	buffer: buffer,
+	count: number,
+	-- Summed branch area when built
+	cost: number,
+	-- Updates until refitting is tried again
+	refitSkips: number,
+	-- Its zones changed since it was last built or refit
+	pending: boolean,
+	-- Zones were added or removed, so it must be rebuilt rather than refit
+	membersChanged: boolean,
 }
 
-export type Tree = {
-	nodes: { Node },
-	count: number,
+-- See Core/ZoneChanges
+export type ChangeSlot = {
+	version: number,
+	-- Everything changed
+	all: boolean,
+	-- One leaf per box
+	tree: Tree,
+}
+
+export type ZoneChanges = {
+	-- Boxes since the last commit
+	boxesMin: { Vector3 },
+	boxesMax: { Vector3 },
+	boxCount: number,
+	all: boolean,
+	boxLimit: number,
+	-- One slot per tree version
+	history: { ChangeSlot },
 }
 
 export type EntityData = {
@@ -89,8 +114,10 @@ export type Group<T = any> = {
 
 export type InternalGroup<T = any> = Group<T> & {
 	_add: (self: Group<T>, entity: T) -> Group<T>,
+	_addEntity: (self: Group<T>, entity: any) -> Group<T>,
 	_addBulk: (self: Group<T>, entities: { T }) -> Group<T>,
 	_remove: (self: Group<T>, entity: T) -> Group<T>,
+	_removeEntity: (self: Group<T>, entity: any) -> Group<T>,
 	_removeBulk: (self: Group<T>, entities: { T }) -> Group<T>,
 	_clear: (self: Group<T>) -> Group<T>,
 	id: number,
@@ -99,6 +126,7 @@ export type InternalGroup<T = any> = Group<T> & {
 	isManaged: boolean?,
 	autoClean: boolean,
 	onDestroyCallbacks: { () -> () }?,
+	phase: Phase,
 }
 
 export type GroupClass = {
@@ -142,12 +170,15 @@ export type InternalZone = Zone & {
 	detach: (self: Zone, observer: any) -> Zone,
 
 	id: number,
+	slot: number,
+	-- The shape asked for. Mesh without a part is Block in the tree until it gets one
+	requestedShapeType: number,
 	reference: (Attachment | BasePart | Bone)?,
-	dynamic: boolean,
 	metadata: any?,
 	autoSync: boolean,
 	syncConnections: { RBXScriptConnection }?,
 	onDestroyCallbacks: { () -> () }?,
+	phase: Phase,
 }
 
 export type Zones = {
@@ -172,12 +203,13 @@ export type InternalZones = Zones & {
 	attach: (self: Zones, observer: any) -> Zones,
 	detach: (self: Zones, observer: any) -> Zones,
 
-	autoSync: boolean?,
+	autoSync: boolean,
 	dynamic: boolean,
 	metadata: any?,
 	zones: { [any]: boolean },
 	observers: { [any]: boolean },
 	onDestroyCallbacks: { () -> () }?,
+	phase: Phase,
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
 	add: (self: InternalZones, zone: Zone) -> (),
@@ -238,31 +270,31 @@ export type Observer<T = any> = {
 	getPlayersInside: (self: Observer<T>) -> { Player },
 	getZoneOfEntity: (self: Observer<T>, entity: T) -> Zone?,
 	getZoneOfPlayer: (self: Observer<T>, player: Player) -> Zone?,
-	getEntitiesInZone: (self: Observer<T>, zone: Zone) -> { T },
-	getPlayersInZone: (self: Observer<T>, zone: Zone) -> { Player },
+	getEntitiesInZone: (self: Observer<T>, zone: Zone | Zones) -> { T },
+	getPlayersInZone: (self: Observer<T>, zone: Zone | Zones) -> { Player },
 
 	iterZones: (self: Observer<T>) -> () -> Zone?,
 	iterGroups: (self: Observer<T>) -> () -> Group<T>?,
 	iterEntitiesInside: (self: Observer<T>) -> () -> (T?, Zone?),
 	iterPlayersInside: (self: Observer<T>) -> () -> (Player?, Zone?),
-	iterEntitiesInZone: (self: Observer<T>, zone: Zone) -> () -> T?,
-	iterPlayersInZone: (self: Observer<T>, zone: Zone) -> () -> Player?,
+	iterEntitiesInZone: (self: Observer<T>, zone: Zone | Zones) -> () -> T?,
+	iterPlayersInZone: (self: Observer<T>, zone: Zone | Zones) -> () -> Player?,
 
-	observe: (self: Observer<T>, callback: (T, Zone) -> (() -> ())?) -> () -> (),
-	observePlayer: (self: Observer<T>, callback: (Player, Zone) -> (() -> ())?) -> () -> (),
-	observeLocalPlayer: (self: Observer<T>, callback: (Zone) -> (() -> ())?) -> () -> (),
-	observeGroup: (self: Observer<T>, callback: (Group<T>, Zone) -> (() -> ())?) -> () -> (),
-	onEnter: (self: Observer<T>, callback: (T, Zone) -> ()) -> () -> (),
-	onExit: (self: Observer<T>, callback: (T, Zone) -> ()) -> () -> (),
-	onPlayerEnter: (self: Observer<T>, callback: (Player, Zone) -> ()) -> () -> (),
-	onPlayerExit: (self: Observer<T>, callback: (Player, Zone) -> ()) -> () -> (),
-	onLocalPlayerEnter: (self: Observer<T>, callback: (Zone) -> ()) -> () -> (),
-	onLocalPlayerExit: (self: Observer<T>, callback: (Zone) -> ()) -> () -> (),
-	onGroupEnter: (self: Observer<T>, callback: (Group<T>, Zone) -> ()) -> () -> (),
-	onGroupExit: (self: Observer<T>, callback: (Group<T>, Zone) -> ()) -> () -> (),
-	onTransition: (self: Observer<T>, callback: (T, Zone) -> ()) -> () -> (),
-	onPlayerTransition: (self: Observer<T>, callback: (Player, Zone) -> ()) -> () -> (),
-	onLocalPlayerTransition: (self: Observer<T>, callback: (Zone) -> ()) -> () -> (),
+	observe: (self: Observer<T>, callback: (T, Zone, Entity) -> (() -> ())?) -> () -> (),
+	observePlayer: (self: Observer<T>, callback: (Player, Zone, Entity) -> (() -> ())?) -> () -> (),
+	observeLocalPlayer: (self: Observer<T>, callback: (Zone, Entity) -> (() -> ())?) -> () -> (),
+	observeGroup: (self: Observer<T>, callback: (Group<T>, Zone, Entity) -> (() -> ())?) -> () -> (),
+	onEnter: (self: Observer<T>, callback: (T, Zone, Entity) -> ()) -> () -> (),
+	onExit: (self: Observer<T>, callback: (T, Zone, Entity) -> ()) -> () -> (),
+	onPlayerEnter: (self: Observer<T>, callback: (Player, Zone, Entity) -> ()) -> () -> (),
+	onPlayerExit: (self: Observer<T>, callback: (Player, Zone, Entity) -> ()) -> () -> (),
+	onLocalPlayerEnter: (self: Observer<T>, callback: (Zone, Entity) -> ()) -> () -> (),
+	onLocalPlayerExit: (self: Observer<T>, callback: (Zone, Entity) -> ()) -> () -> (),
+	onGroupEnter: (self: Observer<T>, callback: (Group<T>, Zone, Entity) -> ()) -> () -> (),
+	onGroupExit: (self: Observer<T>, callback: (Group<T>, Zone, Entity) -> ()) -> () -> (),
+	onTransition: (self: Observer<T>, callback: (T, Zone, Entity) -> ()) -> () -> (),
+	onPlayerTransition: (self: Observer<T>, callback: (Player, Zone, Entity) -> ()) -> () -> (),
+	onLocalPlayerTransition: (self: Observer<T>, callback: (Zone, Entity) -> ()) -> () -> (),
 
 	onDestroy: (self: Observer<T>, callback: () -> ()) -> () -> (),
 	destroy: (self: Observer<T>) -> (),
@@ -285,6 +317,7 @@ export type ObserverClass = {
 export type InternalObserver<T = any> = Observer<T> & {
 	id: number,
 	onDestroyCallbacks: { () -> () }?,
+	phase: Phase,
 }
 
 export type QuickZone = {
@@ -299,7 +332,7 @@ export type QuickZone = {
 	setEnabled: (self: QuickZone, enabled: boolean) -> QuickZone,
 	setAutoSyncRate: (self: QuickZone, hz: number) -> QuickZone,
 	rebuild: (self: QuickZone) -> QuickZone,
-	update: (self: QuickZone, dt: number) -> QuickZone,
+	update: (self: QuickZone, dt: number?) -> QuickZone,
 	setFrameBudget: (self: QuickZone, ms: number) -> QuickZone,
 	setReference: (self: QuickZone, entity: Entity, reference: any?) -> QuickZone,
 	visualize: (self: QuickZone, enabled: boolean) -> QuickZone,

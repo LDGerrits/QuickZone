@@ -1,6 +1,9 @@
 --!strict
+local LogService = game:GetService('LogService')
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
+local QuickZone = require(ReplicatedStorage.QuickZone)
+local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local Log = require(ReplicatedStorage.QuickZone.Utils.Log)
 
 type InstanceTree = {
@@ -69,12 +72,133 @@ function Util.captureWarnings(callback: () -> ()): { string }
 	return captured
 end
 
+-- Errors printed while the callback runs, also from threads it spawns that end before the next frame. Output
+-- arrives a frame late, so what earlier tests printed is let through first
+function Util.captureErrors(callback: () -> ()): { string }
+	task.wait()
+	local captured: { string } = {}
+	local connection = LogService.MessageOut:Connect(function(message, kind)
+		if kind == Enum.MessageType.MessageError then
+			table.insert(captured, message)
+		end
+	end)
+
+	local ok, err = pcall(callback)
+	task.wait()
+	connection:Disconnect()
+
+	if not ok then
+		error(err, 0)
+	end
+
+	return captured
+end
+
 function Util.createParts(count: number, properties: { [string]: any }?): { BasePart }
 	local parts: { BasePart } = table.create(count)
 	for i = 1, count do
 		table.insert(parts, Util.createPart(properties))
 	end
 	return parts
+end
+
+Util.SHAPES = { 'Block', 'Ball', 'Cylinder', 'Wedge', 'CornerWedge' }
+local SHAPES = Util.SHAPES
+
+function Util.setOf(list: { any }): { [any]: true }
+	local set = {}
+	for _, value in list do
+		set[value] = true
+	end
+	return set
+end
+
+-- Calls fn, then destroys whatever it registered, so a failing expectation leaves nothing behind. Every entity
+-- is checked in each update unless fn sets its own budget
+function Util.withCleanup(fn: (track: (any) -> any) -> ())
+	local tracked = {}
+	local function track(object: any): any
+		table.insert(tracked, object)
+		return object
+	end
+
+	QuickZone:setFrameBudget(1000)
+	local ok, err = pcall(fn, track)
+	QuickZone:setFrameBudget(1)
+	for i = #tracked, 1, -1 do
+		local object = tracked[i]
+		if typeof(object) == 'Instance' then
+			object:Destroy()
+		elseif type(object) == 'table' and not Destroyed.isDead(object) and type(object.destroy) == 'function' then
+			pcall(object.destroy, object)
+		end
+	end
+	if not ok then
+		error(err, 0)
+	end
+end
+
+function Util.randomOffset(rng: Random, spread: number): Vector3
+	return Vector3.new(
+		rng:NextNumber(-spread, spread),
+		rng:NextNumber(-spread, spread),
+		rng:NextNumber(-spread, spread)
+	)
+end
+
+function Util.randomCFrame(rng: Random, origin: Vector3, spread: number): CFrame
+	local position = origin + Util.randomOffset(rng, spread)
+	-- Half stay unrotated to cover both paths
+	if rng:NextNumber() < 0.5 then
+		return CFrame.new(position)
+	end
+	return CFrame.new(position)
+		* CFrame.fromOrientation(rng:NextNumber(0, 6.3), rng:NextNumber(0, 6.3), rng:NextNumber(0, 6.3))
+end
+
+-- Balls and cylinders use Roblox's uniform cross-section
+function Util.randomSize(rng: Random, shape: string): Vector3
+	local x, y, z = rng:NextNumber(4, 30), rng:NextNumber(4, 30), rng:NextNumber(4, 30)
+	if shape == 'Ball' then
+		return Vector3.new(x, x, x)
+	elseif shape == 'Cylinder' then
+		return Vector3.new(x, y, y)
+	end
+	return Vector3.new(x, y, z)
+end
+
+function Util.randomZoneConfig(rng: Random, origin: Vector3, spread: number, isDynamic: boolean): { [string]: any }
+	local shape = SHAPES[rng:NextInteger(1, #SHAPES)]
+	return {
+		cframe = Util.randomCFrame(rng, origin, spread),
+		size = Util.randomSize(rng, shape),
+		shape = shape,
+		isDynamic = isDynamic,
+	}
+end
+
+-- Returns where found disagrees with checking each zone, or nil. Zones not in zones are ignored.
+function Util.findMismatch(zones: { any }, point: Vector3, found: { any }): string?
+	local owned = {}
+	for _, zone in zones do
+		owned[zone] = true
+	end
+
+	local foundSet = {}
+	for _, zone in found do
+		if owned[zone] then
+			foundSet[zone] = true
+		end
+	end
+
+	for _, zone in zones do
+		local inside = zone:isPointInside(point)
+		if inside ~= (foundSet[zone] == true) then
+			return `zone {zone:getId()} ({zone:getShape()}, dynamic={zone:isDynamic()}) at {point}: inside={inside}, found={not inside}`
+		end
+	end
+
+	return nil
 end
 
 return Util
