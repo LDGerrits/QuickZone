@@ -36,8 +36,24 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	return self
 end
 
--- private, use Observer:attach
+-- Kept for scripts that attach from the zones. Observer:attach is the way to do it
 function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
+	if not Destroyed.isDead(observer) then
+		observer:attach(self)
+	end
+	return self
+end
+
+-- Kept for scripts that detach from the zones. Observer:detach is the way to do it
+function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
+	if not Destroyed.isDead(observer) then
+		observer:detach(self)
+	end
+	return self
+end
+
+-- private, for Observer:attach. Attaches the observer to every zone, also those added later
+function Zones._attachObserver(self: Types.InternalZones, observer: any): Types.Zones
 	-- Its destroy has already let go of its observers
 	if Destroyed.isDestroyed(self) or self.observers[observer] then
 		return self
@@ -45,7 +61,7 @@ function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	self.observers[observer] = true
 
 	self.onDestroyObserverCleanups[observer] = observer:onDestroy(function()
-		self:detach(observer)
+		self:_detachObserver(observer)
 	end)
 
 	for zone, _ in self.zones do
@@ -55,8 +71,8 @@ function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	return self
 end
 
--- private, use Observer:detach
-function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
+-- private, for Observer:detach
+function Zones._detachObserver(self: Types.InternalZones, observer: any): Types.Zones
 	if not self.observers[observer] then
 		return self
 	end

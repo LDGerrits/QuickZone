@@ -167,12 +167,6 @@ function ZoneShapes.allocateSlot(zoneId: number): number
 	return slot
 end
 
--- Frees the slot of a removed zone. Reusable right away, a stale tree leaf checks the new zone's shape
-function ZoneShapes.freeSlot(slot: number)
-	ZoneShapes.zoneSlotIds[slot] = nil
-	table.insert(ZoneShapes.freeZoneSlots, slot)
-end
-
 -- Adds a zone to the static or dynamic tree. part is the part a Mesh zone queries
 function ZoneShapes.add(
 	slot: number,
@@ -290,6 +284,10 @@ function ZoneShapes.remove(slot: number)
 	shapeAxisAligned[slot] = nil
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
+
+	-- The slot is reusable right away, as a stale tree leaf checks the new zone's shape
+	ZoneShapes.zoneSlotIds[slot] = nil
+	table.insert(ZoneShapes.freeZoneSlots, slot)
 end
 
 -- Called after a tree is rebuilt. Only stale leaves can have changed, as every write marks its slot

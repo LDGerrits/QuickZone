@@ -18,7 +18,6 @@ local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
 local groupEntities = Entities.groupEntities
 local groupToObservers = Links.groupToObservers
-local zoneAttachedObservers = Links.zoneAttachedObservers
 
 local Routing = {}
 
@@ -225,17 +224,6 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 			for _, entity in members do
 				dirtyTopology[entity] = true
 			end
-		end
-	end
-end
-
--- Moves the zone in the slot to the other tree in its observers' counts
-function Routing.moveZoneCounts(slot: number, isDynamic: boolean)
-	local attached = zoneAttachedObservers[slot]
-	if attached then
-		for _, observerId in attached do
-			Routing.changeZoneCount(observerId, not isDynamic, -1)
-			Routing.changeZoneCount(observerId, isDynamic, 1)
 		end
 	end
 end

@@ -181,6 +181,8 @@ export type Zones = {
 export type InternalZones = Zones & {
 	attach: (self: Zones, observer: any) -> Zones,
 	detach: (self: Zones, observer: any) -> Zones,
+	_attachObserver: (self: Zones, observer: any) -> Zones,
+	_detachObserver: (self: Zones, observer: any) -> Zones,
 
 	autoSync: boolean,
 	dynamic: boolean,

@@ -18,10 +18,8 @@
 	:::
 ]=]
 
-local Links = require(script.Parent.Parent.Core.Links)
-local Memberships = require(script.Parent.Parent.Core.Memberships)
 local Registry = require(script.Parent.Parent.Core.Registry)
-local Routing = require(script.Parent.Parent.Core.Routing)
+local Wiring = require(script.Parent.Parent.Core.Wiring)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -315,28 +313,19 @@ function Zone.fromPart(part: BasePart, config: PartsConfig?): Types.Zone
 	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
 end
 
--- private
-function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	if Destroyed.isDestroyed(self) then
-		return self
+-- Kept for scripts that attach from the zone. Observer:attach is the way to do it
+function Zone.attach(self: Types.InternalZone, observer: any): Types.Zone
+	if not Destroyed.isDead(observer) then
+		observer:attach(self)
 	end
-
-	if Links.attach(self.slot, observer.id) then
-		Routing.changeZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), 1)
-		ZoneShapes.touch(self.slot)
-	end
-
 	return self
 end
 
--- private
-function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	if Links.detach(self.slot, observer.id) then
-		Routing.changeZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), -1)
-		-- Its entities leave on the next tick, unless the zone is destroyed first
-		ZoneShapes.touch(self.slot)
+-- Kept for scripts that detach from the zone. Observer:detach is the way to do it
+function Zone.detach(self: Types.InternalZone, observer: any): Types.Zone
+	if not Destroyed.isDead(observer) then
+		observer:detach(self)
 	end
-
 	return self
 end
 
@@ -456,14 +445,9 @@ end
 function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
 	-- A boolean, as the observers' zone counts below assume the zone really changes tree
 	isDynamic = not not isDynamic
-	local slot = self.slot
-	if ZoneShapes.isDynamic(slot) == isDynamic then
+	if not Wiring.setZoneDynamic(self.slot, isDynamic) then
 		return self
 	end
-
-	ZoneShapes.setDynamic(slot, isDynamic)
-
-	Routing.moveZoneCounts(slot, isDynamic)
 
 	if not isDynamic and self.autoSync then
 		self:setAutoSync(false)
@@ -700,23 +684,13 @@ function Zone.destroy(self: Types.InternalZone): ()
 	local id = self.id
 	local slot = self.slot
 
-	-- Detach before any callback runs, so a callback that updates can't move entities back in
-	local attachedObservers = Links.detachAll(slot)
-	if attachedObservers then
-		for _, observerId in attachedObservers do
-			Routing.changeZoneCount(observerId, ZoneShapes.isDynamic(slot), -1)
-		end
-	end
-
-	-- Leave while the zone object is still alive, so callbacks get it
-	Memberships.leaveZone(id)
+	Wiring.unwireZone(slot, id)
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	Registry.zoneIdToZoneObj[id] = nil
 	Registry.zoneSlotToZoneObj[slot] = nil
 	ZoneShapes.remove(slot)
-	ZoneShapes.freeSlot(slot)
 
 	Destroyed.finish(self)
 end
