@@ -28,6 +28,9 @@ local IS_CLIENT = RunService:IsClient()
 local Group = {}
 Group.__index = Group
 
+-- Defined at the end, once Group has every method
+local ManagedGroup: any
+
 --[=[ 
 	Creates a generic Group. 
 	Groups manage collections of Entities (any instance with a position in the world like BaseParts, Models, Attachments, etc.) that Observers should track.
@@ -82,7 +85,7 @@ end
 ]=]
 function Group.fromTag(tag: string): Types.Group<Types.Entity>
 	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Types.Entity>
-	group.isManaged = true
+	setmetatable(group :: any, ManagedGroup)
 
 	local id = group.id
 	local stopWatch = TagWatcher.watch(tag, function(instance)
@@ -114,7 +117,7 @@ end
 ]=]
 function Group.players(): Types.Group<Player>
 	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Player>
-	group.isManaged = true
+	setmetatable(group :: any, ManagedGroup)
 
 	local conn = Players.PlayerAdded:Connect(function(player)
 		Groups.add(group.id, player)
@@ -150,7 +153,7 @@ function Group.localPlayer(): Types.Group<Player>
 	end
 
 	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Player>
-	group.isManaged = true
+	setmetatable(group :: any, ManagedGroup)
 
 	Groups.add(group.id, Players.LocalPlayer)
 
@@ -169,11 +172,6 @@ end
 	@return Group
 ]=]
 function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.Group
-	if self.isManaged then
-		Log.warn('Cannot set autoClean on a Managed Group. Ignoring request.', nil)
-		return self
-	end
-
 	Groups.setAutoClean(self.id, not not enabled)
 	return self
 end
@@ -210,10 +208,6 @@ end
 	@return Group
 ]=]
 function Group.add(self: Types.InternalGroup, entity: any): Types.Group
-	if self.isManaged then
-		Log.warn('Cannot manually add to a Managed Group. Ignoring request.', nil)
-		return self
-	end
 	Groups.add(self.id, entity)
 	return self
 end
@@ -233,10 +227,6 @@ end
 	@return Group
 ]=]
 function Group.addBulk(self: Types.InternalGroup, entities: { any }): Types.Group
-	if self.isManaged then
-		Log.warn('Cannot manually addBulk to a Managed Group. Ignoring request.', nil)
-		return self
-	end
 	Groups.addBulk(self.id, entities)
 	return self
 end
@@ -251,10 +241,6 @@ end
 	@return Group
 ]=]
 function Group.remove(self: Types.InternalGroup, entity: any): Types.Group
-	if self.isManaged then
-		Log.warn('Cannot manually remove from a Managed Group. Ignoring request.', nil)
-		return self
-	end
 	Groups.remove(self.id, entity)
 	return self
 end
@@ -269,10 +255,6 @@ end
 	@return Group
 ]=]
 function Group.removeBulk(self: Types.InternalGroup, entities: { any }): Types.Group
-	if self.isManaged then
-		Log.warn('Cannot manually removeBulk from a Managed Group. Ignoring request.', nil)
-		return self
-	end
 	Groups.removeBulk(self.id, entities)
 	return self
 end
@@ -287,10 +269,6 @@ end
 	@return Group
 ]=]
 function Group.clear(self: Types.InternalGroup): Types.Group
-	if self.isManaged then
-		Log.warn('Cannot clear a Managed Group. Ignoring request.', nil)
-		return self
-	end
 	Groups.clear(self.id)
 	return self
 end
@@ -329,7 +307,7 @@ function Group.getEntities(self: Types.InternalGroup): { any }
 	local members = Entities.groupEntities[self.id] or {}
 	local result = table.create(#members)
 	for i, entity in ipairs(members) do
-		result[i] = References.entityToReference[entity] or entity
+		result[i] = References.referenceOf(entity)
 	end
 	return result
 end
@@ -355,7 +333,7 @@ function Group.iterEntities(self: Types.InternalGroup): () -> any?
 	return function()
 		local entity = nextEntity()
 		if entity ~= nil then
-			return References.entityToReference[entity] or entity
+			return References.referenceOf(entity)
 		end
 		return nil
 	end
@@ -401,5 +379,23 @@ function Group.destroy(self: Types.InternalGroup): ()
 
 	Destroyed.finish(self)
 end
+
+-- Groups that follow players or a tag keep their own members, so the methods that change them only warn
+ManagedGroup = setmetatable({}, { __index = Group }) :: any
+ManagedGroup.__index = ManagedGroup
+
+local function refuse(message: string)
+	return function(self: Types.InternalGroup)
+		Log.warn(message, nil)
+		return self
+	end
+end
+
+ManagedGroup.add = refuse('Cannot manually add to a Managed Group. Ignoring request.')
+ManagedGroup.addBulk = refuse('Cannot manually addBulk to a Managed Group. Ignoring request.')
+ManagedGroup.remove = refuse('Cannot manually remove from a Managed Group. Ignoring request.')
+ManagedGroup.removeBulk = refuse('Cannot manually removeBulk from a Managed Group. Ignoring request.')
+ManagedGroup.clear = refuse('Cannot clear a Managed Group. Ignoring request.')
+ManagedGroup.setAutoClean = refuse('Cannot set autoClean on a Managed Group. Ignoring request.')
 
 return Group

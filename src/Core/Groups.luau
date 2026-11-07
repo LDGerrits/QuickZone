@@ -11,20 +11,12 @@ local Members = require(script.Parent.Members)
 local Memberships = require(script.Parent.Memberships)
 local PlayerTracker = require(script.Parent.PlayerTracker)
 local References = require(script.Parent.References)
-local Registry = require(script.Parent.Registry)
-local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 
 local isPlayer = References.isPlayer
 
 local Groups = {}
 
 local isDestroyed = Members.isGroupDestroyed
-
--- Whether the group's destroy has ended
-local function isDead(groupId: number): boolean
-	local group = Registry.groups[groupId]
-	return group == nil or Destroyed.isDead(group)
-end
 
 -- Removes a member. A character part of a player goes through the player as well, so the player's next
 -- character is not added back
@@ -33,10 +25,8 @@ local function removeMember(groupId: number, entity: Types.Entity)
 	if isPlayer(reference) then
 		PlayerTracker.unsubscribe(reference, groupId)
 	end
-	-- Unless an exit callback destroyed the group meanwhile
-	if not isDead(groupId) then
-		Members.remove(groupId, entity)
-	end
+	-- Does nothing once an exit callback destroyed the group, which let go of every member
+	Members.remove(groupId, entity)
 end
 
 -- Sets up a new group, once the Group class has registered it
@@ -61,10 +51,7 @@ end
 
 function Groups.addBulk(groupId: number, references: { any })
 	for _, reference in references do
-		-- A callback may have destroyed the group
-		if isDestroyed(groupId) then
-			break
-		end
+		-- Does nothing once a callback destroyed the group
 		Groups.add(groupId, reference)
 	end
 end
@@ -82,10 +69,7 @@ end
 
 function Groups.removeBulk(groupId: number, references: { any })
 	for _, reference in references do
-		-- An exit callback may have destroyed the group
-		if isDead(groupId) then
-			break
-		end
+		-- Does nothing once an exit callback destroyed the group
 		Groups.remove(groupId, reference)
 	end
 end

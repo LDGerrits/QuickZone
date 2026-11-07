@@ -31,6 +31,11 @@ function References.entityOf(x: any): Types.Entity
 	return referenceToEntity[x] or x
 end
 
+-- What the API hands out for an entity: its reference, or the entity itself when it has none
+function References.referenceOf(entity: Types.Entity): any
+	return entityToReference[entity] or entity
+end
+
 -- Gives the entity a reference, or none when reference is nil
 function References.link(entity: Types.Entity, reference: any?)
 	local oldReference = entityToReference[entity]

@@ -102,9 +102,7 @@ end
 ]=]
 function Zones.sync(self: Types.InternalZones): Types.Zones
 	for zone, _ in self.zones do
-		if zone:getReference() then
-			zone:sync()
-		end
+		zone:sync()
 	end
 	return self
 end

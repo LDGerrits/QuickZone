@@ -332,7 +332,7 @@ end
 --[=[ 
 	Enables or disables automatic polling and syncing to the tracked BasePart.
 	If the zone is currently static, it will automatically be set to dynamic.
-	A zone without a reference warns and starts syncing once `setReference` gives it one.
+	A zone without a reference starts syncing once `setReference` gives it one.
 
 	@tag Chainable
 	@method setAutoSync
@@ -352,10 +352,9 @@ function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zo
 			self:setDynamic(true)
 		end
 
+		-- Without a reference it starts once setReference gives it one
 		if self.reference then
 			setupAutoSync(self, self.reference)
-		else
-			Log.warn('Cannot autoSync Zone %d without a tracked reference.', nil, self.id)
 		end
 	else
 		clearAutoSync(self)
@@ -411,9 +410,9 @@ end
 	@return Zone
 ]=]
 function Zone.sync(self: Types.InternalZone): Types.Zone
+	-- A zone without a reference has nothing to follow
 	local reference = self.reference
 	if not reference then
-		Log.warn('Zone:sync failed for Zone %d. No reference found.', nil, self.id)
 		return self
 	end
 

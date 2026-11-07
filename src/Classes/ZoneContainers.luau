@@ -43,9 +43,7 @@ local function fromContainer(
 		local zone = instanceToZone[instance]
 		if zone then
 			instanceToZone[instance] = nil
-			if not Destroyed.isDestroyed(zone) then
-				zone:destroy()
-			end
+			zone:destroy()
 		end
 	end
 
@@ -146,9 +144,7 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 		local deadZone = instanceToZone[part]
 		if deadZone then
 			instanceToZone[part] = nil
-			if not Destroyed.isDestroyed(deadZone) then
-				deadZone:destroy()
-			end
+			deadZone:destroy()
 		end
 		local destroyingConn = partDestroyingConnections[part]
 		if destroyingConn then

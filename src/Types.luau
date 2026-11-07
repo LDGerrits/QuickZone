@@ -103,7 +103,6 @@ export type Group<T = any> = {
 
 export type InternalGroup<T = any> = Group<T> & {
 	id: number,
-	isManaged: boolean?,
 	onDestroyCallbacks: { () -> () }?,
 	phase: Phase,
 }

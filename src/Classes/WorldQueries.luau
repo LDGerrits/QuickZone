@@ -27,7 +27,6 @@ local entityData = Entities.entityData
 local observerIdToObserverObj = Registry.observerIdToObserverObj
 local groups = Registry.groups
 local entityToGroups = Entities.entityToGroups
-local entityToReference = References.entityToReference
 local referenceToEntity = References.referenceToEntity
 
 local queryHits = {} :: { number }
@@ -62,7 +61,7 @@ end
 	@return any
 ]=]
 function WorldQueries:getReferenceOfEntity(entity: any): any
-	return entityToReference[entity] or entity
+	return References.referenceOf(entity)
 end
 
 --[=[ 
@@ -126,7 +125,7 @@ function WorldQueries:getEntities(): { any }
 
 	for entity in entityData do
 		count += 1
-		result[count] = entityToReference[entity] or entity
+		result[count] = References.referenceOf(entity)
 	end
 
 	return result
@@ -271,7 +270,7 @@ function WorldQueries:iterEntities(): () -> any?
 	return function(): any?
 		local entity = nextEntity()
 		if entity ~= nil then
-			return entityToReference[entity] or entity
+			return References.referenceOf(entity)
 		end
 		return nil
 	end

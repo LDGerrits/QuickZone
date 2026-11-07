@@ -3,7 +3,7 @@
 -- Teardown shared by every destroyable object. An object is alive, then destroying while its destroy runs, then
 -- dead. While destroying, its callbacks run and see it as it was: queries still find it, but it takes on nothing
 -- new, like entities, observers or syncing, which its destroy would leave behind. Once dead, queries no longer
--- find it and its methods are gone
+-- find it, destroy does nothing, and its other methods raise an error that says it was destroyed
 
 local Log = require(script.Parent.Log)
 local Types = require(script.Parent.Parent.Types)
@@ -22,10 +22,40 @@ function Destroyed.begin(object: Destroyable): boolean
 	return true
 end
 
--- Ends the destroy. The methods go with the metatable, so a dead object can't be used by mistake
+local function ignoreDestroy() end
+
+-- The metatable of dead objects of each class, made on first use
+local deadMetatables = {} :: { [any]: any }
+
+local function deadMetatableOf(class: any): any
+	local dead = deadMetatables[class]
+	if dead == nil then
+		dead = {
+			__index = function(_, key): any
+				if key == 'destroy' then
+					return ignoreDestroy
+				end
+				-- Only the class's methods, so reading a field it doesn't have still gives nil
+				if type(class[key]) == 'function' then
+					return function()
+						Log.fatal('Cannot call %s, as the object was destroyed.', nil, tostring(key))
+					end
+				end
+				return nil
+			end,
+		}
+		deadMetatables[class] = dead
+	end
+	return dead
+end
+
+-- Ends the destroy. The class goes with the old metatable, so a dead object can't be used by mistake: destroying it
+-- again does nothing, as a cleanup may run after the object went another way, and other methods raise an error
 function Destroyed.finish(object: Destroyable)
 	object.phase = 'dead'
-	setmetatable(object :: any, nil)
+	local metatable = getmetatable(object :: any)
+	local class = metatable and metatable.__index
+	setmetatable(object :: any, if type(class) == 'table' then deadMetatableOf(class) else nil)
 end
 
 -- Whether destroy was called on the object, which then takes on nothing new. False for anything that isn't a
