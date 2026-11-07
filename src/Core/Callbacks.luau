@@ -1,6 +1,7 @@
 --!strict
 
--- Observer enter, exit and transition callbacks, in lists keyed by observer id
+-- Observer enter, exit and transition callbacks, in lists keyed by observer id, and the group trackers built on
+-- them. Only this module writes the lists
 
 local Entities = require(script.Parent.Entities)
 local Registry = require(script.Parent.Registry)
@@ -11,8 +12,6 @@ type CallbackLists = { [number]: { any } }
 local entityData = Entities.entityData
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 
--- How many fires are going on. While any is, a disconnect blanks its entry rather than removing it, so no list
--- shifts under a loop. The last fire to end compacts the lists that were blanked
 local Callbacks = {}
 
 Callbacks.observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
@@ -24,6 +23,8 @@ Callbacks.observerGroupTrackers = {} :: { [number]: { (entity: any, destroyedGro
 
 local enteredLists = Callbacks.observerEnteredCallbacks
 
+-- How many fires are going on. While any is, a disconnect blanks its entry rather than removing it, so no list
+-- shifts under a loop. The last fire to end compacts the lists that were blanked
 local firing = 0
 local blanked = {} :: { [{ any }]: true }
 
