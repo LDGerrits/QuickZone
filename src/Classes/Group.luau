@@ -604,9 +604,7 @@ function Group._addEntity(self: Types.InternalGroup, entity: Types.Entity): Type
 	self.entities[idx] = entity
 	self.entityIndices[entity] = idx
 
-	State.dirtyProfiles[entity] = true
-	State.dirtyTopology[entity] = true
-	State.entityData[entity].logicVersion = -1
+	Scheduler.recheck(entity)
 
 	if self.autoClean then
 		watchRemoval(self, entity)
@@ -669,10 +667,7 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 		self.entityIndices[entity] = nil
 	end
 
-	State.dirtyProfiles[entity] = true
-	State.dirtyTopology[entity] = true
-	-- Another observer may take over an entity that stands still
-	data.logicVersion = -1
+	Scheduler.recheck(entity)
 
 	Memberships.exitUnsubscribed(entity, data)
 	-- Its group may leave observers it stays in through other groups
@@ -681,7 +676,7 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 	-- Exit callbacks may have removed the entity everywhere, or added it back
 	local groups = State.entityToGroups[entity]
 	if State.entityData[entity] == data and groups and next(groups) == nil then
-		Scheduler.leaveBucket(data)
+		Scheduler.leaveBucket(entity, data)
 		State.entityData[entity] = nil
 		State.entityToGroups[entity] = nil
 		State.entityToObservers[entity] = nil
