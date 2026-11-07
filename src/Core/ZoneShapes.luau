@@ -2,8 +2,8 @@
 --!optimize 2
 --!strict
 
--- Owns every zone's geometry. Writes go through here, which keeps the world-space shape used by
--- queries and rebuilds, the change log and the tree rebuild flags in step with it
+-- Owns every zone's slot and geometry, the trees and their change logs. Writes go through here, which keeps the
+-- world-space shape used by queries and rebuilds, the change log and the tree rebuild flags in step with it
 
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)

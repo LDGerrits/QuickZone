@@ -1,7 +1,7 @@
 --!strict
 
 -- Owns which groups each entity is in and the data the scheduler keeps on it. An entity exists while it is in a
--- group. Others read the tables, only this module adds or drops entities
+-- group, and Group drops it once its routing is gone. Others read the tables, only this module writes them
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)

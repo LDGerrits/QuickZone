@@ -3,7 +3,8 @@
 --!strict
 
 -- Works out which observers watch each entity, at what rate and precision, and in which trees, and keeps the
--- buckets the scheduler goes through. Others mark entities to route here, only this module writes the routing
+-- buckets the scheduler goes through and each observer's zone counts. Others mark entities to route here, only
+-- this module writes the routing
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
@@ -202,7 +203,7 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 
 	-- Only flag entities dirty if the observer's topology fundamentally changed
 	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
-		-- Only force a global logic override when an observer loses its last zone
+		-- Check every entity again when an observer loses its last zone
 		if current == 1 and newCount == 0 then
 			Routing.recheckAll()
 		end
