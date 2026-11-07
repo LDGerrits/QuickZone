@@ -9,7 +9,7 @@
 
 local Config = require(script.Parent.Parent.Config)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
-local Scheduler = require(script.Parent.Parent.Core.Scheduler)
+local Routing = require(script.Parent.Parent.Core.Routing)
 local State = require(script.Parent.Parent.Core.State)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -35,7 +35,7 @@ local function updateAllEntitiesForObserver(observerId: number)
 		end
 
 		for _, entity in group.entities do
-			Scheduler.reroute(entity)
+			Routing.reroute(entity)
 		end
 	end
 end
@@ -48,7 +48,7 @@ local function disconnectObserverFromGroup(observerId: number, group: Types.Inte
 			continue
 		end
 
-		Scheduler.recheck(entity)
+		Routing.recheck(entity)
 
 		-- Disabled observers let go of every entity
 		if State.observerEnabled[observerId] and Memberships.isSubscribed(entity, observerId) then
@@ -245,7 +245,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	State.groupToObservers[groupId][self.id] = true
 
 	for _, entity in group.entities do
-		Scheduler.recheck(entity)
+		Routing.recheck(entity)
 	end
 
 	-- Members already inside through other groups bring this one in

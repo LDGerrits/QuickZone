@@ -15,23 +15,15 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+local Entities = require(script.Parent.Parent.Core.Entities)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local References = require(script.Parent.Parent.Core.References)
-local Scheduler = require(script.Parent.Parent.Core.Scheduler)
+local Routing = require(script.Parent.Parent.Core.Routing)
 local State = require(script.Parent.Parent.Core.State)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
-
-local STRAT_POS = Config.Strategy.POS
-local STRAT_PRIM = Config.Strategy.PRIM
-local STRAT_WORLD = Config.Strategy.WORLD
-local STRAT_CFRAME = Config.Strategy.CFRAME
-local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
-local STRAT_PIVOT = Config.Strategy.PIVOT
-
-local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local IS_CLIENT = RunService:IsClient()
 
@@ -534,75 +526,15 @@ function Group._addEntity(self: Types.InternalGroup, entity: Types.Entity): Type
 		return self
 	end
 
-	if not State.entityToGroups[entity] then
-		State.entityToGroups[entity] = {}
-	end
-
-	if State.entityToGroups[entity][self.id] then
+	if not Entities.join(entity, self.id) then
 		return self
-	end
-
-	State.entityToGroups[entity][self.id] = true
-
-	if not State.entityData[entity] then
-		local strat
-		if typeof(entity) == 'Instance' then
-			if entity:IsA('BasePart') then
-				strat = STRAT_POS
-			elseif entity:IsA('Attachment') or entity:IsA('Bone') then
-				strat = STRAT_WORLD
-			elseif entity:IsA('Camera') then
-				strat = STRAT_CFRAME
-			elseif entity:IsA('Model') then
-				strat = entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
-			end
-		elseif typeof(entity) == 'table' then
-			if entity.Position then
-				strat = STRAT_POS
-			elseif entity.CFrame then
-				strat = STRAT_CFRAME
-			elseif entity.Transform then
-				strat = STRAT_TRANSFORM
-			elseif entity.WorldPosition then
-				strat = STRAT_WORLD
-			elseif entity.GetPivot then
-				strat = STRAT_PIVOT
-			end
-		end
-
-		if not strat then
-			Log.nonFatal(
-				'Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or a valid EntityTable.',
-				nil,
-				tostring(entity)
-			)
-			State.entityToGroups[entity][self.id] = nil
-			if next(State.entityToGroups[entity]) == nil then
-				State.entityToGroups[entity] = nil
-			end
-			return self
-		end
-
-		State.entityData[entity] = {
-			strategy = strat,
-			lastPosition = Vector3.zero,
-			activeObserverMemberships = {},
-			precisionSq = DEFAULT_PRECISION_SQ,
-			updateRate = -1,
-			bucketIndex = 0,
-			dynamicVersion = -1,
-			staticVersion = -1,
-			logicVersion = -1,
-			needsStatic = false,
-			needsDynamic = false,
-		}
 	end
 
 	local idx = #self.entities + 1
 	self.entities[idx] = entity
 	self.entityIndices[entity] = idx
 
-	Scheduler.recheck(entity)
+	Routing.recheck(entity)
 
 	if self.autoClean then
 		watchRemoval(self, entity)
@@ -639,7 +571,7 @@ end
 
 -- Removes the entity as given, never through the reference map. For internal callers that hold the member
 function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
-	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
+	if not Entities.isIn(entity, self.id) then
 		return self
 	end
 
@@ -649,7 +581,7 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 		State.groupEntityCleanups[self.id][entity] = nil
 	end
 
-	State.entityToGroups[entity][self.id] = nil
+	Entities.leave(entity, self.id)
 	local data = State.entityData[entity]
 
 	local idx = self.entityIndices[entity]
@@ -665,27 +597,14 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 		self.entityIndices[entity] = nil
 	end
 
-	Scheduler.recheck(entity)
+	Routing.recheck(entity)
 
 	Memberships.exitUnsubscribed(entity, data)
 	-- Its group may leave observers it stays in through other groups
 	Memberships.groupsChanged(entity)
 
 	-- Exit callbacks may have removed the entity everywhere, or added it back
-	local groups = State.entityToGroups[entity]
-	if State.entityData[entity] == data and groups and next(groups) == nil then
-		Scheduler.leaveBucket(entity, data)
-		State.entityData[entity] = nil
-		State.entityToGroups[entity] = nil
-		State.entityToObservers[entity] = nil
-		State.dirtyProfiles[entity] = nil
-		State.dirtyTopology[entity] = nil
-
-		local ref = References.entityToReference[entity]
-		if ref and not isPlayer(ref) then
-			References.link(entity, nil)
-		end
-	end
+	Entities.dropIfGroupless(entity, data)
 
 	return self
 end

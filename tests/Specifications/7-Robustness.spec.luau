@@ -14,7 +14,7 @@ local Util = require(TestFolder.Util)
 local withCleanup = Util.withCleanup
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
-local Scheduler = require(ReplicatedStorage.QuickZone.Core.Scheduler)
+local Routing = require(ReplicatedStorage.QuickZone.Core.Routing)
 local State = require(ReplicatedStorage.QuickZone.Core.State)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
@@ -1422,8 +1422,8 @@ return function(Tiniest: Tiniest)
 				QuickZone:update(1)
 
 				local data = State.entityData[first]
-				Scheduler.leaveBucket(first, data)
-				Scheduler.leaveBucket(first, data)
+				Routing.leaveBucket(first, data)
+				Routing.leaveBucket(first, data)
 
 				local bucket = State.buckets[RATE]
 				Expect(data.bucketIndex).is(0)

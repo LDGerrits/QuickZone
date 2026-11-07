@@ -19,6 +19,7 @@
 ]=]
 
 local Memberships = require(script.Parent.Parent.Core.Memberships)
+local Routing = require(script.Parent.Parent.Core.Routing)
 local State = require(script.Parent.Parent.Core.State)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
@@ -180,7 +181,7 @@ local function updateObserverZoneCount(observerId: number, isDynamic: boolean, d
 			end
 
 			for _, entity in group.entities do
-				State.dirtyTopology[entity] = true
+				Routing.markTopology(entity)
 			end
 		end
 	end
