@@ -11,7 +11,11 @@ local Util = require(TestFolder.Util)
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
 local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
-local State = require(ReplicatedStorage.QuickZone.Core.State)
+local Links = require(ReplicatedStorage.QuickZone.Core.Links)
+local Memberships = require(ReplicatedStorage.QuickZone.Core.Memberships)
+local Registry = require(ReplicatedStorage.QuickZone.Core.Registry)
+local Routing = require(ReplicatedStorage.QuickZone.Core.Routing)
+local ZoneShapes = require(ReplicatedStorage.QuickZone.Core.ZoneShapes)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -2672,7 +2676,7 @@ return function(Tiniest: Tiniest)
 			pcall(destroy, zone)
 			QuickZone:rebuild()
 
-			local alive = State.zoneIdToZoneObj[id] ~= nil
+			local alive = Registry.zoneIdToZoneObj[id] ~= nil
 			local found = table.find(QuickZone:getZonesAtPoint(position), zone) ~= nil
 
 			observer:destroy()
@@ -2688,7 +2692,7 @@ return function(Tiniest: Tiniest)
 			local observer = Observer.new({ zones = { zone }, groups = {} })
 			observer:destroy()
 
-			Expect(State.zoneAttachedObservers[(zone :: any).slot]).is(nil)
+			Expect(Links.zoneAttachedObservers[(zone :: any).slot]).is(nil)
 			zone:destroy()
 		end)
 
@@ -2697,13 +2701,13 @@ return function(Tiniest: Tiniest)
 			local observer = Observer.new({ zones = { zone }, groups = {} })
 			local other = Observer.new({ zones = {}, groups = {} })
 			QuickZone:rebuild()
-			local version = State.staticVersion
+			local version = ZoneShapes.staticVersion
 
 			observer:attach(zone)
 			other:detach(zone)
 			QuickZone:rebuild()
 
-			Expect(State.staticVersion).is(version)
+			Expect(ZoneShapes.staticVersion).is(version)
 
 			observer:destroy()
 			other:destroy()
@@ -2929,7 +2933,7 @@ return function(Tiniest: Tiniest)
 			observer:detach(zone)
 			QuickZone:update(1)
 
-			Expect(State.zoneOccupants[zone:getId()]).is(nil)
+			Expect(Memberships.zoneOccupants[zone:getId()]).is(nil)
 
 			observer:destroy()
 			group:destroy()
@@ -2943,14 +2947,14 @@ return function(Tiniest: Tiniest)
 			local group = Group.new({ entities = { entity }, autoClean = false })
 			local observer = Observer.new({ groups = { group }, updateRate = rate, safety = false })
 			QuickZone:update(1)
-			local hadBucket = State.buckets[rate] ~= nil
+			local hadBucket = Routing.buckets[rate] ~= nil
 
 			group:remove(entity)
 			QuickZone:update(1)
 
 			Expect(hadBucket).is(true)
-			Expect(State.buckets[rate]).is(nil)
-			Expect(table.find(State.bucketList, rate)).is(nil)
+			Expect(Routing.buckets[rate]).is(nil)
+			Expect(table.find(Routing.bucketList, rate)).is(nil)
 
 			observer:destroy()
 			group:destroy()
@@ -2989,7 +2993,7 @@ return function(Tiniest: Tiniest)
 			end
 
 			for _, zone in zones do
-				Expect(State.zoneOccupants[zone:getId()]).is(nil)
+				Expect(Memberships.zoneOccupants[zone:getId()]).is(nil)
 			end
 
 			for _, object in cleanups do
@@ -3014,11 +3018,11 @@ return function(Tiniest: Tiniest)
 			QuickZone:update(1)
 			Expect(observer:getZoneOfEntity(entity)).is(second)
 
-			Expect(State.zoneOccupants[first:getId()]).is(nil)
-			Expect(State.zoneOccupants[second:getId()]).is(1)
+			Expect(Memberships.zoneOccupants[first:getId()]).is(nil)
+			Expect(Memberships.zoneOccupants[second:getId()]).is(1)
 
 			observer:destroy()
-			Expect(State.zoneOccupants[second:getId()]).is(nil)
+			Expect(Memberships.zoneOccupants[second:getId()]).is(nil)
 
 			group:destroy()
 			first:destroy()

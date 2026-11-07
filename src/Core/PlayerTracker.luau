@@ -3,7 +3,8 @@
 local Players = game:GetService('Players')
 
 local Types = require(script.Parent.Parent.Types)
-local State = require(script.Parent.State)
+local References = require(script.Parent.References)
+local Registry = require(script.Parent.Registry)
 
 local activeTrackers = {} :: { [Player]: () -> () }
 local playerSubscriptions = {} :: { [Player]: { [number]: Types.InternalGroup } }
@@ -17,7 +18,7 @@ local function isInAnyGroup(player: Player): boolean
 	local subscriptions = playerSubscriptions[player]
 	if subscriptions then
 		for groupId in subscriptions do
-			if State.groups[groupId] then
+			if Registry.groups[groupId] then
 				return true
 			end
 		end
@@ -52,15 +53,13 @@ local function trackPlayer(player: Player)
 		if hrp then
 			-- Let go first, so an exit callback adding the player to a group doesn't add this part
 			currentHrp = nil
-			if State.referenceToEntity[player] == hrp then
-				State.referenceToEntity[player] = nil
-			end
+			References.release(player, hrp)
 
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
 				-- Cloned, as exit callbacks may add the player to groups
 				for groupId, group in table.clone(subscriptions) do
-					if State.groups[groupId] then
+					if Registry.groups[groupId] then
 						group:_removeEntity(hrp)
 					else
 						subscriptions[groupId] = nil
@@ -70,7 +69,7 @@ local function trackPlayer(player: Player)
 
 			-- Unless a callback gave the part to the player again
 			if currentHrp ~= hrp then
-				State.entityToReference[hrp] = nil
+				References.link(hrp, nil)
 			end
 		end
 	end
@@ -99,8 +98,7 @@ local function trackPlayer(player: Player)
 			clearHrp()
 			currentHrp = hrp
 
-			State.entityToReference[hrp] = player
-			State.referenceToEntity[player] = hrp
+			References.link(hrp, player)
 
 			-- Listen for the HRP streaming out or getting destroyed, also by its character leaving
 			hrpConn = hrp.AncestryChanged:Connect(function()
@@ -119,7 +117,7 @@ local function trackPlayer(player: Player)
 				for groupId, group in table.clone(subscriptions) do
 					if currentHrp ~= hrp then
 						break
-					elseif State.groups[groupId] then
+					elseif Registry.groups[groupId] then
 						group:_addEntity(hrp)
 					else
 						subscriptions[groupId] = nil
@@ -187,7 +185,7 @@ function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
 	playerSubscriptions[player][group.id] = group
 	trackPlayer(player)
 
-	local currentHrp = State.referenceToEntity[player]
+	local currentHrp = References.referenceToEntity[player]
 	if currentHrp then
 		group:_addEntity(currentHrp)
 	end
@@ -198,7 +196,7 @@ function PlayerTracker.unsubscribe(player: Player, group: Types.InternalGroup)
 		playerSubscriptions[player][group.id] = nil
 	end
 
-	local currentHrp = State.referenceToEntity[player]
+	local currentHrp = References.referenceToEntity[player]
 	if currentHrp then
 		group:_removeEntity(currentHrp)
 	end
@@ -213,7 +211,7 @@ end
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
 	for groupId, group in playerSubscriptions[player] or {} do
-		if State.groups[groupId] then
+		if Registry.groups[groupId] then
 			table.insert(list, group)
 		end
 	end

@@ -6,12 +6,15 @@ local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
 local Callbacks = require(script.Parent.Parent.Core.Callbacks)
-local State = require(script.Parent.Parent.Core.State)
+local Entities = require(script.Parent.Parent.Core.Entities)
+local Links = require(script.Parent.Parent.Core.Links)
+local Memberships = require(script.Parent.Parent.Core.Memberships)
+local References = require(script.Parent.Parent.Core.References)
+local Registry = require(script.Parent.Parent.Core.Registry)
 local Types = require(script.Parent.Parent.Types)
 local Log = require(script.Parent.Parent.Utils.Log)
-local Checks = require(script.Parent.Checks)
 
-local isPlayer = Checks.isPlayer
+local isPlayer = References.isPlayer
 
 local IS_CLIENT = RunService:IsClient()
 
@@ -32,9 +35,9 @@ local function trackGroups(
 	local disconnected = false
 
 	local function counts(entity: Types.Entity, groupId: number): boolean
-		local data = State.entityData[entity]
-		local groups = State.entityToGroups[entity]
-		local observers = State.groupToObservers[groupId]
+		local data = Entities.entityData[entity]
+		local groups = Entities.entityToGroups[entity]
+		local observers = Links.groupToObservers[groupId]
 		return data ~= nil
 			and data.activeObserverMemberships[observerId] ~= nil
 			and groups ~= nil
@@ -45,9 +48,9 @@ local function trackGroups(
 
 	-- zone is where the entity was when it left the observer
 	local function reconcile(entity: Types.Entity, zone: Types.Zone?)
-		local data = State.entityData[entity]
+		local data = Entities.entityData[entity]
 		local zoneId = data and data.activeObserverMemberships[observerId]
-		local current = if zoneId then State.zoneIdToZoneObj[zoneId] else zone
+		local current = if zoneId then Registry.zoneIdToZoneObj[zoneId] else zone
 		if current and counted[entity] then
 			lastZones[entity] = current
 		end
@@ -64,7 +67,7 @@ local function trackGroups(
 				end
 			end
 		end
-		for groupId in State.entityToGroups[entity] or {} do
+		for groupId in Entities.entityToGroups[entity] or {} do
 			if not (have and have[groupId]) and counts(entity, groupId) then
 				arriving = arriving or {}
 				table.insert(arriving :: { number }, groupId)
@@ -86,7 +89,7 @@ local function trackGroups(
 			members[entity] = nil
 			if next(members) == nil then
 				present[groupId] = nil
-				local group = State.groups[groupId]
+				local group = Registry.groups[groupId]
 				if group then
 					onLeave(groupId, group, current :: Types.Zone, entity)
 				end
@@ -109,7 +112,7 @@ local function trackGroups(
 				members[entity] = true
 			else
 				present[groupId] = { [entity] = true }
-				onArrive(groupId, State.groups[groupId], current :: Types.Zone, entity)
+				onArrive(groupId, Registry.groups[groupId], current :: Types.Zone, entity)
 			end
 		end
 	end
@@ -144,7 +147,7 @@ local function trackGroups(
 				end
 			end
 		end
-		local group = State.groups[groupId]
+		local group = Registry.groups[groupId]
 		if group then
 			onLeave(groupId, group, zone, last)
 		end
@@ -160,14 +163,11 @@ local function trackGroups(
 			reconcile(entity, nil)
 		end
 	end
-	local trackers = State.observerGroupTrackers[observerId]
-	local updated = if trackers then table.clone(trackers) else {}
-	table.insert(updated, track)
-	State.observerGroupTrackers[observerId] = updated
+	Callbacks.addGroupTracker(observerId, track)
 
 	-- Groups already inside arrive now
 	local inside = {}
-	for entity in State.observerTrackingEntities[observerId] or {} do
+	for entity in Memberships.observerTrackingEntities[observerId] or {} do
 		table.insert(inside, entity)
 	end
 	for _, entity in inside do
@@ -179,13 +179,7 @@ local function trackGroups(
 		disconnectEnter()
 		disconnectTransition()
 		disconnectExit()
-		local current = State.observerGroupTrackers[observerId]
-		local idx = current and table.find(current, track)
-		if idx then
-			local remaining = table.clone(current :: { (any) -> () })
-			table.remove(remaining, idx)
-			State.observerGroupTrackers[observerId] = if #remaining > 0 then remaining else nil
-		end
+		Callbacks.removeGroupTracker(observerId, track)
 	end
 end
 
@@ -296,7 +290,7 @@ end
 ]=]
 function ObserverEvents.onEnter(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(State.observerEnteredCallbacks, self.id, callback)
+	return Callbacks.connect(Callbacks.observerEnteredCallbacks, self.id, callback)
 end
 
 --[=[ 
@@ -310,7 +304,7 @@ end
 ]=]
 function ObserverEvents.onExit(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(State.observerExitedCallbacks, self.id, callback)
+	return Callbacks.connect(Callbacks.observerExitedCallbacks, self.id, callback)
 end
 
 --[=[
@@ -542,13 +536,13 @@ function ObserverEvents.observeGroup(
 			else
 				cleanups[groupId] = cleanup
 			end
-		end, State.observerSafety[observerId] ~= false)
+		end, Registry.observerSafety[observerId] ~= false)
 	end, function(groupId)
 		generations[groupId] = (generations[groupId] or 0) + 1
 		local cleanup = cleanups[groupId]
 		if cleanup then
 			cleanups[groupId] = nil
-			Callbacks.call(cleanup, State.observerSafety[observerId] ~= false)
+			Callbacks.call(cleanup, Registry.observerSafety[observerId] ~= false)
 		end
 	end)
 
@@ -583,7 +577,7 @@ function ObserverEvents.onGroupEnter(
 	checkCallback(callback)
 	local observerId = self.id
 	return trackGroups(self, function(_, group, zone, entity)
-		Callbacks.call(callback, State.observerSafety[observerId] ~= false, group, zone, entity)
+		Callbacks.call(callback, Registry.observerSafety[observerId] ~= false, group, zone, entity)
 	end, function() end)
 end
 
@@ -604,7 +598,7 @@ function ObserverEvents.onGroupExit(
 	checkCallback(callback)
 	local observerId = self.id
 	return trackGroups(self, function() end, function(_, group, zone, entity)
-		Callbacks.call(callback, State.observerSafety[observerId] ~= false, group, zone, entity)
+		Callbacks.call(callback, Registry.observerSafety[observerId] ~= false, group, zone, entity)
 	end)
 end
 
@@ -623,7 +617,7 @@ function ObserverEvents.onTransition(
 	callback: (any, Types.Zone, Types.Entity) -> ()
 ): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(State.observerTransitionedCallbacks, self.id, callback)
+	return Callbacks.connect(Callbacks.observerTransitionedCallbacks, self.id, callback)
 end
 
 --[=[ 

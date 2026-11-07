@@ -8,9 +8,12 @@
 ]=]
 
 local Config = require(script.Parent.Parent.Config)
+local Callbacks = require(script.Parent.Parent.Core.Callbacks)
+local Entities = require(script.Parent.Parent.Core.Entities)
+local Links = require(script.Parent.Parent.Core.Links)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
-local Scheduler = require(script.Parent.Parent.Core.Scheduler)
-local State = require(script.Parent.Parent.Core.State)
+local Registry = require(script.Parent.Parent.Core.Registry)
+local Routing = require(script.Parent.Parent.Core.Routing)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
@@ -24,18 +27,18 @@ local hasAttachedMap = {} :: { [number]: boolean }
 local hasSubscribedMap = {} :: { [number]: boolean }
 
 local function updateAllEntitiesForObserver(observerId: number)
-	for groupId, observers in State.groupToObservers do
+	for groupId, observers in Links.groupToObservers do
 		if not observers[observerId] then
 			continue
 		end
 
-		local group = State.groups[groupId]
+		local group = Registry.groups[groupId]
 		if not group then
 			continue
 		end
 
 		for _, entity in group.entities do
-			Scheduler.reroute(entity)
+			Routing.reroute(entity)
 		end
 	end
 end
@@ -43,15 +46,15 @@ end
 local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
 	-- Cloned, as exit callbacks may remove entities from the group, swapping later ones into visited slots
 	for _, entity in table.clone(group.entities) do
-		local data = State.entityData[entity]
+		local data = Entities.entityData[entity]
 		if not data then
 			continue
 		end
 
-		Scheduler.recheck(entity)
+		Routing.recheck(entity)
 
 		-- Disabled observers let go of every entity
-		if State.observerEnabled[observerId] and Memberships.isSubscribed(entity, observerId) then
+		if Registry.observerEnabled[observerId] and Memberships.isSubscribed(entity, observerId) then
 			continue
 		end
 
@@ -150,27 +153,26 @@ function Observer.new<T>(config: {
 		checkGroup(group)
 	end
 
-	local id = State.nextObserverId
-	State.nextObserverId += 1
+	local id = Registry.nextObserverId
+	Registry.nextObserverId += 1
 
 	local self: Types.InternalObserver<T> = setmetatable({
 		id = id,
 		phase = 'alive',
 	}, Observer) :: any
 
-	State.observerPriorityMap[id] = priority
-	State.observerUpdateRate[id] = updateRate
-	State.observerPrecisionSq[id] = precision ^ 2
+	Registry.observerPriorityMap[id] = priority
+	Registry.observerUpdateRate[id] = updateRate
+	Registry.observerPrecisionSq[id] = precision ^ 2
 
-	State.observerEnteredCallbacks[id] = {}
-	State.observerExitedCallbacks[id] = {}
-	State.observerTransitionedCallbacks[id] = {}
-	State.observerTrackingEntities[id] = {}
-	State.observerIdToObserverObj[id] = self
-	State.observerEnabled[id] = if config and config.enabled ~= nil then not not config.enabled else true
-	State.observerSafety[id] = if config and config.safety ~= nil then not not config.safety else Config.Observer.safety
-	State.observerStaticCount[id] = 0
-	State.observerDynamicCount[id] = 0
+	Callbacks.addObserver(id)
+	Memberships.addObserver(id)
+	Registry.observerIdToObserverObj[id] = self
+	Registry.observerEnabled[id] = if config and config.enabled ~= nil then not not config.enabled else true
+	Registry.observerSafety[id] = if config and config.safety ~= nil
+		then not not config.safety
+		else Config.Observer.safety
+	Routing.addObserver(id)
 
 	hasAttachedMap[id] = false
 	hasSubscribedMap[id] = false
@@ -239,17 +241,14 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	hasSubscribedMap[self.id] = true
 
 	local groupId = group.id
-	if not State.groupToObservers[groupId] then
-		State.groupToObservers[groupId] = {}
-	end
-	State.groupToObservers[groupId][self.id] = true
+	Links.subscribe(self.id, groupId)
 
 	for _, entity in group.entities do
-		Scheduler.recheck(entity)
+		Routing.recheck(entity)
 	end
 
 	-- Members already inside through other groups bring this one in
-	if State.observerGroupTrackers[self.id] then
+	if Callbacks.observerGroupTrackers[self.id] then
 		for _, entity in table.clone(group.entities) do
 			Memberships.groupsChanged(entity, self.id)
 		end
@@ -275,14 +274,12 @@ function Observer.unsubscribe(self: Types.InternalObserver, group: Types.Interna
 	checkGroup(group)
 	local groupId = group.id
 
-	if State.groupToObservers[groupId] then
-		State.groupToObservers[groupId][self.id] = nil
-	end
+	Links.unsubscribe(self.id, groupId)
 
 	disconnectObserverFromGroup(self.id, group)
 
 	-- Members that stay inside through other groups no longer bring this one in
-	if State.observerGroupTrackers[self.id] then
+	if Callbacks.observerGroupTrackers[self.id] then
 		for _, entity in table.clone(group.entities) do
 			Memberships.groupsChanged(entity, self.id)
 		end
@@ -358,17 +355,17 @@ function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Ty
 	end
 
 	local id = self.id
-	State.observerEnabled[id] = enabled
-	State.logicVersion += 1
+	Registry.observerEnabled[id] = enabled
+	Routing.recheckAll()
 
 	if not enabled then
 		-- Cloned, as exit callbacks may subscribe groups
-		for groupId, observersMap in table.clone(State.groupToObservers) do
+		for groupId, observersMap in table.clone(Links.groupToObservers) do
 			if not observersMap[id] then
 				continue
 			end
 
-			local group = State.groups[groupId]
+			local group = Registry.groups[groupId]
 			if not group then
 				continue
 			end
@@ -397,7 +394,7 @@ end
 	@return Observer
 ]=]
 function Observer.setSafety(self: Types.InternalObserver, enabled: boolean): Types.Observer
-	State.observerSafety[self.id] = not not enabled
+	Registry.observerSafety[self.id] = not not enabled
 	return self
 end
 
@@ -411,8 +408,8 @@ end
 	@return Observer
 ]=]
 function Observer.setPriority(self: Types.InternalObserver, p: number): Types.Observer
-	State.observerPriorityMap[self.id] = checkPriority(p)
-	State.logicVersion += 1
+	Registry.observerPriorityMap[self.id] = checkPriority(p)
+	Routing.recheckAll()
 	return self
 end
 
@@ -427,7 +424,7 @@ end
 	@return Observer
 ]=]
 function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types.Observer
-	State.observerUpdateRate[self.id] = checkUpdateRate(hz)
+	Registry.observerUpdateRate[self.id] = checkUpdateRate(hz)
 	updateAllEntitiesForObserver(self.id)
 	return self
 end
@@ -444,7 +441,7 @@ end
 function Observer.setPrecision(self: Types.InternalObserver, n: number): Types.Observer
 	checkPrecision(n)
 
-	State.observerPrecisionSq[self.id] = n ^ 2
+	Registry.observerPrecisionSq[self.id] = n ^ 2
 	updateAllEntitiesForObserver(self.id)
 	return self
 end
@@ -457,7 +454,7 @@ end
 	@return boolean
 ]=]
 function Observer.isEnabled(self: Types.InternalObserver): boolean
-	return State.observerEnabled[self.id] ~= false
+	return Registry.observerEnabled[self.id] ~= false
 end
 
 --[=[ 
@@ -468,7 +465,7 @@ end
 	@return boolean
 ]=]
 function Observer.isSafe(self: Types.InternalObserver): boolean
-	return State.observerSafety[self.id]
+	return Registry.observerSafety[self.id]
 end
 
 --[=[ 
@@ -490,7 +487,7 @@ end
 	@return number
 ]=]
 function Observer.getPriority(self: Types.InternalObserver): number
-	return State.observerPriorityMap[self.id]
+	return Registry.observerPriorityMap[self.id]
 end
 
 --[=[ 
@@ -501,7 +498,7 @@ end
 	@return number
 ]=]
 function Observer.getUpdateRate(self: Types.InternalObserver): number
-	return State.observerUpdateRate[self.id]
+	return Registry.observerUpdateRate[self.id]
 end
 
 --[=[ 
@@ -512,7 +509,7 @@ end
 	@return number
 ]=]
 function Observer.getPrecision(self: Types.InternalObserver): number
-	return math.sqrt(State.observerPrecisionSq[self.id])
+	return math.sqrt(Registry.observerPrecisionSq[self.id])
 end
 
 --[=[ 
@@ -556,29 +553,23 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	-- Unlinked entities must be rerouted, also when the observer was already disabled
 	local id = self.id
 	updateAllEntitiesForObserver(id)
-	for _, observers in State.groupToObservers do
-		observers[id] = nil
-	end
+	Links.unsubscribeAll(id)
 
-	for slot, attached in State.zoneAttachedObservers do
+	for slot, attached in Links.zoneAttachedObservers do
 		if table.find(attached, id) then
-			State.zoneSlotToZoneObj[slot]:detach(self)
+			Registry.zoneSlotToZoneObj[slot]:detach(self)
 		end
 	end
 
-	State.observerPriorityMap[id] = nil
-	State.observerEnteredCallbacks[id] = nil
-	State.observerExitedCallbacks[id] = nil
-	State.observerTransitionedCallbacks[id] = nil
-	State.observerGroupTrackers[id] = nil
-	State.observerTrackingEntities[id] = nil
-	State.observerIdToObserverObj[id] = nil
-	State.observerEnabled[id] = nil
-	State.observerSafety[id] = nil
-	State.observerUpdateRate[id] = nil
-	State.observerPrecisionSq[id] = nil
-	State.observerStaticCount[id] = nil
-	State.observerDynamicCount[id] = nil
+	Registry.observerPriorityMap[id] = nil
+	Callbacks.dropObserver(id)
+	Memberships.dropObserver(id)
+	Registry.observerIdToObserverObj[id] = nil
+	Registry.observerEnabled[id] = nil
+	Registry.observerSafety[id] = nil
+	Registry.observerUpdateRate[id] = nil
+	Registry.observerPrecisionSq[id] = nil
+	Routing.dropObserver(id)
 
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil

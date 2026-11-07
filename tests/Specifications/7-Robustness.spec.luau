@@ -14,8 +14,12 @@ local Util = require(TestFolder.Util)
 local withCleanup = Util.withCleanup
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
-local Scheduler = require(ReplicatedStorage.QuickZone.Core.Scheduler)
-local State = require(ReplicatedStorage.QuickZone.Core.State)
+local Callbacks = require(ReplicatedStorage.QuickZone.Core.Callbacks)
+local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
+local Memberships = require(ReplicatedStorage.QuickZone.Core.Memberships)
+local Registry = require(ReplicatedStorage.QuickZone.Core.Registry)
+local Routing = require(ReplicatedStorage.QuickZone.Core.Routing)
+local ZoneShapes = require(ReplicatedStorage.QuickZone.Core.ZoneShapes)
 local Zone = QuickZone.Zone
 local Group = QuickZone.Group
 local Observer = QuickZone.Observer
@@ -236,7 +240,7 @@ return function(Tiniest: Tiniest)
 
 				Expect(fired).is(COUNT)
 				-- Let go of once the event ended
-				Expect(#State.observerEnteredCallbacks[observer:getId()]).is(0)
+				Expect(#Callbacks.observerEnteredCallbacks[observer:getId()]).is(0)
 				-- Copying the list for each disconnect took 150 ms
 				Expect(if elapsed < 0.05 then 'fast' else string.format('%.0f ms', elapsed * 1000)).is('fast')
 			end)
@@ -408,7 +412,7 @@ return function(Tiniest: Tiniest)
 					zones:destroy()
 
 					Expect(table.concat(events, ' ')).is('exit')
-					Expect(next(State.zonesBeingDestroyed)).is(nil)
+					Expect(next(Memberships.zonesBeingDestroyed)).is(nil)
 				end)
 			end
 		)
@@ -509,9 +513,9 @@ return function(Tiniest: Tiniest)
 				observer:destroy()
 
 				Expect(refused).is(4)
-				Expect(State.zoneIdToZoneObj[zoneId]).is(nil)
-				Expect(State.groups[groupId]).is(nil)
-				Expect(State.observerIdToObserverObj[observerId]).is(nil)
+				Expect(Registry.zoneIdToZoneObj[zoneId]).is(nil)
+				Expect(Registry.groups[groupId]).is(nil)
+				Expect(Registry.observerIdToObserverObj[observerId]).is(nil)
 			end)
 		end)
 
@@ -559,7 +563,7 @@ return function(Tiniest: Tiniest)
 			withCleanup(function()
 				local position = Vector3.new(-43100, 0, 41000)
 				local function used(): number
-					return State.zoneSlotCount - #State.freeZoneSlots
+					return ZoneShapes.zoneSlotCount - #ZoneShapes.freeZoneSlots
 				end
 				local before = used()
 				local zoneCount = #QuickZone:getZones()
@@ -765,7 +769,7 @@ return function(Tiniest: Tiniest)
 					end
 					QuickZone:update(0)
 
-					Expect(State.dynamicTree.cost < INF).is_true()
+					Expect(ZoneShapes.dynamicTree.cost < INF).is_true()
 				end)
 			end
 		)
@@ -981,7 +985,7 @@ return function(Tiniest: Tiniest)
 					table.insert(ours, entity)
 				end
 				local entityCount = 0
-				for _ in State.entityData do
+				for _ in Entities.entityData do
 					entityCount += 1
 				end
 				Expect(check(
@@ -1386,7 +1390,7 @@ return function(Tiniest: Tiniest)
 				QuickZone:update(1)
 				QuickZone:update(1)
 
-				Expect(State.buckets[RATE][1]).is(trigger)
+				Expect(Routing.buckets[RATE][1]).is(trigger)
 				Expect(table.concat(events, ' ')).is('')
 				Expect(lowObserver:getZoneOfEntity(entity) ~= nil).is_true()
 			end)
@@ -1421,15 +1425,15 @@ return function(Tiniest: Tiniest)
 				track(Observer.new({ zones = { zone }, groups = { group }, updateRate = RATE }))
 				QuickZone:update(1)
 
-				local data = State.entityData[first]
-				Scheduler.leaveBucket(first, data)
-				Scheduler.leaveBucket(first, data)
+				local data = Entities.entityData[first]
+				Routing.leaveBucket(first, data)
+				Routing.leaveBucket(first, data)
 
-				local bucket = State.buckets[RATE]
+				local bucket = Routing.buckets[RATE]
 				Expect(data.bucketIndex).is(0)
 				Expect(#bucket).is(1)
 				Expect(bucket[1]).is(second)
-				Expect(State.entityData[second].bucketIndex).is(1)
+				Expect(Entities.entityData[second].bucketIndex).is(1)
 			end)
 		end)
 	end)
@@ -1461,7 +1465,7 @@ return function(Tiniest: Tiniest)
 						end
 					end)
 					-- The first in the bucket runs the callback, the second is checked after it in the same tick
-					local bucket = State.buckets[37.25]
+					local bucket = Routing.buckets[37.25]
 					bucket[1].Position = target
 					bucket[2].Position = position
 					for _ = 1, 3 do

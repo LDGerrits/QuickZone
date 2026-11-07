@@ -15,41 +15,27 @@ local RunService = game:GetService('RunService')
 
 local Types = require(script.Parent.Parent.Types)
 local Config = require(script.Parent.Parent.Config)
+local Entities = require(script.Parent.Parent.Core.Entities)
+local Links = require(script.Parent.Parent.Core.Links)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
 local References = require(script.Parent.Parent.Core.References)
-local Scheduler = require(script.Parent.Parent.Core.Scheduler)
-local State = require(script.Parent.Parent.Core.State)
+local Registry = require(script.Parent.Parent.Core.Registry)
+local Routing = require(script.Parent.Parent.Core.Routing)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
-
-local STRAT_POS = Config.Strategy.POS
-local STRAT_PRIM = Config.Strategy.PRIM
-local STRAT_WORLD = Config.Strategy.WORLD
-local STRAT_CFRAME = Config.Strategy.CFRAME
-local STRAT_TRANSFORM = Config.Strategy.TRANSFORM
-local STRAT_PIVOT = Config.Strategy.PIVOT
-
-local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local IS_CLIENT = RunService:IsClient()
 
 local Group = {}
 Group.__index = Group
 
-local function isPlayer(x: any): boolean
-	return typeof(x) == 'Instance' and x:IsA('Player')
-end
-
-local function isMember(group: Types.InternalGroup, entity: any): boolean
-	local groups = State.entityToGroups[entity]
-	return groups ~= nil and groups[group.id] == true
-end
+local isPlayer = References.isPlayer
 
 -- Removes an instance from the group once it leaves the game, while the group has autoClean on
 local function watchRemoval(group: Types.InternalGroup, entity: any)
-	local cleanups = State.groupEntityCleanups[group.id]
+	local cleanups = Registry.groupEntityCleanups[group.id]
 	if typeof(entity) == 'Instance' and not cleanups[entity] then
 		cleanups[entity] = entity.AncestryChanged:Connect(function(_, parent)
 			if not parent then
@@ -62,7 +48,7 @@ end
 -- Removes a member. A character part of a player goes through the player as well, so the player's next
 -- character is not added back
 local function removeMember(group: Types.InternalGroup, entity: any)
-	local reference = State.entityToReference[entity]
+	local reference = References.entityToReference[entity]
 	if isPlayer(reference) then
 		group:_remove(reference)
 	end
@@ -92,8 +78,8 @@ function Group.new<T>(config: {
 	entities: { T }?,
 	autoClean: boolean?,
 }?): Types.Group<T>
-	local id = State.nextGroupId
-	State.nextGroupId += 1
+	local id = Registry.nextGroupId
+	Registry.nextGroupId += 1
 
 	local autoClean = Config.Group.autoClean
 	if config and config.autoClean ~= nil then
@@ -108,9 +94,9 @@ function Group.new<T>(config: {
 		autoClean = autoClean,
 	}, Group) :: any
 
-	State.groups[id] = self
-	State.groupToObservers[id] = {}
-	State.groupEntityCleanups[id] = {}
+	Registry.groups[id] = self
+	Links.addGroup(id)
+	Registry.groupEntityCleanups[id] = {}
 
 	if config and config.entities then
 		self:_addBulk(config.entities)
@@ -272,7 +258,7 @@ function Group.setAutoClean(self: Types.InternalGroup, enabled: boolean): Types.
 	end
 
 	self.autoClean = enabled
-	local cleanups = State.groupEntityCleanups[self.id]
+	local cleanups = Registry.groupEntityCleanups[self.id]
 
 	if enabled then
 		for _, entity in self.entities do
@@ -410,7 +396,7 @@ end
 ]=]
 function Group.contains(self: Types.InternalGroup, entity: any): boolean
 	-- A player is a member while it has no character too
-	return isMember(self, References.entityOf(entity))
+	return Entities.isIn(References.entityOf(entity), self.id)
 		or (isPlayer(entity) and PlayerTracker.isSubscribed(entity, self))
 end
 
@@ -435,7 +421,7 @@ end
 function Group.getEntities(self: Types.InternalGroup): { any }
 	local result = table.create(#self.entities)
 	for i, entity in ipairs(self.entities) do
-		result[i] = State.entityToReference[entity] or entity
+		result[i] = References.entityToReference[entity] or entity
 	end
 	return result
 end
@@ -461,7 +447,7 @@ function Group.iterEntities(self: Types.InternalGroup): () -> any?
 	return function()
 		local entity = nextEntity()
 		if entity ~= nil then
-			return State.entityToReference[entity] or entity
+			return References.entityToReference[entity] or entity
 		end
 		return nil
 	end
@@ -505,9 +491,9 @@ function Group.destroy(self: Types.InternalGroup): ()
 	self:_clear()
 	Memberships.groupDestroyed(self.id)
 
-	State.groupToObservers[self.id] = nil
-	State.groups[self.id] = nil
-	State.groupEntityCleanups[self.id] = nil
+	Links.dropGroup(self.id)
+	Registry.groups[self.id] = nil
+	Registry.groupEntityCleanups[self.id] = nil
 
 	Destroyed.finish(self)
 end
@@ -536,75 +522,15 @@ function Group._addEntity(self: Types.InternalGroup, entity: Types.Entity): Type
 		return self
 	end
 
-	if not State.entityToGroups[entity] then
-		State.entityToGroups[entity] = {}
-	end
-
-	if State.entityToGroups[entity][self.id] then
+	if not Entities.join(entity, self.id) then
 		return self
-	end
-
-	State.entityToGroups[entity][self.id] = true
-
-	if not State.entityData[entity] then
-		local strat
-		if typeof(entity) == 'Instance' then
-			if entity:IsA('BasePart') then
-				strat = STRAT_POS
-			elseif entity:IsA('Attachment') or entity:IsA('Bone') then
-				strat = STRAT_WORLD
-			elseif entity:IsA('Camera') then
-				strat = STRAT_CFRAME
-			elseif entity:IsA('Model') then
-				strat = entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
-			end
-		elseif typeof(entity) == 'table' then
-			if entity.Position then
-				strat = STRAT_POS
-			elseif entity.CFrame then
-				strat = STRAT_CFRAME
-			elseif entity.Transform then
-				strat = STRAT_TRANSFORM
-			elseif entity.WorldPosition then
-				strat = STRAT_WORLD
-			elseif entity.GetPivot then
-				strat = STRAT_PIVOT
-			end
-		end
-
-		if not strat then
-			Log.nonFatal(
-				'Invalid entity (%s). Expected BasePart, Model, Bone, Attachment, Camera, or a valid EntityTable.',
-				nil,
-				tostring(entity)
-			)
-			State.entityToGroups[entity][self.id] = nil
-			if next(State.entityToGroups[entity]) == nil then
-				State.entityToGroups[entity] = nil
-			end
-			return self
-		end
-
-		State.entityData[entity] = {
-			strategy = strat,
-			lastPosition = Vector3.zero,
-			activeObserverMemberships = {},
-			precisionSq = DEFAULT_PRECISION_SQ,
-			updateRate = -1,
-			bucketIndex = 0,
-			dynamicVersion = -1,
-			staticVersion = -1,
-			logicVersion = -1,
-			needsStatic = false,
-			needsDynamic = false,
-		}
 	end
 
 	local idx = #self.entities + 1
 	self.entities[idx] = entity
 	self.entityIndices[entity] = idx
 
-	Scheduler.recheck(entity)
+	Routing.recheck(entity)
 
 	if self.autoClean then
 		watchRemoval(self, entity)
@@ -641,18 +567,18 @@ end
 
 -- Removes the entity as given, never through the reference map. For internal callers that hold the member
 function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): Types.Group
-	if not State.entityToGroups[entity] or not State.entityToGroups[entity][self.id] then
+	if not Entities.isIn(entity, self.id) then
 		return self
 	end
 
-	local cleanupConn = State.groupEntityCleanups[self.id][entity]
+	local cleanupConn = Registry.groupEntityCleanups[self.id][entity]
 	if cleanupConn then
 		cleanupConn:Disconnect()
-		State.groupEntityCleanups[self.id][entity] = nil
+		Registry.groupEntityCleanups[self.id][entity] = nil
 	end
 
-	State.entityToGroups[entity][self.id] = nil
-	local data = State.entityData[entity]
+	Entities.leave(entity, self.id)
+	local data = Entities.entityData[entity]
 
 	local idx = self.entityIndices[entity]
 	local lastIdx = #self.entities
@@ -667,30 +593,17 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 		self.entityIndices[entity] = nil
 	end
 
-	Scheduler.recheck(entity)
+	Routing.recheck(entity)
 
 	Memberships.exitUnsubscribed(entity, data)
 	-- Its group may leave observers it stays in through other groups
 	Memberships.groupsChanged(entity)
 
 	-- Exit callbacks may have removed the entity everywhere, or added it back
-	local groups = State.entityToGroups[entity]
-	if State.entityData[entity] == data and groups and next(groups) == nil then
-		Scheduler.leaveBucket(entity, data)
-		State.entityData[entity] = nil
-		State.entityToGroups[entity] = nil
-		State.entityToObservers[entity] = nil
-		State.dirtyProfiles[entity] = nil
-		State.dirtyTopology[entity] = nil
-
-		local ref = State.entityToReference[entity]
-		if ref and not isPlayer(ref) then
-			State.entityToReference[entity] = nil
-			-- Ensure we only clear the reverse map if it still points to this exact entity
-			if State.referenceToEntity[ref] == entity then
-				State.referenceToEntity[ref] = nil
-			end
-		end
+	if Entities.isGroupless(entity, data) then
+		Routing.forget(entity, data :: Types.EntityData)
+		Entities.drop(entity)
+		References.forget(entity)
 	end
 
 	return self
