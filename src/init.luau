@@ -369,7 +369,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			local size = halfSize * 2
 
 			local observers = zoneAttachedObservers[slot]
-			local isActive = observers and next(observers) ~= nil
+			-- Links drops a slot's list once it empties
+			local isActive = observers ~= nil
 			local color
 			if dynamicSlots[slot] then
 				color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive

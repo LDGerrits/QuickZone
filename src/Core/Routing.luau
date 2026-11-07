@@ -174,7 +174,7 @@ local function processTopologyChange(entity: Types.Entity)
 end
 
 -- The trees the entity's observers query changed, so the entity is placed again at the next tick
-function Routing.markTopology(entity: Types.Entity)
+local function markTopology(entity: Types.Entity)
 	dirtyTopology[entity] = true
 end
 
@@ -201,10 +201,11 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 	local newCount = current + delta
 	dict[observerId] = newCount
 
-	-- Only flag entities dirty if the observer's topology fundamentally changed
-	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
+	-- Only flag entities dirty when the observer gains its first zone in the tree or loses its last, as the
+	-- delta is always 1 or -1
+	if current == 0 or newCount == 0 then
 		-- Check every entity again when an observer loses its last zone
-		if current == 1 and newCount == 0 then
+		if newCount == 0 then
 			Routing.recheckAll()
 		end
 
@@ -219,7 +220,7 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 			end
 
 			for _, entity in group.entities do
-				Routing.markTopology(entity)
+				markTopology(entity)
 			end
 		end
 	end

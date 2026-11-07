@@ -31,13 +31,9 @@ function Links.unsubscribeAll(observerId: number)
 	end
 end
 
+-- The group's set exists, as only live groups are subscribed
 function Links.subscribe(observerId: number, groupId: number)
-	local observers = groupToObservers[groupId]
-	if not observers then
-		observers = {}
-		groupToObservers[groupId] = observers
-	end
-	observers[observerId] = true
+	groupToObservers[groupId][observerId] = true
 end
 
 function Links.unsubscribe(observerId: number, groupId: number)

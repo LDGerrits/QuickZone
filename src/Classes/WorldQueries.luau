@@ -188,7 +188,7 @@ end
 function WorldQueries:getZonesOfEntity(entity: any): { Types.Zone }
 	entity = entityOf(entity)
 	local data = entityData[entity]
-	if not data or not data.activeObserverMemberships then
+	if not data then
 		return {}
 	end
 
@@ -367,7 +367,7 @@ function WorldQueries:iterZonesOfEntity(entity: any): () -> Types.Zone?
 	entity = entityOf(entity)
 
 	local data = entityData[entity]
-	if not data or not data.activeObserverMemberships then
+	if not data then
 		return function()
 			return nil
 		end

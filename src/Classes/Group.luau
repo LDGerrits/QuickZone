@@ -580,18 +580,14 @@ function Group._removeEntity(self: Types.InternalGroup, entity: Types.Entity): T
 	Entities.leave(entity, self.id)
 	local data = Entities.entityData[entity]
 
+	-- Swaps the last member into its place. Also right when it is the last, as its own entries are cleared after
 	local idx = self.entityIndices[entity]
 	local lastIdx = #self.entities
-	if idx == lastIdx then
-		self.entities[lastIdx] = nil
-		self.entityIndices[entity] = nil
-	else
-		local lastEntity = self.entities[lastIdx]
-		self.entities[idx] = lastEntity
-		self.entityIndices[lastEntity] = idx
-		self.entities[lastIdx] = nil
-		self.entityIndices[entity] = nil
-	end
+	local lastEntity = self.entities[lastIdx]
+	self.entities[idx] = lastEntity
+	self.entityIndices[lastEntity] = idx
+	self.entities[lastIdx] = nil
+	self.entityIndices[entity] = nil
 
 	Routing.recheck(entity)
 

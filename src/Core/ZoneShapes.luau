@@ -293,7 +293,7 @@ function ZoneShapes.remove(slot: number)
 end
 
 -- Called after a tree is rebuilt. Only stale leaves can have changed, as every write marks its slot
-function ZoneShapes.markBuilt(slots: { [number]: any })
+local function markBuilt(slots: { [number]: any })
 	for slot in staleSlots do
 		if slots[slot] then
 			treeExact[slot] = shapeAxisAligned[slot]
@@ -339,7 +339,7 @@ local function updateTree(tree: Types.Tree, members: { [number]: any })
 		tree.membersChanged = false
 	end
 	tree.pending = false
-	ZoneShapes.markBuilt(members)
+	markBuilt(members)
 end
 
 -- Brings both trees up to date with their zones, and raises the version of each that changed

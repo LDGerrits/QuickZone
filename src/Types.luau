@@ -37,17 +37,6 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 -- See Utils/Destroyed
 export type Phase = 'alive' | 'destroying' | 'dead'
 
-export type BoundingVolume = {
-	position: Vector3,
-	cframe: CFrame,
-	halfSize: Vector3,
-	type: ShapeType,
-	radiusSq: number?,
-	start: Vector3?,
-	axis: Vector3?,
-	axisLength: number?,
-}
-
 -- Flat LBVH, see Utils/LinearBVH for the node layout
 export type Tree = {
 	buffer: buffer,

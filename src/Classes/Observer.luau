@@ -193,8 +193,9 @@ function Observer.new<T>(config: {
 	local explicitlyPassedZones = config and config.zones ~= nil
 	local explicitlyPassedGroups = config and config.groups ~= nil
 
-	local missingZones = not explicitlyPassedZones and not hasAttachedMap[id]
-	local missingGroups = not explicitlyPassedGroups and not hasSubscribedMap[id]
+	-- Nothing was attached or subscribed above without a table, so only a later attach or subscribe can fix it
+	local missingZones = not explicitlyPassedZones
+	local missingGroups = not explicitlyPassedGroups
 
 	if missingZones or missingGroups then
 		local creationTrace = debug.traceback('', 2)

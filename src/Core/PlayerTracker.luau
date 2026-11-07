@@ -13,17 +13,10 @@ local leaving = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Player]: true 
 
 local PlayerTracker = {}
 
--- Whether the player is in a group that is not destroyed
+-- Whether the player is in a group. A group being destroyed lets go of its players before it is gone
 local function isInAnyGroup(player: Player): boolean
 	local subscriptions = playerSubscriptions[player]
-	if subscriptions then
-		for groupId in subscriptions do
-			if Registry.groups[groupId] then
-				return true
-			end
-		end
-	end
-	return false
+	return subscriptions ~= nil and next(subscriptions) ~= nil
 end
 
 local stopTracking: (player: Player) -> ()
@@ -59,10 +52,9 @@ local function trackPlayer(player: Player)
 			if subscriptions then
 				-- Cloned, as exit callbacks may add the player to groups
 				for groupId, group in table.clone(subscriptions) do
+					-- Unless a callback destroyed it meanwhile
 					if Registry.groups[groupId] then
 						group:_removeEntity(hrp)
-					else
-						subscriptions[groupId] = nil
 					end
 				end
 			end
@@ -119,8 +111,6 @@ local function trackPlayer(player: Player)
 						break
 					elseif Registry.groups[groupId] then
 						group:_addEntity(hrp)
-					else
-						subscriptions[groupId] = nil
 					end
 				end
 			end
@@ -207,11 +197,12 @@ function PlayerTracker.isSubscribed(player: Player, group: Types.InternalGroup):
 	return subscriptions ~= nil and subscriptions[group.id] ~= nil
 end
 
--- The live groups the player was added to, also while it has no character
+-- The groups the player was added to, also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
-	for groupId, group in playerSubscriptions[player] or {} do
-		if Registry.groups[groupId] then
+	local subscriptions = playerSubscriptions[player]
+	if subscriptions then
+		for _, group in subscriptions do
 			table.insert(list, group)
 		end
 	end

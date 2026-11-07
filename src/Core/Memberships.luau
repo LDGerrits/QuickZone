@@ -79,14 +79,14 @@ function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boo
 	return false
 end
 
--- Moves the entity into the observer's zone, returns the zone it was in
-function Memberships.move(observerId: number, entity: Types.Entity, data: Types.EntityData, zoneId: number): number?
+-- Moves the entity into the observer's zone
+function Memberships.move(observerId: number, entity: Types.Entity, data: Types.EntityData, zoneId: number)
 	local memberships = data.activeObserverMemberships
 	local oldZoneId = memberships[observerId]
 	local tracked = observerTrackingEntities[observerId]
 	-- Destroyed observers track nothing
 	if oldZoneId == zoneId or not tracked then
-		return oldZoneId
+		return
 	end
 
 	memberships[observerId] = zoneId
@@ -95,8 +95,6 @@ function Memberships.move(observerId: number, entity: Types.Entity, data: Types.
 		removeOccupant(oldZoneId)
 	end
 	addOccupant(zoneId)
-
-	return oldZoneId
 end
 
 -- Takes the entity out of the observer's zone and fires the observer's exits
@@ -150,7 +148,7 @@ end
 
 -- Takes the observer's entities out of a zone being destroyed. An entity another of the observer's zones holds
 -- moves there, as it would if the zone were detached, rather than leaving and entering again on the next tick
-function Memberships.leaveDestroyedZone(observerId: number, zoneId: number)
+local function leaveDestroyedZone(observerId: number, zoneId: number)
 	local tracked = observerTrackingEntities[observerId]
 	if not tracked then
 		return
@@ -222,7 +220,7 @@ function Memberships.leaveZone(zoneId: number)
 		table.insert(observerIds, observerId)
 	end
 	for _, observerId in observerIds do
-		Memberships.leaveDestroyedZone(observerId, zoneId)
+		leaveDestroyedZone(observerId, zoneId)
 		if not zoneOccupants[zoneId] then
 			break
 		end

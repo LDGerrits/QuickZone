@@ -16,10 +16,6 @@ local function formatLog(messageTemplate: string, trace: string?, ...: any): str
 	return (messageText:gsub('\n', '\n    '))
 end
 
-function Log.info(message: string, trace: string?, ...: any)
-	print(formatLog(message, trace, ...))
-end
-
 function Log.warn(message: string, trace: string?, ...: any)
 	warn(formatLog(message, trace, ...))
 end

@@ -715,7 +715,6 @@ function Zone.destroy(self: Types.InternalZone): ()
 	Registry.zoneSlotToZoneObj[slot] = nil
 	ZoneShapes.remove(slot)
 	ZoneShapes.freeSlot(slot)
-	Memberships.setZoneDestroying(id, false)
 
 	Destroyed.finish(self)
 end

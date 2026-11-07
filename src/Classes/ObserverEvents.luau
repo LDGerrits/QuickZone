@@ -222,16 +222,16 @@ function ObserverEvents.observe(
 	checkCallback(callback)
 	local cleanups = {} :: { [Types.Entity]: () -> () }
 	local activeIds = {} :: { [Types.Entity]: number }
-	local nextId = 0
+	local nextGeneration = 0
 
 	local cleanupEnter = self:onEnter(function(reference, zone, entity: any)
-		nextId += 1
-		local observerId = nextId
-		activeIds[entity] = observerId
+		nextGeneration += 1
+		local generation = nextGeneration
+		activeIds[entity] = generation
 
 		local cleanup = callback(reference, zone, entity)
 
-		if activeIds[entity] ~= observerId then
+		if activeIds[entity] ~= generation then
 			if type(cleanup) == 'function' then
 				cleanup()
 			end
