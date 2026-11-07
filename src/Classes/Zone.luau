@@ -19,7 +19,7 @@
 ]=]
 
 local Memberships = require(script.Parent.Parent.Core.Memberships)
-local Routing = require(script.Parent.Parent.Core.Routing)
+local Links = require(script.Parent.Parent.Core.Links)
 local State = require(script.Parent.Parent.Core.State)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
@@ -155,36 +155,6 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 
 	zone.syncConnections = connections
 	zone:sync()
-end
-
-local function updateObserverZoneCount(observerId: number, isDynamic: boolean, delta: number)
-	local dict = isDynamic and State.observerDynamicCount or State.observerStaticCount
-	local current = dict[observerId] or 0
-	local newCount = current + delta
-	dict[observerId] = newCount
-
-	-- Only flag entities dirty if the observer's topology fundamentally changed
-	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
-		-- Only force a global logic override when an observer loses its last zone
-		if current == 1 and newCount == 0 then
-			State.logicVersion += 1
-		end
-
-		for groupId, observers in State.groupToObservers do
-			if not observers[observerId] then
-				continue
-			end
-
-			local group = State.groups[groupId]
-			if not group then
-				continue
-			end
-
-			for _, entity in group.entities do
-				Routing.markTopology(entity)
-			end
-		end
-	end
 end
 
 -- Checked before a setter writes, as a bad value stored in the zone would break every later write
@@ -354,13 +324,7 @@ function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver)
 		return self
 	end
 
-	local attached = State.zoneAttachedObservers[self.slot] or {}
-	State.zoneAttachedObservers[self.slot] = attached
-
-	if not table.find(attached, observer.id) then
-		table.insert(attached, observer.id)
-		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
-		updateObserverZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), 1)
+	if Links.attach(self.slot, observer.id, ZoneShapes.isDynamic(self.slot)) then
 		ZoneShapes.touch(self.slot)
 	end
 
@@ -369,26 +333,9 @@ end
 
 -- private
 function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	local attached = State.zoneAttachedObservers[self.slot]
-	if not attached then
-		return self
-	end
-
-	local idx = table.find(attached, observer.id)
-	if idx then
-		local lastIdx = #attached
-		if idx ~= lastIdx then
-			attached[idx] = attached[lastIdx]
-		end
-		attached[lastIdx] = nil
-		State.zoneSoleObserver[self.slot] = if #attached == 1 then attached[1] else nil
-		updateObserverZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), -1)
+	if Links.detach(self.slot, observer.id, ZoneShapes.isDynamic(self.slot)) then
 		-- Its entities leave on the next tick, unless the zone is destroyed first
 		ZoneShapes.touch(self.slot)
-	end
-
-	if #attached == 0 then
-		State.zoneAttachedObservers[self.slot] = nil
 	end
 
 	return self
@@ -517,13 +464,7 @@ function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zo
 
 	ZoneShapes.setDynamic(slot, isDynamic)
 
-	local attached = State.zoneAttachedObservers[slot]
-	if attached then
-		for _, obsId in attached do
-			updateObserverZoneCount(obsId, not isDynamic, -1)
-			updateObserverZoneCount(obsId, isDynamic, 1)
-		end
-	end
+	Links.changeTree(slot, isDynamic)
 
 	if not isDynamic and self.autoSync then
 		self:setAutoSync(false)
@@ -761,15 +702,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	local slot = self.slot
 
 	-- Detach before any callback runs, so a callback that updates can't move entities back in
-	local attachedObservers = State.zoneAttachedObservers[slot]
-	State.zoneAttachedObservers[slot] = nil
-	State.zoneSoleObserver[slot] = nil
-
-	if attachedObservers then
-		for _, observerId in attachedObservers do
-			updateObserverZoneCount(observerId, ZoneShapes.isDynamic(slot), -1)
-		end
-	end
+	Links.detachAll(slot, ZoneShapes.isDynamic(slot))
 
 	-- Leave while the zone object is still alive, so callbacks get it
 	Memberships.leaveZone(id)
