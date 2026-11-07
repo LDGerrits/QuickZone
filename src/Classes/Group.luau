@@ -38,8 +38,6 @@ local IS_CLIENT = RunService:IsClient()
 local Group = {}
 Group.__index = Group
 
--- Removes a member. A character part of a player goes through the player as well, so the player's next
--- character is not added back
 local function isPlayer(x: any): boolean
 	return typeof(x) == 'Instance' and x:IsA('Player')
 end
@@ -61,6 +59,8 @@ local function watchRemoval(group: Types.InternalGroup, entity: any)
 	end
 end
 
+-- Removes a member. A character part of a player goes through the player as well, so the player's next
+-- character is not added back
 local function removeMember(group: Types.InternalGroup, entity: any)
 	local reference = State.entityToReference[entity]
 	if isPlayer(reference) then
@@ -350,7 +350,7 @@ function Group.addBulk(self: Types.InternalGroup, entities: { any }): Types.Grou
 end
 
 --[=[ 
-	Removes the entity from the group.
+	Removes the entity from the group. Removing a player's `HumanoidRootPart` removes the player.
 
 	@tag Chainable
 	@method remove
@@ -635,8 +635,10 @@ function Group._remove(self: Types.InternalGroup, reference: any): Types.Group
 		return self
 	end
 
-	-- An entity is removed itself, also when it is another entity's reference, as contains finds it
-	return self:_removeEntity(References.entityOf(reference))
+	-- An entity is removed itself, also when it is another entity's reference, as contains finds it. A player's
+	-- part is removed as the player
+	removeMember(self, References.entityOf(reference))
+	return self
 end
 
 -- Removes the entity as given, never through the reference map. For internal callers that hold the member
