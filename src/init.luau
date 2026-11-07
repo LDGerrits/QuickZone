@@ -193,6 +193,11 @@ end
 	end)
 	```
 
+	:::info Lifetime
+	The reference is forgotten once the entity leaves its last group, so set it again when you add the entity back.
+	The `HumanoidRootPart` of a player QuickZone tracks keeps the player as its reference; setting another one is ignored.
+	:::
+
 	@tag Chainable
 	@method setReference
 	@within QuickZone
@@ -202,30 +207,24 @@ end
 ]=]
 function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	local oldReference = entityToReference[entity]
-	local oldIsPlayer = isPlayer(oldReference)
 
-	if reference == nil then
-		if not oldIsPlayer then
-			-- Only if it still leads here, another entity may have taken it since
-			if oldReference ~= nil and referenceToEntity[oldReference] == entity then
-				referenceToEntity[oldReference] = nil
-			end
-			entityToReference[entity] = nil
+	-- The player tracker links a player's part and sets the link again on every respawn
+	if isPlayer(oldReference) then
+		if reference ~= oldReference then
+			Log.warn("Cannot change the reference of a player's HumanoidRootPart. Ignoring request.", nil)
 		end
 		return self
 	end
+	if isPlayer(reference) then
+		return self
+	end
 
-	if not isPlayer(reference) then
-		-- The old reference no longer leads to this entity
-		if
-			oldReference ~= nil
-			and oldReference ~= reference
-			and not oldIsPlayer
-			and referenceToEntity[oldReference] == entity
-		then
-			referenceToEntity[oldReference] = nil
-		end
-		entityToReference[entity] = reference
+	-- The old reference no longer leads to this entity, unless another entity has taken it since
+	if oldReference ~= nil and oldReference ~= reference and referenceToEntity[oldReference] == entity then
+		referenceToEntity[oldReference] = nil
+	end
+	entityToReference[entity] = reference
+	if reference ~= nil then
 		referenceToEntity[reference] = entity
 	end
 

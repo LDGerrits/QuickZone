@@ -556,6 +556,50 @@ return function(Tiniest: Tiniest)
 			part:Destroy()
 		end)
 
+		-- These two clean up also when they fail, as a tagged part left behind would join every later Zones of its tag
+		Test('A part whose zone was destroyed gets a new one when a tag claims it again.', function()
+			Util.withCleanup(function(track)
+				local tag = 'QZ_FROM_TAG_RECLAIM'
+				local model = track(Instance.new('Model'))
+				local part = track(CreatePart())
+
+				part.Parent = model
+				model.Parent = workspace
+				CollectionService:AddTag(part, tag)
+				CollectionService:AddTag(model, tag)
+				local zones = track(Zone.fromTag(tag))
+				zones:getZones()[1]:destroy()
+				local afterDestroy = #zones:getZones()
+
+				-- The model's tag still claims the part meanwhile
+				CollectionService:RemoveTag(part, tag)
+				task.wait()
+				CollectionService:AddTag(part, tag)
+				task.wait()
+
+				Expect(afterDestroy).is(0)
+				Expect(#zones:getZones()).is(1)
+			end)
+		end)
+
+		Test('A part whose zone was destroyed stays without one when it moves.', function()
+			Util.withCleanup(function(track)
+				local tag = 'QZ_FROM_TAG_DESTROYED_MOVES'
+				local folder = track(Instance.new('Folder'))
+				local part = track(CreatePart())
+
+				folder.Parent = workspace
+				CollectionService:AddTag(part, tag)
+				local zones = track(Zone.fromTag(tag))
+				zones:getZones()[1]:destroy()
+
+				part.Parent = folder
+				task.wait()
+
+				Expect(#zones:getZones()).is(0)
+			end)
+		end)
+
 		Test('Tagged container outside workspace drops zones, re-parenting restores them.', function()
 			local tag = 'QZ_FROM_TAG_ANCESTRY'
 			local model = Instance.new('Model')

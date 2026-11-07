@@ -498,17 +498,27 @@ function Zone.fromTag(tag: string, config: PartsConfig?): Types.Zones
 		end
 	end
 
+	local function addZone(part: BasePart)
+		local newZone = Zone.fromPart(part, { isDynamic = zones.dynamic })
+		instanceToZone[part] = newZone
+		zones:add(newZone)
+	end
+
 	local function claimPart(part: BasePart, claimer: Instance)
 		local claims = partClaims[part]
 		if claims then
-			claims[claimer] = true
+			-- A zone the user destroyed comes back on a new claim, not when a claimer reports itself again as it moves
+			if not claims[claimer] then
+				claims[claimer] = true
+				if Destroyed.isDestroyed(instanceToZone[part]) then
+					addZone(part)
+				end
+			end
 			return
 		end
 		partClaims[part] = { [claimer] = true }
 
-		local newZone = Zone.fromPart(part, { isDynamic = zones.dynamic })
-		instanceToZone[part] = newZone
-		zones:add(newZone)
+		addZone(part)
 
 		partDestroyingConnections[part] = part.Destroying:Connect(function()
 			dropPart(part)
@@ -653,6 +663,7 @@ end
 --[=[ 
 	Enables or disables automatic polling and syncing to the tracked BasePart.
 	If the zone is currently static, it will automatically be set to dynamic.
+	A zone without a reference warns and starts syncing once `setReference` gives it one.
 
 	@tag Chainable
 	@method setAutoSync
