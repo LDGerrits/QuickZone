@@ -91,19 +91,37 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 
 local Scheduler = {}
 
+-- The entity's observers changed their settings, so its rate, precision and trees are worked out at the next tick
+function Scheduler.reroute(entity: Types.Entity)
+	dirtyProfiles[entity] = true
+	dirtyTopology[entity] = true
+end
+
+-- The entity's groups or their observers changed. Rerouted, and checked at the next tick also when it stands
+-- still, as another observer may take it over
+function Scheduler.recheck(entity: Types.Entity)
+	Scheduler.reroute(entity)
+	local data = entityData[entity]
+	if data then
+		data.logicVersion = -1
+	end
+end
+
 -- Takes an entity out of the bucket of its update rate, swapping the last one into its place
-function Scheduler.leaveBucket(data: Types.EntityData)
+function Scheduler.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 	local bucket = buckets[data.updateRate]
-	if not bucket then
+	local idx = data.bucketIndex
+	-- Already out: the slot is empty or holds the entity swapped into it
+	if not bucket or bucket[idx] ~= entity then
 		return
 	end
 
-	local idx = data.bucketIndex
 	local last = #bucket
 	local lastEntity = bucket[last]
 	bucket[idx] = lastEntity
 	entityData[lastEntity].bucketIndex = idx
 	bucket[last] = nil
+	data.bucketIndex = 0
 end
 
 local function processProfileChange(entity: Types.Entity)
@@ -149,7 +167,7 @@ local function processProfileChange(entity: Types.Entity)
 
 	-- Swap buckets
 	if data.updateRate ~= maxRate then
-		Scheduler.leaveBucket(data)
+		Scheduler.leaveBucket(entity, data)
 
 		if maxRate > 0 then
 			if not buckets[maxRate] then
@@ -164,8 +182,6 @@ local function processProfileChange(entity: Types.Entity)
 			local newIdx = #newBucket + 1
 			newBucket[newIdx] = entity
 			data.bucketIndex = newIdx
-		else
-			data.bucketIndex = 0 -- Entity is not in a bucket, so no processing
 		end
 
 		data.updateRate = maxRate
