@@ -63,3 +63,10 @@ selene src
 stylua --check src tests
 stylua src tests
 ```
+
+`scripts/check-structure.sh` checks that the classes in `src/Classes` leave multi-step operations, such as attaching
+a zone or removing an entity from a group, to `Core/Groups` and `Core/Wiring`:
+
+```bash
+./scripts/check-structure.sh
+```
