@@ -2,8 +2,7 @@
 --!optimize 2
 --!strict
 
--- Owns every zone's slot and geometry, the trees and their change logs. Writes go through here, which keeps the
--- world-space shape used by queries and rebuilds, the change log and the tree rebuild flags in step with it
+-- Owns zone slots, geometry, trees and their change logs. Writes go through here to keep them in step
 
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
@@ -23,22 +22,19 @@ local isPointInShape = Geometry.isPointInShape
 
 local ZoneShapes = {}
 
--- Keyed by slot instead of id, slots are reused
+-- Keyed by reused slots rather than ids, so the tables stay arrays
 ZoneShapes.zoneSlotCount = 0
 ZoneShapes.freeZoneSlots = {} :: { number }
 ZoneShapes.zoneSlotIds = {} :: { [number]: number }
--- Slots of the zones in each tree
 ZoneShapes.staticSlots = {} :: { [number]: true }
 ZoneShapes.dynamicSlots = {} :: { [number]: true }
--- Geometry of every zone
 ZoneShapes.shapeCFrames = {} :: { [number]: CFrame }
 ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
--- Half size the shape fills, as a Ball fills its smallest side and a Cylinder its smallest cross-section
+-- Half size the shape fills: a Ball its smallest side, a Cylinder its smallest cross-section
 ZoneShapes.shapeExtents = {} :: { [number]: Vector3 }
 ZoneShapes.shapeTypes = {} :: { [number]: number }
 -- The part a Mesh zone queries
 ZoneShapes.shapeParts = {} :: { [number]: BasePart }
--- World-space shape derived from the geometry
 ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
 ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
@@ -48,9 +44,8 @@ ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
 ZoneShapes.shapeAxisAligned = {} :: { [number]: boolean }
 -- Zones whose leaf is exactly their shape
 ZoneShapes.treeExact = {} :: { [number]: boolean }
--- Zones added, moved or changed since their tree was built, which the trees may not find where they are
+-- Changed since their tree was built, so the trees may miss them
 ZoneShapes.staleSlots = {} :: { [number]: true }
--- Where zones changed per tree
 ZoneShapes.staticChanges = ZoneChanges.new()
 ZoneShapes.dynamicChanges = ZoneChanges.new()
 ZoneShapes.staticTree = LinearBVH.new()
@@ -92,14 +87,13 @@ local function treeOf(isDynamic: boolean): Types.Tree
 	return if isDynamic then dynamicTree else staticTree
 end
 
--- Zones were added to or removed from the tree, so it must be rebuilt rather than refit
+-- Rebuilt rather than refit
 local function markMembersChanged(isDynamic: boolean)
 	local tree = treeOf(isDynamic)
 	tree.pending = true
 	tree.membersChanged = true
 end
 
--- The half size a shape fills, like a part of that size. Negative sizes fill nothing past the center
 local function extentsOf(halfSize: Vector3, shapeType: number): Vector3
 	local extents = vector.max(halfSize, Vector3.zero)
 	if shapeType == BALL_SHAPE_VALUE then
@@ -112,7 +106,6 @@ local function extentsOf(halfSize: Vector3, shapeType: number): Vector3
 	return extents
 end
 
--- Recomputes the world-space shape from the geometry
 local function refresh(slot: number)
 	local isDynamic = dynamicSlots[slot] == true
 	local shapeType = shapeTypes[slot]
@@ -129,7 +122,7 @@ local function refresh(slot: number)
 		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
 	end
 
-	-- Entities in the old or new box may be affected. Checked here too, as zones moving every frame soon fill the log
+	-- Skipped when the log is full, as zones moving every frame soon fill it
 	local changes = changesOf(isDynamic)
 	if not changes.all then
 		local oldMin = shapeBoundsMin[slot]
@@ -149,14 +142,12 @@ local function refresh(slot: number)
 	-- Unrotated blocks are exactly their bounds
 	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE and isAxis(right) and isAxis(up) and isAxis(back)
 
-	-- Leaf is stale until the next rebuild
 	treeExact[slot] = nil
 	staleSlots[slot] = true
 
 	treeOf(isDynamic).pending = true
 end
 
--- A slot for a new zone. Keyed by slot, which is reused, so the tables stay arrays
 function ZoneShapes.allocateSlot(zoneId: number): number
 	local slot = table.remove(ZoneShapes.freeZoneSlots)
 	if not slot then
@@ -167,7 +158,6 @@ function ZoneShapes.allocateSlot(zoneId: number): number
 	return slot
 end
 
--- Adds a zone to the static or dynamic tree. part is the part a Mesh zone queries
 function ZoneShapes.add(
 	slot: number,
 	isDynamic: boolean,
@@ -190,9 +180,8 @@ function ZoneShapes.add(
 	refresh(slot)
 end
 
--- Sets the whole geometry
 function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeType: number, part: BasePart?)
-	-- Ignore writes for removed zones, like a late property signal
+	-- A late property signal can write to a removed zone
 	if not shapeCFrames[slot] then
 		return
 	end
@@ -229,8 +218,7 @@ function ZoneShapes.isDynamic(slot: number): boolean
 	return dynamicSlots[slot] == true
 end
 
--- Moves a zone between the static and dynamic trees. Its shape stays, but it is recorded as a change in both,
--- as entities only query the trees their observers have zones in
+-- Logged in both trees, as entities only query the trees their observers have zones in
 function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	if (dynamicSlots[slot] == true) == isDynamic then
 		return
@@ -285,12 +273,12 @@ function ZoneShapes.remove(slot: number)
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
 
-	-- The slot is reusable right away, as a stale tree leaf checks the new zone's shape
+	-- Reusable at once, as a stale tree leaf checks the new zone's shape
 	ZoneShapes.zoneSlotIds[slot] = nil
 	table.insert(ZoneShapes.freeZoneSlots, slot)
 end
 
--- Called after a tree is rebuilt. Only stale leaves can have changed, as every write marks its slot
+-- Only stale leaves can have changed, as every write marks its slot
 local function markBuilt(slots: { [number]: any })
 	for slot in staleSlots do
 		if slots[slot] then
@@ -318,19 +306,17 @@ function ZoneShapes.containsPoint(slot: number, point: Vector3): boolean
 	)
 end
 
--- Skips the shape check for exact leaves
 function ZoneShapes.leafContainsPoint(slot: number, point: Vector3): boolean
 	return treeExact[slot] == true or ZoneShapes.containsPoint(slot, point)
 end
 
--- Writes the ids of dynamic, then static, leaves containing the point to hits, returns the count.
--- Check each with leafContainsPoint before the trees change
+-- Hits are leaf boxes; check each with leafContainsPoint before the trees change
 function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 	local hitCount = queryPoint(dynamicTree, point, hits, 0)
 	return queryPoint(staticTree, point, hits, hitCount)
 end
 
--- Refit if only shapes changed, rebuild if zones were added or removed or the tree degraded
+-- Rebuild when members changed or the refit gives up on a degraded tree
 local function updateTree(tree: Types.Tree, members: { [number]: any })
 	if tree.membersChanged or not LinearBVH.refit(tree, shapeBoundsMin, shapeBoundsMax) then
 		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
@@ -340,7 +326,6 @@ local function updateTree(tree: Types.Tree, members: { [number]: any })
 	markBuilt(members)
 end
 
--- Brings both trees up to date with their zones, and raises the version of each that changed
 function ZoneShapes.rebuildTrees()
 	if dynamicTree.pending then
 		updateTree(dynamicTree, dynamicSlots)
@@ -350,7 +335,6 @@ function ZoneShapes.rebuildTrees()
 		updateTree(staticTree, staticSlots)
 	end
 
-	-- New version for every tree that changed
 	if ZoneChanges.commit(dynamicChanges, ZoneShapes.dynamicVersion + 1, (dynamicTree.count + 1) // 2) then
 		ZoneShapes.dynamicVersion += 1
 	end

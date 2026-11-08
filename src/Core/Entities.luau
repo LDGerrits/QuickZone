@@ -1,8 +1,6 @@
 --!strict
 
--- Owns which groups each entity is in, the members of each group, and the data the scheduler keeps on each
--- entity. An entity exists while it is in a group, and Members drops it once its routing is gone. Others read the
--- tables, only this module writes them
+-- Owns entity group membership, group member lists and per-entity scheduler data. Only this module writes them
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
@@ -19,10 +17,8 @@ local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local Entities = {}
 
--- The groups each entity is in, and what the scheduler keeps on it
 Entities.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
 Entities.entityData = {} :: { [Types.Entity]: Types.EntityData }
--- The members of each group in the order they joined, swap-removed when they leave, and each member's index
 Entities.groupEntities = {} :: { [number]: { Types.Entity } }
 Entities.groupEntityIndices = {} :: { [number]: { [Types.Entity]: number } }
 
@@ -31,7 +27,6 @@ local entityToGroups = Entities.entityToGroups
 local groupEntities = Entities.groupEntities
 local groupEntityIndices = Entities.groupEntityIndices
 
--- How the scheduler reads the entity's position, or nil when it can't be tracked
 local function strategyOf(entity: any): number?
 	if typeof(entity) == 'Instance' then
 		if entity:IsA('BasePart') then
@@ -59,7 +54,6 @@ local function strategyOf(entity: any): number?
 	return nil
 end
 
--- Whether x is something QuickZone can track as an entity
 function Entities.canTrack(x: any): boolean
 	return strategyOf(x) ~= nil
 end
@@ -69,8 +63,7 @@ function Entities.addGroup(groupId: number)
 	groupEntityIndices[groupId] = {}
 end
 
--- Forgets a destroyed group once its members are gone. Its list is emptied in place, so a loop still holding it
--- ends rather than finding a missing list
+-- Emptied in place so a loop still holding the list ends
 function Entities.dropGroup(groupId: number)
 	local members = groupEntities[groupId]
 	if members then
@@ -85,8 +78,7 @@ function Entities.isIn(entity: Types.Entity, groupId: number): boolean
 	return groups ~= nil and groups[groupId] == true
 end
 
--- Puts the entity in the group, and creates its data when it is new. False when it was in the group already, or
--- can't be tracked
+-- False when already in the group or untrackable
 function Entities.join(entity: Types.Entity, groupId: number): boolean
 	if Entities.isIn(entity, groupId) then
 		return false
@@ -132,7 +124,7 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 	return true
 end
 
--- Takes the entity out of the group. It stays until dropped, as exit callbacks still see it
+-- Keeps the entity's data until dropped, as exit callbacks still read it
 function Entities.leave(entity: Types.Entity, groupId: number)
 	local groups = entityToGroups[entity]
 	if groups then
@@ -142,7 +134,7 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	local indices = groupEntityIndices[groupId]
 	local idx = indices and indices[entity]
 	if idx then
-		-- Swaps the last member into its place. Also right when it is the last, as its own entries are cleared after
+		-- Also right when it is the last, as its own entries are cleared after
 		local members = groupEntities[groupId]
 		local lastIdx = #members
 		local lastEntity = members[lastIdx]
@@ -153,13 +145,13 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	end
 end
 
--- Whether the entity with this data left its last group, and exit callbacks didn't add it back or replace its data
+-- Left its last group, and exit callbacks didn't re-add it or replace its data
 function Entities.isGroupless(entity: Types.Entity, data: Types.EntityData?): boolean
 	local groups = entityToGroups[entity]
 	return data ~= nil and entityData[entity] == data and groups ~= nil and next(groups) == nil
 end
 
--- Drops an entity that left its last group, once its routing is gone. Members calls it, after Routing.forget
+-- Only after Routing.forget
 function Entities.drop(entity: Types.Entity)
 	entityData[entity] = nil
 	entityToGroups[entity] = nil

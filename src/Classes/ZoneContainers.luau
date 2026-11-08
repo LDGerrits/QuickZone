@@ -1,7 +1,5 @@
 --!strict
 
--- The Zone constructors that keep a Zones in step with a set of parts
-
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local TagWatcher = require(script.Parent.Parent.Utils.TagWatcher)
@@ -13,15 +11,13 @@ local ZoneContainers = {}
 
 type ZoneClass = { fromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone }
 
--- Builds the zone of each part with Zone.fromPart, looked up when called. Zone gives itself, as it requires
--- this module
+-- Zone gives itself, as it requires this module
 local Zone: ZoneClass
 
 function ZoneContainers.setZone(zone: ZoneClass)
 	Zone = zone
 end
 
--- Zones for the parts among initial and the instances added reports, until removed reports them
 local function fromContainer(
 	config: PartsConfig?,
 	added: RBXScriptSignal,
@@ -135,8 +131,7 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
 	local partDestroyingConnections = {} :: { [BasePart]: RBXScriptConnection }
 	local instanceToZone = {} :: { [BasePart]: Types.Zone }
-	-- The tagged instances that claim each part, the part itself or a tagged container. A set rather than a
-	-- count, as a tagged instance reports itself again each time it moves
+	-- A set rather than a count, as a tagged instance reports itself again each time it moves
 	local partClaims = {} :: { [BasePart]: { [Instance]: true } }
 
 	local function dropPart(part: BasePart)
@@ -159,7 +154,6 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 			return
 		end
 		claims[claimer] = nil
-		-- No more active tags claim this part, so safe to destroy
 		if next(claims) == nil then
 			dropPart(part)
 		end
@@ -174,7 +168,7 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	local function claimPart(part: BasePart, claimer: Instance)
 		local claims = partClaims[part]
 		if claims then
-			-- A zone the user destroyed comes back on a new claim, not when a claimer reports itself again as it moves
+			-- A user-destroyed zone returns on a new claim, not on a claimer reporting itself again
 			if not claims[claimer] then
 				claims[claimer] = true
 				if Destroyed.isDestroyed(instanceToZone[part]) then
@@ -192,7 +186,6 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 		end)
 	end
 
-	-- Releases what a tagged instance claimed, as it left the workspace or lost its tag
 	local function releaseInstance(instance: Instance)
 		if instance:IsA('BasePart') then
 			releasePart(instance, instance)

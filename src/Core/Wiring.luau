@@ -1,8 +1,7 @@
 --!strict
 
--- What an observer watches and how it is set, with what each change sets off, in the order it must happen:
--- attaching and detaching zones, moving a zone between trees, letting go of a zone being destroyed, subscribing
--- groups, and the observer's settings. The only writer of the observer settings in Registry
+-- Observer zone attachments, group subscriptions and settings, with their follow-on steps in required order. The
+-- only writer of observer settings in Registry
 
 local Types = require(script.Parent.Parent.Types)
 local Callbacks = require(script.Parent.Callbacks)
@@ -23,19 +22,17 @@ export type ObserverSettings = {
 
 local Wiring = {}
 
--- Tells the observer's group trackers that the group's members may count for it now, or no longer
 local function retrackMembers(observerId: number, groupId: number)
 	if Callbacks.observerGroupTrackers[observerId] then
-		-- Cloned, as tracker callbacks may change the group
+		-- Cloned: tracker callbacks may change the group
 		for _, entity in table.clone(Entities.groupEntities[groupId] :: { Types.Entity }) do
 			Memberships.groupsChanged(entity, observerId)
 		end
 	end
 end
 
--- Rechecks the group's members, and exits those the observer no longer watches
 local function disconnectFromGroup(observerId: number, groupId: number)
-	-- Cloned, as exit callbacks may remove entities from the group, swapping later ones into visited slots
+	-- Cloned: exit callbacks may remove members, swapping later ones into visited slots
 	for _, entity in table.clone(Entities.groupEntities[groupId] :: { Types.Entity }) do
 		local data = Entities.entityData[entity]
 		if not data then
@@ -53,8 +50,6 @@ local function disconnectFromGroup(observerId: number, groupId: number)
 	end
 end
 
--- Zones
-
 function Wiring.attach(slot: number, observerId: number)
 	if Links.attach(slot, observerId) then
 		Routing.changeZoneCount(observerId, ZoneShapes.isDynamic(slot), 1)
@@ -70,7 +65,6 @@ function Wiring.detach(slot: number, observerId: number)
 	end
 end
 
--- Moves the zone to the other tree, and its observers' zone counts with it. False when it was there already
 function Wiring.setZoneDynamic(slot: number, isDynamic: boolean): boolean
 	if ZoneShapes.isDynamic(slot) == isDynamic then
 		return false
@@ -88,8 +82,8 @@ function Wiring.setZoneDynamic(slot: number, isDynamic: boolean): boolean
 	return true
 end
 
--- Lets go of a zone being destroyed: its observers first, before any callback, so a callback that updates can't
--- move entities back in, then its entities leave or move on while the zone object is still alive
+-- Observers go before any callback, so an update can't move entities back in; entities leave while the zone
+-- object is still alive
 function Wiring.unwireZone(slot: number, zoneId: number)
 	local attached = Links.detachAll(slot)
 	if attached then
@@ -101,8 +95,6 @@ function Wiring.unwireZone(slot: number, zoneId: number)
 
 	Memberships.leaveZone(zoneId)
 end
-
--- Groups
 
 function Wiring.subscribe(observerId: number, groupId: number)
 	Links.subscribe(observerId, groupId)
@@ -122,9 +114,7 @@ function Wiring.unsubscribe(observerId: number, groupId: number)
 	retrackMembers(observerId, groupId)
 end
 
--- Observers
-
--- Registers a new observer whose settings were checked
+-- Settings must already be validated
 function Wiring.addObserver(observerId: number, settings: ObserverSettings)
 	Registry.observerPriorityMap[observerId] = settings.priority
 	Registry.observerUpdateRate[observerId] = settings.updateRate
@@ -136,9 +126,9 @@ function Wiring.addObserver(observerId: number, settings: ObserverSettings)
 	Routing.addObserver(observerId)
 end
 
--- Lets go of everything a destroyed observer has, once its onDestroy callbacks ran
+-- After its onDestroy callbacks
 function Wiring.removeObserver(observerId: number)
-	-- Exits every entity. Destroyed from an exit callback, the loop that fired it may not have reached them all
+	-- Exits every entity: destroyed from an exit callback, that loop may not have reached them all
 	Wiring.setEnabled(observerId, false)
 	Memberships.exitObserver(observerId)
 
@@ -171,8 +161,7 @@ function Wiring.setEnabled(observerId: number, enabled: boolean)
 	Routing.recheckAll()
 
 	if not enabled then
-		-- Cloned, as exit callbacks may subscribe groups. The live set is checked per group, as they may also
-		-- unsubscribe them
+		-- Cloned, as exit callbacks may subscribe groups; checked live, as they may unsubscribe too
 		for groupId, observers in table.clone(Links.groupToObservers) do
 			if observers[observerId] and Registry.groups[groupId] then
 				disconnectFromGroup(observerId, groupId)

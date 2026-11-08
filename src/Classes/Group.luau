@@ -28,7 +28,6 @@ local IS_CLIENT = RunService:IsClient()
 local Group = {}
 Group.__index = Group
 
--- Defined at the end, once Group has every method
 local ManagedGroup: any
 
 --[=[ 
@@ -388,7 +387,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 	Destroyed.finish(self)
 end
 
--- Groups that follow players or a tag keep their own members, so the methods that change them only warn
+-- Player and tag groups own their members, so the methods that change them only warn
 ManagedGroup = setmetatable({}, { __index = Group }) :: any
 ManagedGroup.__index = ManagedGroup
 

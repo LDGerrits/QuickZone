@@ -1,7 +1,5 @@
 --!strict
 
--- The Observer's events, also the player and group ones built on them
-
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
@@ -18,20 +16,17 @@ local isPlayer = References.isPlayer
 
 local IS_CLIENT = RunService:IsClient()
 
--- Keeps which subscribed groups have a member inside the observer, and runs onArrive and onLeave as that
--- changes. Read from the state rather than replayed from events, as entities change groups while inside
+-- Read from state rather than replayed from events, as entities change groups while inside
 local function trackGroups(
 	self: Types.InternalObserver,
 	onArrive: (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> (),
 	onLeave: (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> ()
 ): () -> ()
 	local observerId = self.id
-	-- Members inside of each group that is present, and the groups each entity counts for
 	local present = {} :: { [number]: { [Types.Entity]: true } }
 	local counted = {} :: { [Types.Entity]: { [number]: true } }
-	-- The zone each counted entity was last seen in
 	local lastZones = {} :: { [Types.Entity]: Types.Zone }
-	-- Set once disconnected, also by a callback halfway through a change
+	-- Also set by a callback halfway through a change
 	local disconnected = false
 
 	local function counts(entity: Types.Entity, groupId: number): boolean
@@ -46,7 +41,7 @@ local function trackGroups(
 			and observers[observerId] == true
 	end
 
-	-- zone is where the entity was when it left the observer
+	-- zone is where the entity left the observer
 	local function reconcile(entity: Types.Entity, zone: Types.Zone?)
 		local data = Entities.entityData[entity]
 		local zoneId = data and data.activeObserverMemberships[observerId]
@@ -55,7 +50,7 @@ local function trackGroups(
 			lastZones[entity] = current
 		end
 
-		-- Collected first, as the callbacks below may change groups and memberships
+		-- Collected first, as callbacks below may change groups and memberships
 		local leaving: { number }? = nil
 		local arriving: { number }? = nil
 		local have = counted[entity]
@@ -126,8 +121,7 @@ local function trackGroups(
 	local disconnectTransition = self:onTransition(onEvent)
 	local disconnectExit = self:onExit(onEvent)
 
-	-- A group being destroyed leaves while it still exists. It may count entities whose exit hasn't reached
-	-- this tracker yet, when a callback ahead of it destroyed the group
+	-- Runs while the group still exists, and may count entities whose exit hasn't reached this tracker yet
 	local function dropGroup(groupId: number)
 		local members = present[groupId]
 		if not members then
@@ -153,7 +147,6 @@ local function trackGroups(
 		end
 	end
 
-	-- Told when groups change, replaced rather than changed so a list being run never shifts
 	local function track(entity: Types.Entity?, destroyedGroupId: number?)
 		if disconnected then
 			return
@@ -165,7 +158,6 @@ local function trackGroups(
 	end
 	Callbacks.addGroupTracker(observerId, track)
 
-	-- Groups already inside arrive now
 	local inside = {}
 	for entity in Memberships.observerTrackingEntities[observerId] or {} do
 		table.insert(inside, entity)
@@ -185,13 +177,11 @@ end
 
 local checkCallback = Log.checkCallback
 
--- Whether the observer runs callbacks in their own thread. Also true once it is destroyed and its setting is gone,
--- so a cleanup that runs late is still kept apart
+-- Also true after destroy, so a late cleanup still runs in its own thread
 local function isSafe(observerId: number): boolean
 	return Registry.observerSafety[observerId] ~= false
 end
 
--- Passes on the events of players only. Also passes on what the callback returns, for observe
 local function forPlayers(callback: (Player, Types.Zone, Types.Entity) -> any): (any, Types.Zone, Types.Entity) -> any
 	checkCallback(callback)
 	return function(reference, zone, entity)
@@ -202,7 +192,6 @@ local function forPlayers(callback: (Player, Types.Zone, Types.Entity) -> any): 
 	end
 end
 
--- Passes on the events of the local player only, and refuses to on the server
 local function forLocalPlayer(
 	methodName: string,
 	callback: (Types.Zone, Types.Entity) -> any
@@ -219,7 +208,6 @@ local function forLocalPlayer(
 	end
 end
 
--- Calls back when a group arrives in the observer, or when it leaves
 local function groupEvent(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> (),
@@ -519,7 +507,7 @@ function ObserverEvents.observeGroup(
 	checkCallback(callback)
 	local observerId = self.id
 	local cleanups = {} :: { [number]: () -> () }
-	-- Bumped each time a group arrives or leaves, so a cleanup returned after its group left still runs
+	-- Bumped on arrive and leave, so a cleanup returned after its group left still runs
 	local generations = {} :: { [number]: number }
 	local disconnected = false
 

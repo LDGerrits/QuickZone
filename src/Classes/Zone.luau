@@ -49,7 +49,6 @@ for name, value in SHAPE_MAP do
 	SHAPE_NAMES[value] = name :: any
 end
 
--- The shape type of a shape name, Block for one that isn't
 local function shapeValueOf(shape: any): number
 	local mapped = SHAPE_MAP[shape]
 	if not mapped then
@@ -85,7 +84,6 @@ local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): Base
 	return nil
 end
 
--- The shape type and the part it queries. Mesh zones need a part, and fall back to Block without one
 local function resolveShape(zoneId: number, shapeType: number, part: BasePart?): (number, BasePart?)
 	if shapeType ~= MESH_SHAPE_VALUE then
 		return shapeType, nil
@@ -99,7 +97,7 @@ local function resolveShape(zoneId: number, shapeType: number, part: BasePart?):
 	return shapeType, part
 end
 
--- Sets the shape asked for. It is kept, so a Mesh zone that fell back to Block is Mesh again once it has a part
+-- Kept, so a Mesh zone that fell back to Block is Mesh again once it has a part
 local function applyShape(zone: Types.InternalZone, shapeType: number)
 	zone.requestedShapeType = shapeType
 	ZoneShapes.setShape(zone.slot, resolveShape(zone.id, shapeType, asQueryablePart(zone.reference)))
@@ -121,7 +119,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 		return
 	end
 
-	-- Each tick reads its CFrame, so anything else would make every tick error
+	-- Every tick reads its CFrame, so anything else would error each tick
 	if typeof(reference) ~= 'Instance' or not (reference:IsA('BasePart') or reference:IsA('Attachment')) then
 		Log.warn(
 			'Cannot autoSync Zone %d to %s. Use a BasePart, Attachment or Bone.',
@@ -158,7 +156,7 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 	zone:sync()
 end
 
--- Checked before a setter writes, as a bad value stored in the zone would break every later write
+-- Checked before writing, as a stored bad value breaks every later write
 local function checkCFrame(cframe: any)
 	if typeof(cframe) ~= 'CFrame' then
 		Log.fatal('Zone cframe must be a CFrame, got %s.', nil, typeof(cframe))
@@ -191,7 +189,7 @@ local function newZoneInternal(
 	metadata: any?,
 	autoSync: boolean
 ): Types.Zone
-	-- Checked before anything is registered, so a bad config can't leave a broken slot in the tree
+	-- Checked before registering, so a bad config leaves no broken slot in the tree
 	checkCFrame(cframe)
 	checkSize(size)
 	checkReference(reference)
@@ -377,8 +375,7 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 	self.reference = reference
 
 	if self.requestedShapeType == MESH_SHAPE_VALUE then
-		-- Mesh zones query the part directly, so the new reference has to take over.
-		-- Without a queryable part the zone falls back to its bounding box.
+		-- Mesh zones query the part directly, so the new reference has to take over
 		applyShape(self, MESH_SHAPE_VALUE)
 	end
 
@@ -409,7 +406,6 @@ end
 	@return Zone
 ]=]
 function Zone.sync(self: Types.InternalZone): Types.Zone
-	-- A zone without a reference has nothing to follow
 	local reference = self.reference
 	if not reference then
 		return self
@@ -441,7 +437,7 @@ end
 	@return Zone
 ]=]
 function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
-	-- A boolean, as the observers' zone counts below assume the zone really changes tree
+	-- A boolean, as observer zone counts assume the zone really changes tree
 	isDynamic = not not isDynamic
 	if not Wiring.setZoneDynamic(self.slot, isDynamic) then
 		return self
@@ -694,7 +690,6 @@ function Zone.destroy(self: Types.InternalZone): ()
 	Destroyed.finish(self)
 end
 
--- The constructors that keep a Zones in step with a set of parts are kept in their own file
 ZoneContainers.setZone(Zone)
 Zone.fromParts = ZoneContainers.fromParts
 Zone.fromChildren = ZoneContainers.fromChildren

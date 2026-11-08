@@ -1,14 +1,10 @@
 --!strict
 
--- Follows the instances that have a tag, for the fromTag constructors
-
 local CollectionService = game:GetService('CollectionService')
 
 local TagWatcher = {}
 
--- Calls onChange when an instance gets the tag and each time its ancestry changes, and onRemoved when it loses the
--- tag or the watch stops. When accept is given, only the instances it accepts are followed, but onRemoved still
--- hears of every instance that loses the tag. Returns the function that stops the watch
+-- onChange also fires on ancestry changes. onRemoved fires for every instance losing the tag, accepted or not
 function TagWatcher.watch(
 	tag: string,
 	onChange: (instance: Instance) -> (),

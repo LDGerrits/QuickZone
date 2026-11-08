@@ -58,7 +58,6 @@ local ctx_candidateIndex = table.create(16) :: { [number]: number }
 local ctx_candidateList = table.create(16) :: { [number]: number }
 local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
--- The bucket and index of the entity being checked, so a tick that errors resumes after it
 local ctx_rate: number? = nil
 local ctx_index = 0
 
@@ -69,7 +68,7 @@ local autoUpdateConnection: RBXScriptConnection?
 
 local bucketList = Routing.bucketList
 local buckets = Routing.buckets
-local nextBucketIndex = 1 -- Round-robin pointer
+local nextBucketIndex = 1
 local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
 local NOWHERE = Vector3.new(0 / 0, 0 / 0, 0 / 0)
@@ -88,7 +87,7 @@ local function processObserverHit(observerId: number, zoneId: number)
 		return
 	end
 
-	if ctx_candidatePriority[observerId] == nil then -- First hit
+	if ctx_candidatePriority[observerId] == nil then
 		local priority = observerPriorityMap[observerId] or 0
 		ctx_cCount += 1
 		ctx_candidateList[ctx_cCount] = observerId
@@ -99,7 +98,7 @@ local function processObserverHit(observerId: number, zoneId: number)
 			ctx_highestWin = priority
 		end
 	elseif ctx_currentMemberships[observerId] == zoneId then
-		-- An observer's zones share its priority, so a later hit only takes over when it is the current zone
+		-- An observer's zones share its priority, so only the current zone takes over
 		ctx_candidateIndex[observerId] = zoneId
 	end
 end
@@ -124,7 +123,6 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 
 		if observerId then
 			if ctx_candidatePriority[observerId] ~= nil then
-				-- An observer's zones share a priority, so only the current zone can take over
 				if ctx_currentMemberships[observerId] ~= zoneSlotIds[slot] then
 					continue
 				end
@@ -141,7 +139,6 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	end
 end
 
--- A dropped bucket starts from its first entity when its rate comes back
 local function dropBucketProgress(rate: number)
 	bucketLastProcessedIndex[rate] = nil
 end
@@ -151,7 +148,6 @@ local function runTick(dt: number)
 
 	Routing.settle(dropBucketProgress)
 
-	-- Auto-sync zone positions if enabled
 	if autoSyncRate > 0 then
 		local syncInterval = 1 / autoSyncRate
 		autoSyncTimer += dt
@@ -171,8 +167,7 @@ local function runTick(dt: number)
 		end
 	end
 
-	-- No return here when the rebuild used up the budget, as entities would never be checked while zones keep
-	-- moving. The loop below checks the budget every few entities, so each tick makes some progress
+	-- No early return on budget, or entities would never be checked while zones keep moving
 	ZoneShapes.rebuildTrees()
 
 	local numBuckets = #bucketList
@@ -180,7 +175,6 @@ local function runTick(dt: number)
 		return
 	end
 
-	-- Pointer may have gotten out of bounds
 	if nextBucketIndex > numBuckets then
 		nextBucketIndex = 1
 	end
@@ -189,7 +183,6 @@ local function runTick(dt: number)
 	local staticVersion = ZoneShapes.staticVersion
 	local logicVersion = Routing.logicVersion
 
-	-- Round-robin scheduling to prevent starvation
 	for _ = 1, numBuckets do
 		local rate = bucketList[nextBucketIndex]
 		nextBucketIndex = (nextBucketIndex % numBuckets) + 1
@@ -200,7 +193,7 @@ local function runTick(dt: number)
 			continue
 		end
 
-		-- At least one, also when the quota is NaN from an infinite rate and no time passed
+		-- At least one, also when an infinite rate and zero dt make the quota NaN
 		local rawQuota = math.ceil(totalEntities * rate * dt)
 		local workQuota = if rawQuota >= totalEntities then totalEntities elseif rawQuota >= 1 then rawQuota else 1
 
@@ -218,7 +211,6 @@ local function runTick(dt: number)
 			local entity = list[idx]
 			local data = entityData[entity] :: Types.EntityData
 
-			-- Strategy
 			local position
 			local strategy = data.strategy
 			if strategy == STRAT_POS then
@@ -237,7 +229,7 @@ local function runTick(dt: number)
 			elseif strategy == STRAT_PIVOT then
 				position = (entity :: any):GetPivot().Position
 			end
-			-- A table entity without a position is nowhere, rather than an error that stops every entity after it
+			-- A table entity without a position is nowhere, rather than an error that stops the tick
 			if not position then
 				position = NOWHERE
 			end
@@ -257,7 +249,6 @@ local function runTick(dt: number)
 				shouldCheck = not ((dx * dx + dy * dy + dz * dz) < data.precisionSq)
 			end
 
-			-- Standing still, so only zone changes at either position matter
 			if not shouldCheck and needsDynamic and data.dynamicVersion ~= dynamicVersion then
 				shouldCheck = touches(dynamicChanges, data.dynamicVersion, dynamicVersion, position, lastPosition)
 				if not shouldCheck then
@@ -272,8 +263,7 @@ local function runTick(dt: number)
 				end
 			end
 
-			-- A callback earlier this tick changed its groups or their observers, which apply from the next tick.
-			-- Checked now, an observer it lost could still win over one it has, and make it leave that one
+			-- Groups changed by a callback this tick apply next tick; checked now, a lost observer could still win
 			if shouldCheck and dirtyProfiles[entity] then
 				data.logicVersion = -1
 				shouldCheck = false
@@ -301,7 +291,6 @@ local function runTick(dt: number)
 
 				local current = data.activeObserverMemberships
 
-				-- Exits
 				for observerId in current do
 					local newPri = ctx_candidatePriority[observerId]
 					if newPri and newPri >= ctx_highestWin then
@@ -311,7 +300,6 @@ local function runTick(dt: number)
 					exitMembership(observerId, entity, data)
 				end
 
-				-- Entries & Transitions
 				for i = 1, ctx_cCount do
 					local observerId = ctx_candidateList[i]
 					local priority = ctx_candidatePriority[observerId]
@@ -329,7 +317,6 @@ local function runTick(dt: number)
 						continue
 					end
 
-					-- Already in this zone, so nothing to enter
 					local currentZoneId = current[observerId]
 					if currentZoneId == zoneIdx then
 						continue
@@ -341,8 +328,7 @@ local function runTick(dt: number)
 						continue
 					end
 
-					-- Or changed the observer, so the entity is checked again next tick. Changes to its groups
-					-- leave its profile dirty, and a clean profile means the observer still watches one of them
+					-- Or changed the observer, so recheck next tick. A clean profile means it is still subscribed
 					local attached = zoneAttachedObservers[zone.slot]
 					if
 						observerEnabled[observerId] == false
@@ -356,7 +342,6 @@ local function runTick(dt: number)
 
 					moveMembership(observerId, entity, data, zoneIdx)
 
-					-- Entry if it was in none of the observer's zones, transition otherwise
 					local reference = entityToReference[entity] or entity
 					fireCallback(
 						if currentZoneId then observerTransitionedCallbacks else observerEnteredCallbacks,
@@ -369,8 +354,7 @@ local function runTick(dt: number)
 					)
 				end
 
-				-- A callback changed its groups or their observers, which only applies from the next tick,
-				-- so it is checked again then even when standing still
+				-- A callback changed its groups, so recheck next tick even when standing still
 				if dirtyProfiles[entity] then
 					data.logicVersion = -1
 				end
@@ -389,7 +373,6 @@ local function runTick(dt: number)
 			end
 			processed += 1
 
-			-- Global budget check
 			budgetCheckCountdown -= 1
 			if budgetCheckCountdown == 0 then
 				budgetCheckCountdown = BUDGET_CHECK
@@ -408,8 +391,7 @@ local function runTick(dt: number)
 	end
 end
 
--- After a tick errored partway, as a bad entity or reference can make it. Without this, the candidates of the
--- entity being checked would stay and freeze their observers, and every tick would stop at the same entity
+-- Leftover candidates would freeze their observers, and every tick would stop at the same entity
 local function recoverFromError()
 	ctx_cCount = 0
 	table.clear(ctx_candidateList)
@@ -422,9 +404,8 @@ local function recoverFromError()
 	end
 end
 
--- The thread running a tick, set while one runs. A callback updating again would clobber the tick in progress,
--- so that update is skipped and its work is left to the next tick. Suspended rather than running, it was an
--- unsafe callback that yielded, which is warned about once per stall
+-- Set while a tick runs, so an update from a callback is skipped instead of clobbering it.
+-- Suspended means an unsafe callback yielded
 local tickThread: thread? = nil
 local warnedYield = false
 

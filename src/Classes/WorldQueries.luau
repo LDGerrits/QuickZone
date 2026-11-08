@@ -1,7 +1,5 @@
 --!strict
 
--- QuickZone's queries over everything that exists: entities, groups, observers and zones
-
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Parent.Core.Entities)
 local PlayerTracker = require(script.Parent.Parent.Core.PlayerTracker)
@@ -30,7 +28,6 @@ local entityToGroups = Entities.entityToGroups
 local referenceToEntity = References.referenceToEntity
 
 local queryHits = {} :: { number }
--- Candidate lists of finished iterZonesAtPoint iterators, for reuse
 local spareCandidates = {} :: { { Types.InternalZone } }
 
 local WorldQueries = {}
@@ -175,7 +172,7 @@ function WorldQueries:getZonesOfEntity(entity: any): { Types.Zone }
 	end
 
 	local results = {}
-	local seenZones = {} -- In case multiple observers track the entity in the same zone
+	local seenZones = {} -- Several observers may track the entity in the same zone
 
 	for _, zoneId in data.activeObserverMemberships do
 		if seenZones[zoneId] then
@@ -308,7 +305,6 @@ function WorldQueries:iterGroupsOfEntity(entity: any): () -> Types.Group?
 
 	local groupIds = entityToGroups[entity]
 	if not groupIds then
-		-- A player without a character is still in the groups it was added to
 		local list = if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
 		local i = 0
 		return function(): Types.Group?
@@ -424,7 +420,6 @@ function WorldQueries:iterZonesAtPoint(point: Vector3): () -> Types.Zone?
 			end
 		end
 
-		-- Finished, so the list can be reused
 		table.clear(candidates)
 		table.insert(spareCandidates, candidates)
 		candidates = nil

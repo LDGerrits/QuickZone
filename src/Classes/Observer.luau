@@ -23,7 +23,7 @@ local checkZone = Checks.checkZone
 local hasAttachedMap = {} :: { [number]: boolean }
 local hasSubscribedMap = {} :: { [number]: boolean }
 
--- Settings are checked where they are given, as a NaN would quietly break every later tick
+-- A NaN setting would quietly break every later tick
 local function checkPriority(p: any): number
 	if type(p) ~= 'number' or p ~= p then
 		Log.fatal('priority must be a number, got %s.', nil, tostring(p))
@@ -46,7 +46,7 @@ local function checkPrecision(n: any): number
 end
 
 local function checkGroup(group: any)
-	-- A destroyed group is no longer registered, and gets its own error below
+	-- A destroyed group is unregistered and gets its own error below
 	local isGroup = type(group) == 'table'
 		and type(group.id) == 'number'
 		and (Registry.groups[group.id] == group or Destroyed.isDestroyed(group))
@@ -110,7 +110,7 @@ function Observer.new<T>(config: {
 	local priority = checkPriority(config and config.priority or 0)
 	local updateRate = checkUpdateRate(config and config.updateRate or Config.Observer.updateRate)
 	local precision = checkPrecision(config and config.precision or Config.Observer.precision)
-	-- All checked before anything is registered, so a bad entry can't leave a half-made observer behind
+	-- Checked before registering, so a bad entry leaves no half-made observer
 	for _, zone in config and config.zones or {} do
 		checkZone(zone)
 	end
@@ -150,11 +150,10 @@ function Observer.new<T>(config: {
 		end
 	end
 
-	-- If a user passes a table, the warning is suppressed
 	local explicitlyPassedZones = config and config.zones ~= nil
 	local explicitlyPassedGroups = config and config.groups ~= nil
 
-	-- Without a table nothing was attached or subscribed above, so whether one came later is checked when deferred
+	-- Deferred, so a later :attach or :subscribe silences the warning
 	local missingZones = not explicitlyPassedZones
 	local missingGroups = not explicitlyPassedGroups
 
@@ -162,12 +161,10 @@ function Observer.new<T>(config: {
 		local creationTrace = debug.traceback('', 2)
 
 		task.defer(function()
-			-- Ensure the observer wasn't destroyed or disabled
 			if Destroyed.isDestroyed(self) or not self:isEnabled() then
 				return
 			end
 
-			-- Check if :attach() or :subscribe() was used instead
 			if missingZones and not hasAttachedMap[id] then
 				Log.warn('Observer %d has no attached zones. It will not detect spatial queries.', creationTrace, id)
 			end
@@ -196,7 +193,7 @@ end
 ]=]
 function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
 	checkGroup(group)
-	-- From a callback during its destroy, which has let go of its groups or is about to
+	-- Called from a callback during its destroy
 	if Destroyed.isDestroyed(self) then
 		return self
 	end
@@ -245,7 +242,7 @@ end
 ]=]
 function Observer.attach(self: Types.InternalObserver, zone: any)
 	checkZone(zone)
-	-- From a callback during its destroy, which has let go of its zones or is about to
+	-- Called from a callback during its destroy
 	if Destroyed.isDestroyed(self) then
 		return self
 	end
@@ -472,7 +469,6 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	Destroyed.finish(self)
 end
 
--- Its events and queries are kept in their own files
 for name, method in ObserverEvents do
 	(Observer :: any)[name] = method
 end

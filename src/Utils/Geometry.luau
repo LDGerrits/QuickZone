@@ -46,13 +46,11 @@ function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB:
 	return vector.min(minA, minB), vector.max(maxA, maxB)
 end
 
--- How far a half size reaches along an axis. An infinite one reaches nowhere along an axis it is
--- perpendicular to, where the plain product would be NaN
+-- 0 along an axis the half size is perpendicular to, where inf * 0 would be NaN
 local function reach(direction: number, half: number): number
 	return if direction == 0 then 0 else math.abs(direction) * half
 end
 
--- Bounds of a box from its basis vectors
 function Geometry.getBounds(
 	position: Vector3,
 	right: Vector3,
@@ -60,12 +58,11 @@ function Geometry.getBounds(
 	back: Vector3,
 	halfSize: Vector3
 ): (Vector3, Vector3)
-	-- Calculate the projection of the box extents onto the global axes
 	local x = math.abs(right.X) * halfSize.X + math.abs(up.X) * halfSize.Y + math.abs(back.X) * halfSize.Z
 	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(back.Y) * halfSize.Z
 	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(back.Z) * halfSize.Z
 
-	-- Only an infinite size gets here, as for a kill plane
+	-- NaN only from an infinite size, as for a kill plane
 	if x ~= x or y ~= y or z ~= z then
 		x = reach(right.X, halfSize.X) + reach(up.X, halfSize.Y) + reach(back.X, halfSize.Z)
 		y = reach(right.Y, halfSize.X) + reach(up.Y, halfSize.Y) + reach(back.Y, halfSize.Z)
@@ -101,7 +98,6 @@ local function toObjectSpace(point: Vector3, position: Vector3, right: Vector3, 
 	return Vector3.new(vector.dot(offset, right), vector.dot(offset, up), vector.dot(offset, back))
 end
 
--- Takes the position and basis vectors instead of a CFrame
 function Geometry.isPointInShape(
 	point: Vector3,
 	position: Vector3,
@@ -116,7 +112,7 @@ function Geometry.isPointInShape(
 		local localPoint = vector.abs(toObjectSpace(point, position, right, up, back))
 		return vector.min(localPoint, halfSize) == localPoint
 	elseif shapeType == CYLINDER_SHAPE_VALUE then
-		-- Along its X axis. Compared without multiplying by the length, which would be NaN for an infinite one
+		-- Axis along X; no multiply by the length, which is NaN when infinite
 		local localPoint = toObjectSpace(point, position, right, up, back)
 		local radius = halfSize.Y
 		return math.abs(localPoint.X) <= halfSize.X
@@ -149,8 +145,7 @@ function Geometry.isPointInShape(
 		if not part then
 			return false
 		end
-		-- The part's shape placed and sized where the zone is, so a zone that was moved or resized away from
-		-- its part agrees with the trees, which only know the zone
+		-- Mapped onto the part, so a zone moved or resized off its part still agrees with the trees
 		local scale = part.ExtentsSize / (halfSize * 2)
 		local partCFrame = part.CFrame
 		local query = partCFrame:PointToWorldSpace(toObjectSpace(point, position, right, up, back) * scale)

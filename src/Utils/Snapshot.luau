@@ -1,10 +1,9 @@
 --!strict
 
--- Iterates a table's keys as they were when the loop started, so the loop survives the table changing under
--- it, also when its body yields. A plain next() would error once a removed key is rehashed away. Keys removed
--- since the start are skipped when reached, keys added are not visited
+-- Survives the table changing mid-loop, where next() errors once a removed key is rehashed away. Removed keys
+-- are skipped, added keys are not visited
 
--- Lists reused once a loop runs to the end, so a loop allocates nothing after the first
+-- Pooled so repeated loops don't allocate
 local spareLists = {} :: { { any } }
 local MAX_SPARE_LISTS = 4
 
@@ -26,7 +25,7 @@ function Snapshot.keys<K, V>(t: { [K]: V }): () -> (K?, V?)
 				if #spareLists < MAX_SPARE_LISTS then
 					table.insert(spareLists, list)
 				end
-				-- Called again after the end, must not read a list another loop uses
+				-- The list is back in the pool; a call after the end must not read it
 				list = nil
 				break
 			end

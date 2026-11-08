@@ -1,15 +1,12 @@
 --!strict
 
--- Owns the links between observers and the groups and zones they watch. Others read the tables, only this module
--- writes them
+-- Owns observer links to groups and zones. Only this module writes them
 
 local Links = {}
 
--- Observers of each group
 Links.groupToObservers = {} :: { [number]: { [number]: boolean } }
--- Observers each zone is attached to, keyed by slot
+-- Keyed by zone slot
 Links.zoneAttachedObservers = {} :: { [number]: { number } }
--- Observer of zones attached to exactly one
 Links.zoneSoleObserver = {} :: { [number]: number }
 
 local groupToObservers = Links.groupToObservers
@@ -24,7 +21,6 @@ function Links.dropGroup(groupId: number)
 	groupToObservers[groupId] = nil
 end
 
--- The ids of the groups the observer watches, as a new list
 function Links.groupIdsOf(observerId: number): { number }
 	local list = {}
 	for groupId, observers in groupToObservers do
@@ -35,14 +31,13 @@ function Links.groupIdsOf(observerId: number): { number }
 	return list
 end
 
--- Unlinks the observer from every group, as it is destroyed
 function Links.unsubscribeAll(observerId: number)
 	for _, observers in groupToObservers do
 		observers[observerId] = nil
 	end
 end
 
--- The group's set exists, as only live groups are subscribed
+-- Only live groups are subscribed, so the set exists
 function Links.subscribe(observerId: number, groupId: number)
 	groupToObservers[groupId][observerId] = true
 end
@@ -54,7 +49,6 @@ function Links.unsubscribe(observerId: number, groupId: number)
 	end
 end
 
--- Attaches the observer to the zone in the slot. False when it was attached already
 function Links.attach(slot: number, observerId: number): boolean
 	local attached = zoneAttachedObservers[slot] or {}
 	zoneAttachedObservers[slot] = attached
@@ -67,7 +61,6 @@ function Links.attach(slot: number, observerId: number): boolean
 	return true
 end
 
--- Detaches the observer from the zone in the slot. False when it wasn't attached
 function Links.detach(slot: number, observerId: number): boolean
 	local attached = zoneAttachedObservers[slot]
 	if not attached then
@@ -90,7 +83,6 @@ function Links.detach(slot: number, observerId: number): boolean
 	return idx ~= nil
 end
 
--- Detaches every observer from the zone in the slot, as it is destroyed. Returns the observers it had
 function Links.detachAll(slot: number): { number }?
 	local attached = zoneAttachedObservers[slot]
 	zoneAttachedObservers[slot] = nil
