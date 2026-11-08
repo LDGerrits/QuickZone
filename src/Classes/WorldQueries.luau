@@ -27,7 +27,6 @@ local entityData = Entities.entityData
 local observerIdToObserverObj = Registry.observerIdToObserverObj
 local groups = Registry.groups
 local entityToGroups = Entities.entityToGroups
-local entityToReference = References.entityToReference
 local referenceToEntity = References.referenceToEntity
 
 local queryHits = {} :: { number }
@@ -50,24 +49,7 @@ function WorldQueries:getEntityOfReference(reference: any): Types.Entity?
 		return entity
 	end
 
-	entity = reference
-	if typeof(entity) == 'Instance' then
-		if
-			entity:IsA('BasePart')
-			or entity:IsA('Attachment')
-			or entity:IsA('Bone')
-			or entity:IsA('Camera')
-			or entity:IsA('Model')
-		then
-			return entity
-		end
-	elseif typeof(entity) == 'table' then
-		if entity.Position or entity.CFrame or entity.Transform or entity.WorldPosition or entity.GetPivot then
-			return entity
-		end
-	end
-
-	return nil
+	return if Entities.canTrack(reference) then reference else nil
 end
 
 --[=[
@@ -79,7 +61,7 @@ end
 	@return any
 ]=]
 function WorldQueries:getReferenceOfEntity(entity: any): any
-	return entityToReference[entity] or entity
+	return References.referenceOf(entity)
 end
 
 --[=[ 
@@ -143,7 +125,7 @@ function WorldQueries:getEntities(): { any }
 
 	for entity in entityData do
 		count += 1
-		result[count] = entityToReference[entity] or entity
+		result[count] = References.referenceOf(entity)
 	end
 
 	return result
@@ -188,7 +170,7 @@ end
 function WorldQueries:getZonesOfEntity(entity: any): { Types.Zone }
 	entity = entityOf(entity)
 	local data = entityData[entity]
-	if not data or not data.activeObserverMemberships then
+	if not data then
 		return {}
 	end
 
@@ -288,7 +270,7 @@ function WorldQueries:iterEntities(): () -> any?
 	return function(): any?
 		local entity = nextEntity()
 		if entity ~= nil then
-			return entityToReference[entity] or entity
+			return References.referenceOf(entity)
 		end
 		return nil
 	end
@@ -367,7 +349,7 @@ function WorldQueries:iterZonesOfEntity(entity: any): () -> Types.Zone?
 	entity = entityOf(entity)
 
 	local data = entityData[entity]
-	if not data or not data.activeObserverMemberships then
+	if not data then
 		return function()
 			return nil
 		end

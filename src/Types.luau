@@ -37,17 +37,6 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 -- See Utils/Destroyed
 export type Phase = 'alive' | 'destroying' | 'dead'
 
-export type BoundingVolume = {
-	position: Vector3,
-	cframe: CFrame,
-	halfSize: Vector3,
-	type: ShapeType,
-	radiusSq: number?,
-	start: Vector3?,
-	axis: Vector3?,
-	axisLength: number?,
-}
-
 -- Flat LBVH, see Utils/LinearBVH for the node layout
 export type Tree = {
 	buffer: buffer,
@@ -113,18 +102,7 @@ export type Group<T = any> = {
 }
 
 export type InternalGroup<T = any> = Group<T> & {
-	_add: (self: Group<T>, entity: T) -> Group<T>,
-	_addEntity: (self: Group<T>, entity: any) -> Group<T>,
-	_addBulk: (self: Group<T>, entities: { T }) -> Group<T>,
-	_remove: (self: Group<T>, entity: T) -> Group<T>,
-	_removeEntity: (self: Group<T>, entity: any) -> Group<T>,
-	_removeBulk: (self: Group<T>, entities: { T }) -> Group<T>,
-	_clear: (self: Group<T>) -> Group<T>,
 	id: number,
-	entities: { T },
-	entityIndices: { [any]: number },
-	isManaged: boolean?,
-	autoClean: boolean,
 	onDestroyCallbacks: { () -> () }?,
 	phase: Phase,
 }
@@ -202,6 +180,8 @@ export type Zones = {
 export type InternalZones = Zones & {
 	attach: (self: Zones, observer: any) -> Zones,
 	detach: (self: Zones, observer: any) -> Zones,
+	_attachObserver: (self: Zones, observer: any) -> Zones,
+	_detachObserver: (self: Zones, observer: any) -> Zones,
 
 	autoSync: boolean,
 	dynamic: boolean,
@@ -215,6 +195,10 @@ export type InternalZones = Zones & {
 	add: (self: InternalZones, zone: Zone) -> (),
 	remove: (self: InternalZones, zone: Zone) -> (),
 }
+
+-- Options of the Zone constructors that make zones from parts, for their code. The public signatures in ZoneClass
+-- spell them out, so an editor shows the fields rather than this name
+export type PartsConfig = { isDynamic: boolean?, metadata: any?, autoSync: boolean? }
 
 export type ZoneClass = {
 	new: (

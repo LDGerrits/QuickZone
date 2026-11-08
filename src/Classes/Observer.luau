@@ -8,59 +8,20 @@
 ]=]
 
 local Config = require(script.Parent.Parent.Config)
-local Callbacks = require(script.Parent.Parent.Core.Callbacks)
-local Entities = require(script.Parent.Parent.Core.Entities)
-local Links = require(script.Parent.Parent.Core.Links)
-local Memberships = require(script.Parent.Parent.Core.Memberships)
 local Registry = require(script.Parent.Parent.Core.Registry)
-local Routing = require(script.Parent.Parent.Core.Routing)
+local Wiring = require(script.Parent.Parent.Core.Wiring)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 local Checks = require(script.Parent.Checks)
 local ObserverEvents = require(script.Parent.ObserverEvents)
 local ObserverQueries = require(script.Parent.ObserverQueries)
+local Zones = require(script.Parent.Zones)
 
 local checkZone = Checks.checkZone
 
 local hasAttachedMap = {} :: { [number]: boolean }
 local hasSubscribedMap = {} :: { [number]: boolean }
-
-local function updateAllEntitiesForObserver(observerId: number)
-	for groupId, observers in Links.groupToObservers do
-		if not observers[observerId] then
-			continue
-		end
-
-		local group = Registry.groups[groupId]
-		if not group then
-			continue
-		end
-
-		for _, entity in group.entities do
-			Routing.reroute(entity)
-		end
-	end
-end
-
-local function disconnectObserverFromGroup(observerId: number, group: Types.InternalGroup)
-	-- Cloned, as exit callbacks may remove entities from the group, swapping later ones into visited slots
-	for _, entity in table.clone(group.entities) do
-		local data = Entities.entityData[entity]
-		if not data then
-			continue
-		end
-
-		Routing.recheck(entity)
-
-		-- Disabled observers let go of every entity
-		if Registry.observerEnabled[observerId] and Memberships.isSubscribed(entity, observerId) then
-			continue
-		end
-
-		Memberships.exit(observerId, entity, data)
-	end
-end
 
 -- Settings are checked where they are given, as a NaN would quietly break every later tick
 local function checkPriority(p: any): number
@@ -85,7 +46,11 @@ local function checkPrecision(n: any): number
 end
 
 local function checkGroup(group: any)
-	if type(group) ~= 'table' or type(group.id) ~= 'number' or type(group.entities) ~= 'table' then
+	-- A destroyed group is no longer registered, and gets its own error below
+	local isGroup = type(group) == 'table'
+		and type(group.id) == 'number'
+		and (Registry.groups[group.id] == group or Destroyed.isDestroyed(group))
+	if not isGroup then
 		Log.fatal('Expected a Group, got %s.', nil, tostring(group))
 	end
 	if Destroyed.isDestroyed(group) then
@@ -161,18 +126,14 @@ function Observer.new<T>(config: {
 		phase = 'alive',
 	}, Observer) :: any
 
-	Registry.observerPriorityMap[id] = priority
-	Registry.observerUpdateRate[id] = updateRate
-	Registry.observerPrecisionSq[id] = precision ^ 2
-
-	Callbacks.addObserver(id)
-	Memberships.addObserver(id)
 	Registry.observerIdToObserverObj[id] = self
-	Registry.observerEnabled[id] = if config and config.enabled ~= nil then not not config.enabled else true
-	Registry.observerSafety[id] = if config and config.safety ~= nil
-		then not not config.safety
-		else Config.Observer.safety
-	Routing.addObserver(id)
+	Wiring.addObserver(id, {
+		priority = priority,
+		updateRate = updateRate,
+		precision = precision,
+		enabled = if config and config.enabled ~= nil then not not config.enabled else true,
+		safety = if config and config.safety ~= nil then not not config.safety else Config.Observer.safety,
+	})
 
 	hasAttachedMap[id] = false
 	hasSubscribedMap[id] = false
@@ -193,8 +154,9 @@ function Observer.new<T>(config: {
 	local explicitlyPassedZones = config and config.zones ~= nil
 	local explicitlyPassedGroups = config and config.groups ~= nil
 
-	local missingZones = not explicitlyPassedZones and not hasAttachedMap[id]
-	local missingGroups = not explicitlyPassedGroups and not hasSubscribedMap[id]
+	-- Without a table nothing was attached or subscribed above, so whether one came later is checked when deferred
+	local missingZones = not explicitlyPassedZones
+	local missingGroups = not explicitlyPassedGroups
 
 	if missingZones or missingGroups then
 		local creationTrace = debug.traceback('', 2)
@@ -240,20 +202,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	end
 	hasSubscribedMap[self.id] = true
 
-	local groupId = group.id
-	Links.subscribe(self.id, groupId)
-
-	for _, entity in group.entities do
-		Routing.recheck(entity)
-	end
-
-	-- Members already inside through other groups bring this one in
-	if Callbacks.observerGroupTrackers[self.id] then
-		for _, entity in table.clone(group.entities) do
-			Memberships.groupsChanged(entity, self.id)
-		end
-	end
-
+	Wiring.subscribe(self.id, group.id)
 	return self
 end
 
@@ -272,19 +221,8 @@ function Observer.unsubscribe(self: Types.InternalObserver, group: Types.Interna
 		return self
 	end
 	checkGroup(group)
-	local groupId = group.id
 
-	Links.unsubscribe(self.id, groupId)
-
-	disconnectObserverFromGroup(self.id, group)
-
-	-- Members that stay inside through other groups no longer bring this one in
-	if Callbacks.observerGroupTrackers[self.id] then
-		for _, entity in table.clone(group.entities) do
-			Memberships.groupsChanged(entity, self.id)
-		end
-	end
-
+	Wiring.unsubscribe(self.id, group.id)
 	return self
 end
 
@@ -312,7 +250,12 @@ function Observer.attach(self: Types.InternalObserver, zone: any)
 		return self
 	end
 	hasAttachedMap[self.id] = true
-	zone:attach(self)
+
+	if getmetatable(zone) == Zones then
+		zone:_attachObserver(self)
+	elseif not Destroyed.isDestroyed(zone) then
+		Wiring.attach(zone.slot, self.id)
+	end
 	return self
 end
 
@@ -332,7 +275,12 @@ function Observer.detach(self: Types.InternalObserver, zone: any)
 		return self
 	end
 	checkZone(zone)
-	zone:detach(self)
+
+	if getmetatable(zone) == Zones then
+		zone:_detachObserver(self)
+	else
+		Wiring.detach(zone.slot, self.id)
+	end
 	return self
 end
 
@@ -347,35 +295,7 @@ end
 	@return Observer
 ]=]
 function Observer.setEnabled(self: Types.InternalObserver, enabled: boolean): Types.Observer
-	enabled = not not enabled
-	local wasEnabled = self:isEnabled()
-
-	if wasEnabled == enabled then
-		return self
-	end
-
-	local id = self.id
-	Registry.observerEnabled[id] = enabled
-	Routing.recheckAll()
-
-	if not enabled then
-		-- Cloned, as exit callbacks may subscribe groups
-		for groupId, observersMap in table.clone(Links.groupToObservers) do
-			if not observersMap[id] then
-				continue
-			end
-
-			local group = Registry.groups[groupId]
-			if not group then
-				continue
-			end
-
-			disconnectObserverFromGroup(id, group)
-		end
-	end
-
-	updateAllEntitiesForObserver(self.id)
-
+	Wiring.setEnabled(self.id, not not enabled)
 	return self
 end
 
@@ -394,7 +314,7 @@ end
 	@return Observer
 ]=]
 function Observer.setSafety(self: Types.InternalObserver, enabled: boolean): Types.Observer
-	Registry.observerSafety[self.id] = not not enabled
+	Wiring.setSafety(self.id, not not enabled)
 	return self
 end
 
@@ -408,8 +328,7 @@ end
 	@return Observer
 ]=]
 function Observer.setPriority(self: Types.InternalObserver, p: number): Types.Observer
-	Registry.observerPriorityMap[self.id] = checkPriority(p)
-	Routing.recheckAll()
+	Wiring.setPriority(self.id, checkPriority(p))
 	return self
 end
 
@@ -424,8 +343,7 @@ end
 	@return Observer
 ]=]
 function Observer.setUpdateRate(self: Types.InternalObserver, hz: number): Types.Observer
-	Registry.observerUpdateRate[self.id] = checkUpdateRate(hz)
-	updateAllEntitiesForObserver(self.id)
+	Wiring.setUpdateRate(self.id, checkUpdateRate(hz))
 	return self
 end
 
@@ -439,10 +357,7 @@ end
 	@return Observer
 ]=]
 function Observer.setPrecision(self: Types.InternalObserver, n: number): Types.Observer
-	checkPrecision(n)
-
-	Registry.observerPrecisionSq[self.id] = n ^ 2
-	updateAllEntitiesForObserver(self.id)
+	Wiring.setPrecision(self.id, checkPrecision(n))
 	return self
 end
 
@@ -533,6 +448,7 @@ end
 
 --[=[ 
 	Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.
+	Destroying it again does nothing. Its other methods raise an error once it is destroyed.
 	
 	@tag Destructor
 	@method destroy
@@ -546,30 +462,9 @@ function Observer.destroy(self: Types.InternalObserver): ()
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
-	-- Exits every entity. Destroyed from an exit callback, the loop that fired it may not have reached them all
-	self:setEnabled(false)
-	Memberships.exitObserver(self.id)
-
-	-- Unlinked entities must be rerouted, also when the observer was already disabled
 	local id = self.id
-	updateAllEntitiesForObserver(id)
-	Links.unsubscribeAll(id)
-
-	for slot, attached in Links.zoneAttachedObservers do
-		if table.find(attached, id) then
-			Registry.zoneSlotToZoneObj[slot]:detach(self)
-		end
-	end
-
-	Registry.observerPriorityMap[id] = nil
-	Callbacks.dropObserver(id)
-	Memberships.dropObserver(id)
+	Wiring.removeObserver(id)
 	Registry.observerIdToObserverObj[id] = nil
-	Registry.observerEnabled[id] = nil
-	Registry.observerSafety[id] = nil
-	Registry.observerUpdateRate[id] = nil
-	Registry.observerPrecisionSq[id] = nil
-	Routing.dropObserver(id)
 
 	hasAttachedMap[id] = nil
 	hasSubscribedMap[id] = nil

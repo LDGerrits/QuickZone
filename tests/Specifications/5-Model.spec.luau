@@ -15,6 +15,7 @@ local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local Callbacks = require(ReplicatedStorage.QuickZone.Core.Callbacks)
 local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
 local Links = require(ReplicatedStorage.QuickZone.Core.Links)
+local Members = require(ReplicatedStorage.QuickZone.Core.Members)
 local Memberships = require(ReplicatedStorage.QuickZone.Core.Memberships)
 local Registry = require(ReplicatedStorage.QuickZone.Core.Registry)
 local Routing = require(ReplicatedStorage.QuickZone.Core.Routing)
@@ -123,7 +124,7 @@ local function describeZone(zone: any): string
 	if zone == nil then
 		return 'nil'
 	end
-	-- Read directly, as destroyed zones lose their methods
+	-- Read directly, as a destroyed zone's methods raise an error
 	return `zone {zone.id}`
 end
 
@@ -270,7 +271,7 @@ local function reconcile(world: World, container: ContainerModel)
 	local expected = partsOf(container)
 	local seen = {}
 	for _, zone in container.zones:getZones() do
-		-- Read directly, as destroyed zones lose their methods
+		-- Read directly, as a destroyed zone's methods raise an error
 		local part = zone.reference
 		if Destroyed.isDestroyed(zone) then
 			fail(world, `container of {container.folder.Name} holds destroyed {describeZone(zone)}`)
@@ -1827,6 +1828,7 @@ local function snapshotState(): { [string]: { [any]: true } }
 		Callbacks = Callbacks,
 		Entities = Entities,
 		Links = Links,
+		Members = Members,
 		Memberships = Memberships,
 		Registry = Registry,
 		Routing = Routing,

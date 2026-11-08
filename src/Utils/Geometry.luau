@@ -35,6 +35,11 @@ end
 
 local Geometry = {}
 
+Geometry.BLOCK_SHAPE_VALUE = BLOCK_SHAPE_VALUE
+Geometry.BALL_SHAPE_VALUE = BALL_SHAPE_VALUE
+Geometry.CYLINDER_SHAPE_VALUE = CYLINDER_SHAPE_VALUE
+Geometry.WEDGE_SHAPE_VALUE = WEDGE_SHAPE_VALUE
+Geometry.CORNER_WEDGE_SHAPE_VALUE = CORNER_WEDGE_SHAPE_VALUE
 Geometry.MESH_SHAPE_VALUE = MESH_SHAPE_VALUE
 
 function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB: Vector3): (Vector3, Vector3)

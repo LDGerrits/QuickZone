@@ -24,6 +24,17 @@ function Links.dropGroup(groupId: number)
 	groupToObservers[groupId] = nil
 end
 
+-- The ids of the groups the observer watches, as a new list
+function Links.groupIdsOf(observerId: number): { number }
+	local list = {}
+	for groupId, observers in groupToObservers do
+		if observers[observerId] then
+			table.insert(list, groupId)
+		end
+	end
+	return list
+end
+
 -- Unlinks the observer from every group, as it is destroyed
 function Links.unsubscribeAll(observerId: number)
 	for _, observers in groupToObservers do
@@ -31,13 +42,9 @@ function Links.unsubscribeAll(observerId: number)
 	end
 end
 
+-- The group's set exists, as only live groups are subscribed
 function Links.subscribe(observerId: number, groupId: number)
-	local observers = groupToObservers[groupId]
-	if not observers then
-		observers = {}
-		groupToObservers[groupId] = observers
-	end
-	observers[observerId] = true
+	groupToObservers[groupId][observerId] = true
 end
 
 function Links.unsubscribe(observerId: number, groupId: number)

@@ -10,9 +10,9 @@ local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local ZoneChanges = require(script.Parent.ZoneChanges)
 local Types = require(script.Parent.Parent.Types)
 
-local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
-local BALL_SHAPE_VALUE = Enum.PartType.Ball.Value
-local CYLINDER_SHAPE_VALUE = Enum.PartType.Cylinder.Value
+local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
+local BALL_SHAPE_VALUE = Geometry.BALL_SHAPE_VALUE
+local CYLINDER_SHAPE_VALUE = Geometry.CYLINDER_SHAPE_VALUE
 -- Bounds that contain nothing and widen nothing they are merged into
 local EMPTY_MIN = Vector3.one * math.huge
 local EMPTY_MAX = -EMPTY_MIN
@@ -167,12 +167,6 @@ function ZoneShapes.allocateSlot(zoneId: number): number
 	return slot
 end
 
--- Frees the slot of a removed zone. Reusable right away, a stale tree leaf checks the new zone's shape
-function ZoneShapes.freeSlot(slot: number)
-	ZoneShapes.zoneSlotIds[slot] = nil
-	table.insert(ZoneShapes.freeZoneSlots, slot)
-end
-
 -- Adds a zone to the static or dynamic tree. part is the part a Mesh zone queries
 function ZoneShapes.add(
 	slot: number,
@@ -290,10 +284,14 @@ function ZoneShapes.remove(slot: number)
 	shapeAxisAligned[slot] = nil
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
+
+	-- The slot is reusable right away, as a stale tree leaf checks the new zone's shape
+	ZoneShapes.zoneSlotIds[slot] = nil
+	table.insert(ZoneShapes.freeZoneSlots, slot)
 end
 
 -- Called after a tree is rebuilt. Only stale leaves can have changed, as every write marks its slot
-function ZoneShapes.markBuilt(slots: { [number]: any })
+local function markBuilt(slots: { [number]: any })
 	for slot in staleSlots do
 		if slots[slot] then
 			treeExact[slot] = shapeAxisAligned[slot]
@@ -339,7 +337,7 @@ local function updateTree(tree: Types.Tree, members: { [number]: any })
 		tree.membersChanged = false
 	end
 	tree.pending = false
-	ZoneShapes.markBuilt(members)
+	markBuilt(members)
 end
 
 -- Brings both trees up to date with their zones, and raises the version of each that changed

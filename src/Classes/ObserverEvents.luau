@@ -183,11 +183,55 @@ local function trackGroups(
 	end
 end
 
--- Checked when connected, as a tick would only fail on it at the next event
-local function checkCallback(callback: any)
-	if type(callback) ~= 'function' then
-		Log.fatal('Expected a callback function, got %s.', nil, typeof(callback))
+local checkCallback = Log.checkCallback
+
+-- Whether the observer runs callbacks in their own thread. Also true once it is destroyed and its setting is gone,
+-- so a cleanup that runs late is still kept apart
+local function isSafe(observerId: number): boolean
+	return Registry.observerSafety[observerId] ~= false
+end
+
+-- Passes on the events of players only. Also passes on what the callback returns, for observe
+local function forPlayers(callback: (Player, Types.Zone, Types.Entity) -> any): (any, Types.Zone, Types.Entity) -> any
+	checkCallback(callback)
+	return function(reference, zone, entity)
+		if isPlayer(reference) then
+			return callback(reference, zone, entity)
+		end
+		return nil
 	end
+end
+
+-- Passes on the events of the local player only, and refuses to on the server
+local function forLocalPlayer(
+	methodName: string,
+	callback: (Types.Zone, Types.Entity) -> any
+): (any, Types.Zone, Types.Entity) -> any
+	checkCallback(callback)
+	if not IS_CLIENT then
+		Log.fatal('Observer:%s can only be called on the Client.', nil, methodName)
+	end
+	return function(reference, zone, entity)
+		if reference == Players.LocalPlayer then
+			return callback(zone, entity)
+		end
+		return nil
+	end
+end
+
+-- Calls back when a group arrives in the observer, or when it leaves
+local function groupEvent(
+	self: Types.InternalObserver,
+	callback: (Types.Group, Types.Zone, Types.Entity) -> (),
+	onArrive: boolean
+): () -> ()
+	checkCallback(callback)
+	local observerId = self.id
+	local function fire(_, group, zone, entity)
+		Callbacks.call(callback, isSafe(observerId), group, zone, entity)
+	end
+	local function ignore() end
+	return trackGroups(self, if onArrive then fire else ignore, if onArrive then ignore else fire)
 end
 
 local ObserverEvents = {}
@@ -222,16 +266,16 @@ function ObserverEvents.observe(
 	checkCallback(callback)
 	local cleanups = {} :: { [Types.Entity]: () -> () }
 	local activeIds = {} :: { [Types.Entity]: number }
-	local nextId = 0
+	local nextGeneration = 0
 
 	local cleanupEnter = self:onEnter(function(reference, zone, entity: any)
-		nextId += 1
-		local observerId = nextId
-		activeIds[entity] = observerId
+		nextGeneration += 1
+		local generation = nextGeneration
+		activeIds[entity] = generation
 
 		local cleanup = callback(reference, zone, entity)
 
-		if activeIds[entity] ~= observerId then
+		if activeIds[entity] ~= generation then
 			if type(cleanup) == 'function' then
 				cleanup()
 			end
@@ -330,13 +374,7 @@ function ObserverEvents.observePlayer(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
-	checkCallback(callback)
-	return self:observe(function(reference, zone, entity)
-		if isPlayer(reference) then
-			return callback(reference, zone, entity)
-		end
-		return nil
-	end)
+	return self:observe(forPlayers(callback))
 end
 
 --[=[ 
@@ -364,12 +402,7 @@ function ObserverEvents.onPlayerEnter(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	return self:onEnter(function(reference, zone, entity: any)
-		if isPlayer(reference) then
-			callback(reference, zone, entity)
-		end
-	end)
+	return self:onEnter(forPlayers(callback))
 end
 
 --[=[ 
@@ -386,12 +419,7 @@ function ObserverEvents.onPlayerExit(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	return self:onExit(function(reference, zone, entity: any)
-		if isPlayer(reference) then
-			callback(reference, zone, entity)
-		end
-	end)
+	return self:onExit(forPlayers(callback))
 end
 
 --[=[
@@ -416,17 +444,7 @@ function ObserverEvents.observeLocalPlayer(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Entity) -> (() -> ())?
 ): () -> ()
-	checkCallback(callback)
-	if not IS_CLIENT then
-		Log.fatal('Observer:observeLocalPlayer can only be called on the Client.', nil)
-	end
-
-	return self:observe(function(reference, zone, entity)
-		if reference == Players.LocalPlayer then
-			return callback(zone, entity)
-		end
-		return nil
-	end)
+	return self:observe(forLocalPlayer('observeLocalPlayer', callback))
 end
 
 --[=[ 
@@ -454,16 +472,7 @@ function ObserverEvents.onLocalPlayerEnter(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	if not IS_CLIENT then
-		Log.fatal('Observer:onLocalPlayerEnter can only be called on the Client.', nil)
-	end
-
-	return self:onEnter(function(reference, zone, entity: any)
-		if reference == Players.LocalPlayer then
-			callback(zone, entity)
-		end
-	end)
+	return self:onEnter(forLocalPlayer('onLocalPlayerEnter', callback))
 end
 
 --[=[ 
@@ -481,16 +490,7 @@ function ObserverEvents.onLocalPlayerExit(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	if not IS_CLIENT then
-		Log.fatal('Observer:onLocalPlayerExit can only be called on the Client.', nil)
-	end
-
-	return self:onExit(function(reference, zone, entity: any)
-		if reference == Players.LocalPlayer then
-			callback(zone, entity)
-		end
-	end)
+	return self:onExit(forLocalPlayer('onLocalPlayerExit', callback))
 end
 
 --[=[ 
@@ -536,13 +536,13 @@ function ObserverEvents.observeGroup(
 			else
 				cleanups[groupId] = cleanup
 			end
-		end, Registry.observerSafety[observerId] ~= false)
+		end, isSafe(observerId))
 	end, function(groupId)
 		generations[groupId] = (generations[groupId] or 0) + 1
 		local cleanup = cleanups[groupId]
 		if cleanup then
 			cleanups[groupId] = nil
-			Callbacks.call(cleanup, Registry.observerSafety[observerId] ~= false)
+			Callbacks.call(cleanup, isSafe(observerId))
 		end
 	end)
 
@@ -574,11 +574,7 @@ function ObserverEvents.onGroupEnter(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	local observerId = self.id
-	return trackGroups(self, function(_, group, zone, entity)
-		Callbacks.call(callback, Registry.observerSafety[observerId] ~= false, group, zone, entity)
-	end, function() end)
+	return groupEvent(self, callback, true)
 end
 
 --[=[ 
@@ -595,11 +591,7 @@ function ObserverEvents.onGroupExit(
 	self: Types.InternalObserver,
 	callback: (Types.Group, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	local observerId = self.id
-	return trackGroups(self, function() end, function(_, group, zone, entity)
-		Callbacks.call(callback, Registry.observerSafety[observerId] ~= false, group, zone, entity)
-	end)
+	return groupEvent(self, callback, false)
 end
 
 --[=[ 
@@ -633,12 +625,7 @@ function ObserverEvents.onPlayerTransition(
 	self: Types.InternalObserver,
 	callback: (Player, Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	return self:onTransition(function(reference, newZone, entity: any)
-		if isPlayer(reference) then
-			callback(reference, newZone, entity)
-		end
-	end)
+	return self:onTransition(forPlayers(callback))
 end
 
 --[=[ 
@@ -655,16 +642,7 @@ function ObserverEvents.onLocalPlayerTransition(
 	self: Types.InternalObserver,
 	callback: (Types.Zone, Types.Entity) -> ()
 ): () -> ()
-	checkCallback(callback)
-	if not IS_CLIENT then
-		Log.fatal('Observer:onLocalPlayerTransition can only be called on the Client.', nil)
-	end
-
-	return self:onTransition(function(reference, newZone, entity: any)
-		if reference == Players.LocalPlayer then
-			callback(newZone, entity)
-		end
-	end)
+	return self:onTransition(forLocalPlayer('onLocalPlayerTransition', callback))
 end
 
 return ObserverEvents

@@ -1887,4 +1887,57 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 	end)
+
+	Describe('Destroyed objects', function()
+		Test('Calling another method on a destroyed object says it was destroyed.', function()
+			local zone = Zone.new({ cframe = CFrame.new(-48600, 0, 41000), size = Vector3.one * 4 })
+			zone:destroy()
+
+			local ok, err = pcall(function()
+				zone:getPosition()
+			end)
+
+			Expect(ok).is(false)
+			Expect(string.find(tostring(err), 'destroyed', 1, true) ~= nil).is_true()
+		end)
+
+		Test('A managed group refuses every change and warns each time.', function()
+			withCleanup(function(track)
+				local players = track(Group.players())
+				local part = track(Util.createPart({ Position = Vector3.new(-48600, 0, 41000) }))
+				local warnings = Util.captureWarnings(function()
+					players:add(part)
+					players:addBulk({ part })
+					players:remove(player)
+					players:removeBulk({ player })
+					players:clear()
+					players:setAutoClean(true)
+				end)
+				local refused = 0
+				for _, message in warnings do
+					if string.find(message, 'Managed Group', 1, true) then
+						refused += 1
+					end
+				end
+
+				Expect(refused).is(6)
+				Expect(players:contains(part)).is(false)
+			end)
+		end)
+
+		Test('A zone without a reference syncs nothing, without warning.', function()
+			withCleanup(function(track)
+				local zone = track(Zone.new({ cframe = CFrame.new(-48600, 0, 41000), size = Vector3.one * 4 }))
+				local zones = track(Zone.fromParts({}))
+				local warnings = Util.captureWarnings(function()
+					zone:setAutoSync(true)
+					zone:sync()
+					zones:sync()
+				end)
+
+				Expect(#warnings).is(0)
+				Expect(zone:getPosition()).is(Vector3.new(-48600, 0, 41000))
+			end)
+		end)
+	end)
 end

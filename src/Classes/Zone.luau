@@ -18,10 +18,8 @@
 	:::
 ]=]
 
-local Links = require(script.Parent.Parent.Core.Links)
-local Memberships = require(script.Parent.Parent.Core.Memberships)
 local Registry = require(script.Parent.Parent.Core.Registry)
-local Routing = require(script.Parent.Parent.Core.Routing)
+local Wiring = require(script.Parent.Parent.Core.Wiring)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
@@ -33,15 +31,17 @@ local shapeCFrames = ZoneShapes.shapeCFrames
 local shapeHalfSizes = ZoneShapes.shapeHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
 
-local BLOCK_SHAPE_VALUE = Enum.PartType.Block.Value
+local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
 local MESH_SHAPE_VALUE = Geometry.MESH_SHAPE_VALUE
+local WEDGE_SHAPE_VALUE = Geometry.WEDGE_SHAPE_VALUE
+local CORNER_WEDGE_SHAPE_VALUE = Geometry.CORNER_WEDGE_SHAPE_VALUE
 
 local SHAPE_MAP: { [string]: number } = {
-	Block = Enum.PartType.Block.Value,
-	Cylinder = Enum.PartType.Cylinder.Value,
-	Ball = Enum.PartType.Ball.Value,
-	Wedge = Enum.PartType.Wedge.Value,
-	CornerWedge = Enum.PartType.CornerWedge.Value,
+	Block = BLOCK_SHAPE_VALUE,
+	Cylinder = Geometry.CYLINDER_SHAPE_VALUE,
+	Ball = Geometry.BALL_SHAPE_VALUE,
+	Wedge = WEDGE_SHAPE_VALUE,
+	CornerWedge = CORNER_WEDGE_SHAPE_VALUE,
 	Mesh = MESH_SHAPE_VALUE,
 }
 local SHAPE_NAMES = {} :: { [number]: Types.ShapeType }
@@ -68,14 +68,14 @@ local function getShapeEnumValue(part: BasePart): number
 	end
 
 	if part:IsA('WedgePart') then
-		return Enum.PartType.Wedge.Value
+		return WEDGE_SHAPE_VALUE
 	end
 
 	if part:IsA('CornerWedgePart') then
-		return Enum.PartType.CornerWedge.Value
+		return CORNER_WEDGE_SHAPE_VALUE
 	end
 
-	return Enum.PartType.Block.Value
+	return BLOCK_SHAPE_VALUE
 end
 
 local function asQueryablePart(reference: (BasePart | Attachment | Bone)?): BasePart?
@@ -180,7 +180,7 @@ end
 local Zone = {}
 Zone.__index = Zone
 
-type PartsConfig = ZoneContainers.PartsConfig
+type PartsConfig = Types.PartsConfig
 
 local function newZoneInternal(
 	cframe: CFrame,
@@ -313,35 +313,26 @@ function Zone.fromPart(part: BasePart, config: PartsConfig?): Types.Zone
 	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
 end
 
--- private
-function Zone.attach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	if Destroyed.isDestroyed(self) then
-		return self
+-- Kept for scripts that attach from the zone. Observer:attach is the way to do it
+function Zone.attach(self: Types.InternalZone, observer: any): Types.Zone
+	if not Destroyed.isDead(observer) then
+		observer:attach(self)
 	end
-
-	if Links.attach(self.slot, observer.id) then
-		Routing.changeZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), 1)
-		ZoneShapes.touch(self.slot)
-	end
-
 	return self
 end
 
--- private
-function Zone.detach(self: Types.InternalZone, observer: Types.InternalObserver): Types.Zone
-	if Links.detach(self.slot, observer.id) then
-		Routing.changeZoneCount(observer.id, ZoneShapes.isDynamic(self.slot), -1)
-		-- Its entities leave on the next tick, unless the zone is destroyed first
-		ZoneShapes.touch(self.slot)
+-- Kept for scripts that detach from the zone. Observer:detach is the way to do it
+function Zone.detach(self: Types.InternalZone, observer: any): Types.Zone
+	if not Destroyed.isDead(observer) then
+		observer:detach(self)
 	end
-
 	return self
 end
 
 --[=[ 
 	Enables or disables automatic polling and syncing to the tracked BasePart.
 	If the zone is currently static, it will automatically be set to dynamic.
-	A zone without a reference warns and starts syncing once `setReference` gives it one.
+	A zone without a reference starts syncing once `setReference` gives it one.
 
 	@tag Chainable
 	@method setAutoSync
@@ -363,8 +354,6 @@ function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zo
 
 		if self.reference then
 			setupAutoSync(self, self.reference)
-		else
-			Log.warn('Cannot autoSync Zone %d without a tracked reference.', nil, self.id)
 		end
 	else
 		clearAutoSync(self)
@@ -420,9 +409,9 @@ end
 	@return Zone
 ]=]
 function Zone.sync(self: Types.InternalZone): Types.Zone
+	-- A zone without a reference has nothing to follow
 	local reference = self.reference
 	if not reference then
-		Log.warn('Zone:sync failed for Zone %d. No reference found.', nil, self.id)
 		return self
 	end
 
@@ -454,14 +443,9 @@ end
 function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
 	-- A boolean, as the observers' zone counts below assume the zone really changes tree
 	isDynamic = not not isDynamic
-	local slot = self.slot
-	if ZoneShapes.isDynamic(slot) == isDynamic then
+	if not Wiring.setZoneDynamic(self.slot, isDynamic) then
 		return self
 	end
-
-	ZoneShapes.setDynamic(slot, isDynamic)
-
-	Routing.moveZoneCounts(slot, isDynamic)
 
 	if not isDynamic and self.autoSync then
 		self:setAutoSync(false)
@@ -677,6 +661,7 @@ end
 
 --[=[ 
 	Cleans up the zone, removes it from the LBVH tree, and detaches all observers.
+	Destroying it again does nothing. Its other methods raise an error once it is destroyed.
 
 	:::caution Rebuild Request
 	Requests a rebuild of corresponding tree (batched per frame).
@@ -698,24 +683,13 @@ function Zone.destroy(self: Types.InternalZone): ()
 	local id = self.id
 	local slot = self.slot
 
-	-- Detach before any callback runs, so a callback that updates can't move entities back in
-	local attachedObservers = Links.detachAll(slot)
-	if attachedObservers then
-		for _, observerId in attachedObservers do
-			Routing.changeZoneCount(observerId, ZoneShapes.isDynamic(slot), -1)
-		end
-	end
-
-	-- Leave while the zone object is still alive, so callbacks get it
-	Memberships.leaveZone(id)
+	Wiring.unwireZone(slot, id)
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
 	Registry.zoneIdToZoneObj[id] = nil
 	Registry.zoneSlotToZoneObj[slot] = nil
 	ZoneShapes.remove(slot)
-	ZoneShapes.freeSlot(slot)
-	Memberships.setZoneDestroying(id, false)
 
 	Destroyed.finish(self)
 end

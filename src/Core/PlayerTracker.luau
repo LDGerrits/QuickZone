@@ -1,29 +1,27 @@
 --!strict
 
+-- Follows each player added to a group through its characters: the HumanoidRootPart of its current character is
+-- the member, through Members, and the player its reference. Keeps which groups each player was added to
+
 local Players = game:GetService('Players')
 
 local Types = require(script.Parent.Parent.Types)
+local Members = require(script.Parent.Members)
 local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 
 local activeTrackers = {} :: { [Player]: () -> () }
-local playerSubscriptions = {} :: { [Player]: { [number]: Types.InternalGroup } }
+-- The ids of the groups each player was added to
+local playerSubscriptions = {} :: { [Player]: { [number]: true } }
 -- Players whose PlayerRemoving has fired. Their Parent is still Players while it runs
 local leaving = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Player]: true }
 
 local PlayerTracker = {}
 
--- Whether the player is in a group that is not destroyed
+-- Whether the player is in a group. A group being destroyed lets go of its players before it is gone
 local function isInAnyGroup(player: Player): boolean
 	local subscriptions = playerSubscriptions[player]
-	if subscriptions then
-		for groupId in subscriptions do
-			if Registry.groups[groupId] then
-				return true
-			end
-		end
-	end
-	return false
+	return subscriptions ~= nil and next(subscriptions) ~= nil
 end
 
 local stopTracking: (player: Player) -> ()
@@ -58,11 +56,10 @@ local function trackPlayer(player: Player)
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
 				-- Cloned, as exit callbacks may add the player to groups
-				for groupId, group in table.clone(subscriptions) do
+				for groupId in table.clone(subscriptions) do
+					-- Unless a callback destroyed it meanwhile
 					if Registry.groups[groupId] then
-						group:_removeEntity(hrp)
-					else
-						subscriptions[groupId] = nil
+						Members.remove(groupId, hrp)
 					end
 				end
 			end
@@ -114,13 +111,11 @@ local function trackPlayer(player: Player)
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
 				-- Cloned, as enter callbacks may add the player to groups, which adds the part themselves
-				for groupId, group in table.clone(subscriptions) do
+				for groupId in table.clone(subscriptions) do
 					if currentHrp ~= hrp then
 						break
 					elseif Registry.groups[groupId] then
-						group:_addEntity(hrp)
-					else
-						subscriptions[groupId] = nil
+						Members.add(groupId, hrp)
 					end
 				end
 			end
@@ -172,7 +167,7 @@ local function trackPlayer(player: Player)
 	end
 end
 
-function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
+function PlayerTracker.subscribe(player: Player, groupId: number)
 	-- A player that is leaving or left would never be let go, as its PlayerRemoving has fired
 	if player.Parent ~= Players or leaving[player] then
 		return
@@ -182,37 +177,39 @@ function PlayerTracker.subscribe(player: Player, group: Types.InternalGroup)
 		playerSubscriptions[player] = {}
 	end
 
-	playerSubscriptions[player][group.id] = group
+	playerSubscriptions[player][groupId] = true
 	trackPlayer(player)
 
 	local currentHrp = References.referenceToEntity[player]
 	if currentHrp then
-		group:_addEntity(currentHrp)
+		Members.add(groupId, currentHrp)
 	end
 end
 
-function PlayerTracker.unsubscribe(player: Player, group: Types.InternalGroup)
+function PlayerTracker.unsubscribe(player: Player, groupId: number)
 	if playerSubscriptions[player] then
-		playerSubscriptions[player][group.id] = nil
+		playerSubscriptions[player][groupId] = nil
 	end
 
 	local currentHrp = References.referenceToEntity[player]
 	if currentHrp then
-		group:_removeEntity(currentHrp)
+		Members.remove(groupId, currentHrp)
 	end
 end
 
-function PlayerTracker.isSubscribed(player: Player, group: Types.InternalGroup): boolean
+function PlayerTracker.isSubscribed(player: Player, groupId: number): boolean
 	local subscriptions = playerSubscriptions[player]
-	return subscriptions ~= nil and subscriptions[group.id] ~= nil
+	return subscriptions ~= nil and subscriptions[groupId] ~= nil
 end
 
--- The live groups the player was added to, also while it has no character
+-- The groups the player was added to, also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
-	for groupId, group in playerSubscriptions[player] or {} do
-		if Registry.groups[groupId] then
-			table.insert(list, group)
+	local subscriptions = playerSubscriptions[player]
+	if subscriptions then
+		for groupId in subscriptions do
+			-- A group being destroyed lets go of its players before it is gone
+			table.insert(list, Registry.groups[groupId])
 		end
 	end
 	return list

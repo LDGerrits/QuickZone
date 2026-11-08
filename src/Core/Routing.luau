@@ -16,8 +16,8 @@ local observerUpdateRate = Registry.observerUpdateRate
 
 local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
+local groupEntities = Entities.groupEntities
 local groupToObservers = Links.groupToObservers
-local zoneAttachedObservers = Links.zoneAttachedObservers
 
 local Routing = {}
 
@@ -173,9 +173,16 @@ local function processTopologyChange(entity: Types.Entity)
 	data.needsDynamic = needsDynamic
 end
 
--- The trees the entity's observers query changed, so the entity is placed again at the next tick
-function Routing.markTopology(entity: Types.Entity)
-	dirtyTopology[entity] = true
+-- The observer's settings changed, so every entity it watches is routed again
+function Routing.rerouteObserver(observerId: number)
+	for groupId, observers in groupToObservers do
+		local members = groupEntities[groupId]
+		if members and observers[observerId] then
+			for _, entity in members do
+				Routing.reroute(entity)
+			end
+		end
+	end
 end
 
 -- Checks every entity again at the next tick, also those that stand still
@@ -201,37 +208,22 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 	local newCount = current + delta
 	dict[observerId] = newCount
 
-	-- Only flag entities dirty if the observer's topology fundamentally changed
-	if (current == 0 and newCount == 1) or (current == 1 and newCount == 0) then
+	-- Only flag entities dirty when the observer gains its first zone in the tree or loses its last, as the
+	-- delta is always 1 or -1
+	if current == 0 or newCount == 0 then
 		-- Check every entity again when an observer loses its last zone
-		if current == 1 and newCount == 0 then
+		if newCount == 0 then
 			Routing.recheckAll()
 		end
 
 		for groupId, observers in groupToObservers do
-			if not observers[observerId] then
+			local members = groupEntities[groupId]
+			if not (members and observers[observerId]) then
 				continue
 			end
-
-			local group = Registry.groups[groupId]
-			if not group then
-				continue
+			for _, entity in members do
+				dirtyTopology[entity] = true
 			end
-
-			for _, entity in group.entities do
-				Routing.markTopology(entity)
-			end
-		end
-	end
-end
-
--- Moves the zone in the slot to the other tree in its observers' counts
-function Routing.moveZoneCounts(slot: number, isDynamic: boolean)
-	local attached = zoneAttachedObservers[slot]
-	if attached then
-		for _, observerId in attached do
-			Routing.changeZoneCount(observerId, not isDynamic, -1)
-			Routing.changeZoneCount(observerId, isDynamic, 1)
 		end
 	end
 end

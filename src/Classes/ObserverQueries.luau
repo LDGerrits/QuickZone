@@ -40,7 +40,7 @@ local function iterTracked(
 				continue
 			end
 
-			local ref = References.entityToReference[entity] or entity
+			local ref = References.referenceOf(entity)
 			if playersOnly and not isPlayer(ref) then
 				continue
 			end
@@ -106,7 +106,7 @@ end
 function ObserverQueries.getEntitiesInside(self: Types.InternalObserver): { any }
 	local results = {}
 	for entity in Memberships.observerTrackingEntities[self.id] do
-		table.insert(results, References.entityToReference[entity] or entity)
+		table.insert(results, References.referenceOf(entity))
 	end
 	return results
 end
@@ -161,18 +161,9 @@ end
 ]=]
 function ObserverQueries.getGroups(self: Types.InternalObserver): { Types.Group }
 	local result = {}
-
-	for groupId, observersMap in Links.groupToObservers do
-		if not observersMap[self.id] then
-			continue
-		end
-
-		local group = Registry.groups[groupId]
-		if group then
-			table.insert(result, group)
-		end
+	for _, groupId in Links.groupIdsOf(self.id) do
+		table.insert(result, Registry.groups[groupId])
 	end
-
 	return result
 end
 
