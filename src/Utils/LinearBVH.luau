@@ -69,15 +69,13 @@ local buildBoundsMax = EMPTY_BOUNDS
 local buildBuffer = EMPTY_BUFFER
 local buildCost = 0
 
--- Half the surface area, the usual BVH cost. 0 for a node with an infinite zone, which is huge in any layout. Its
--- area would make the cost infinite or NaN, and the refit check never ask for a rebuild
+-- 0 when infinite, else the cost goes inf/NaN and refit never asks for a rebuild
 local function halfArea(dx: number, dy: number, dz: number): number
 	local area = dx * dy + dy * dz + dz * dx
 	return if area < math.huge then area else 0
 end
 
--- Grows the scratch space for count members, or shrinks it once the tree it was grown for mostly
--- shrank. Other trees don't shrink it, so a small tree can't make a large one allocate every build
+-- Only the owner shrinks it, so a small tree can't make a large one reallocate every build
 local function prepareScratch(tree: Types.Tree, count: number)
 	local capacity = buffer.len(codesA) // 4
 	if capacity >= count then
@@ -94,18 +92,15 @@ local function prepareScratch(tree: Types.Tree, count: number)
 	idsB = buffer.create(size)
 	sortedCodes, sortedIds = codesA, idsA
 
-	-- Keep only the ids of this build
 	if #memberIds > count then
 		memberIds = table.move(memberIds, 1, count, 1, table.create(count))
 	end
 end
 
--- Bytes in each build scratch buffer
 function LinearBVH.scratchSize(): number
 	return buffer.len(codesA)
 end
 
--- Stable insertion sort for small counts
 local function insertionSort(count: number)
 	for i = 1, count - 1 do
 		local code = readu32(codesA, i * 4)
@@ -123,7 +118,7 @@ local function insertionSort(count: number)
 	sortedCodes, sortedIds = codesA, idsA
 end
 
--- Stable radix sort, the result ends up in sortedCodes/sortedIds
+-- Result lands in sortedCodes/sortedIds
 local function radixSort(count: number)
 	if count <= INSERTION_SORT_LIMIT then
 		insertionSort(count)
@@ -213,7 +208,7 @@ local function writeNode(buf: buffer, offset: number, min: Vector3, max: Vector3
 end
 
 local function buildFlatTree(beginIndex: number, endIndex: number, offset: number): (number, Vector3, Vector3)
-	if beginIndex == endIndex then -- Leaf node
+	if beginIndex == endIndex then
 		local id = readu32(sortedIds, beginIndex * 4)
 		local min, max = buildBoundsMin[id], buildBoundsMax[id]
 		local nextOffset = offset + NODE_SIZE
@@ -221,14 +216,13 @@ local function buildFlatTree(beginIndex: number, endIndex: number, offset: numbe
 		writeNode(buildBuffer, offset, min, max, nextOffset, id)
 
 		return nextOffset, min, max
-	else -- Branch node
+	else
 		local mid = getSplitPos(beginIndex, endIndex)
 
 		local rightOffset, lMin, lMax = buildFlatTree(beginIndex, mid - 1, offset + NODE_SIZE)
 		local nextOffset, rMin, rMax = buildFlatTree(mid, endIndex, rightOffset)
 
 		local min, max = unionBounds(lMin, lMax, rMin, rMax)
-		-- If the point is not in this branch, we skip both subtrees
 		writeNode(buildBuffer, offset, min, max, nextOffset, 0)
 
 		local extent = max - min
@@ -238,19 +232,16 @@ local function buildFlatTree(beginIndex: number, endIndex: number, offset: numbe
 	end
 end
 
--- The buffer to build nodeCount nodes into. A new one if it is too small or mostly unused
 local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
 	local buf = tree.buffer
 	local capacity = buffer.len(buf) // NODE_SIZE
 	if capacity < nodeCount or (capacity > SHRINK_MIN_NODES and capacity > nodeCount * SHRINK_FACTOR) then
-		-- Grow with headroom
 		buf = buffer.create((nodeCount + nodeCount // 2) * NODE_SIZE)
 		tree.buffer = buf
 	end
 	return buf
 end
 
--- Builds the tree from the zones in members
 function LinearBVH.build(
 	tree: Types.Tree,
 	members: { [number]: any },
@@ -262,8 +253,7 @@ function LinearBVH.build(
 	local max = NEGATIVE_HUGE_VECTOR
 	local count = 0
 
-	-- Collect members and the scene the Morton codes span, which is where their centers are. Infinite or
-	-- NaN centers are left out, as is the size, so one huge zone doesn't put every other in the same cell
+	-- Scene spans finite centers only, so one huge zone can't squash the rest into one Morton cell
 	for id in members do
 		local position = positions[id]
 		if position - position == Vector3.zero then
@@ -289,7 +279,7 @@ function LinearBVH.build(
 		min, max = Vector3.zero, Vector3.zero
 	end
 
-	-- Add padding to avoid edge cases with flat scenes
+	-- Padding keeps a flat scene from having a zero-size axis
 	local padding = vector.max(vector.one, (max - min) * 0.01)
 	local sceneMin, sceneMax = min - padding, max + padding
 	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
@@ -310,7 +300,7 @@ function LinearBVH.build(
 
 	buildFlatTree(0, count - 1, 0)
 
-	-- Don't keep the tree's buffer or the bounds alive once they are replaced
+	-- Let replaced buffers and bounds be collected
 	buildBuffer = EMPTY_BUFFER
 	buildBoundsMin = EMPTY_BOUNDS
 	buildBoundsMax = EMPTY_BOUNDS
@@ -319,7 +309,7 @@ function LinearBVH.build(
 	tree.cost = buildCost
 end
 
--- Updates node bounds for moved zones. Returns false if the tree should be rebuilt instead
+-- Returns false if the tree should be rebuilt instead
 function LinearBVH.refit(tree: Types.Tree, boundsMin: { [number]: Vector3 }, boundsMax: { [number]: Vector3 }): boolean
 	if tree.refitSkips > 0 then
 		tree.refitSkips -= 1
@@ -397,14 +387,13 @@ function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, hits: { number }
 			end
 			offset += NODE_SIZE
 		else
-			offset = readu32(buf, offset + SKIP_OFFSET) -- Skip branch
+			offset = readu32(buf, offset + SKIP_OFFSET)
 		end
 	end
 
 	return hitCount
 end
 
--- Whether any leaf contains the point
 function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
 	local buf = tree.buffer
 	local endOffset = tree.count * NODE_SIZE
@@ -425,7 +414,7 @@ function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
 			end
 			offset += NODE_SIZE
 		else
-			offset = readu32(buf, offset + SKIP_OFFSET) -- Skip branch
+			offset = readu32(buf, offset + SKIP_OFFSET)
 		end
 	end
 

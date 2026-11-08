@@ -2,8 +2,7 @@
 --!optimize 2
 --!strict
 
--- The zone each observer has an entity in. Writes go through here, which keeps the observer's
--- tracking and the zone's occupants in step with it. Exits re-read state, as callbacks may change it
+-- The zone each observer has an entity in. Writes go through here to keep tracking and occupants in step
 
 local Callbacks = require(script.Parent.Callbacks)
 local Entities = require(script.Parent.Entities)
@@ -28,11 +27,10 @@ local staleSlots = ZoneShapes.staleSlots
 
 local Memberships = {}
 
--- Entity to the id of its zone
 Memberships.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: number } }
--- Zone id to the number of entities observers have in it
+-- Entities observers have in each zone
 Memberships.zoneOccupants = {} :: { [number]: number }
--- Ids of zones a Zones is destroying, so entities don't move from one to the next on the way out
+-- Zones a Zones is destroying, so entities don't move from one to the next on the way out
 Memberships.zonesBeingDestroyed = {} :: { [number]: true }
 
 local observerTrackingEntities = Memberships.observerTrackingEntities
@@ -54,15 +52,12 @@ local function removeOccupant(zoneId: number)
 	end
 end
 
--- Runs the observer's group trackers. Lists are replaced rather than changed, so this one can't shift under
--- the loop, and a tracker disconnected meanwhile does nothing
 local function runTrackers(observerId: number, entity: Types.Entity?, destroyedGroupId: number?)
 	for _, track in observerGroupTrackers[observerId] or {} do
 		track(entity, destroyedGroupId)
 	end
 end
 
--- Whether the observer still watches one of the entity's groups
 function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boolean
 	local groups = entityToGroups[entity]
 	if not groups then
@@ -79,7 +74,6 @@ function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boo
 	return false
 end
 
--- Moves the entity into the observer's zone
 function Memberships.move(observerId: number, entity: Types.Entity, data: Types.EntityData, zoneId: number)
 	local memberships = data.activeObserverMemberships
 	local oldZoneId = memberships[observerId]
@@ -97,7 +91,6 @@ function Memberships.move(observerId: number, entity: Types.Entity, data: Types.
 	addOccupant(zoneId)
 end
 
--- Takes the entity out of the observer's zone and fires the observer's exits
 function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.EntityData)
 	local zoneId = data.activeObserverMemberships[observerId]
 	if not zoneId then
@@ -115,7 +108,6 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	fire(observerExitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observerSafety[observerId])
 end
 
--- Whether the zone in slot is another of the observer's zones, which stays
 local function isOtherZone(slot: number, observerId: number, zoneId: number): boolean
 	local otherId = zoneSlotIds[slot]
 	local attached = zoneAttachedObservers[slot]
@@ -126,7 +118,7 @@ local function isOtherZone(slot: number, observerId: number, zoneId: number): bo
 		and table.find(attached, observerId) ~= nil
 end
 
--- Another zone of the observer that holds the entity where it was last checked, or nil
+-- Uses the position the entity was last checked at
 local function otherZoneOf(observerId: number, data: Types.EntityData, zoneId: number): number?
 	local position = data.lastPosition
 	local hitCount = ZoneShapes.leavesAtPoint(position, leafHits)
@@ -146,8 +138,7 @@ local function otherZoneOf(observerId: number, data: Types.EntityData, zoneId: n
 	return nil
 end
 
--- Takes the observer's entities out of a zone being destroyed. An entity another of the observer's zones holds
--- moves there, as it would if the zone were detached, rather than leaving and entering again on the next tick
+-- Entities another of the observer's zones holds move there, rather than exiting and entering next tick
 local function leaveDestroyedZone(observerId: number, zoneId: number)
 	local tracked = observerTrackingEntities[observerId]
 	if not tracked then
@@ -186,7 +177,6 @@ local function leaveDestroyedZone(observerId: number, zoneId: number)
 	end
 end
 
--- Exits every entity the observer has in a zone
 function Memberships.exitObserver(observerId: number)
 	local tracked = observerTrackingEntities[observerId]
 	if not tracked then
@@ -207,8 +197,7 @@ function Memberships.exitObserver(observerId: number)
 	end
 end
 
--- Takes every observer's entities out of a zone being destroyed, including observers that detached from it
--- since the last tick
+-- Goes through every observer, as ones detached since the last tick may still hold entities
 function Memberships.leaveZone(zoneId: number)
 	if not zoneOccupants[zoneId] then
 		return
@@ -229,8 +218,6 @@ function Memberships.leaveZone(zoneId: number)
 	zoneOccupants[zoneId] = nil
 end
 
--- Tells the group trackers of the observers the entity is in that its groups, or their observers, changed.
--- Only those of observerId when given
 function Memberships.groupsChanged(entity: Types.Entity, observerId: number?)
 	local data = entityData[entity]
 	if not data then
@@ -253,8 +240,7 @@ function Memberships.groupsChanged(entity: Types.Entity, observerId: number?)
 	end
 end
 
--- Tells every group tracker that a group is being destroyed. A tracker may still count entities that left
--- before it heard, so it can't wait for their exits
+-- Every tracker, as one may still count entities that left before it heard
 function Memberships.groupDestroyed(groupId: number)
 	local observerIds = {}
 	for id in observerGroupTrackers do
@@ -265,7 +251,6 @@ function Memberships.groupDestroyed(groupId: number)
 	end
 end
 
--- Exits the entity from every observer that no longer watches one of its groups
 function Memberships.exitUnsubscribed(entity: Types.Entity, data: Types.EntityData)
 	-- Collected first, as a callback may update and add memberships
 	local leaving: { number }? = nil
@@ -293,7 +278,6 @@ function Memberships.dropObserver(observerId: number)
 	observerTrackingEntities[observerId] = nil
 end
 
--- Marks a zone a Zones is destroying, so entities don't move into it from the zones going with it
 function Memberships.setZoneDestroying(zoneId: number, destroying: boolean)
 	if destroying then
 		zonesBeingDestroyed[zoneId] = true

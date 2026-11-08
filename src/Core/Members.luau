@@ -1,7 +1,7 @@
 --!strict
 
--- An entity, as given, joining or leaving a group, with everything that follows from it in the order it must
--- happen. Also keeps the removal watches of autoClean groups. Only this module writes its tables
+-- An entity joining or leaving a group, with its follow-on steps in required order, and autoClean removal
+-- watches. Only this module writes its tables
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
@@ -14,14 +14,13 @@ local Log = require(script.Parent.Parent.Utils.Log)
 
 local Members = {}
 
--- Groups that let go of members once they leave the game, and the connection that watches each such member
 Members.autoCleanGroups = {} :: { [number]: true }
 Members.cleanups = {} :: { [number]: { [Instance]: RBXScriptConnection } }
 
 local autoCleanGroups = Members.autoCleanGroups
 local cleanups = Members.cleanups
 
--- Whether the group's destroy has begun. A group takes on nothing new from then on
+-- True from the start of destroy, so nothing new joins mid-teardown
 function Members.isGroupDestroyed(groupId: number): boolean
 	local group = Registry.groups[groupId]
 	return group == nil or Destroyed.isDestroyed(group)
@@ -29,7 +28,6 @@ end
 
 local isDestroyed = Members.isGroupDestroyed
 
--- Removes an instance from the group once it leaves the game
 local function watchRemoval(groupId: number, entity: Types.Entity)
 	local groupCleanups = cleanups[groupId]
 	if typeof(entity) == 'Instance' and not groupCleanups[entity] then
@@ -78,7 +76,7 @@ function Members.setAutoClean(groupId: number, enabled: boolean)
 	end
 end
 
--- Adds the entity as given, never through the reference map
+-- Takes the entity as given, without resolving references
 function Members.add(groupId: number, entity: Types.Entity)
 	if isDestroyed(groupId) then
 		return
@@ -98,12 +96,11 @@ function Members.add(groupId: number, entity: Types.Entity)
 		watchRemoval(groupId, entity)
 	end
 
-	-- Its group may arrive in observers it is already in
+	-- Observers it is already in may now count this group
 	Memberships.groupsChanged(entity)
 end
 
--- Removes the entity as given, never through the reference map. Exit callbacks run in the middle and may change
--- anything, so whether the entity is dropped is decided after them
+-- Takes the entity as given. Exit callbacks run mid-way, so dropping is decided after them
 function Members.remove(groupId: number, entity: Types.Entity)
 	if not Entities.isIn(entity, groupId) then
 		return
@@ -122,11 +119,10 @@ function Members.remove(groupId: number, entity: Types.Entity)
 	Routing.recheck(entity)
 
 	Memberships.exitUnsubscribed(entity, data)
-	-- Its group may leave observers it stays in through other groups
+	-- Observers it stays in through other groups may no longer count this group
 	Memberships.groupsChanged(entity)
 
-	-- Unless exit callbacks added it back. Routing goes first, as it reads the data of the entity swapped into its
-	-- bucket slot, which may be this one
+	-- Routing first: it reads the data of the entity swapped into its bucket slot, possibly this one
 	if Entities.isGroupless(entity, data) then
 		Routing.forget(entity, data :: Types.EntityData)
 		Entities.drop(entity)

@@ -2,21 +2,18 @@
 --!optimize 2
 --!strict
 
--- Records where a tree's zones changed between versions, so entities that
--- stand still only re-query near a change
+-- Where a tree's zones changed per version, so entities standing still only re-query near a change
 
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Types = require(script.Parent.Parent.Types)
 
 local anyLeafContains = LinearBVH.anyLeafContains
 
--- Versions kept
 local HISTORY = 16
--- More boxes than this (or than the tree has zones) counts as everything changed
+-- More boxes than this, or than the tree has zones, counts as everything changed
 local MIN_BOXES = 64
 local MAX_BOXES = 2048
 
--- Commit scratch space, shared by every log
 local boxCenters = {} :: { Vector3 }
 
 local function addAll(log: Types.ZoneChanges)
@@ -39,7 +36,7 @@ function ZoneChanges.new(): Types.ZoneChanges
 	}
 end
 
--- Records a changed box. Empty ones, of zones that contain nothing, are left out
+-- Empty boxes (min above max) are skipped
 function ZoneChanges.add(log: Types.ZoneChanges, min: Vector3, max: Vector3)
 	if log.all or min.X > max.X then
 		return
@@ -56,7 +53,6 @@ function ZoneChanges.add(log: Types.ZoneChanges, min: Vector3, max: Vector3)
 	log.boxCount = count
 end
 
--- Returns whether anything changed since the last commit
 function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: number): boolean
 	local count = log.boxCount
 	if not log.all and count == 0 then
@@ -82,7 +78,7 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 		boxCenters[i] = (boxesMin[i] + boxesMax[i]) * 0.5
 	end
 
-	-- Box indices are the leaf ids. Empty if everything changed, freeing the old leaves
+	-- Box indices are the leaf ids; empty when everything changed, freeing the old leaves
 	LinearBVH.build(slot.tree, boxesMin, boxesMin, boxesMax, boxCenters)
 
 	table.clear(boxesMin)

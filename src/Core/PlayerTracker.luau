@@ -1,7 +1,7 @@
 --!strict
 
--- Follows each player added to a group through its characters: the HumanoidRootPart of its current character is
--- the member, through Members, and the player its reference. Keeps which groups each player was added to
+-- Follows grouped players through their characters: the current HumanoidRootPart is the member, the player its
+-- reference
 
 local Players = game:GetService('Players')
 
@@ -11,14 +11,12 @@ local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 
 local activeTrackers = {} :: { [Player]: () -> () }
--- The ids of the groups each player was added to
 local playerSubscriptions = {} :: { [Player]: { [number]: true } }
--- Players whose PlayerRemoving has fired. Their Parent is still Players while it runs
+-- PlayerRemoving fired. Parent is still Players while it runs
 local leaving = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Player]: true }
 
 local PlayerTracker = {}
 
--- Whether the player is in a group. A group being destroyed lets go of its players before it is gone
 local function isInAnyGroup(player: Player): boolean
 	local subscriptions = playerSubscriptions[player]
 	return subscriptions ~= nil and next(subscriptions) ~= nil
@@ -49,15 +47,15 @@ local function trackPlayer(player: Player)
 
 		local hrp = currentHrp
 		if hrp then
-			-- Let go first, so an exit callback adding the player to a group doesn't add this part
+			-- Before exits, so a callback re-adding the player doesn't add this part
 			currentHrp = nil
 			References.release(player, hrp)
 
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
-				-- Cloned, as exit callbacks may add the player to groups
+				-- Cloned: exit callbacks may add the player to groups
 				for groupId in table.clone(subscriptions) do
-					-- Unless a callback destroyed it meanwhile
+					-- A callback may have destroyed it
 					if Registry.groups[groupId] then
 						Members.remove(groupId, hrp)
 					end
@@ -97,7 +95,6 @@ local function trackPlayer(player: Player)
 
 			References.link(hrp, player)
 
-			-- Listen for the HRP streaming out or getting destroyed, also by its character leaving
 			hrpConn = hrp.AncestryChanged:Connect(function()
 				if not hrp:IsDescendantOf(game) then
 					clearHrp(hrp)
@@ -110,7 +107,7 @@ local function trackPlayer(player: Player)
 
 			local subscriptions = playerSubscriptions[player]
 			if subscriptions then
-				-- Cloned, as enter callbacks may add the player to groups, which adds the part themselves
+				-- Cloned: enter callbacks may add the player to groups, which adds the part itself
 				for groupId in table.clone(subscriptions) do
 					if currentHrp ~= hrp then
 						break
@@ -123,8 +120,7 @@ local function trackPlayer(player: Player)
 	end
 
 	local function onCharacterAdded(character: Model)
-		-- A player in no group is let go here rather than when it leaves its last group, as that may happen in a
-		-- callback while its part is being handled
+		-- Let go here, not on leaving its last group, which may happen in a callback mid-handling
 		if not isInAnyGroup(player) then
 			stopTracking(player)
 			return
@@ -134,14 +130,13 @@ local function trackPlayer(player: Player)
 		currentCharacter = character
 		checkHrp(character)
 
-		-- Listen for the HRP streaming in dynamically
 		charConn = character.ChildAdded:Connect(function(child)
 			if child.Name == 'HumanoidRootPart' then
 				checkHrp(character)
 			end
 		end)
 
-		-- A character taken out of the world and put back keeps its HRP, so it is picked up again
+		-- Put back into the world, a character keeps its HRP without ChildAdded
 		charAncestryConn = character.AncestryChanged:Connect(function()
 			if character:IsDescendantOf(game) then
 				checkHrp(character)
@@ -168,7 +163,7 @@ local function trackPlayer(player: Player)
 end
 
 function PlayerTracker.subscribe(player: Player, groupId: number)
-	-- A player that is leaving or left would never be let go, as its PlayerRemoving has fired
+	-- Its PlayerRemoving already fired, so it would never be let go
 	if player.Parent ~= Players or leaving[player] then
 		return
 	end
@@ -202,29 +197,27 @@ function PlayerTracker.isSubscribed(player: Player, groupId: number): boolean
 	return subscriptions ~= nil and subscriptions[groupId] ~= nil
 end
 
--- The groups the player was added to, also while it has no character
+-- Also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
 	local subscriptions = playerSubscriptions[player]
 	if subscriptions then
 		for groupId in subscriptions do
-			-- A group being destroyed lets go of its players before it is gone
+			-- Never nil: a destroyed group drops its players first
 			table.insert(list, Registry.groups[groupId])
 		end
 	end
 	return list
 end
 
--- Forgets every player added to the group, also those without a character
 function PlayerTracker.dropGroup(groupId: number)
 	for _, subscriptions in playerSubscriptions do
 		subscriptions[groupId] = nil
 	end
 end
 
--- Stops following the player's characters and lets go of its part
 function stopTracking(player: Player)
-	-- First, so its part leaves the groups it is still in
+	-- Before clearing subscriptions, so its part leaves its groups
 	local cleanup = activeTrackers[player]
 	if cleanup then
 		cleanup()

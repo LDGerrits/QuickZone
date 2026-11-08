@@ -23,7 +23,6 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 
 	local self: Types.InternalZones = setmetatable({
 		phase = 'alive',
-		-- Auto-synced zones are always dynamic
 		dynamic = not not (isDynamic or autoSync),
 		metadata = metadata,
 		autoSync = not not autoSync,
@@ -52,7 +51,7 @@ function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 	return self
 end
 
--- private, for Observer:attach. Attaches the observer to every zone, also those added later
+-- private, for Observer:attach
 function Zones._attachObserver(self: Types.InternalZones, observer: any): Types.Zones
 	-- Its destroy has already let go of its observers
 	if Destroyed.isDestroyed(self) or self.observers[observer] then
@@ -161,7 +160,7 @@ end
 	@return Zones
 ]=]
 function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
-	-- Applied to every zone even when unchanged, as single zones may have been changed directly
+	-- Applied even when unchanged, as single zones may have been changed directly
 	autoSync = not not autoSync
 	self.autoSync = autoSync
 	if autoSync then
@@ -189,8 +188,7 @@ end
 	@return Zones
 ]=]
 function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
-	-- Applied to every zone even when unchanged, as single zones may have been changed directly. Static
-	-- zones stop auto-syncing, as each zone does
+	-- Applied even when unchanged, as single zones may have been changed directly
 	isDynamic = not not isDynamic
 	self.dynamic = isDynamic
 	if not isDynamic then
@@ -355,7 +353,7 @@ function Zones.destroy(self: Types.InternalZones)
 		cleanup()
 		zone:destroy()
 	end
-	-- Also for zones a callback took out before they were destroyed. Ids are never reused
+	-- By id, to cover zones a callback took out first. Ids are never reused
 	for _, id in zoneIds do
 		Memberships.setZoneDestroying(id, false)
 	end
@@ -368,8 +366,7 @@ function Zones.destroy(self: Types.InternalZones)
 	Destroyed.finish(self)
 end
 
--- private. Not checked for a destroy: it is only given zones made for it, and what makes them stops before
--- its zones are destroyed
+-- private. No destroy check: its constructors stop before its zones are destroyed
 function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	if self.zones[zone] then
 		return

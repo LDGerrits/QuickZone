@@ -1,8 +1,7 @@
 --!strict
 
--- The group operations the Group class offers, by group id. A member is given as the user gives it: a player,
--- followed through its characters, or a reference or entity, resolved to its entity. Classes change group
--- membership only through here, and read it from Entities
+-- Group operations by id, taking members as users give them. Classes change membership only through here and
+-- read it from Entities
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
@@ -18,18 +17,17 @@ local Groups = {}
 
 local isDestroyed = Members.isGroupDestroyed
 
--- Removes a member. A character part of a player goes through the player as well, so the player's next
--- character is not added back
+-- A player's character part unsubscribes the player too, so its next character isn't added back
 local function removeMember(groupId: number, entity: Types.Entity)
 	local reference = References.entityToReference[entity]
 	if isPlayer(reference) then
 		PlayerTracker.unsubscribe(reference, groupId)
 	end
-	-- Does nothing once an exit callback destroyed the group, which let go of every member
+	-- No-op if an exit callback destroyed the group
 	Members.remove(groupId, entity)
 end
 
--- Sets up a new group, once the Group class has registered it
+-- After the Group class registers it
 function Groups.create(groupId: number, autoClean: boolean)
 	Links.addGroup(groupId)
 	Entities.addGroup(groupId)
@@ -37,7 +35,7 @@ function Groups.create(groupId: number, autoClean: boolean)
 end
 
 function Groups.add(groupId: number, reference: any)
-	-- A callback during destroy must not add entities that are never removed
+	-- Nothing joins mid-destroy, or it would never be removed
 	if isDestroyed(groupId) then
 		return
 	end
@@ -51,7 +49,6 @@ end
 
 function Groups.addBulk(groupId: number, references: { any })
 	for _, reference in references do
-		-- Does nothing once a callback destroyed the group
 		Groups.add(groupId, reference)
 	end
 end
@@ -62,27 +59,24 @@ function Groups.remove(groupId: number, reference: any)
 		return
 	end
 
-	-- An entity is removed itself, also when it is another entity's reference, as contains finds it. A player's
-	-- part is removed as the player
+	-- An entity that is also another's reference is removed itself, matching contains
 	removeMember(groupId, References.entityOf(reference))
 end
 
 function Groups.removeBulk(groupId: number, references: { any })
 	for _, reference in references do
-		-- Does nothing once an exit callback destroyed the group
 		Groups.remove(groupId, reference)
 	end
 end
 
--- Adds or removes the entity as given, never through the reference map, for groups that follow instances. These
--- are Members' own, so the classes can keep to this one module
+-- Re-exported so classes only use this module
 Groups.addEntity = Members.add
 Groups.removeEntity = Members.remove
 Groups.setAutoClean = Members.setAutoClean
 
 function Groups.clear(groupId: number)
-	-- Held once and walked backwards, as exit callbacks may remove members after this one, or destroy the group,
-	-- which empties the list
+	-- Held once and walked backwards: exit callbacks may remove later members, or destroy the group and empty the
+	-- list
 	local members = Entities.groupEntities[groupId]
 	if members then
 		for idx = #members, 1, -1 do
@@ -102,7 +96,7 @@ function Groups.contains(groupId: number, reference: any): boolean
 		or (isPlayer(reference) and PlayerTracker.isSubscribed(reference, groupId))
 end
 
--- Lets go of everything the group has, once its onDestroy callbacks have run. The Group class forgets the object
+-- After its onDestroy callbacks. The Group class forgets the object
 function Groups.destroy(groupId: number)
 	Groups.clear(groupId)
 	Memberships.groupDestroyed(groupId)

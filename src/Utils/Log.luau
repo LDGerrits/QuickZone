@@ -29,7 +29,7 @@ function Log.nonFatal(message: string, trace: string?, ...: any)
 	task.spawn(error :: any, formattedString, 0)
 end
 
--- Checked where a callback is given, as the code that calls it would only fail later
+-- Fails where the callback is given rather than later when it runs
 function Log.checkCallback(callback: any)
 	if type(callback) ~= 'function' then
 		Log.fatal('Expected a callback function, got %s.', nil, typeof(callback))

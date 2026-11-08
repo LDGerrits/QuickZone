@@ -1,7 +1,5 @@
 --!strict
 
--- The Observer's queries: what is inside it, and where
-
 local Entities = require(script.Parent.Parent.Core.Entities)
 local Links = require(script.Parent.Parent.Core.Links)
 local Memberships = require(script.Parent.Parent.Core.Memberships)
@@ -23,8 +21,7 @@ local zoneAttachedObservers = Links.zoneAttachedObservers
 
 local queryHits = {} :: { number }
 
--- Iterates the entities the observer has in a zone, as their references. Safe while entities enter and leave,
--- also when the loop yields across ticks, as each is checked again when reached
+-- Safe while entities enter and leave, also when the loop yields across ticks
 local function iterTracked(
 	observerId: number,
 	zoneIds: { [number]: true }?,
@@ -49,7 +46,7 @@ local function iterTracked(
 	end
 end
 
--- The ids of a Zone, or of every zone in a Zones. Its entities are found while it is destroyed, until it is dead
+-- A zone being destroyed keeps its ids until it is dead
 local function zoneIdsOf(zone: any): { [number]: true }
 	local ids = {}
 	if Destroyed.isDead(zone) then
@@ -121,7 +118,7 @@ end
 function ObserverQueries.getPlayersInside(self: Types.InternalObserver): { Player }
 	local results = {}
 	for entity in Memberships.observerTrackingEntities[self.id] do
-		-- Only a player's current HumanoidRootPart has the player as its reference, so none comes twice
+		-- Only the current HumanoidRootPart maps to its player, so none comes twice
 		local ref = References.entityToReference[entity]
 		if isPlayer(ref) then
 			table.insert(results, ref)

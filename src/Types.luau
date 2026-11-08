@@ -47,7 +47,7 @@ export type Tree = {
 	refitSkips: number,
 	-- Its zones changed since it was last built or refit
 	pending: boolean,
-	-- Zones were added or removed, so it must be rebuilt rather than refit
+	-- Zones were added or removed, so refit can't be used
 	membersChanged: boolean,
 }
 

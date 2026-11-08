@@ -2,9 +2,8 @@
 --!optimize 2
 --!strict
 
--- Works out which observers watch each entity, at what rate and precision, and in which trees, and keeps the
--- buckets the scheduler goes through and each observer's zone counts. Others mark entities to route here, only
--- this module writes the routing
+-- Which observers watch each entity, at what rate, precision and trees, and the scheduler's buckets.
+-- Others mark entities, only this module writes the routing
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
@@ -21,14 +20,14 @@ local groupToObservers = Links.groupToObservers
 
 local Routing = {}
 
--- Raised to check every entity again at the next tick
+-- Raised to recheck every entity next tick
 Routing.logicVersion = 0
 Routing.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
 Routing.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 Routing.dirtyTopology = {} :: { [Types.Entity]: boolean }
 Routing.bucketList = {} :: { number }
 Routing.buckets = {} :: { [number]: { Types.Entity } }
--- How many static and dynamic zones each observer has, which decides the trees its entities are checked in
+-- Zones per observer per tree, which decide the trees its entities query
 Routing.observerDynamicCount = {} :: { [number]: number }
 Routing.observerStaticCount = {} :: { [number]: number }
 
@@ -40,14 +39,13 @@ local dirtyTopology = Routing.dirtyTopology
 local bucketList = Routing.bucketList
 local buckets = Routing.buckets
 
--- The entity's observers changed their settings, so its rate, precision and trees are worked out at the next tick
+-- Works out rate, precision and trees again at the next tick
 function Routing.reroute(entity: Types.Entity)
 	dirtyProfiles[entity] = true
 	dirtyTopology[entity] = true
 end
 
--- The entity's groups or their observers changed. Rerouted, and checked at the next tick also when it stands
--- still, as another observer may take it over
+-- Also checked next tick when standing still, as another observer may take it over
 function Routing.recheck(entity: Types.Entity)
 	Routing.reroute(entity)
 	local data = entityData[entity]
@@ -56,7 +54,6 @@ function Routing.recheck(entity: Types.Entity)
 	end
 end
 
--- Takes an entity out of the bucket of its update rate, swapping the last one into its place
 function Routing.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 	local bucket = buckets[data.updateRate]
 	local idx = data.bucketIndex
@@ -79,7 +76,6 @@ local function processProfileChange(entity: Types.Entity)
 		return
 	end
 
-	-- Track linked observers for quick lookup in hot loop
 	local linkedObservers = entityToObservers[entity]
 	if linkedObservers then
 		table.clear(linkedObservers)
@@ -90,7 +86,6 @@ local function processProfileChange(entity: Types.Entity)
 	local minPrecSq = math.huge
 	local maxRate = 0
 
-	-- Find the highest settings across all subscribed observers
 	for groupId, _ in groups do
 		local observers = groupToObservers[groupId]
 		if not observers then
@@ -114,7 +109,6 @@ local function processProfileChange(entity: Types.Entity)
 
 	local data = entityData[entity]
 
-	-- Swap buckets
 	if data.updateRate ~= maxRate then
 		Routing.leaveBucket(entity, data)
 
@@ -136,7 +130,7 @@ local function processProfileChange(entity: Types.Entity)
 		data.updateRate = maxRate
 	end
 
-	-- Rates are above 0, so a rate of 0 means no observer watches the entity
+	-- Rate 0 means no observer watches the entity
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
 		entityToObservers[entity] = linkedObservers
@@ -173,7 +167,6 @@ local function processTopologyChange(entity: Types.Entity)
 	data.needsDynamic = needsDynamic
 end
 
--- The observer's settings changed, so every entity it watches is routed again
 function Routing.rerouteObserver(observerId: number)
 	for groupId, observers in groupToObservers do
 		local members = groupEntities[groupId]
@@ -185,7 +178,6 @@ function Routing.rerouteObserver(observerId: number)
 	end
 end
 
--- Checks every entity again at the next tick, also those that stand still
 function Routing.recheckAll()
 	Routing.logicVersion += 1
 end
@@ -195,23 +187,20 @@ function Routing.addObserver(observerId: number)
 	observerDynamicCount[observerId] = 0
 end
 
--- Drops the zone counts of a destroyed observer, once its zones have detached
+-- Call once the observer's zones have detached
 function Routing.dropObserver(observerId: number)
 	observerStaticCount[observerId] = nil
 	observerDynamicCount[observerId] = nil
 end
 
--- Counts a zone the observer gained or lost in a tree
 function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: number)
 	local dict = isDynamic and observerDynamicCount or observerStaticCount
 	local current = dict[observerId] or 0
 	local newCount = current + delta
 	dict[observerId] = newCount
 
-	-- Only flag entities dirty when the observer gains its first zone in the tree or loses its last, as the
-	-- delta is always 1 or -1
+	-- Delta is always 1 or -1, so only crossing zero changes which trees entities need
 	if current == 0 or newCount == 0 then
-		-- Check every entity again when an observer loses its last zone
 		if newCount == 0 then
 			Routing.recheckAll()
 		end
@@ -228,7 +217,6 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 	end
 end
 
--- Drops the routing of an entity that left its last group
 function Routing.forget(entity: Types.Entity, data: Types.EntityData)
 	Routing.leaveBucket(entity, data)
 	entityToObservers[entity] = nil
@@ -236,9 +224,7 @@ function Routing.forget(entity: Types.Entity, data: Types.EntityData)
 	dirtyTopology[entity] = nil
 end
 
--- Routes the marked entities, at the start of a tick. onBucketDropped is told each rate whose bucket went
 function Routing.settle(onBucketDropped: (rate: number) -> ())
-	-- Route entities that have changed groups or observers since the last update
 	for entity, _ in dirtyProfiles do
 		dirtyProfiles[entity] = nil
 		if entityData[entity] then
@@ -246,8 +232,7 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 		end
 	end
 
-	-- Route entities of which the topology changed
-	-- Must be after profile change
+	-- After profiles, as topology reads entityToObservers
 	for entity, _ in dirtyTopology do
 		dirtyTopology[entity] = nil
 		if entityData[entity] then
@@ -255,8 +240,7 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 		end
 	end
 
-	-- Drop buckets left empty by entities that changed rate or were removed. Only done here, as removals
-	-- from callbacks can't shrink the list while a tick goes through it
+	-- Only here, as callbacks can't shrink the list while a tick walks it
 	for i = #bucketList, 1, -1 do
 		local rate = bucketList[i]
 		if #buckets[rate] == 0 then

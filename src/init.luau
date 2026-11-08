@@ -79,7 +79,7 @@ function QuickZone:configure(config: { enabled: boolean?, autoSyncRate: number?,
 	if type(config) ~= 'table' then
 		Log.fatal('configure expects a config table, got %s.', nil, typeof(config))
 	end
-	-- Checked first, so a bad value doesn't leave the settings before it applied
+	-- Validate all first, so a bad value applies nothing
 	if config.autoSyncRate ~= nil then
 		Scheduler.checkAutoSyncRate(config.autoSyncRate)
 	end
@@ -195,7 +195,7 @@ end
 function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	local oldReference = entityToReference[entity]
 
-	-- The player tracker links a player's part and sets the link again on every respawn
+	-- PlayerTracker owns player links and resets them on respawn
 	if isPlayer(oldReference) then
 		if reference ~= oldReference then
 			Log.warn("Cannot change the reference of a player's HumanoidRootPart. Ignoring request.", nil)
@@ -253,7 +253,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 	-- Groups already asked, so a managed group warns once
 	local asked = {} :: { [any]: true }
 
-	-- A player leaves the groups it was added to, also while it has no character
+	-- Also when the player has no character
 	if isPlayer(entity) then
 		for _, group in PlayerTracker.groupsOf(entity) do
 			asked[group] = true
@@ -273,8 +273,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 		table.insert(idsToRemove, groupId)
 	end
 
-	-- A player's character part goes by its player, so the player is removed rather than only this
-	-- character. Other entities go by themselves, as entities may share a reference
+	-- A character part is removed as its player; others as themselves, since entities may share a reference
 	local reference = entityToReference[entity]
 	local target = if isPlayer(reference) then reference else entity
 	for _, groupId in idsToRemove do
@@ -364,7 +363,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 		for slot, cframe in shapeCFrames do
 			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
-			-- What the shape fills, so a Ball or Cylinder is drawn at the size it detects
+			-- Drawn at the size the shape detects
 			local halfSize = shapeExtents[slot]
 			local size = halfSize * 2
 
@@ -392,7 +391,6 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			box.Color3 = color
 		end
 
-		-- Destroy removed zones
 		for id, box in debugVisuals do
 			if not shapeCFrames[id] then
 				box.adornment:Destroy()
@@ -404,7 +402,6 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	return self
 end
 
--- Its queries are kept in their own file
 for name, method in WorldQueries do
 	(QuickZone :: any)[name] = method
 end
