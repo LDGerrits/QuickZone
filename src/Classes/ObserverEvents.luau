@@ -41,11 +41,10 @@ local function trackGroups(
 			and observers[observerId] == true
 	end
 
-	-- zone is where the entity left the observer
-	local function reconcile(entity: Types.Entity, zone: Types.Zone?)
+	local function reconcile(entity: Types.Entity, exitZone: Types.Zone?)
 		local data = Entities.entityData[entity]
 		local zoneId = data and data.activeObserverMemberships[observerId]
-		local current = if zoneId then Registry.zoneIdToZoneObj[zoneId] else zone
+		local current = if zoneId then Registry.zoneIdToZoneObj[zoneId] else exitZone
 		if current and counted[entity] then
 			lastZones[entity] = current
 		end

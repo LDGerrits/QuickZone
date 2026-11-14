@@ -17,7 +17,7 @@ local checkZone = Checks.checkZone
 local leavesAtPoint = ZoneShapes.leavesAtPoint
 local leafContainsPoint = ZoneShapes.leafContainsPoint
 
-local zoneAttachedObservers = Links.zoneAttachedObservers
+local slotObservers = Links.slotObservers
 
 local queryHits = {} :: { number }
 
@@ -80,7 +80,7 @@ function ObserverQueries.isPointInside(self: Types.InternalObserver, position: V
 	for i = 1, hitCount do
 		local hitId = queryHits[i]
 
-		local observers = zoneAttachedObservers[hitId]
+		local observers = slotObservers[hitId]
 		if not observers or not table.find(observers, observerId) then
 			continue
 		end
@@ -136,7 +136,7 @@ end
 ]=]
 function ObserverQueries.getZones(self: Types.InternalObserver): { Types.Zone }
 	local results = {}
-	for slot, attachedList in Links.zoneAttachedObservers do
+	for slot, attachedList in Links.slotObservers do
 		if not table.find(attachedList, self.id) then
 			continue
 		end
@@ -245,7 +245,7 @@ end
 	@return () -> Zone?
 ]=]
 function ObserverQueries.iterZones(self: Types.InternalObserver): () -> Types.Zone?
-	local nextSlot = Snapshot.keys(zoneAttachedObservers)
+	local nextSlot = Snapshot.keys(slotObservers)
 	local observerId = self.id
 
 	return function(): Types.Zone?

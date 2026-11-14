@@ -22,7 +22,7 @@ export type ObserverSettings = {
 
 local Wiring = {}
 
-local function retrackMembers(observerId: number, groupId: number)
+local function notifyGroupTrackers(observerId: number, groupId: number)
 	if Callbacks.observerGroupTrackers[observerId] then
 		-- Cloned: tracker callbacks may change the group
 		for _, entity in table.clone(Entities.groupEntities[groupId] :: { Types.Entity }) do
@@ -72,7 +72,7 @@ function Wiring.setZoneDynamic(slot: number, isDynamic: boolean): boolean
 
 	ZoneShapes.setDynamic(slot, isDynamic)
 
-	local attached = Links.zoneAttachedObservers[slot]
+	local attached = Links.slotObservers[slot]
 	if attached then
 		for _, observerId in attached do
 			Routing.changeZoneCount(observerId, not isDynamic, -1)
@@ -104,14 +104,14 @@ function Wiring.subscribe(observerId: number, groupId: number)
 	end
 
 	-- Members already inside through other groups bring this one in
-	retrackMembers(observerId, groupId)
+	notifyGroupTrackers(observerId, groupId)
 end
 
 function Wiring.unsubscribe(observerId: number, groupId: number)
 	Links.unsubscribe(observerId, groupId)
 	disconnectFromGroup(observerId, groupId)
 	-- Members that stay inside through other groups no longer bring this one in
-	retrackMembers(observerId, groupId)
+	notifyGroupTrackers(observerId, groupId)
 end
 
 -- Settings must already be validated
@@ -136,7 +136,7 @@ function Wiring.removeObserver(observerId: number)
 	Routing.rerouteObserver(observerId)
 	Links.unsubscribeAll(observerId)
 
-	for slot, attached in Links.zoneAttachedObservers do
+	for slot, attached in Links.slotObservers do
 		if table.find(attached, observerId) then
 			Wiring.detach(slot, observerId)
 		end
