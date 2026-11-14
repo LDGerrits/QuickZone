@@ -2692,7 +2692,7 @@ return function(Tiniest: Tiniest)
 			local observer = Observer.new({ zones = { zone }, groups = {} })
 			observer:destroy()
 
-			Expect(Links.zoneAttachedObservers[(zone :: any).slot]).is(nil)
+			Expect(Links.slotObservers[(zone :: any).slot]).is(nil)
 			zone:destroy()
 		end)
 

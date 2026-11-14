@@ -106,7 +106,7 @@ local function extentsOf(halfSize: Vector3, shapeType: number): Vector3
 	return extents
 end
 
-local function refresh(slot: number)
+local function deriveWorldShape(slot: number)
 	local isDynamic = dynamicSlots[slot] == true
 	local shapeType = shapeTypes[slot]
 	local halfSize = extentsOf(shapeHalfSizes[slot], shapeType)
@@ -177,7 +177,7 @@ function ZoneShapes.add(
 	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
 	shapeParts[slot] = part
-	refresh(slot)
+	deriveWorldShape(slot)
 end
 
 function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeType: number, part: BasePart?)
@@ -199,7 +199,7 @@ function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeTy
 	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
 	shapeParts[slot] = part
-	refresh(slot)
+	deriveWorldShape(slot)
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)

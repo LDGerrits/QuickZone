@@ -1524,7 +1524,7 @@ return function(Tiniest: Tiniest)
 
 				Expect(table.concat(refused, ', ')).is('deadGroup, deadZone, group, zone')
 				Expect(#QuickZone:getObservers()).is(before + 1)
-				Expect(#(Links.zoneAttachedObservers[zone.slot] or {})).is(0)
+				Expect(#(Links.slotObservers[zone.slot] or {})).is(0)
 				Expect(subscribeDead).is(false)
 				Expect(attachDead).is(false)
 				Expect(Links.groupToObservers[deadGroupId]).is(nil)

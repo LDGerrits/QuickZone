@@ -6,13 +6,13 @@ local Zones = require(script.Parent.Zones)
 
 local Checks = {}
 
-local function isZone(zone: any): boolean
+local function isLiveZone(zone: any): boolean
 	local class = getmetatable(zone)
 	return type(zone) == 'table' and (class == Zone or class == Zones)
 end
 
 function Checks.checkZone(zone: any)
-	if not isZone(zone) then
+	if not isLiveZone(zone) then
 		Log.fatal('Expected a live Zone or Zones, got %s.', nil, tostring(zone))
 	end
 end

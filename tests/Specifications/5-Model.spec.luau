@@ -1636,7 +1636,7 @@ local function describeLeaves(zones: { [any]: any }, point: Vector3): string
 		table.insert(
 			parts,
 			`other leaf at slot {slot} ({if zone then describeZone(zone) else 'no zone'}, attached to observer ids {table.concat(
-				Links.zoneAttachedObservers[slot] or {},
+				Links.slotObservers[slot] or {},
 				','
 			)}): leaf {ZoneShapes.leafContainsPoint(slot, point)}`
 		)

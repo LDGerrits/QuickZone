@@ -29,8 +29,8 @@ local isSubscribed = Memberships.isSubscribed
 local treeExact = ZoneShapes.treeExact
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotIds = ZoneShapes.zoneSlotIds
-local zoneAttachedObservers = Links.zoneAttachedObservers
-local zoneSoleObserver = Links.zoneSoleObserver
+local slotObservers = Links.slotObservers
+local slotSoleObserver = Links.slotSoleObserver
 local autoSyncZones = Registry.autoSyncZones
 
 local observerPriorityMap = Registry.observerPriorityMap
@@ -58,8 +58,8 @@ local ctx_candidateIndex = table.create(16) :: { [number]: number }
 local ctx_candidateList = table.create(16) :: { [number]: number }
 local ctx_linkedObservers: { [number]: boolean }
 local ctx_currentMemberships: { [number]: number }
-local ctx_rate: number? = nil
-local ctx_index = 0
+local ctx_checkingRate: number? = nil
+local ctx_checkingIndex = 0
 
 local frameBudget = Config.Scheduler.frameBudget
 local autoSyncRate = Config.Scheduler.autoSyncRate
@@ -104,7 +104,7 @@ local function processObserverHit(observerId: number, zoneId: number)
 end
 
 local function processZoneHit(slot: number)
-	local observers = zoneAttachedObservers[slot]
+	local observers = slotObservers[slot]
 	if not observers then
 		return
 	end
@@ -119,7 +119,7 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	local hitCount = queryPoint(tree, position, ctx_hits, 0)
 	for i = 1, hitCount do
 		local slot = ctx_hits[i]
-		local observerId = zoneSoleObserver[slot]
+		local observerId = slotSoleObserver[slot]
 
 		if observerId then
 			if ctx_candidatePriority[observerId] ~= nil then
@@ -204,10 +204,10 @@ local function runTick(dt: number)
 		end
 
 		local budgetCheckCountdown = BUDGET_CHECK
-		ctx_rate = rate
+		ctx_checkingRate = rate
 
 		while processed < workQuota do
-			ctx_index = idx
+			ctx_checkingIndex = idx
 			local entity = list[idx]
 			local data = entityData[entity] :: Types.EntityData
 
@@ -329,7 +329,7 @@ local function runTick(dt: number)
 					end
 
 					-- Or changed the observer, so recheck next tick. A clean profile means it is still subscribed
-					local attached = zoneAttachedObservers[zone.slot]
+					local attached = slotObservers[zone.slot]
 					if
 						observerEnabled[observerId] == false
 						or not attached
@@ -383,7 +383,7 @@ local function runTick(dt: number)
 		end
 
 		bucketLastProcessedIndex[rate] = idx
-		ctx_rate = nil
+		ctx_checkingRate = nil
 
 		if (os.clock() - start) > frameBudget then
 			break
@@ -398,9 +398,9 @@ local function recoverFromError()
 	table.clear(ctx_candidatePriority)
 	table.clear(ctx_candidateIndex)
 
-	if ctx_rate then
-		bucketLastProcessedIndex[ctx_rate] = ctx_index + 1
-		ctx_rate = nil
+	if ctx_checkingRate then
+		bucketLastProcessedIndex[ctx_checkingRate] = ctx_checkingIndex + 1
+		ctx_checkingRate = nil
 	end
 end
 

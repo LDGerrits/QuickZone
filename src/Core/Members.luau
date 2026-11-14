@@ -15,10 +15,10 @@ local Log = require(script.Parent.Parent.Utils.Log)
 local Members = {}
 
 Members.autoCleanGroups = {} :: { [number]: true }
-Members.cleanups = {} :: { [number]: { [Instance]: RBXScriptConnection } }
+Members.removalWatches = {} :: { [number]: { [Instance]: RBXScriptConnection } }
 
 local autoCleanGroups = Members.autoCleanGroups
-local cleanups = Members.cleanups
+local removalWatches = Members.removalWatches
 
 -- True from the start of destroy, so nothing new joins mid-teardown
 function Members.isGroupDestroyed(groupId: number): boolean
@@ -29,9 +29,9 @@ end
 local isDestroyed = Members.isGroupDestroyed
 
 local function watchRemoval(groupId: number, entity: Types.Entity)
-	local groupCleanups = cleanups[groupId]
-	if typeof(entity) == 'Instance' and not groupCleanups[entity] then
-		groupCleanups[entity] = entity.AncestryChanged:Connect(function(_, parent)
+	local groupWatches = removalWatches[groupId]
+	if typeof(entity) == 'Instance' and not groupWatches[entity] then
+		groupWatches[entity] = entity.AncestryChanged:Connect(function(_, parent)
 			if not parent then
 				Members.remove(groupId, entity)
 			end
@@ -43,25 +43,25 @@ function Members.addGroup(groupId: number, autoClean: boolean)
 	if autoClean then
 		autoCleanGroups[groupId] = true
 	end
-	cleanups[groupId] = {}
+	removalWatches[groupId] = {}
 end
 
 function Members.dropGroup(groupId: number)
-	local groupCleanups = cleanups[groupId]
-	if groupCleanups then
-		for _, conn in groupCleanups do
+	local groupWatches = removalWatches[groupId]
+	if groupWatches then
+		for _, conn in groupWatches do
 			conn:Disconnect()
 		end
 	end
 	autoCleanGroups[groupId] = nil
-	cleanups[groupId] = nil
+	removalWatches[groupId] = nil
 end
 
 function Members.setAutoClean(groupId: number, enabled: boolean)
 	if (autoCleanGroups[groupId] == true) == enabled then
 		return
 	end
-	local groupCleanups = cleanups[groupId]
+	local groupWatches = removalWatches[groupId]
 	if enabled then
 		autoCleanGroups[groupId] = true
 		for _, entity in Entities.groupEntities[groupId] do
@@ -69,9 +69,9 @@ function Members.setAutoClean(groupId: number, enabled: boolean)
 		end
 	else
 		autoCleanGroups[groupId] = nil
-		for entity, conn in groupCleanups do
+		for entity, conn in groupWatches do
 			conn:Disconnect()
-			groupCleanups[entity] = nil
+			groupWatches[entity] = nil
 		end
 	end
 end
@@ -106,11 +106,11 @@ function Members.remove(groupId: number, entity: Types.Entity)
 		return
 	end
 
-	local groupCleanups = cleanups[groupId]
-	local cleanupConn = groupCleanups and groupCleanups[entity :: any]
-	if cleanupConn then
-		cleanupConn:Disconnect()
-		groupCleanups[entity :: any] = nil
+	local groupWatches = removalWatches[groupId]
+	local watch = groupWatches and groupWatches[entity :: any]
+	if watch then
+		watch:Disconnect()
+		groupWatches[entity :: any] = nil
 	end
 
 	Entities.leave(entity, groupId)

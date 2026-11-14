@@ -24,7 +24,7 @@ local isPlayer = References.isPlayer
 
 local entityOf = References.entityOf
 
-local zoneAttachedObservers = Links.zoneAttachedObservers
+local slotObservers = Links.slotObservers
 local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local groups = Registry.groups
 local entityToGroups = Entities.entityToGroups
@@ -367,7 +367,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			local halfSize = shapeExtents[slot]
 			local size = halfSize * 2
 
-			local observers = zoneAttachedObservers[slot]
+			local observers = slotObservers[slot]
 			-- Links drops a slot's list once it empties
 			local isActive = observers ~= nil
 			local color
