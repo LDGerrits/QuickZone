@@ -5,13 +5,12 @@
 local Links = {}
 
 Links.groupToObservers = {} :: { [number]: { [number]: boolean } }
--- Keyed by zone slot
-Links.zoneAttachedObservers = {} :: { [number]: { number } }
-Links.zoneSoleObserver = {} :: { [number]: number }
+Links.slotObservers = {} :: { [number]: { number } }
+Links.slotSoleObserver = {} :: { [number]: number }
 
 local groupToObservers = Links.groupToObservers
-local zoneAttachedObservers = Links.zoneAttachedObservers
-local zoneSoleObserver = Links.zoneSoleObserver
+local slotObservers = Links.slotObservers
+local slotSoleObserver = Links.slotSoleObserver
 
 function Links.addGroup(groupId: number)
 	groupToObservers[groupId] = {}
@@ -50,19 +49,19 @@ function Links.unsubscribe(observerId: number, groupId: number)
 end
 
 function Links.attach(slot: number, observerId: number): boolean
-	local attached = zoneAttachedObservers[slot] or {}
-	zoneAttachedObservers[slot] = attached
+	local attached = slotObservers[slot] or {}
+	slotObservers[slot] = attached
 
 	if table.find(attached, observerId) then
 		return false
 	end
 	table.insert(attached, observerId)
-	zoneSoleObserver[slot] = if #attached == 1 then attached[1] else nil
+	slotSoleObserver[slot] = if #attached == 1 then attached[1] else nil
 	return true
 end
 
 function Links.detach(slot: number, observerId: number): boolean
-	local attached = zoneAttachedObservers[slot]
+	local attached = slotObservers[slot]
 	if not attached then
 		return false
 	end
@@ -74,19 +73,19 @@ function Links.detach(slot: number, observerId: number): boolean
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
-		zoneSoleObserver[slot] = if #attached == 1 then attached[1] else nil
+		slotSoleObserver[slot] = if #attached == 1 then attached[1] else nil
 	end
 
 	if #attached == 0 then
-		zoneAttachedObservers[slot] = nil
+		slotObservers[slot] = nil
 	end
 	return idx ~= nil
 end
 
 function Links.detachAll(slot: number): { number }?
-	local attached = zoneAttachedObservers[slot]
-	zoneAttachedObservers[slot] = nil
-	zoneSoleObserver[slot] = nil
+	local attached = slotObservers[slot]
+	slotObservers[slot] = nil
+	slotSoleObserver[slot] = nil
 	return attached
 end
 

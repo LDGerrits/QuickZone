@@ -11,14 +11,14 @@ local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 
 local activeTrackers = {} :: { [Player]: () -> () }
-local playerSubscriptions = {} :: { [Player]: { [number]: true } }
+local playerGroupIds = {} :: { [Player]: { [number]: true } }
 -- PlayerRemoving fired. Parent is still Players while it runs
 local leaving = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Player]: true }
 
 local PlayerTracker = {}
 
 local function isInAnyGroup(player: Player): boolean
-	local subscriptions = playerSubscriptions[player]
+	local subscriptions = playerGroupIds[player]
 	return subscriptions ~= nil and next(subscriptions) ~= nil
 end
 
@@ -51,7 +51,7 @@ local function trackPlayer(player: Player)
 			currentHrp = nil
 			References.release(player, hrp)
 
-			local subscriptions = playerSubscriptions[player]
+			local subscriptions = playerGroupIds[player]
 			if subscriptions then
 				-- Cloned: exit callbacks may add the player to groups
 				for groupId in table.clone(subscriptions) do
@@ -105,7 +105,7 @@ local function trackPlayer(player: Player)
 				end
 			end)
 
-			local subscriptions = playerSubscriptions[player]
+			local subscriptions = playerGroupIds[player]
 			if subscriptions then
 				-- Cloned: enter callbacks may add the player to groups, which adds the part itself
 				for groupId in table.clone(subscriptions) do
@@ -168,11 +168,11 @@ function PlayerTracker.subscribe(player: Player, groupId: number)
 		return
 	end
 
-	if not playerSubscriptions[player] then
-		playerSubscriptions[player] = {}
+	if not playerGroupIds[player] then
+		playerGroupIds[player] = {}
 	end
 
-	playerSubscriptions[player][groupId] = true
+	playerGroupIds[player][groupId] = true
 	trackPlayer(player)
 
 	local currentHrp = References.referenceToEntity[player]
@@ -182,8 +182,8 @@ function PlayerTracker.subscribe(player: Player, groupId: number)
 end
 
 function PlayerTracker.unsubscribe(player: Player, groupId: number)
-	if playerSubscriptions[player] then
-		playerSubscriptions[player][groupId] = nil
+	if playerGroupIds[player] then
+		playerGroupIds[player][groupId] = nil
 	end
 
 	local currentHrp = References.referenceToEntity[player]
@@ -193,14 +193,14 @@ function PlayerTracker.unsubscribe(player: Player, groupId: number)
 end
 
 function PlayerTracker.isSubscribed(player: Player, groupId: number): boolean
-	local subscriptions = playerSubscriptions[player]
+	local subscriptions = playerGroupIds[player]
 	return subscriptions ~= nil and subscriptions[groupId] ~= nil
 end
 
 -- Also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
-	local subscriptions = playerSubscriptions[player]
+	local subscriptions = playerGroupIds[player]
 	if subscriptions then
 		for groupId in subscriptions do
 			-- Never nil: a destroyed group drops its players first
@@ -211,7 +211,7 @@ function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 end
 
 function PlayerTracker.dropGroup(groupId: number)
-	for _, subscriptions in playerSubscriptions do
+	for _, subscriptions in playerGroupIds do
 		subscriptions[groupId] = nil
 	end
 end
@@ -223,7 +223,7 @@ function stopTracking(player: Player)
 		cleanup()
 	end
 	activeTrackers[player] = nil
-	playerSubscriptions[player] = nil
+	playerGroupIds[player] = nil
 end
 
 Players.PlayerRemoving:Connect(function(player)

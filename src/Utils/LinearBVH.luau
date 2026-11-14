@@ -256,7 +256,8 @@ function LinearBVH.build(
 	-- Scene spans finite centers only, so one huge zone can't squash the rest into one Morton cell
 	for id in members do
 		local position = positions[id]
-		if position - position == Vector3.zero then
+		local isFinite = position - position == Vector3.zero
+		if isFinite then
 			min = vector.min(min, position)
 			max = vector.max(max, position)
 		end

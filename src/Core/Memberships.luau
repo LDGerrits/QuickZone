@@ -20,7 +20,7 @@ local observerExitedCallbacks = Callbacks.observerExitedCallbacks
 local observerGroupTrackers = Callbacks.observerGroupTrackers
 local observerSafety = Registry.observerSafety
 local observerTransitionedCallbacks = Callbacks.observerTransitionedCallbacks
-local zoneAttachedObservers = Links.zoneAttachedObservers
+local slotObservers = Links.slotObservers
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotIds = ZoneShapes.zoneSlotIds
 local staleSlots = ZoneShapes.staleSlots
@@ -110,7 +110,7 @@ end
 
 local function isOtherZone(slot: number, observerId: number, zoneId: number): boolean
 	local otherId = zoneSlotIds[slot]
-	local attached = zoneAttachedObservers[slot]
+	local attached = slotObservers[slot]
 	return otherId ~= nil
 		and otherId ~= zoneId
 		and not zonesBeingDestroyed[otherId]

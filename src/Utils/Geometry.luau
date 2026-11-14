@@ -62,8 +62,9 @@ function Geometry.getBounds(
 	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(back.Y) * halfSize.Z
 	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(back.Z) * halfSize.Z
 
-	-- NaN only from an infinite size, as for a kill plane
-	if x ~= x or y ~= y or z ~= z then
+	-- An infinite size, as for a kill plane, multiplies a zero component into NaN
+	local hasNaN = x ~= x or y ~= y or z ~= z
+	if hasNaN then
 		x = reach(right.X, halfSize.X) + reach(up.X, halfSize.Y) + reach(back.X, halfSize.Z)
 		y = reach(right.Y, halfSize.X) + reach(up.Y, halfSize.Y) + reach(back.Y, halfSize.Z)
 		z = reach(right.Z, halfSize.X) + reach(up.Z, halfSize.Y) + reach(back.Z, halfSize.Z)
