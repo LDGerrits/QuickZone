@@ -1,11 +1,11 @@
 --!strict
 
--- Objects by id and observer settings, kept low in Core so hot readers can hold them as locals. One writer each:
---   groups                               Group     Routing, Memberships, ObserverEvents
---   zoneIdToZoneObj, zoneSlotToZoneObj   Zone      Scheduler, Memberships, Callbacks
---   autoSyncZones                        Zone      Scheduler
---   observerIdToObserverObj              Observer  WorldQueries
---   observer* settings                   Wiring    Scheduler, Routing, Memberships
+-- Objects by id and observer settings, kept low in Core so hot readers can hold them as locals. Writers:
+--   groups                                  Group
+--   autoSyncZones                           Zone
+--   observerIdToObserverObj                 Observer
+--   zoneIdToZoneObj, zoneSlotToZoneObj      Wiring
+--   observer* settings                      Wiring
 
 local Types = require(script.Parent.Parent.Types)
 

@@ -29,7 +29,7 @@ description = "Set a hard frame budget (e.g., 1ms) to completely eliminate lag s
 
 [[home.features]]
 title = "Shape Support"
-description = "Built-in for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes."
+description = "Built-in for Blocks, Balls, Cylinders, Wedges and CornerWedges without relying on physics collision meshes. MeshParts and Unions are supported through their collision geometry."
 
 [[home.features]]
 title = "Declarative Lifecycles"

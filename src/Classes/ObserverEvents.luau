@@ -4,9 +4,7 @@ local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 
 local Callbacks = require(script.Parent.Parent.Core.Callbacks)
-local Entities = require(script.Parent.Parent.Core.Entities)
-local Links = require(script.Parent.Parent.Core.Links)
-local Memberships = require(script.Parent.Parent.Core.Memberships)
+local GroupPresence = require(script.Parent.Parent.Core.GroupPresence)
 local References = require(script.Parent.Parent.Core.References)
 local Registry = require(script.Parent.Parent.Core.Registry)
 local Types = require(script.Parent.Parent.Types)
@@ -15,164 +13,6 @@ local Log = require(script.Parent.Parent.Utils.Log)
 local isPlayer = References.isPlayer
 
 local IS_CLIENT = RunService:IsClient()
-
--- Read from state rather than replayed from events, as entities change groups while inside
-local function trackGroups(
-	self: Types.InternalObserver,
-	onArrive: (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> (),
-	onLeave: (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> ()
-): () -> ()
-	local observerId = self.id
-	local present = {} :: { [number]: { [Types.Entity]: true } }
-	local counted = {} :: { [Types.Entity]: { [number]: true } }
-	local lastZones = {} :: { [Types.Entity]: Types.Zone }
-	-- Also set by a callback halfway through a change
-	local disconnected = false
-
-	local function counts(entity: Types.Entity, groupId: number): boolean
-		local data = Entities.entityData[entity]
-		local groups = Entities.entityToGroups[entity]
-		local observers = Links.groupToObservers[groupId]
-		return data ~= nil
-			and data.activeObserverMemberships[observerId] ~= nil
-			and groups ~= nil
-			and groups[groupId] == true
-			and observers ~= nil
-			and observers[observerId] == true
-	end
-
-	local function reconcile(entity: Types.Entity, exitZone: Types.Zone?)
-		local data = Entities.entityData[entity]
-		local zoneId = data and data.activeObserverMemberships[observerId]
-		local current = if zoneId then Registry.zoneIdToZoneObj[zoneId] else exitZone
-		if current and counted[entity] then
-			lastZones[entity] = current
-		end
-
-		-- Collected first, as callbacks below may change groups and memberships
-		local leaving: { number }? = nil
-		local arriving: { number }? = nil
-		local have = counted[entity]
-		if have then
-			for groupId in have do
-				if not counts(entity, groupId) then
-					leaving = leaving or {}
-					table.insert(leaving :: { number }, groupId)
-				end
-			end
-		end
-		for groupId in Entities.entityToGroups[entity] or {} do
-			if not (have and have[groupId]) and counts(entity, groupId) then
-				arriving = arriving or {}
-				table.insert(arriving :: { number }, groupId)
-			end
-		end
-
-		for _, groupId in leaving or {} do
-			-- A callback may have disconnected, or settled it already
-			local now = counted[entity]
-			if disconnected or not (now and now[groupId]) or counts(entity, groupId) then
-				continue
-			end
-			now[groupId] = nil
-			if next(now) == nil then
-				counted[entity] = nil
-				lastZones[entity] = nil
-			end
-			local members = present[groupId]
-			members[entity] = nil
-			if next(members) == nil then
-				present[groupId] = nil
-				local group = Registry.groups[groupId]
-				if group then
-					onLeave(groupId, group, current :: Types.Zone, entity)
-				end
-			end
-		end
-
-		for _, groupId in arriving or {} do
-			local now = counted[entity]
-			if disconnected or (now and now[groupId]) or not counts(entity, groupId) then
-				continue
-			end
-			if not now then
-				now = {}
-				counted[entity] = now
-				lastZones[entity] = current :: Types.Zone
-			end
-			(now :: { [number]: true })[groupId] = true
-			local members = present[groupId]
-			if members then
-				members[entity] = true
-			else
-				present[groupId] = { [entity] = true }
-				onArrive(groupId, Registry.groups[groupId], current :: Types.Zone, entity)
-			end
-		end
-	end
-
-	local function onEvent(_, zone: Types.Zone, entity: Types.Entity)
-		if not disconnected then
-			reconcile(entity, zone)
-		end
-	end
-	local disconnectEnter = self:onEnter(onEvent)
-	local disconnectTransition = self:onTransition(onEvent)
-	local disconnectExit = self:onExit(onEvent)
-
-	-- Runs while the group still exists, and may count entities whose exit hasn't reached this tracker yet
-	local function dropGroup(groupId: number)
-		local members = present[groupId]
-		if not members then
-			return
-		end
-		present[groupId] = nil
-		local last, zone
-		for entity in members do
-			last = entity
-			zone = lastZones[entity]
-			local have = counted[entity]
-			if have then
-				have[groupId] = nil
-				if next(have) == nil then
-					counted[entity] = nil
-					lastZones[entity] = nil
-				end
-			end
-		end
-		local group = Registry.groups[groupId]
-		if group then
-			onLeave(groupId, group, zone, last)
-		end
-	end
-
-	local function track(entity: Types.Entity?, destroyedGroupId: number?)
-		if disconnected then
-			return
-		elseif destroyedGroupId then
-			dropGroup(destroyedGroupId)
-		else
-			reconcile(entity, nil)
-		end
-	end
-	Callbacks.addGroupTracker(observerId, track)
-
-	local inside = {}
-	for entity in Memberships.observerTrackingEntities[observerId] or {} do
-		table.insert(inside, entity)
-	end
-	for _, entity in inside do
-		reconcile(entity, nil)
-	end
-
-	return function()
-		disconnected = true
-		disconnectEnter()
-		disconnectTransition()
-		disconnectExit()
-		Callbacks.removeGroupTracker(observerId, track)
-	end
-end
 
 local checkCallback = Log.checkCallback
 
@@ -218,7 +58,7 @@ local function groupEvent(
 		Callbacks.call(callback, isSafe(observerId), group, zone, entity)
 	end
 	local function ignore() end
-	return trackGroups(self, if onArrive then fire else ignore, if onArrive then ignore else fire)
+	return GroupPresence.track(observerId, if onArrive then fire else ignore, if onArrive then ignore else fire)
 end
 
 local ObserverEvents = {}
@@ -510,7 +350,7 @@ function ObserverEvents.observeGroup(
 	local generations = {} :: { [number]: number }
 	local disconnected = false
 
-	local disconnectTracker = trackGroups(self, function(groupId, group, zone, entity)
+	local disconnectTracker = GroupPresence.track(observerId, function(groupId, group, zone, entity)
 		local generation = (generations[groupId] or 0) + 1
 		generations[groupId] = generation
 		Callbacks.call(function()

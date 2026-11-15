@@ -17,7 +17,6 @@ local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
 local groupToObservers = Links.groupToObservers
 local observerExitedCallbacks = Callbacks.observerExitedCallbacks
-local observerGroupTrackers = Callbacks.observerGroupTrackers
 local observerSafety = Registry.observerSafety
 local observerTransitionedCallbacks = Callbacks.observerTransitionedCallbacks
 local slotObservers = Links.slotObservers
@@ -52,10 +51,12 @@ local function removeOccupant(zoneId: number)
 	end
 end
 
-local function runTrackers(observerId: number, entity: Types.Entity?, destroyedGroupId: number?)
-	for _, track in observerGroupTrackers[observerId] or {} do
-		track(entity, destroyedGroupId)
-	end
+-- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing's
+-- entityToObservers holds its answers per entity
+function Memberships.bringsIn(groupId: number, entity: Types.Entity, observerId: number): boolean
+	local groups = entityToGroups[entity]
+	local observers = groupToObservers[groupId]
+	return groups ~= nil and groups[groupId] == true and observers ~= nil and observers[observerId] == true
 end
 
 function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boolean
@@ -216,39 +217,6 @@ function Memberships.leaveZone(zoneId: number)
 	end
 
 	zoneOccupants[zoneId] = nil
-end
-
-function Memberships.groupsChanged(entity: Types.Entity, observerId: number?)
-	local data = entityData[entity]
-	if not data then
-		return
-	end
-
-	-- Collected first, as trackers run callbacks that may change memberships
-	local observerIds: { number }? = nil
-	for id in data.activeObserverMemberships do
-		if observerGroupTrackers[id] and (observerId == nil or id == observerId) then
-			observerIds = observerIds or {}
-			table.insert(observerIds :: { number }, id)
-		end
-	end
-
-	if observerIds then
-		for _, id in observerIds do
-			runTrackers(id, entity, nil)
-		end
-	end
-end
-
--- Every tracker, as one may still count entities that left before it heard
-function Memberships.groupDestroyed(groupId: number)
-	local observerIds = {}
-	for id in observerGroupTrackers do
-		table.insert(observerIds, id)
-	end
-	for _, id in observerIds do
-		runTrackers(id, nil, groupId)
-	end
 end
 
 function Memberships.exitUnsubscribed(entity: Types.Entity, data: Types.EntityData)

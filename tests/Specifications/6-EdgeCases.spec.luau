@@ -15,6 +15,7 @@ local withCleanup = Util.withCleanup
 local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Config = require(ReplicatedStorage.QuickZone.Config)
 local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
 local Links = require(ReplicatedStorage.QuickZone.Core.Links)
@@ -358,6 +359,10 @@ return function(Tiniest: Tiniest)
 				kind('table with GetPivot', pivotTable, function(p)
 					pivotTable.pivot = CFrame.new(p)
 				end)
+				local transformTable = { Transform = CFrame.new(outside) }
+				kind('table with a Transform', transformTable, function(p)
+					transformTable.Transform = CFrame.new(p)
+				end)
 
 				local entities = {}
 				for _, k in kinds do
@@ -366,6 +371,20 @@ return function(Tiniest: Tiniest)
 				local group = track(Group.new({ entities = entities, autoClean = false }))
 				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
 				QuickZone:update(1)
+
+				-- A new strategy needs a kind above
+				local covered = {}
+				for _, k in kinds do
+					covered[Entities.entityData[k.entity].strategy] = true
+				end
+				local missing = {}
+				for name, id in Config.Strategy do
+					if not covered[id] then
+						table.insert(missing, name)
+					end
+				end
+				table.sort(missing)
+				Expect(table.concat(missing, ', ')).is('')
 
 				local results = {}
 				for _, k in kinds do
@@ -1285,6 +1304,38 @@ return function(Tiniest: Tiniest)
 
 				Expect(own).is(1)
 				Expect(late).is(0)
+			end)
+		end)
+
+		Test('A group callback that removes the entity again hides the group from later group callbacks.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27885)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = track(Group.new({ autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				local events = {}
+				local function log(name: string): () -> ()
+					return function()
+						table.insert(events, name)
+					end
+				end
+				observer:onExit(log('exit'))
+				observer:onGroupEnter(function(entered)
+					table.insert(events, 'first enter')
+					entered:remove(entity)
+				end)
+				observer:onGroupExit(log('first exit'))
+				observer:onGroupEnter(log('second enter'))
+				observer:onGroupExit(log('second exit'))
+				observer:observeGroup(function()
+					table.insert(events, 'observe')
+					return log('observe cleanup')
+				end)
+				group:add(entity)
+				QuickZone:update(1)
+
+				Expect(table.concat(events, ', ')).is('first enter, exit')
 			end)
 		end)
 

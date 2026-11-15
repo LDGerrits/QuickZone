@@ -16,8 +16,6 @@ local Callbacks = {}
 Callbacks.observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
 Callbacks.observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
 Callbacks.observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
--- Only set while the observer has trackers
-Callbacks.observerGroupTrackers = {} :: { [number]: { (entity: any, destroyedGroupId: number?) -> () } }
 
 local enteredLists = Callbacks.observerEnteredCallbacks
 
@@ -139,25 +137,6 @@ function Callbacks.dropObserver(observerId: number)
 	Callbacks.observerEnteredCallbacks[observerId] = nil
 	Callbacks.observerExitedCallbacks[observerId] = nil
 	Callbacks.observerTransitionedCallbacks[observerId] = nil
-	Callbacks.observerGroupTrackers[observerId] = nil
-end
-
--- Group trackers are replaced rather than changed, so a list being run never shifts
-function Callbacks.addGroupTracker(observerId: number, track: (entity: any, destroyedGroupId: number?) -> ())
-	local trackers = Callbacks.observerGroupTrackers[observerId]
-	local updated = if trackers then table.clone(trackers) else {}
-	table.insert(updated, track)
-	Callbacks.observerGroupTrackers[observerId] = updated
-end
-
-function Callbacks.removeGroupTracker(observerId: number, track: (entity: any, destroyedGroupId: number?) -> ())
-	local current = Callbacks.observerGroupTrackers[observerId]
-	local idx = current and table.find(current, track)
-	if idx then
-		local remaining = table.clone(current :: { (any) -> () })
-		table.remove(remaining, idx)
-		Callbacks.observerGroupTrackers[observerId] = if #remaining > 0 then remaining else nil
-	end
 end
 
 return Callbacks

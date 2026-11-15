@@ -5,9 +5,9 @@
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
+local GroupPresence = require(script.Parent.GroupPresence)
 local Links = require(script.Parent.Links)
 local Members = require(script.Parent.Members)
-local Memberships = require(script.Parent.Memberships)
 local PlayerTracker = require(script.Parent.PlayerTracker)
 local References = require(script.Parent.References)
 
@@ -99,7 +99,7 @@ end
 -- After its onDestroy callbacks. The Group class forgets the object
 function Groups.destroy(groupId: number)
 	Groups.clear(groupId)
-	Memberships.groupDestroyed(groupId)
+	GroupPresence.groupDestroyed(groupId)
 
 	Links.dropGroup(groupId)
 	Entities.dropGroup(groupId)
