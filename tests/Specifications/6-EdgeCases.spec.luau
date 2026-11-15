@@ -15,6 +15,7 @@ local withCleanup = Util.withCleanup
 local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
+local Config = require(ReplicatedStorage.QuickZone.Config)
 local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
 local Links = require(ReplicatedStorage.QuickZone.Core.Links)
@@ -358,6 +359,10 @@ return function(Tiniest: Tiniest)
 				kind('table with GetPivot', pivotTable, function(p)
 					pivotTable.pivot = CFrame.new(p)
 				end)
+				local transformTable = { Transform = CFrame.new(outside) }
+				kind('table with a Transform', transformTable, function(p)
+					transformTable.Transform = CFrame.new(p)
+				end)
 
 				local entities = {}
 				for _, k in kinds do
@@ -366,6 +371,20 @@ return function(Tiniest: Tiniest)
 				local group = track(Group.new({ entities = entities, autoClean = false }))
 				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
 				QuickZone:update(1)
+
+				-- A new strategy needs a kind above
+				local covered = {}
+				for _, k in kinds do
+					covered[Entities.entityData[k.entity].strategy] = true
+				end
+				local missing = {}
+				for name, id in Config.Strategy do
+					if not covered[id] then
+						table.insert(missing, name)
+					end
+				end
+				table.sort(missing)
+				Expect(table.concat(missing, ', ')).is('')
 
 				local results = {}
 				for _, k in kinds do

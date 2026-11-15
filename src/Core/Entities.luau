@@ -1,6 +1,7 @@
 --!strict
 
--- Owns entity group membership, group member lists and per-entity scheduler data. Only this module writes them
+-- Owns entity group membership and group member lists. Creates and drops each entity's data, whose fields other
+-- modules write (see Types.EntityData)
 
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)

@@ -71,18 +71,24 @@ export type ZoneChanges = {
 	history: { ChangeSlot },
 }
 
+-- Fields by writer
 export type EntityData = {
+	-- Memberships
 	activeObserverMemberships: { [number]: number },
-	lastPosition: Vector3,
+	-- Entities
 	strategy: number,
+	-- Routing
 	precisionSq: number,
 	updateRate: number,
 	bucketIndex: number,
-	staticVersion: number,
-	dynamicVersion: number,
-	logicVersion: number,
 	needsStatic: boolean,
 	needsDynamic: boolean,
+	-- Scheduler, and Routing.recheck. -1 forces a check next tick
+	logicVersion: number,
+	-- Scheduler
+	lastPosition: Vector3,
+	staticVersion: number,
+	dynamicVersion: number,
 }
 
 export type Group<T = any> = {

@@ -22,7 +22,7 @@ local extract = bit32.extract
 --   0  min X, Y, Z (f32)
 --   12 max X, Y, Z (f32)
 --   24 byte offset of the node after this subtree (u32)
---   28 zone id, 0 for branches (u32)
+--   28 leaf id (u32): a zone slot or a change box index, 0 for branches
 local NODE_SIZE = 32
 local SKIP_OFFSET = 24
 local ID_OFFSET = 28
