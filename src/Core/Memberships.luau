@@ -29,7 +29,8 @@ local Memberships = {}
 Memberships.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: number } }
 -- Entities observers have in each zone
 Memberships.zoneOccupants = {} :: { [number]: number }
--- Zones a Zones is destroying, so entities don't move from one to the next on the way out
+-- Zones on their way out, which entities can't move into: one being destroyed, and the rest of a Zones destroyed
+-- with it, so an entity in several leaves once rather than moving through each
 Memberships.zonesBeingDestroyed = {} :: { [number]: true }
 
 local observerTrackingEntities = Memberships.observerTrackingEntities
@@ -109,30 +110,29 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	fire(observerExitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observerSafety[observerId])
 end
 
-local function isOtherZone(slot: number, observerId: number, zoneId: number): boolean
+local function canMoveInto(slot: number, observerId: number): boolean
 	local otherId = zoneSlotIds[slot]
 	local attached = slotObservers[slot]
 	return otherId ~= nil
-		and otherId ~= zoneId
 		and not zonesBeingDestroyed[otherId]
 		and attached ~= nil
 		and table.find(attached, observerId) ~= nil
 end
 
 -- Uses the position the entity was last checked at
-local function otherZoneOf(observerId: number, data: Types.EntityData, zoneId: number): number?
+local function otherZoneOf(observerId: number, data: Types.EntityData): number?
 	local position = data.lastPosition
 	local hitCount = ZoneShapes.leavesAtPoint(position, leafHits)
 	for i = 1, hitCount do
 		local slot = leafHits[i]
-		if isOtherZone(slot, observerId, zoneId) and ZoneShapes.leafContainsPoint(slot, position) then
+		if canMoveInto(slot, observerId) and ZoneShapes.leafContainsPoint(slot, position) then
 			return zoneSlotIds[slot]
 		end
 	end
 
 	-- The trees miss zones made or moved since they were built
 	for slot in staleSlots do
-		if isOtherZone(slot, observerId, zoneId) and ZoneShapes.containsPoint(slot, position) then
+		if canMoveInto(slot, observerId) and ZoneShapes.containsPoint(slot, position) then
 			return zoneSlotIds[slot]
 		end
 	end
@@ -159,7 +159,7 @@ local function leaveDestroyedZone(observerId: number, zoneId: number)
 		if not data or data.activeObserverMemberships[observerId] ~= zoneId then
 			continue
 		end
-		local otherId = otherZoneOf(observerId, data, zoneId)
+		local otherId = otherZoneOf(observerId, data)
 		if otherId then
 			Memberships.move(observerId, entity, data, otherId)
 			local reference = entityToReference[entity] or entity

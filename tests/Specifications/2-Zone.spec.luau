@@ -719,6 +719,21 @@ return function(Tiniest: Tiniest)
 			part:Destroy()
 		end)
 
+		Test('A zone without a reference starts syncing once it gets one.', function()
+			local part = CreatePart()
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 10 })
+			zone:setAutoSync(true)
+			Expect(zone:isDynamic()).is_true()
+
+			zone:setReference(part)
+			part.CFrame = CFrame.new(25, 0, 0)
+			QuickZone:update(1 / 10)
+
+			Expect(zone:getPosition()).is(Vector3.new(25, 0, 0))
+			zone:destroy()
+			part:Destroy()
+		end)
+
 		Test('Reference size changes propagate to the zone.', function()
 			local size = Vector3.one * 20
 			local part = CreatePart({ Size = Vector3.one * 10 })
@@ -1503,6 +1518,57 @@ return function(Tiniest: Tiniest)
 			zones:destroy()
 			partA:Destroy()
 			partB:Destroy()
+		end)
+
+		Test('A config of false counts as no config.', function()
+			local part = CreatePart()
+			local zones = Zone.fromParts({ part }, false :: any)
+
+			Expect(zones:isDynamic()).never_is_true()
+			zones:destroy()
+			part:Destroy()
+		end)
+
+		Test('A Zones that stops auto-syncing gives late zones dynamic and not syncing.', function()
+			local parentFolder = Instance.new('Folder')
+			parentFolder.Parent = workspace
+			local zones = Zone.fromChildren(parentFolder, { autoSync = true })
+			zones:setAutoSync(false)
+			Expect(zones:isDynamic()).is_true()
+
+			local part = CreatePart({ CFrame = CFrame.new(30, 0, 0) })
+			part.Parent = parentFolder
+			task.wait()
+
+			local late = zones:getZones()[1]
+			Expect(late:isDynamic()).is_true()
+			part.CFrame = CFrame.new(60, 0, 0)
+			QuickZone:update(1 / 10)
+			Expect(late:getPosition()).is(Vector3.new(30, 0, 0))
+
+			zones:destroy()
+			parentFolder:Destroy()
+		end)
+
+		Test('A Zones made static gives late zones static and not syncing.', function()
+			local parentFolder = Instance.new('Folder')
+			parentFolder.Parent = workspace
+			local zones = Zone.fromChildren(parentFolder, { autoSync = true })
+			zones:setDynamic(false)
+			Expect(zones:isDynamic()).never_is_true()
+
+			local part = CreatePart({ CFrame = CFrame.new(30, 0, 0) })
+			part.Parent = parentFolder
+			task.wait()
+
+			local late = zones:getZones()[1]
+			Expect(late:isDynamic()).never_is_true()
+			part.CFrame = CFrame.new(60, 0, 0)
+			QuickZone:update(1 / 10)
+			Expect(late:getPosition()).is(Vector3.new(30, 0, 0))
+
+			zones:destroy()
+			parentFolder:Destroy()
 		end)
 
 		Test('Zones:sync pulls every inner zone from its own reference.', function()

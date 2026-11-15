@@ -58,9 +58,9 @@ function Wiring.detach(slot: number, observerId: number)
 	end
 end
 
-function Wiring.setZoneDynamic(slot: number, isDynamic: boolean): boolean
+function Wiring.setZoneDynamic(slot: number, isDynamic: boolean)
 	if ZoneShapes.isDynamic(slot) == isDynamic then
-		return false
+		return
 	end
 
 	ZoneShapes.setDynamic(slot, isDynamic)
@@ -72,7 +72,6 @@ function Wiring.setZoneDynamic(slot: number, isDynamic: boolean): boolean
 			Routing.changeZoneCount(observerId, isDynamic, 1)
 		end
 	end
-	return true
 end
 
 -- After the class built the zone object, which gets its slot here
@@ -97,6 +96,7 @@ function Wiring.removeZone(zone: Types.InternalZone)
 	local id = zone.id
 	local slot = zone.slot
 
+	Memberships.setZoneDestroying(id, true)
 	local attached = Links.detachAll(slot)
 	if attached then
 		local isDynamic = ZoneShapes.isDynamic(slot)
@@ -111,9 +111,11 @@ function Wiring.removeZone(zone: Types.InternalZone)
 	Registry.zoneIdToZoneObj[id] = nil
 	Registry.zoneSlotToZoneObj[slot] = nil
 	ZoneShapes.remove(slot)
+	Memberships.setZoneDestroying(id, false)
 end
 
--- A Zones destroys its zones together, so an entity in several leaves once rather than moving through each
+-- Marks all of a Zones' zones before the first goes, so an entity in several leaves once rather than moving through
+-- each
 function Wiring.destroyZones(zoneIds: { number }, destroy: () -> ())
 	for _, id in zoneIds do
 		Memberships.setZoneDestroying(id, true)

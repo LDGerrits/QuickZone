@@ -10,33 +10,35 @@ local Members = require(script.Parent.Members)
 local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 
-local activeTrackers = {} :: { [Player]: () -> () }
-local playerGroupIds = {} :: { [Player]: { [number]: true } }
+-- A player in a group. Its states: no character, a character without a HumanoidRootPart, or a part linked (hrp set,
+-- and the player its reference). Kept after leaving its last group until its next character, as that may happen in a
+-- callback mid-handling
+type Tracked = {
+	groupIds: { [number]: true },
+	character: Model?,
+	hrp: BasePart?,
+	stop: () -> (),
+}
+
+local tracked = {} :: { [Player]: Tracked }
 -- PlayerRemoving fired. Parent is still Players while it runs
 local leaving = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Player]: true }
 
 local PlayerTracker = {}
 
-local function isInAnyGroup(player: Player): boolean
-	local subscriptions = playerGroupIds[player]
-	return subscriptions ~= nil and next(subscriptions) ~= nil
-end
-
 local stopTracking: (player: Player) -> ()
 
-local function trackPlayer(player: Player)
-	if activeTrackers[player] then
-		return
-	end
+local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracked
+	-- stop is set once the connections it ends exist
+	local state: Tracked = { groupIds = groupIds, stop = nil :: any }
+	tracked[player] = state
 
 	local charConn: RBXScriptConnection?
 	local charAncestryConn: RBXScriptConnection?
 	local hrpConn: RBXScriptConnection?
-	local currentCharacter: Model?
-	local currentHrp: BasePart?
 
 	local function clearHrp(targetHrp: BasePart?)
-		if targetHrp and targetHrp ~= currentHrp then
+		if targetHrp and targetHrp ~= state.hrp then
 			return
 		end
 
@@ -45,32 +47,30 @@ local function trackPlayer(player: Player)
 			hrpConn = nil
 		end
 
-		local hrp = currentHrp
+		local hrp = state.hrp
 		if hrp then
 			-- Before exits, so a callback re-adding the player doesn't add this part
-			currentHrp = nil
+			state.hrp = nil
 			References.release(player, hrp)
 
-			local subscriptions = playerGroupIds[player]
-			if subscriptions then
-				-- Cloned: exit callbacks may add the player to groups
-				for groupId in table.clone(subscriptions) do
-					-- A callback may have destroyed it
-					if Registry.groups[groupId] then
-						Members.remove(groupId, hrp)
-					end
+			-- Cloned: exit callbacks may add the player to groups
+			for groupId in table.clone(state.groupIds) do
+				-- A callback may have destroyed it
+				if Registry.groups[groupId] then
+					Members.remove(groupId, hrp)
 				end
 			end
 
 			-- Unless a callback gave the part to the player again
-			if currentHrp ~= hrp then
+			if state.hrp ~= hrp then
 				References.link(hrp, nil)
 			end
 		end
 	end
 
 	local function clearCharacter()
-		clearHrp()
+		-- Before its part leaves, so an exit callback putting the character back can't link the part again
+		state.character = nil
 		if charConn then
 			charConn:Disconnect()
 			charConn = nil
@@ -79,19 +79,19 @@ local function trackPlayer(player: Player)
 			charAncestryConn:Disconnect()
 			charAncestryConn = nil
 		end
-		currentCharacter = nil
+		clearHrp()
 	end
 
 	local function checkHrp(character: Model)
-		if character ~= currentCharacter then
+		if character ~= state.character then
 			return
 		end
 
 		local hrp = character:FindFirstChild('HumanoidRootPart')
 
-		if hrp and hrp:IsA('BasePart') and hrp ~= currentHrp then
+		if hrp and hrp:IsA('BasePart') and hrp ~= state.hrp then
 			clearHrp()
-			currentHrp = hrp
+			state.hrp = hrp
 
 			References.link(hrp, player)
 
@@ -99,35 +99,32 @@ local function trackPlayer(player: Player)
 				if not hrp:IsDescendantOf(game) then
 					clearHrp(hrp)
 					-- A new HRP may have been added before this one went
-					if currentCharacter and currentCharacter:IsDescendantOf(game) then
-						checkHrp(currentCharacter)
+					local current = state.character
+					if current and current:IsDescendantOf(game) then
+						checkHrp(current)
 					end
 				end
 			end)
 
-			local subscriptions = playerGroupIds[player]
-			if subscriptions then
-				-- Cloned: enter callbacks may add the player to groups, which adds the part itself
-				for groupId in table.clone(subscriptions) do
-					if currentHrp ~= hrp then
-						break
-					elseif Registry.groups[groupId] then
-						Members.add(groupId, hrp)
-					end
+			-- Cloned: enter callbacks may add the player to groups, which adds the part itself
+			for groupId in table.clone(state.groupIds) do
+				if state.hrp ~= hrp then
+					break
+				elseif Registry.groups[groupId] then
+					Members.add(groupId, hrp)
 				end
 			end
 		end
 	end
 
 	local function onCharacterAdded(character: Model)
-		-- Let go here, not on leaving its last group, which may happen in a callback mid-handling
-		if not isInAnyGroup(player) then
+		if next(state.groupIds) == nil then
 			stopTracking(player)
 			return
 		end
 
 		clearCharacter()
-		currentCharacter = character
+		state.character = character
 		checkHrp(character)
 
 		charConn = character.ChildAdded:Connect(function(child)
@@ -146,12 +143,12 @@ local function trackPlayer(player: Player)
 
 	local addedConn = player.CharacterAdded:Connect(onCharacterAdded)
 	local removingConn = player.CharacterRemoving:Connect(function(character)
-		if currentCharacter == character then
+		if state.character == character then
 			clearCharacter()
 		end
 	end)
 
-	activeTrackers[player] = function()
+	state.stop = function()
 		addedConn:Disconnect()
 		removingConn:Disconnect()
 		clearCharacter()
@@ -160,6 +157,7 @@ local function trackPlayer(player: Player)
 	if player.Character then
 		onCharacterAdded(player.Character)
 	end
+	return state
 end
 
 function PlayerTracker.subscribe(player: Player, groupId: number)
@@ -168,41 +166,43 @@ function PlayerTracker.subscribe(player: Player, groupId: number)
 		return
 	end
 
-	if not playerGroupIds[player] then
-		playerGroupIds[player] = {}
+	local state = tracked[player]
+	if state then
+		state.groupIds[groupId] = true
+	else
+		state = trackPlayer(player, { [groupId] = true })
 	end
 
-	playerGroupIds[player][groupId] = true
-	trackPlayer(player)
-
-	local currentHrp = References.referenceToEntity[player]
-	if currentHrp then
-		Members.add(groupId, currentHrp)
+	local hrp = state.hrp
+	if hrp then
+		Members.add(groupId, hrp)
 	end
 end
 
 function PlayerTracker.unsubscribe(player: Player, groupId: number)
-	if playerGroupIds[player] then
-		playerGroupIds[player][groupId] = nil
+	local state = tracked[player]
+	if not state then
+		return
 	end
 
-	local currentHrp = References.referenceToEntity[player]
-	if currentHrp then
-		Members.remove(groupId, currentHrp)
+	state.groupIds[groupId] = nil
+	local hrp = state.hrp
+	if hrp then
+		Members.remove(groupId, hrp)
 	end
 end
 
 function PlayerTracker.isSubscribed(player: Player, groupId: number): boolean
-	local subscriptions = playerGroupIds[player]
-	return subscriptions ~= nil and subscriptions[groupId] ~= nil
+	local state = tracked[player]
+	return state ~= nil and state.groupIds[groupId] ~= nil
 end
 
 -- Also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
-	local subscriptions = playerGroupIds[player]
-	if subscriptions then
-		for groupId in subscriptions do
+	local state = tracked[player]
+	if state then
+		for groupId in state.groupIds do
 			-- Never nil: a destroyed group drops its players first
 			table.insert(list, Registry.groups[groupId])
 		end
@@ -211,19 +211,18 @@ function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 end
 
 function PlayerTracker.dropGroup(groupId: number)
-	for _, subscriptions in playerGroupIds do
-		subscriptions[groupId] = nil
+	for _, state in tracked do
+		state.groupIds[groupId] = nil
 	end
 end
 
 function stopTracking(player: Player)
-	-- Before clearing subscriptions, so its part leaves its groups
-	local cleanup = activeTrackers[player]
-	if cleanup then
-		cleanup()
+	local state = tracked[player]
+	if state then
+		-- Before letting go of its groups, so its part leaves them
+		state.stop()
+		tracked[player] = nil
 	end
-	activeTrackers[player] = nil
-	playerGroupIds[player] = nil
 end
 
 Players.PlayerRemoving:Connect(function(player)
