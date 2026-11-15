@@ -230,9 +230,11 @@ end
 
 -- Members inside through other groups now bring this one in, or no longer do
 function GroupPresence.subscriptionChanged(observerId: number, groupId: number)
-	if trackersOf(observerId) then
+	-- A callback during unsubscribe may have destroyed the group, which already let its trackers know
+	local group = groups[groupId]
+	if group and trackersOf(observerId) then
 		-- Cloned: tracker callbacks may change the group
-		for _, entity in table.clone(groups[groupId].members) do
+		for _, entity in table.clone(group.members) do
 			local data = entityData[entity]
 			if data and data.activeObserverMemberships[observerId] then
 				runTrackers(observerId, entity, nil)

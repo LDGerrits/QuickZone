@@ -1455,6 +1455,35 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('Unsubscribing finishes when an exit callback destroys the group, also with group events.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27750)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = Group.new({ entities = { entity }, autoClean = false })
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				local left = {}
+				observer:onGroupExit(function(exitGroup)
+					table.insert(left, exitGroup)
+				end)
+				observer:onExit(function()
+					if not Destroyed.isDestroyed(group) then
+						group:destroy()
+					end
+				end)
+				local ok, err = pcall(function()
+					observer:unsubscribe(group)
+				end)
+
+				Expect(if ok then 'ok' else err).is('ok')
+				Expect(#left).is(1)
+				Expect(left[1]).is(group)
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+				Expect(#observer:getGroups()).is(0)
+			end)
+		end)
+
 		Test('An entity that is not valid leaves nothing behind.', function()
 			withCleanup(function(track)
 				local group = track(Group.new({ autoClean = true }))
