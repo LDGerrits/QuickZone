@@ -14,9 +14,8 @@ local Types = require(script.Parent.Parent.Types)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local entityData = Entities.entityData
-local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
-local groupToObservers = Links.groupToObservers
+local groups = Registry.groups
 local observers = Registry.observers
 local slotObservers = Links.slotObservers
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
@@ -49,23 +48,23 @@ local function removeOccupant(zoneId: number)
 	end
 end
 
--- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing's
--- entityToObservers holds its answers per entity
+-- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing keeps its
+-- answers in each entity's observers
 function Memberships.bringsIn(groupId: number, entity: Types.Entity, observerId: number): boolean
-	local groups = entityToGroups[entity]
-	local subscribed = groupToObservers[groupId]
-	return groups ~= nil and groups[groupId] == true and subscribed ~= nil and subscribed[observerId] == true
+	local data = entityData[entity]
+	local group = groups[groupId]
+	return data ~= nil and data.groups[groupId] == true and group ~= nil and group.subscribers[observerId] == true
 end
 
 function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boolean
-	local groups = entityToGroups[entity]
-	if not groups then
+	local data = entityData[entity]
+	if not data then
 		return false
 	end
 
-	for groupId in groups do
-		local subscribed = groupToObservers[groupId]
-		if subscribed and subscribed[observerId] then
+	for groupId in data.groups do
+		local group = groups[groupId]
+		if group and group.subscribers[observerId] then
 			return true
 		end
 	end

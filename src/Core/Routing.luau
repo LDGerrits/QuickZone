@@ -7,27 +7,22 @@
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
-local Links = require(script.Parent.Links)
 local Registry = require(script.Parent.Registry)
 
 local observers = Registry.observers
 
 local entityData = Entities.entityData
-local entityToGroups = Entities.entityToGroups
-local groupEntities = Entities.groupEntities
-local groupToObservers = Links.groupToObservers
+local groups = Registry.groups
 
 local Routing = {}
 
 -- Raised to recheck every entity next tick
 Routing.logicVersion = 0
-Routing.entityToObservers = {} :: { [Types.Entity]: { [number]: boolean } }
 Routing.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 Routing.dirtyTopology = {} :: { [Types.Entity]: boolean }
 Routing.bucketList = {} :: { number }
 Routing.buckets = {} :: { [number]: { Types.Entity } }
 
-local entityToObservers = Routing.entityToObservers
 local dirtyProfiles = Routing.dirtyProfiles
 local dirtyTopology = Routing.dirtyTopology
 local bucketList = Routing.bucketList
@@ -64,11 +59,8 @@ function Routing.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 	data.bucketIndex = 0
 end
 
--- Settle checked the entity has data, which it gets with its groups table
 local function processProfileChange(entity: Types.Entity, data: Types.EntityData)
-	local groups = entityToGroups[entity] :: { [number]: boolean }
-
-	local linkedObservers = entityToObservers[entity]
+	local linkedObservers = data.observers
 	if linkedObservers then
 		table.clear(linkedObservers)
 	else
@@ -78,14 +70,14 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 	local minPrecSq = math.huge
 	local maxRate = 0
 
-	for groupId, _ in groups do
-		local subscribed = groupToObservers[groupId]
-		if not subscribed then
+	for groupId, _ in data.groups do
+		local group = groups[groupId]
+		if not group then
 			continue
 		end
 
-		for observerId, _ in subscribed do
-			linkedObservers[observerId] = true
+		for observerId, _ in group.subscribers do
+			(linkedObservers :: { [number]: true })[observerId] = true
 
 			local observer = observers[observerId]
 			local prec = observer.precisionSq
@@ -124,16 +116,16 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 	-- Rate 0 means no observer watches the entity
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
-		entityToObservers[entity] = linkedObservers
+		data.observers = linkedObservers
 	else
-		entityToObservers[entity] = nil
+		data.observers = nil
 	end
 end
 
-local function processTopologyChange(entity: Types.Entity, data: Types.EntityData)
+local function processTopologyChange(data: Types.EntityData)
 	local needsStatic = false
 	local needsDynamic = false
-	local linkedObservers = entityToObservers[entity]
+	local linkedObservers = data.observers
 
 	if linkedObservers then
 		for observerId, _ in linkedObservers do
@@ -160,10 +152,9 @@ end
 
 -- Every member of a group the observer subscribes to
 local function markMembersOf(observerId: number, alsoProfiles: boolean)
-	for groupId, subscribed in groupToObservers do
-		local members = groupEntities[groupId]
-		if members and subscribed[observerId] then
-			for _, entity in members do
+	for _, group in groups do
+		if group.subscribers[observerId] then
+			for _, entity in group.members do
 				dirtyTopology[entity] = true
 				if alsoProfiles then
 					dirtyProfiles[entity] = true
@@ -202,7 +193,7 @@ end
 
 function Routing.forget(entity: Types.Entity, data: Types.EntityData)
 	Routing.leaveBucket(entity, data)
-	entityToObservers[entity] = nil
+	data.observers = nil
 	dirtyProfiles[entity] = nil
 	dirtyTopology[entity] = nil
 end
@@ -216,12 +207,12 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 		end
 	end
 
-	-- After profiles, as topology reads entityToObservers
+	-- After profiles, as topology reads the observers they route to
 	for entity, _ in dirtyTopology do
 		dirtyTopology[entity] = nil
 		local data = entityData[entity]
 		if data then
-			processTopologyChange(entity, data)
+			processTopologyChange(data)
 		end
 	end
 

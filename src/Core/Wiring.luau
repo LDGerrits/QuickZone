@@ -20,7 +20,7 @@ local Wiring = {}
 
 local function disconnectFromGroup(observerId: number, groupId: number)
 	-- Cloned: exit callbacks may remove members, swapping later ones into visited slots
-	for _, entity in table.clone(Entities.groupEntities[groupId] :: { Types.Entity }) do
+	for _, entity in table.clone(Registry.groups[groupId].members) do
 		local data = Entities.entityData[entity]
 		if not data then
 			continue
@@ -122,7 +122,7 @@ end
 function Wiring.subscribe(observerId: number, groupId: number)
 	Links.subscribe(observerId, groupId)
 
-	for _, entity in Entities.groupEntities[groupId] do
+	for _, entity in Registry.groups[groupId].members do
 		Routing.recheck(entity)
 	end
 
@@ -173,8 +173,8 @@ function Wiring.setEnabled(observerId: number, enabled: boolean)
 
 	if not enabled then
 		-- Cloned, as exit callbacks may subscribe groups; checked live, as they may unsubscribe too
-		for groupId, subscribed in table.clone(Links.groupToObservers) do
-			if subscribed[observerId] and Registry.groups[groupId] then
+		for groupId in table.clone(Registry.groups) do
+			if Links.subscribes(observerId, groupId) then
 				disconnectFromGroup(observerId, groupId)
 			end
 		end

@@ -79,9 +79,12 @@ export type ZoneChanges = {
 export type EntityData = {
 	-- Memberships
 	activeObserverMemberships: { [number]: number },
-	-- Entities
+	-- Entities. Dropped once it left its last group, after which its table is never reused
 	strategy: number,
-	-- Routing
+	groups: { [number]: true },
+	dropped: boolean,
+	-- Routing. The observers its groups bring it into, nil while none does
+	observers: { [number]: true }?,
 	precisionSq: number,
 	updateRate: number,
 	bucketIndex: number,
@@ -111,8 +114,20 @@ export type Group<T = any> = {
 	destroy: (self: Group<T>) -> (),
 }
 
+-- Its state is kept on the object, registered in Registry.groups while alive. Writers:
+--   subscribers                             Links
+--   members, memberIndices                  Entities
+--   autoClean, removalWatches               Members
 export type InternalGroup<T = any> = Group<T> & Destroyable & {
 	id: number,
+	-- Observers subscribed to it
+	subscribers: { [number]: true },
+	-- Swap-removed, each at its index in memberIndices. Emptied in place on destroy, so a loop holding it ends
+	members: { Entity },
+	memberIndices: { [Entity]: number },
+	autoClean: boolean,
+	-- Instance members watched for removal while autoClean is on
+	removalWatches: { [Instance]: RBXScriptConnection },
 }
 
 export type GroupClass = {

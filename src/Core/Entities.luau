@@ -6,6 +6,7 @@
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 local Log = require(script.Parent.Parent.Utils.Log)
+local Registry = require(script.Parent.Registry)
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -18,15 +19,11 @@ local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
 local Entities = {}
 
-Entities.entityToGroups = {} :: { [Types.Entity]: { [number]: boolean } }
+-- Entities in a group. Dropped when they leave their last one
 Entities.entityData = {} :: { [Types.Entity]: Types.EntityData }
-Entities.groupEntities = {} :: { [number]: { Types.Entity } }
-Entities.groupEntityIndices = {} :: { [number]: { [Types.Entity]: number } }
 
 local entityData = Entities.entityData
-local entityToGroups = Entities.entityToGroups
-local groupEntities = Entities.groupEntities
-local groupEntityIndices = Entities.groupEntityIndices
+local groups = Registry.groups
 
 local function strategyOf(entity: any): number?
 	if typeof(entity) == 'Instance' then
@@ -59,21 +56,15 @@ function Entities.canTrack(x: any): boolean
 	return strategyOf(x) ~= nil
 end
 
-function Entities.addGroup(groupId: number)
-	groupEntities[groupId] = {}
-	groupEntityIndices[groupId] = {}
-end
-
 -- Emptied in place so a loop still holding the list ends
-function Entities.dropGroup(groupId: number)
-	table.clear(groupEntities[groupId])
-	groupEntities[groupId] = nil
-	groupEntityIndices[groupId] = nil
+function Entities.dropGroup(group: Types.InternalGroup)
+	table.clear(group.members)
+	table.clear(group.memberIndices)
 end
 
 function Entities.isIn(entity: Types.Entity, groupId: number): boolean
-	local groups = entityToGroups[entity]
-	return groups ~= nil and groups[groupId] == true
+	local data = entityData[entity]
+	return data ~= nil and data.groups[groupId] == true
 end
 
 -- False when already in the group or untrackable
@@ -82,7 +73,8 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 		return false
 	end
 
-	if not entityData[entity] then
+	local data = entityData[entity]
+	if not data then
 		local strat = strategyOf(entity)
 		if not strat then
 			Log.nonFatal(
@@ -93,8 +85,11 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			return false
 		end
 
-		entityData[entity] = {
+		data = {
 			strategy = strat,
+			groups = {},
+			dropped = false,
+			observers = nil,
 			lastPosition = Vector3.zero,
 			activeObserverMemberships = {},
 			precisionSq = DEFAULT_PRECISION_SQ,
@@ -106,34 +101,33 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			needsStatic = false,
 			needsDynamic = false,
 		}
+		entityData[entity] = data
 	end
+	local memberOf = (data :: Types.EntityData).groups
+	memberOf[groupId] = true
 
-	local groups = entityToGroups[entity]
-	if not groups then
-		groups = {}
-		entityToGroups[entity] = groups
-	end
-	groups[groupId] = true
-
-	local members = groupEntities[groupId]
+	-- Only live groups are joined
+	local group = groups[groupId]
+	local members = group.members
 	local idx = #members + 1
 	members[idx] = entity
-	groupEntityIndices[groupId][entity] = idx
+	group.memberIndices[entity] = idx
 	return true
 end
 
 -- Keeps the entity's data until dropped, as exit callbacks still read it
 function Entities.leave(entity: Types.Entity, groupId: number)
-	local groups = entityToGroups[entity]
-	if groups then
-		groups[groupId] = nil
+	local data = entityData[entity]
+	if data then
+		data.groups[groupId] = nil
 	end
 
-	local indices = groupEntityIndices[groupId]
+	local group = groups[groupId]
+	local indices = group and group.memberIndices
 	local idx = indices and indices[entity]
 	if idx then
 		-- Also right when it is the last, as its own entries are cleared after
-		local members = groupEntities[groupId]
+		local members = (group :: Types.InternalGroup).members
 		local lastIdx = #members
 		local lastEntity = members[lastIdx]
 		members[idx] = lastEntity
@@ -143,16 +137,15 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	end
 end
 
--- Left its last group, and exit callbacks didn't re-add it or replace its data
-function Entities.isGroupless(entity: Types.Entity, data: Types.EntityData?): boolean
-	local groups = entityToGroups[entity]
-	return data ~= nil and entityData[entity] == data and groups ~= nil and next(groups) == nil
+-- Left its last group, and exit callbacks didn't re-add it or drop it
+function Entities.isGroupless(data: Types.EntityData): boolean
+	return not data.dropped and next(data.groups) == nil
 end
 
 -- Only after Routing.forget
-function Entities.drop(entity: Types.Entity)
+function Entities.drop(entity: Types.Entity, data: Types.EntityData)
+	data.dropped = true
 	entityData[entity] = nil
-	entityToGroups[entity] = nil
 end
 
 return Entities

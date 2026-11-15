@@ -6,7 +6,6 @@ local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local QuickZoneFolder = ReplicatedStorage.QuickZone
 local Entities = require(QuickZoneFolder.Core.Entities)
 local Links = require(QuickZoneFolder.Core.Links)
-local Members = require(QuickZoneFolder.Core.Members)
 local Memberships = require(QuickZoneFolder.Core.Memberships)
 local References = require(QuickZoneFolder.Core.References)
 local Registry = require(QuickZoneFolder.Core.Registry)
@@ -49,7 +48,6 @@ function Invariants.check(): string?
 
 	local entityData = Entities.entityData
 	local observers = Registry.observers
-	local groupToObservers = Links.groupToObservers
 
 	-- Observers: registered while alive under their own id, trackers only while they have some, and no blanked
 	-- callbacks outside of firing
@@ -136,55 +134,37 @@ function Invariants.check(): string?
 		end
 	end
 
-	-- Groups: every per-group table holds exactly the live groups
+	-- Groups: registered while alive under their own id, subscribed only by live observers, and the member list, its
+	-- index map, the members' own groups and the removal watches agree
 	local groups = Registry.groups
-	local perGroup = {
-		['Links.groupToObservers'] = groupToObservers,
-		['Entities.groupEntities'] = Entities.groupEntities,
-		['Entities.groupEntityIndices'] = Entities.groupEntityIndices,
-		['Members.removalWatches'] = Members.removalWatches,
-	} :: { [string]: { [number]: any } }
-	for name, map in perGroup do
-		if not sameKeys(map, groups) then
-			problem(`{name} is not keyed by exactly the live groups`)
+	for groupId, group in groups do
+		if group.id ~= groupId or group.phase == 'dead' then
+			problem(`group {groupId} is registered dead or under another id`)
 		end
-	end
-	for groupId in Members.autoCleanGroups do
-		if not groups[groupId] then
-			problem(`destroyed group {groupId} is still set to autoClean`)
-		end
-	end
-	for groupId, subscribed in groupToObservers do
-		for observerId in subscribed do
+		for observerId in group.subscribers do
 			if not observers[observerId] then
 				problem(`group {groupId} is subscribed by destroyed observer {observerId}`)
 			end
 		end
-	end
 
-	-- Group members: list, index map and the entity's own groups agree
-	for groupId, members in Entities.groupEntities do
-		local indices = Entities.groupEntityIndices[groupId]
-		if not indices then
-			continue
-		end
+		local members, indices = group.members, group.memberIndices
 		if count(indices) ~= #members then
 			problem(`group {groupId} lists {#members} members, indexes {count(indices)}`)
 		end
-		local autoClean = Members.autoCleanGroups[groupId] == true
-		local watches = Members.removalWatches[groupId] or {}
 		for idx, entity in members do
+			local data = entityData[entity]
 			if indices[entity] ~= idx then
 				problem(`group {groupId} has {entity} at {idx}, indexed at {indices[entity]}`)
 			end
-			if not Entities.isIn(entity, groupId) or not entityData[entity] then
+			if not data or data.groups[groupId] ~= true then
 				problem(`group {groupId} lists {entity}, which is not in it`)
 			end
-			if (watches[entity :: any] ~= nil) ~= (autoClean and typeof(entity) == 'Instance') then
-				problem(`group {groupId} watches {entity} for removal {watches[entity :: any] ~= nil}`)
+			local watched = group.removalWatches[entity :: any] ~= nil
+			if watched ~= (group.autoClean and typeof(entity) == 'Instance') then
+				problem(`group {groupId} watches {entity} for removal {watched}`)
 			end
 		end
-		for entity in watches do
+		for entity in group.removalWatches do
 			if indices[entity] == nil then
 				problem(`group {groupId} watches {entity}, which is not a member`)
 			end
@@ -192,16 +172,16 @@ function Invariants.check(): string?
 	end
 
 	-- Entities: data exactly while in a group, and each group lists it
-	if not sameKeys(Entities.entityToGroups, entityData) then
-		problem('Entities.entityToGroups is not keyed by exactly the entities with data')
-	end
-	for entity, entityGroups in Entities.entityToGroups do
-		if next(entityGroups) == nil then
+	for entity, data in entityData do
+		if data.dropped then
+			problem(`{entity} has data marked dropped`)
+		end
+		if next(data.groups) == nil then
 			problem(`{entity} has data but no groups`)
 		end
-		for groupId, isIn in entityGroups do
-			local indices = Entities.groupEntityIndices[groupId]
-			if isIn ~= true or not indices or indices[entity] == nil then
+		for groupId, isIn in data.groups do
+			local group = groups[groupId]
+			if isIn ~= true or not group or group.memberIndices[entity] == nil then
 				problem(`{entity} is in group {groupId}, which does not list it`)
 			end
 		end
@@ -215,11 +195,6 @@ function Invariants.check(): string?
 			end
 		end
 	end
-	for entity in Routing.entityToObservers do
-		if not entityData[entity] then
-			problem(`{entity} is routed without data`)
-		end
-	end
 	for entity, data in entityData do
 		if Routing.dirtyProfiles[entity] then
 			continue
@@ -227,15 +202,15 @@ function Invariants.check(): string?
 		local expected = {}
 		local maxRate = 0
 		local minPrecisionSq = math.huge
-		for groupId in Entities.entityToGroups[entity] or {} do
-			for observerId in groupToObservers[groupId] or {} do
+		for groupId in data.groups do
+			for observerId in groups[groupId].subscribers do
 				expected[observerId] = true
 				local observer = observers[observerId]
 				maxRate = math.max(maxRate, observer.updateRate)
 				minPrecisionSq = math.min(minPrecisionSq, observer.precisionSq)
 			end
 		end
-		local routed = Routing.entityToObservers[entity]
+		local routed = data.observers
 		if if maxRate > 0 then not (routed and sameKeys(routed, expected)) else routed ~= nil then
 			problem(`{entity} is routed to the wrong observers`)
 		end

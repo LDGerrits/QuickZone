@@ -37,7 +37,6 @@ local observers = Registry.observers
 
 local entityToReference = References.entityToReference
 local entityData = Entities.entityData
-local entityToObservers = Routing.entityToObservers
 local dirtyProfiles = Routing.dirtyProfiles
 
 local staticTree = ZoneShapes.staticTree
@@ -51,7 +50,7 @@ local ctx_highestWin: number
 local ctx_candidatePriority = table.create(16) :: { [number]: number }
 local ctx_candidateIndex = table.create(16) :: { [number]: number }
 local ctx_candidateList = table.create(16) :: { [number]: number }
-local ctx_linkedObservers: { [number]: boolean }
+local ctx_linkedObservers: { [number]: true }
 local ctx_currentMemberships: { [number]: number }
 local ctx_checkingRate: number? = nil
 local ctx_checkingIndex = 0
@@ -275,7 +274,7 @@ local function runTick(dt: number)
 				data.logicVersion = logicVersion
 				data.staticVersion = staticVersion
 
-				ctx_linkedObservers = entityToObservers[entity]
+				ctx_linkedObservers = data.observers :: { [number]: true }
 				ctx_currentMemberships = data.activeObserverMemberships
 
 				ctx_cCount = 0
@@ -326,7 +325,7 @@ local function runTick(dt: number)
 
 					-- An earlier callback may have removed the entity or destroyed the zone
 					local zone = zoneIdToZoneObj[zoneIdx]
-					if entityData[entity] ~= data or not zone then
+					if data.dropped or not zone then
 						continue
 					end
 

@@ -1,7 +1,7 @@
 --!strict
 
 -- Objects by id, kept low in Core so hot readers can hold them as locals. Writers:
---   groups                                  Group
+--   groups                                  Groups
 --   autoSyncZones                           Zone
 --   observers                               Wiring
 --   zoneIdToZoneObj, zoneSlotToZoneObj      Wiring
@@ -15,6 +15,7 @@ Registry.nextZoneId = 1
 Registry.nextObserverId = 1
 Registry.nextGroupId = 1
 
+-- Live groups, which hold their own state (see Types.InternalGroup)
 Registry.groups = {} :: { [number]: Types.InternalGroup }
 
 Registry.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }

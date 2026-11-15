@@ -17,8 +17,6 @@ local Memberships = require(script.Parent.Memberships)
 local Registry = require(script.Parent.Registry)
 
 local entityData = Entities.entityData
-local entityToGroups = Entities.entityToGroups
-local groupEntities = Entities.groupEntities
 local groups = Registry.groups
 local observers = Registry.observers
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
@@ -116,7 +114,7 @@ function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPrese
 				end
 			end
 		end
-		for groupId in entityToGroups[entity] or {} do
+		for groupId in if data then data.groups else {} do
 			if not (have and have[groupId]) and counts(entity, groupId) then
 				arriving = arriving or {}
 				table.insert(arriving :: { number }, groupId)
@@ -234,7 +232,7 @@ end
 function GroupPresence.subscriptionChanged(observerId: number, groupId: number)
 	if trackersOf(observerId) then
 		-- Cloned: tracker callbacks may change the group
-		for _, entity in table.clone(groupEntities[groupId] :: { Types.Entity }) do
+		for _, entity in table.clone(groups[groupId].members) do
 			local data = entityData[entity]
 			if data and data.activeObserverMemberships[observerId] then
 				runTrackers(observerId, entity, nil)

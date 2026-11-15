@@ -61,10 +61,14 @@ function Group.new<T>(config: {
 	local self: Types.InternalGroup<T> = setmetatable({
 		id = id,
 		phase = 'alive',
+		subscribers = {},
+		members = {},
+		memberIndices = {},
+		autoClean = not not autoClean,
+		removalWatches = {},
 	}, Group) :: any
 
-	Registry.groups[id] = self
-	Groups.create(id, autoClean)
+	Groups.create(self)
 
 	if config and config.entities then
 		Groups.addBulk(id, config.entities)
@@ -309,7 +313,7 @@ end
 	@return { any }
 ]=]
 function Group.getEntities(self: Types.InternalGroup): { any }
-	local members = Entities.groupEntities[self.id] or {}
+	local members = self.members
 	local result = table.create(#members)
 	for i, entity in ipairs(members) do
 		result[i] = References.referenceOf(entity)
@@ -333,7 +337,7 @@ end
 	@return () -> any?
 ]=]
 function Group.iterEntities(self: Types.InternalGroup): () -> any?
-	local nextEntity = Snapshot.keys(Entities.groupEntityIndices[self.id] or {})
+	local nextEntity = Snapshot.keys(self.memberIndices)
 
 	return function()
 		local entity = nextEntity()
@@ -379,8 +383,7 @@ function Group.destroy(self: Types.InternalGroup): ()
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
-	Groups.destroy(self.id)
-	Registry.groups[self.id] = nil
+	Groups.destroy(self)
 
 	Destroyed.finish(self)
 end

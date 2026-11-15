@@ -24,7 +24,6 @@ local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local entityData = Entities.entityData
 local observers = Registry.observers
 local groups = Registry.groups
-local entityToGroups = Entities.entityToGroups
 local referenceToEntity = References.referenceToEntity
 
 local queryHits = {} :: { number }
@@ -187,7 +186,8 @@ end
 ]=]
 function WorldQueries:getGroupsOfEntity(entity: any): { Types.Group }
 	entity = entityOf(entity)
-	local groupIds = entityToGroups[entity]
+	local data = entityData[entity]
+	local groupIds = data and data.groups
 	if not groupIds then
 		-- A player without a character is still in the groups it was added to
 		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
@@ -291,7 +291,8 @@ end
 function WorldQueries:iterGroupsOfEntity(entity: any): () -> Types.Group?
 	entity = entityOf(entity)
 
-	local groupIds = entityToGroups[entity]
+	local data = entityData[entity]
+	local groupIds = data and data.groups
 	if not groupIds then
 		local list = if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
 		local i = 0

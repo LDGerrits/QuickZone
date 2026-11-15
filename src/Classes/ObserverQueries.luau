@@ -249,22 +249,13 @@ end
 	@return () -> Group?
 ]=]
 function ObserverQueries.iterGroups(self: Types.InternalObserver): () -> Types.Group?
-	local nextGroupId = Snapshot.keys(Links.groupToObservers)
+	local nextGroup = Snapshot.keys(Registry.groups)
 	local observerId = self.id
 
 	return function(): Types.Group?
 		while true do
-			local groupId, observersMap = nextGroupId()
-			if not groupId then
-				return nil
-			end
-
-			if not (observersMap :: { [number]: boolean })[observerId] then
-				continue
-			end
-
-			local group = Registry.groups[groupId]
-			if group then
+			local _, group = nextGroup()
+			if not group or Links.subscribes(observerId, group.id) then
 				return group
 			end
 		end
