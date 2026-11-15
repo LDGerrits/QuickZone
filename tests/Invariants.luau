@@ -4,9 +4,7 @@
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 
 local QuickZoneFolder = ReplicatedStorage.QuickZone
-local Callbacks = require(QuickZoneFolder.Core.Callbacks)
 local Entities = require(QuickZoneFolder.Core.Entities)
-local GroupPresence = require(QuickZoneFolder.Core.GroupPresence)
 local Links = require(QuickZoneFolder.Core.Links)
 local Members = require(QuickZoneFolder.Core.Members)
 local Memberships = require(QuickZoneFolder.Core.Memberships)
@@ -50,40 +48,20 @@ function Invariants.check(): string?
 	end
 
 	local entityData = Entities.entityData
-	local observers = Registry.observerIdToObserverObj
+	local observers = Registry.observers
 	local groupToObservers = Links.groupToObservers
 
-	-- Observers: every per-observer table holds exactly the live observers
-	local perObserver = {
-		['Registry.observerPriorityMap'] = Registry.observerPriorityMap,
-		['Registry.observerEnabled'] = Registry.observerEnabled,
-		['Registry.observerSafety'] = Registry.observerSafety,
-		['Registry.observerUpdateRate'] = Registry.observerUpdateRate,
-		['Registry.observerPrecisionSq'] = Registry.observerPrecisionSq,
-		['Callbacks.observerEnteredCallbacks'] = Callbacks.observerEnteredCallbacks,
-		['Callbacks.observerExitedCallbacks'] = Callbacks.observerExitedCallbacks,
-		['Callbacks.observerTransitionedCallbacks'] = Callbacks.observerTransitionedCallbacks,
-		['Memberships.observerTrackingEntities'] = Memberships.observerTrackingEntities,
-	} :: { [string]: { [number]: any } }
-	for name, map in perObserver do
-		if not sameKeys(map, observers) then
-			problem(`{name} is not keyed by exactly the live observers`)
+	-- Observers: registered while alive under their own id, trackers only while they have some, and no blanked
+	-- callbacks outside of firing
+	for observerId, observer in observers do
+		if observer.id ~= observerId or observer.phase == 'dead' then
+			problem(`observer {observerId} is registered dead or under another id`)
 		end
-	end
-	for observerId, trackers in GroupPresence.observerTrackers do
-		if not observers[observerId] or #trackers == 0 then
-			problem(`observer {observerId} has a trackers list while destroyed or without trackers`)
+		if observer.trackers and #observer.trackers == 0 then
+			problem(`observer {observerId} has an empty trackers list`)
 		end
-	end
-	for _, lists in
-		{
-			Callbacks.observerEnteredCallbacks,
-			Callbacks.observerExitedCallbacks,
-			Callbacks.observerTransitionedCallbacks,
-		}
-	do
-		for observerId, list in lists do
-			if table.find(list, false) then
+		for _, list in { observer.entered, observer.exited, observer.transitioned } do
+			if table.find(list :: { any }, false) then
 				problem(`observer {observerId} has a blanked callback outside of firing`)
 			end
 		end
@@ -148,20 +126,13 @@ function Invariants.check(): string?
 			problem(`slot {slot} caches a sole observer without an observer list`)
 		end
 	end
-	for observerId in observers do
-		local static = Routing.observerStaticCount[observerId] or 0
-		local dynamic = Routing.observerDynamicCount[observerId] or 0
+	for observerId, observer in observers do
+		local static = observer.staticZoneCount
+		local dynamic = observer.dynamicZoneCount
 		if static ~= (staticCount[observerId] or 0) or dynamic ~= (dynamicCount[observerId] or 0) then
 			problem(
 				`observer {observerId} counts {static} static and {dynamic} dynamic zones, has {staticCount[observerId] or 0} and {dynamicCount[observerId] or 0}`
 			)
-		end
-	end
-	for _, counts in { Routing.observerStaticCount, Routing.observerDynamicCount } do
-		for observerId in counts do
-			if not observers[observerId] then
-				problem(`destroyed observer {observerId} still has zone counts`)
-			end
 		end
 	end
 
@@ -259,8 +230,9 @@ function Invariants.check(): string?
 		for groupId in Entities.entityToGroups[entity] or {} do
 			for observerId in groupToObservers[groupId] or {} do
 				expected[observerId] = true
-				maxRate = math.max(maxRate, Registry.observerUpdateRate[observerId])
-				minPrecisionSq = math.min(minPrecisionSq, Registry.observerPrecisionSq[observerId])
+				local observer = observers[observerId]
+				maxRate = math.max(maxRate, observer.updateRate)
+				minPrecisionSq = math.min(minPrecisionSq, observer.precisionSq)
 			end
 		end
 		local routed = Routing.entityToObservers[entity]
@@ -275,8 +247,9 @@ function Invariants.check(): string?
 		end
 		local needsStatic, needsDynamic = false, false
 		for observerId in routed or {} do
-			needsStatic = needsStatic or (Routing.observerStaticCount[observerId] or 0) > 0
-			needsDynamic = needsDynamic or (Routing.observerDynamicCount[observerId] or 0) > 0
+			local observer = observers[observerId]
+			needsStatic = needsStatic or observer.staticZoneCount > 0
+			needsDynamic = needsDynamic or observer.dynamicZoneCount > 0
 		end
 		if data.needsStatic ~= needsStatic or data.needsDynamic ~= needsDynamic then
 			problem(`{entity} queries static {data.needsStatic} dynamic {data.needsDynamic}, expected the opposite`)
@@ -318,8 +291,8 @@ function Invariants.check(): string?
 	local occupants = {}
 	for entity, data in entityData do
 		for observerId, zoneId in data.activeObserverMemberships do
-			local tracked = Memberships.observerTrackingEntities[observerId]
-			if not tracked or tracked[entity] ~= zoneId then
+			local observer = observers[observerId]
+			if not observer or observer.tracked[entity] ~= zoneId then
 				problem(`{entity} is in zone {zoneId} for observer {observerId}, which does not track it there`)
 			end
 			if not zoneIds[zoneId] then
@@ -328,8 +301,8 @@ function Invariants.check(): string?
 			occupants[zoneId] = (occupants[zoneId] or 0) + 1
 		end
 	end
-	for observerId, tracked in Memberships.observerTrackingEntities do
-		for entity, zoneId in tracked do
+	for observerId, observer in observers do
+		for entity, zoneId in observer.tracked do
 			local data = entityData[entity]
 			if not data or data.activeObserverMemberships[observerId] ~= zoneId then
 				problem(`observer {observerId} tracks {entity} in zone {zoneId} without that membership`)

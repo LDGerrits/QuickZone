@@ -22,7 +22,7 @@ local containsPoint = ZoneShapes.containsPoint
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local entityData = Entities.entityData
-local observerIdToObserverObj = Registry.observerIdToObserverObj
+local observers = Registry.observers
 local groups = Registry.groups
 local entityToGroups = Entities.entityToGroups
 local referenceToEntity = References.referenceToEntity
@@ -271,7 +271,7 @@ end
 	@return () -> Observer?
 ]=]
 function WorldQueries:iterObservers(): () -> Types.Observer<any>?
-	local nextObserver = Snapshot.keys(observerIdToObserverObj)
+	local nextObserver = Snapshot.keys(observers)
 	return function(): Types.Observer<any>?
 		local _, observer = nextObserver()
 		return observer

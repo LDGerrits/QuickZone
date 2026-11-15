@@ -2,7 +2,6 @@
 
 local Entities = require(script.Parent.Parent.Core.Entities)
 local Links = require(script.Parent.Parent.Core.Links)
-local Memberships = require(script.Parent.Parent.Core.Memberships)
 local References = require(script.Parent.Parent.Core.References)
 local Registry = require(script.Parent.Parent.Core.Registry)
 local ZoneShapes = require(script.Parent.Parent.Core.ZoneShapes)
@@ -23,11 +22,11 @@ local queryHits = {} :: { number }
 
 -- Safe while entities enter and leave, also when the loop yields across ticks
 local function iterTracked(
-	observerId: number,
+	observer: Types.InternalObserver,
 	zoneIds: { [number]: true }?,
 	playersOnly: boolean
 ): () -> (any?, Types.Zone?)
-	local nextEntity = Snapshot.keys(Memberships.observerTrackingEntities[observerId] or {})
+	local nextEntity = Snapshot.keys(observer.tracked)
 	return function()
 		while true do
 			local entity, zoneId = nextEntity()
@@ -102,7 +101,7 @@ end
 ]=]
 function ObserverQueries.getEntitiesInside(self: Types.InternalObserver): { any }
 	local results = {}
-	for entity in Memberships.observerTrackingEntities[self.id] do
+	for entity in self.tracked do
 		table.insert(results, References.referenceOf(entity))
 	end
 	return results
@@ -117,7 +116,7 @@ end
 ]=]
 function ObserverQueries.getPlayersInside(self: Types.InternalObserver): { Player }
 	local results = {}
-	for entity in Memberships.observerTrackingEntities[self.id] do
+	for entity in self.tracked do
 		-- Only the current HumanoidRootPart maps to its player, so none comes twice
 		local ref = References.entityToReference[entity]
 		if isPlayer(ref) then
@@ -282,7 +281,7 @@ end
 	@return () -> (Entity?, Zone?)
 ]=]
 function ObserverQueries.iterEntitiesInside(self: Types.InternalObserver): () -> (any?, Types.Zone?)
-	return iterTracked(self.id, nil, false)
+	return iterTracked(self, nil, false)
 end
 
 --[=[ 
@@ -295,7 +294,7 @@ end
 	@return () -> (Player?, Zone?)
 ]=]
 function ObserverQueries.iterPlayersInside(self: Types.InternalObserver): () -> (Player?, Types.Zone?)
-	return iterTracked(self.id, nil, true)
+	return iterTracked(self, nil, true)
 end
 
 --[=[ 
@@ -311,7 +310,7 @@ function ObserverQueries.iterEntitiesInZone(
 	self: Types.InternalObserver,
 	zone: Types.Zone | Types.Zones
 ): () -> Types.Entity?
-	local iterate = iterTracked(self.id, zoneIdsOf(zone), false)
+	local iterate = iterTracked(self, zoneIdsOf(zone), false)
 	return function(): Types.Entity?
 		return (iterate())
 	end
@@ -327,7 +326,7 @@ end
 	@return () -> Player?
 ]=]
 function ObserverQueries.iterPlayersInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): () -> Player?
-	local iterate = iterTracked(self.id, zoneIdsOf(zone), true)
+	local iterate = iterTracked(self, zoneIdsOf(zone), true)
 	return function(): Player?
 		return (iterate())
 	end

@@ -301,9 +301,38 @@ export type ObserverClass = {
 	) -> Observer<T>,
 }
 
+-- Its state is kept on the object, registered in Registry.observers while alive. Writers:
+--   settings                                Wiring
+--   staticZoneCount, dynamicZoneCount       Routing
+--   tracked                                 Memberships
+--   entered, exited, transitioned           Callbacks
+--   trackers                                GroupPresence
+--   hasAttached, hasSubscribed              Observer
 export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	id: number,
+	priority: number,
+	updateRate: number,
+	precisionSq: number,
+	enabled: boolean,
+	safety: boolean,
+	-- Attached zones per tree, which decide the trees its entities query
+	staticZoneCount: number,
+	dynamicZoneCount: number,
+	-- The zone id each entity inside is in
+	tracked: { [Entity]: number },
+	entered: { ObserverCallback },
+	exited: { ObserverCallback },
+	transitioned: { ObserverCallback },
+	-- Replaced rather than changed, so a list being run never shifts. Only set while it has trackers
+	trackers: { Tracker }?,
+	-- Whether attach or subscribe was ever called, for the warning about a missing one
+	hasAttached: boolean,
+	hasSubscribed: boolean,
 }
+
+-- Blanked to false in its list while firing when disconnected
+export type ObserverCallback = (any, Zone, Entity) -> ()
+export type Tracker = (entity: Entity?, destroyedGroupId: number?) -> ()
 
 export type QuickZone = {
 	Zone: ZoneClass,

@@ -1,33 +1,29 @@
 --!strict
 
--- Observer enter, exit and transition callbacks and group trackers. Only this module writes the lists
+-- Observer enter, exit and transition callbacks and group trackers. Only this module writes the observers' lists
 
 local Entities = require(script.Parent.Entities)
 local Registry = require(script.Parent.Registry)
 local Types = require(script.Parent.Parent.Types)
 
-type CallbackLists = { [number]: { any } }
+-- Entries are blanked to false while firing when disconnected
+type CallbackList = { any }
 
 local entityData = Entities.entityData
+local observers = Registry.observers
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 
 local Callbacks = {}
 
-Callbacks.observerEnteredCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
-Callbacks.observerExitedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
-Callbacks.observerTransitionedCallbacks = {} :: { [number]: { (any, Types.Zone, Types.Entity) -> () } }
-
-local enteredLists = Callbacks.observerEnteredCallbacks
-
 -- While firing, a disconnect blanks its entry so no list shifts under a loop; the last fire compacts
 local firing = 0
-local blanked = {} :: { [{ any }]: true }
+local blanked = {} :: { [CallbackList]: true }
 
 local function withTraceback(err: any): string
 	return debug.traceback(tostring(err), 2)
 end
 
-local function compact(list: { any })
+local function compact(list: CallbackList)
 	local count = 0
 	for _, callback in list do
 		if callback then
@@ -40,8 +36,7 @@ local function compact(list: { any })
 	end
 end
 
-function Callbacks.connect(lists: CallbackLists, key: number, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
-	local list = lists[key] :: { any }
+function Callbacks.connect(list: CallbackList, callback: Types.ObserverCallback): () -> ()
 	table.insert(list, callback)
 
 	return function()
@@ -57,21 +52,16 @@ function Callbacks.connect(lists: CallbackLists, key: number, callback: (any, Ty
 	end
 end
 
--- zoneId is the entity's new zone, nil for exits
+-- One of the observer's lists. zoneId is the entity's new zone, nil for exits
 function Callbacks.fire(
-	lists: CallbackLists,
-	key: number,
+	callbacks: CallbackList,
+	observerId: number,
 	reference: any,
 	zone: Types.Zone,
 	entity: any,
 	safety: boolean,
 	zoneId: number?
 )
-	local callbacks = lists[key]
-	if not callbacks then
-		return
-	end
-
 	firing += 1
 
 	-- Callbacks connected during the event wait for the next one
@@ -84,10 +74,11 @@ function Callbacks.fire(
 		if i > 1 then
 			-- Stop once a callback moved the entity, or later ones would see an entry after its own exit
 			local data = entityData[entity]
-			local now = if data then data.activeObserverMemberships[key] else nil
+			local now = if data then data.activeObserverMemberships[observerId] else nil
 			if now ~= zoneId then
 				-- Unless its zone was destroyed and it moved to another: later callbacks get that entry
-				if now == nil or lists ~= enteredLists then
+				local observer = observers[observerId]
+				if now == nil or not observer or callbacks ~= observer.entered then
 					break
 				end
 				zoneId = now
@@ -125,18 +116,6 @@ function Callbacks.call<A...>(callback: (A...) -> ...any, safety: boolean, ...: 
 			task.spawn(error, trace, 0)
 		end
 	end
-end
-
-function Callbacks.addObserver(observerId: number)
-	Callbacks.observerEnteredCallbacks[observerId] = {}
-	Callbacks.observerExitedCallbacks[observerId] = {}
-	Callbacks.observerTransitionedCallbacks[observerId] = {}
-end
-
-function Callbacks.dropObserver(observerId: number)
-	Callbacks.observerEnteredCallbacks[observerId] = nil
-	Callbacks.observerExitedCallbacks[observerId] = nil
-	Callbacks.observerTransitionedCallbacks[observerId] = nil
 end
 
 return Callbacks

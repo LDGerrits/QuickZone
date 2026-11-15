@@ -11,13 +11,13 @@ forbidden=(
 	'Members\.[A-Za-z]+\('
 	'Links\.(attach|detach|detachAll|subscribe|unsubscribe|unsubscribeAll|addGroup|dropGroup)\('
 	'Entities\.(join|leave|drop|addGroup|dropGroup)\('
-	'Memberships\.(move|exit|exitObserver|exitUnsubscribed|leaveZone|setZoneDestroying|addObserver|dropObserver)\('
-	'GroupPresence\.(groupsChanged|subscriptionChanged|groupDestroyed|dropObserver)\('
-	'Callbacks\.(addObserver|dropObserver)\('
+	'Memberships\.(move|exit|exitObserver|exitUnsubscribed|leaveZone|setZoneDestroying)\('
+	'GroupPresence\.(groupsChanged|subscriptionChanged|groupDestroyed)\('
 	'ZoneShapes\.(setDynamic|allocateSlot|add|remove)\('
 	'PlayerTracker\.(subscribe|unsubscribe|dropGroup)\('
 	'References\.(link|forget|release)\('
-	'Registry\.observer(PriorityMap|Enabled|Safety|UpdateRate|PrecisionSq)\[[^]]*\] =([^=]|$)'
+	'Registry\.observers\[[^]]*\] =([^=]|$)'
+	'\.(priority|updateRate|precisionSq|enabled|safety|staticZoneCount|dynamicZoneCount|tracked|trackers) =([^=]|$)'
 	'Registry\.zone(IdToZoneObj|SlotToZoneObj)\[[^]]*\] =([^=]|$)'
 )
 pattern=$(IFS='|'; echo "${forbidden[*]}")

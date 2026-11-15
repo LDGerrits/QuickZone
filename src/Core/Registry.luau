@@ -1,11 +1,10 @@
 --!strict
 
--- Objects by id and observer settings, kept low in Core so hot readers can hold them as locals. Writers:
+-- Objects by id, kept low in Core so hot readers can hold them as locals. Writers:
 --   groups                                  Group
 --   autoSyncZones                           Zone
---   observerIdToObserverObj                 Observer
+--   observers                               Wiring
 --   zoneIdToZoneObj, zoneSlotToZoneObj      Wiring
---   observer* settings                      Wiring
 
 local Types = require(script.Parent.Parent.Types)
 
@@ -22,12 +21,7 @@ Registry.zoneIdToZoneObj = {} :: { [number]: Types.InternalZone }
 Registry.zoneSlotToZoneObj = {} :: { [number]: Types.InternalZone }
 Registry.autoSyncZones = {} :: { [number]: Types.InternalZone }
 
-Registry.observerIdToObserverObj = {} :: { [number]: Types.InternalObserver }
-
-Registry.observerPriorityMap = {} :: { [number]: number }
-Registry.observerEnabled = {} :: { [number]: boolean }
-Registry.observerSafety = {} :: { [number]: boolean }
-Registry.observerUpdateRate = {} :: { [number]: number }
-Registry.observerPrecisionSq = {} :: { [number]: number }
+-- Live observers, which hold their own state (see Types.InternalObserver)
+Registry.observers = {} :: { [number]: Types.InternalObserver }
 
 return Registry

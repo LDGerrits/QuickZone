@@ -20,39 +20,38 @@ local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
 local groupEntities = Entities.groupEntities
 local groups = Registry.groups
+local observers = Registry.observers
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
-local observerTrackingEntities = Memberships.observerTrackingEntities
 local bringsIn = Memberships.bringsIn
 
 export type OnPresence = (groupId: number, group: Types.Group, zone: Types.Zone, entity: Types.Entity) -> ()
-type Tracker = (entity: Types.Entity?, destroyedGroupId: number?) -> ()
+type Tracker = Types.Tracker
 
 local GroupPresence = {}
 
--- Replaced rather than changed, so a list being run never shifts. Only set while the observer has trackers
-GroupPresence.observerTrackers = {} :: { [number]: { Tracker } }
-
-local observerTrackers = GroupPresence.observerTrackers
-
-local function addTracker(observerId: number, track: Tracker)
-	local trackers = observerTrackers[observerId]
-	local updated = if trackers then table.clone(trackers) else {}
+local function addTracker(observer: Types.InternalObserver, track: Tracker)
+	local updated = if observer.trackers then table.clone(observer.trackers) else {}
 	table.insert(updated, track)
-	observerTrackers[observerId] = updated
+	observer.trackers = updated
 end
 
-local function removeTracker(observerId: number, track: Tracker)
-	local current = observerTrackers[observerId]
+local function removeTracker(observer: Types.InternalObserver, track: Tracker)
+	local current = observer.trackers
 	local idx = current and table.find(current, track)
 	if idx then
 		local remaining = table.clone(current :: { Tracker })
 		table.remove(remaining, idx)
-		observerTrackers[observerId] = if #remaining > 0 then remaining else nil
+		observer.trackers = if #remaining > 0 then remaining else nil
 	end
 end
 
+local function trackersOf(observerId: number): { Tracker }?
+	local observer = observers[observerId]
+	return observer and observer.trackers
+end
+
 local function runTrackers(observerId: number, entity: Types.Entity?, destroyedGroupId: number?)
-	for _, track in observerTrackers[observerId] or {} do
+	for _, track in trackersOf(observerId) or {} do
 		track(entity, destroyedGroupId)
 	end
 end
@@ -67,7 +66,7 @@ function GroupPresence.groupsChanged(entity: Types.Entity)
 	-- Collected first, as trackers run callbacks that may change memberships
 	local observerIds: { number }? = nil
 	for id in data.activeObserverMemberships do
-		if observerTrackers[id] then
+		if trackersOf(id) then
 			observerIds = observerIds or {}
 			table.insert(observerIds :: { number }, id)
 		end
@@ -82,7 +81,8 @@ end
 
 -- Starts counting the observer's groups, from the entities already inside, and returns a disconnect. Read from
 -- state rather than replayed from events, as entities change groups while inside
-function GroupPresence.track(observerId: number, onArrive: OnPresence, onLeave: OnPresence): () -> ()
+function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPresence, onLeave: OnPresence): () -> ()
+	local observerId = observer.id
 	local present = {} :: { [number]: { [Types.Entity]: true } }
 	local counted = {} :: { [Types.Entity]: { [number]: true } }
 	local lastZones = {} :: { [Types.Entity]: Types.Zone }
@@ -172,9 +172,9 @@ function GroupPresence.track(observerId: number, onArrive: OnPresence, onLeave: 
 		end
 	end
 	-- Entries in the observer's own lists, so each tracker decides at its place among the user's callbacks
-	local disconnectEnter = Callbacks.connect(Callbacks.observerEnteredCallbacks, observerId, onEvent)
-	local disconnectTransition = Callbacks.connect(Callbacks.observerTransitionedCallbacks, observerId, onEvent)
-	local disconnectExit = Callbacks.connect(Callbacks.observerExitedCallbacks, observerId, onEvent)
+	local disconnectEnter = Callbacks.connect(observer.entered, onEvent)
+	local disconnectTransition = Callbacks.connect(observer.transitioned, onEvent)
+	local disconnectExit = Callbacks.connect(observer.exited, onEvent)
 
 	-- Runs while the group still exists, and may count entities whose exit hasn't reached this tracker yet
 	local function dropGroup(groupId: number)
@@ -211,10 +211,10 @@ function GroupPresence.track(observerId: number, onArrive: OnPresence, onLeave: 
 			reconcile(entity, nil)
 		end
 	end
-	addTracker(observerId, track)
+	addTracker(observer, track)
 
 	local inside = {}
-	for entity in observerTrackingEntities[observerId] or {} do
+	for entity in observer.tracked do
 		table.insert(inside, entity)
 	end
 	for _, entity in inside do
@@ -226,13 +226,13 @@ function GroupPresence.track(observerId: number, onArrive: OnPresence, onLeave: 
 		disconnectEnter()
 		disconnectTransition()
 		disconnectExit()
-		removeTracker(observerId, track)
+		removeTracker(observer, track)
 	end
 end
 
 -- Members inside through other groups now bring this one in, or no longer do
 function GroupPresence.subscriptionChanged(observerId: number, groupId: number)
-	if observerTrackers[observerId] then
+	if trackersOf(observerId) then
 		-- Cloned: tracker callbacks may change the group
 		for _, entity in table.clone(groupEntities[groupId] :: { Types.Entity }) do
 			local data = entityData[entity]
@@ -246,13 +246,9 @@ end
 -- While the group still exists. Every tracker, as one may still count entities that left before it heard
 function GroupPresence.groupDestroyed(groupId: number)
 	-- A snapshot, as trackers run callbacks that may connect and disconnect others
-	for id in Snapshot.keys(observerTrackers) do
+	for id in Snapshot.keys(observers) do
 		runTrackers(id, nil, groupId)
 	end
-end
-
-function GroupPresence.dropObserver(observerId: number)
-	observerTrackers[observerId] = nil
 end
 
 return GroupPresence

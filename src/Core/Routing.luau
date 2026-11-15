@@ -10,8 +10,7 @@ local Entities = require(script.Parent.Entities)
 local Links = require(script.Parent.Links)
 local Registry = require(script.Parent.Registry)
 
-local observerPrecisionSq = Registry.observerPrecisionSq
-local observerUpdateRate = Registry.observerUpdateRate
+local observers = Registry.observers
 
 local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
@@ -27,12 +26,7 @@ Routing.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 Routing.dirtyTopology = {} :: { [Types.Entity]: boolean }
 Routing.bucketList = {} :: { number }
 Routing.buckets = {} :: { [number]: { Types.Entity } }
--- Zones per observer per tree, which decide the trees its entities query
-Routing.observerDynamicCount = {} :: { [number]: number }
-Routing.observerStaticCount = {} :: { [number]: number }
 
-local observerStaticCount = Routing.observerStaticCount
-local observerDynamicCount = Routing.observerDynamicCount
 local entityToObservers = Routing.entityToObservers
 local dirtyProfiles = Routing.dirtyProfiles
 local dirtyTopology = Routing.dirtyTopology
@@ -85,16 +79,17 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 	local maxRate = 0
 
 	for groupId, _ in groups do
-		local observers = groupToObservers[groupId]
-		if not observers then
+		local subscribed = groupToObservers[groupId]
+		if not subscribed then
 			continue
 		end
 
-		for observerId, _ in observers do
+		for observerId, _ in subscribed do
 			linkedObservers[observerId] = true
 
-			local prec = observerPrecisionSq[observerId]
-			local rate = observerUpdateRate[observerId]
+			local observer = observers[observerId]
+			local prec = observer.precisionSq
+			local rate = observer.updateRate
 
 			if prec < minPrecSq then
 				minPrecSq = prec
@@ -142,10 +137,15 @@ local function processTopologyChange(entity: Types.Entity, data: Types.EntityDat
 
 	if linkedObservers then
 		for observerId, _ in linkedObservers do
-			if (observerStaticCount[observerId] or 0) > 0 then
+			-- Settled profiles only route to live observers, but a stale route must not error the tick
+			local observer = observers[observerId]
+			if not observer then
+				continue
+			end
+			if observer.staticZoneCount > 0 then
 				needsStatic = true
 			end
-			if (observerDynamicCount[observerId] or 0) > 0 then
+			if observer.dynamicZoneCount > 0 then
 				needsDynamic = true
 			end
 			if needsStatic and needsDynamic then
@@ -160,9 +160,9 @@ end
 
 -- Every member of a group the observer subscribes to
 local function markMembersOf(observerId: number, alsoProfiles: boolean)
-	for groupId, observers in groupToObservers do
+	for groupId, subscribed in groupToObservers do
 		local members = groupEntities[groupId]
-		if members and observers[observerId] then
+		if members and subscribed[observerId] then
 			for _, entity in members do
 				dirtyTopology[entity] = true
 				if alsoProfiles then
@@ -181,17 +181,15 @@ function Routing.recheckAll()
 	Routing.logicVersion += 1
 end
 
--- Call once the observer's zones have detached
-function Routing.dropObserver(observerId: number)
-	observerStaticCount[observerId] = nil
-	observerDynamicCount[observerId] = nil
-end
-
 function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: number)
-	local dict = isDynamic and observerDynamicCount or observerStaticCount
-	local current = dict[observerId] or 0
+	local observer = observers[observerId]
+	local current = if isDynamic then observer.dynamicZoneCount else observer.staticZoneCount
 	local newCount = current + delta
-	dict[observerId] = newCount
+	if isDynamic then
+		observer.dynamicZoneCount = newCount
+	else
+		observer.staticZoneCount = newCount
+	end
 
 	-- Delta is always 1 or -1, so only crossing zero changes which trees entities need
 	if current == 0 or newCount == 0 then
