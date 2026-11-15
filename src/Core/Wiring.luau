@@ -97,12 +97,9 @@ function Wiring.removeZone(zone: Types.InternalZone)
 	local slot = zone.slot
 
 	Memberships.setZoneDestroying(id, true)
-	local attached = Links.detachAll(slot)
-	if attached then
-		local isDynamic = ZoneShapes.isDynamic(slot)
-		for _, observerId in attached do
-			Routing.changeZoneCount(observerId, isDynamic, -1)
-		end
+	local isDynamic = ZoneShapes.isDynamic(slot)
+	for _, observerId in (Links.detachAll(slot) or {}) :: { number } do
+		Routing.changeZoneCount(observerId, isDynamic, -1)
 	end
 	Memberships.leaveZone(id)
 
@@ -154,7 +151,6 @@ function Wiring.addObserver(observerId: number, settings: ObserverSettings)
 	Registry.observerSafety[observerId] = settings.safety
 	Callbacks.addObserver(observerId)
 	Memberships.addObserver(observerId)
-	Routing.addObserver(observerId)
 end
 
 -- After its onDestroy callbacks

@@ -181,15 +181,9 @@ local function setSyncMode(zone: Types.InternalZone, mode: Types.SyncMode)
 end
 
 -- Checked before writing, as a stored bad value breaks every later write
-local function checkCFrame(cframe: any)
-	if typeof(cframe) ~= 'CFrame' then
-		Log.fatal('Zone cframe must be a CFrame, got %s.', nil, typeof(cframe))
-	end
-end
-
-local function checkSize(size: any)
-	if typeof(size) ~= 'Vector3' then
-		Log.fatal('Zone size must be a Vector3, got %s.', nil, typeof(size))
+local function checkType(field: string, expected: string, value: any)
+	if typeof(value) ~= expected then
+		Log.fatal('Zone %s must be a %s, got %s.', nil, field, expected, typeof(value))
 	end
 end
 
@@ -214,8 +208,8 @@ local function newZoneInternal(
 	autoSync: boolean
 ): Types.Zone
 	-- Checked before registering, so a bad config leaves no broken slot in the tree
-	checkCFrame(cframe)
-	checkSize(size)
+	checkType('cframe', 'CFrame', cframe)
+	checkType('size', 'Vector3', size)
 	checkReference(reference)
 
 	local id = Registry.nextZoneId
@@ -452,7 +446,7 @@ end
 	@return Zone
 ]=]
 function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
-	checkCFrame(cf)
+	checkType('cframe', 'CFrame', cf)
 	ZoneShapes.setCFrame(self.slot, cf)
 	return self
 end
@@ -471,9 +465,7 @@ end
 	@return Zone
 ]=]
 function Zone.setPosition(self: Types.InternalZone, pos: Vector3): Types.Zone
-	if typeof(pos) ~= 'Vector3' then
-		Log.fatal('Zone position must be a Vector3, got %s.', nil, typeof(pos))
-	end
+	checkType('position', 'Vector3', pos)
 	return self:setCFrame(shapeCFrames[self.slot].Rotation + pos)
 end
 
@@ -491,7 +483,7 @@ end
 	@return Zone
 ]=]
 function Zone.setSize(self: Types.InternalZone, size: Vector3): Types.Zone
-	checkSize(size)
+	checkType('size', 'Vector3', size)
 	ZoneShapes.setHalfSize(self.slot, size * 0.5)
 	return self
 end
@@ -639,9 +631,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Zone.onDestroy(self: Types.InternalZone, callback: () -> ()): () -> ()
-	return Destroyed.connect(self, callback)
-end
+Zone.onDestroy = Destroyed.connect
 
 --[=[ 
 	Cleans up the zone, removes it from the LBVH tree, and detaches all observers.

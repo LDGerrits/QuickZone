@@ -69,11 +69,7 @@ end
 	@return { Observer }
 ]=]
 function WorldQueries:getObservers(): { Types.Observer<any> }
-	local result = {}
-	for _, observer in observerIdToObserverObj do
-		table.insert(result, observer)
-	end
-	return (result :: any) :: { Types.Observer<any> }
+	return Snapshot.collect(self:iterObservers())
 end
 
 --[=[ 
@@ -85,11 +81,7 @@ end
 	@return { Group }
 ]=]
 function WorldQueries:getGroups(): { Types.Group }
-	local result = {}
-	for _, group in groups do
-		table.insert(result, group)
-	end
-	return result
+	return Snapshot.collect(self:iterGroups())
 end
 
 --[=[ 
@@ -101,11 +93,7 @@ end
 	@return { Zone }
 ]=]
 function WorldQueries:getZones(): { Types.Zone }
-	local result = {}
-	for _, zone in zoneIdToZoneObj do
-		table.insert(result, zone)
-	end
-	return result
+	return Snapshot.collect(self:iterZones())
 end
 
 --[=[ 

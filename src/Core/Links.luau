@@ -20,16 +20,6 @@ function Links.dropGroup(groupId: number)
 	groupToObservers[groupId] = nil
 end
 
-function Links.groupIdsOf(observerId: number): { number }
-	local list = {}
-	for groupId, observers in groupToObservers do
-		if observers[observerId] then
-			table.insert(list, groupId)
-		end
-	end
-	return list
-end
-
 function Links.unsubscribeAll(observerId: number)
 	for _, observers in groupToObservers do
 		observers[observerId] = nil

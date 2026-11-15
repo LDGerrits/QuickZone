@@ -10,6 +10,7 @@
 -- connected later may see a change the earlier one's callbacks already undid
 
 local Types = require(script.Parent.Parent.Types)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 local Callbacks = require(script.Parent.Callbacks)
 local Entities = require(script.Parent.Entities)
 local Memberships = require(script.Parent.Memberships)
@@ -56,7 +57,8 @@ local function runTrackers(observerId: number, entity: Types.Entity?, destroyedG
 	end
 end
 
-local function groupsChangedFor(entity: Types.Entity, observerId: number?)
+-- Observers it is in may now count, or stop counting, one of its groups
+function GroupPresence.groupsChanged(entity: Types.Entity)
 	local data = entityData[entity]
 	if not data then
 		return
@@ -65,7 +67,7 @@ local function groupsChangedFor(entity: Types.Entity, observerId: number?)
 	-- Collected first, as trackers run callbacks that may change memberships
 	local observerIds: { number }? = nil
 	for id in data.activeObserverMemberships do
-		if observerTrackers[id] and (observerId == nil or id == observerId) then
+		if observerTrackers[id] then
 			observerIds = observerIds or {}
 			table.insert(observerIds :: { number }, id)
 		end
@@ -228,28 +230,23 @@ function GroupPresence.track(observerId: number, onArrive: OnPresence, onLeave: 
 	end
 end
 
--- Observers it is in may now count, or stop counting, one of its groups
-function GroupPresence.groupsChanged(entity: Types.Entity)
-	groupsChangedFor(entity, nil)
-end
-
 -- Members inside through other groups now bring this one in, or no longer do
 function GroupPresence.subscriptionChanged(observerId: number, groupId: number)
 	if observerTrackers[observerId] then
 		-- Cloned: tracker callbacks may change the group
 		for _, entity in table.clone(groupEntities[groupId] :: { Types.Entity }) do
-			groupsChangedFor(entity, observerId)
+			local data = entityData[entity]
+			if data and data.activeObserverMemberships[observerId] then
+				runTrackers(observerId, entity, nil)
+			end
 		end
 	end
 end
 
 -- While the group still exists. Every tracker, as one may still count entities that left before it heard
 function GroupPresence.groupDestroyed(groupId: number)
-	local observerIds = {}
-	for id in observerTrackers do
-		table.insert(observerIds, id)
-	end
-	for _, id in observerIds do
+	-- A snapshot, as trackers run callbacks that may connect and disconnect others
+	for id in Snapshot.keys(observerTrackers) do
 		runTrackers(id, nil, groupId)
 	end
 end

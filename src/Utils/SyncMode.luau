@@ -15,18 +15,12 @@ end
 
 -- Syncing makes it dynamic, and stopping leaves it dynamic
 function SyncMode.withAutoSync(mode: SyncMode, autoSync: boolean): SyncMode
-	if autoSync then
-		return 'synced'
-	end
-	return if mode == 'synced' then 'dynamic' else mode
+	return if autoSync then 'synced' elseif mode == 'synced' then 'dynamic' else mode
 end
 
 -- Making it static stops its sync
 function SyncMode.withDynamic(mode: SyncMode, isDynamic: boolean): SyncMode
-	if not isDynamic then
-		return 'static'
-	end
-	return if mode == 'static' then 'dynamic' else mode
+	return if not isDynamic then 'static' elseif mode == 'static' then 'dynamic' else mode
 end
 
 return SyncMode

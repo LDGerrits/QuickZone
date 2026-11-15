@@ -359,9 +359,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Group.onDestroy(self: Types.InternalGroup, callback: () -> ()): () -> ()
-	return Destroyed.connect(self, callback)
-end
+Group.onDestroy = Destroyed.connect
 
 --[=[ 
 	Cleans up the group, removes all tracked entities, and detaches any 

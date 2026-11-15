@@ -70,11 +70,9 @@ function Routing.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 	data.bucketIndex = 0
 end
 
-local function processProfileChange(entity: Types.Entity)
-	local groups = entityToGroups[entity]
-	if not groups then
-		return
-	end
+-- Settle checked the entity has data, which it gets with its groups table
+local function processProfileChange(entity: Types.Entity, data: Types.EntityData)
+	local groups = entityToGroups[entity] :: { [number]: boolean }
 
 	local linkedObservers = entityToObservers[entity]
 	if linkedObservers then
@@ -107,8 +105,6 @@ local function processProfileChange(entity: Types.Entity)
 		end
 	end
 
-	local data = entityData[entity]
-
 	if data.updateRate ~= maxRate then
 		Routing.leaveBucket(entity, data)
 
@@ -139,12 +135,7 @@ local function processProfileChange(entity: Types.Entity)
 	end
 end
 
-local function processTopologyChange(entity: Types.Entity)
-	local data = entityData[entity]
-	if not data then
-		return
-	end
-
+local function processTopologyChange(entity: Types.Entity, data: Types.EntityData)
 	local needsStatic = false
 	local needsDynamic = false
 	local linkedObservers = entityToObservers[entity]
@@ -167,24 +158,27 @@ local function processTopologyChange(entity: Types.Entity)
 	data.needsDynamic = needsDynamic
 end
 
-function Routing.rerouteObserver(observerId: number)
+-- Every member of a group the observer subscribes to
+local function markMembersOf(observerId: number, alsoProfiles: boolean)
 	for groupId, observers in groupToObservers do
 		local members = groupEntities[groupId]
 		if members and observers[observerId] then
 			for _, entity in members do
-				Routing.reroute(entity)
+				dirtyTopology[entity] = true
+				if alsoProfiles then
+					dirtyProfiles[entity] = true
+				end
 			end
 		end
 	end
 end
 
-function Routing.recheckAll()
-	Routing.logicVersion += 1
+function Routing.rerouteObserver(observerId: number)
+	markMembersOf(observerId, true)
 end
 
-function Routing.addObserver(observerId: number)
-	observerStaticCount[observerId] = 0
-	observerDynamicCount[observerId] = 0
+function Routing.recheckAll()
+	Routing.logicVersion += 1
 end
 
 -- Call once the observer's zones have detached
@@ -204,16 +198,7 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 		if newCount == 0 then
 			Routing.recheckAll()
 		end
-
-		for groupId, observers in groupToObservers do
-			local members = groupEntities[groupId]
-			if not (members and observers[observerId]) then
-				continue
-			end
-			for _, entity in members do
-				dirtyTopology[entity] = true
-			end
-		end
+		markMembersOf(observerId, false)
 	end
 end
 
@@ -227,16 +212,18 @@ end
 function Routing.settle(onBucketDropped: (rate: number) -> ())
 	for entity, _ in dirtyProfiles do
 		dirtyProfiles[entity] = nil
-		if entityData[entity] then
-			processProfileChange(entity)
+		local data = entityData[entity]
+		if data then
+			processProfileChange(entity, data)
 		end
 	end
 
 	-- After profiles, as topology reads entityToObservers
 	for entity, _ in dirtyTopology do
 		dirtyTopology[entity] = nil
-		if entityData[entity] then
-			processTopologyChange(entity)
+		local data = entityData[entity]
+		if data then
+			processTopologyChange(entity, data)
 		end
 	end
 

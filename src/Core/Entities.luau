@@ -66,10 +66,7 @@ end
 
 -- Emptied in place so a loop still holding the list ends
 function Entities.dropGroup(groupId: number)
-	local members = groupEntities[groupId]
-	if members then
-		table.clear(members)
-	end
+	table.clear(groupEntities[groupId])
 	groupEntities[groupId] = nil
 	groupEntityIndices[groupId] = nil
 end

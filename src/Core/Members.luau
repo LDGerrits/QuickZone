@@ -48,11 +48,8 @@ function Members.addGroup(groupId: number, autoClean: boolean)
 end
 
 function Members.dropGroup(groupId: number)
-	local groupWatches = removalWatches[groupId]
-	if groupWatches then
-		for _, conn in groupWatches do
-			conn:Disconnect()
-		end
+	for _, conn in removalWatches[groupId] do
+		conn:Disconnect()
 	end
 	autoCleanGroups[groupId] = nil
 	removalWatches[groupId] = nil

@@ -436,15 +436,11 @@ function Scheduler.update(dt: number?)
 end
 
 function Scheduler.setEnabled(enabled: boolean)
-	if enabled then
-		if not autoUpdateConnection then
-			autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
-		end
-	else
-		if autoUpdateConnection then
-			autoUpdateConnection:Disconnect()
-			autoUpdateConnection = nil
-		end
+	if enabled and not autoUpdateConnection then
+		autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
+	elseif not enabled and autoUpdateConnection then
+		autoUpdateConnection:Disconnect()
+		autoUpdateConnection = nil
 	end
 end
 

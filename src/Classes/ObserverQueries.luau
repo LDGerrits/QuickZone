@@ -135,18 +135,7 @@ end
 	@return { Zone }
 ]=]
 function ObserverQueries.getZones(self: Types.InternalObserver): { Types.Zone }
-	local results = {}
-	for slot, attachedList in Links.slotObservers do
-		if not table.find(attachedList, self.id) then
-			continue
-		end
-
-		local zone = Registry.zoneSlotToZoneObj[slot]
-		if zone then
-			table.insert(results, zone)
-		end
-	end
-	return results
+	return Snapshot.collect(self:iterZones())
 end
 
 --[=[ 
@@ -157,11 +146,7 @@ end
 	@return { Group }
 ]=]
 function ObserverQueries.getGroups(self: Types.InternalObserver): { Types.Group }
-	local result = {}
-	for _, groupId in Links.groupIdsOf(self.id) do
-		table.insert(result, Registry.groups[groupId])
-	end
-	return result
+	return Snapshot.collect(self:iterGroups())
 end
 
 --[=[ 
@@ -208,13 +193,7 @@ end
 	@return { any }
 ]=]
 function ObserverQueries.getEntitiesInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): { any }
-	local results = {}
-
-	for entity in self:iterEntitiesInZone(zone) do
-		table.insert(results, entity)
-	end
-
-	return results
+	return Snapshot.collect(self:iterEntitiesInZone(zone))
 end
 
 --[=[ 
@@ -226,13 +205,7 @@ end
 	@return { Player }
 ]=]
 function ObserverQueries.getPlayersInZone(self: Types.InternalObserver, zone: Types.Zone | Types.Zones): { Player }
-	local results = {}
-
-	for player in self:iterPlayersInZone(zone) do
-		table.insert(results, player)
-	end
-
-	return results
+	return Snapshot.collect(self:iterPlayersInZone(zone))
 end
 
 --[=[ 

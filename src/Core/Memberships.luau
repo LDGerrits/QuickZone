@@ -11,6 +11,7 @@ local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local entityData = Entities.entityData
 local entityToGroups = Entities.entityToGroups
@@ -184,13 +185,8 @@ function Memberships.exitObserver(observerId: number)
 		return
 	end
 
-	-- Collected first, as callbacks may change the map
-	local leaving = {}
-	for entity in tracked do
-		table.insert(leaving, entity)
-	end
-
-	for _, entity in leaving do
+	-- A snapshot, as callbacks may change the map
+	for entity in Snapshot.keys(tracked) do
 		local data = entityData[entity]
 		if data then
 			Memberships.exit(observerId, entity, data)
@@ -204,12 +200,8 @@ function Memberships.leaveZone(zoneId: number)
 		return
 	end
 
-	-- Collected first, as callbacks may create or destroy observers
-	local observerIds = {}
-	for observerId in observerTrackingEntities do
-		table.insert(observerIds, observerId)
-	end
-	for _, observerId in observerIds do
+	-- A snapshot, as callbacks may create or destroy observers
+	for observerId in Snapshot.keys(observerTrackingEntities) do
 		leaveDestroyedZone(observerId, zoneId)
 		if not zoneOccupants[zoneId] then
 			break

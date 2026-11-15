@@ -138,24 +138,18 @@ function Observer.new<T>(config: {
 	hasAttachedMap[id] = false
 	hasSubscribedMap[id] = false
 
-	if config and config.zones then
-		for _, zone in config.zones do
-			self:attach(zone)
-		end
+	local zones = config and config.zones
+	local groups = config and config.groups
+	for _, zone in (zones or {}) :: { any } do
+		self:attach(zone)
 	end
-
-	if config and config.groups then
-		for _, group in config.groups do
-			self:subscribe(group)
-		end
+	for _, group in (groups or {}) :: { any } do
+		self:subscribe(group)
 	end
-
-	local explicitlyPassedZones = config and config.zones ~= nil
-	local explicitlyPassedGroups = config and config.groups ~= nil
 
 	-- Deferred, so a later :attach or :subscribe silences the warning
-	local missingZones = not explicitlyPassedZones
-	local missingGroups = not explicitlyPassedGroups
+	local missingZones = zones == nil
+	local missingGroups = groups == nil
 
 	if missingZones or missingGroups then
 		local creationTrace = debug.traceback('', 2)
@@ -439,9 +433,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onDestroy(self: Types.InternalObserver, callback: () -> ()): () -> ()
-	return Destroyed.connect(self, callback)
-end
+Observer.onDestroy = Destroyed.connect
 
 --[=[ 
 	Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.

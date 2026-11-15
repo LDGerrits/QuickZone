@@ -53,12 +53,9 @@ local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracke
 			state.hrp = nil
 			References.release(player, hrp)
 
-			-- Cloned: exit callbacks may add the player to groups
+			-- Cloned: exit callbacks may add the player to groups. A group they destroy has no members left
 			for groupId in table.clone(state.groupIds) do
-				-- A callback may have destroyed it
-				if Registry.groups[groupId] then
-					Members.remove(groupId, hrp)
-				end
+				Members.remove(groupId, hrp)
 			end
 
 			-- Unless a callback gave the part to the player again
@@ -108,11 +105,11 @@ local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracke
 
 			-- Cloned: enter callbacks may add the player to groups, which adds the part itself
 			for groupId in table.clone(state.groupIds) do
+				-- Members.add skips a group a callback destroyed
 				if state.hrp ~= hrp then
 					break
-				elseif Registry.groups[groupId] then
-					Members.add(groupId, hrp)
 				end
+				Members.add(groupId, hrp)
 			end
 		end
 	end

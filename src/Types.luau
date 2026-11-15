@@ -37,6 +37,8 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 -- See Utils/Destroyed
 export type Phase = 'alive' | 'destroying' | 'dead'
 
+export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
+
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
 -- Flat LBVH, see Utils/LinearBVH for the node layout
@@ -109,10 +111,8 @@ export type Group<T = any> = {
 	destroy: (self: Group<T>) -> (),
 }
 
-export type InternalGroup<T = any> = Group<T> & {
+export type InternalGroup<T = any> = Group<T> & Destroyable & {
 	id: number,
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
 }
 
 export type GroupClass = {
@@ -151,7 +151,7 @@ export type Zone = {
 	destroy: (self: Zone) -> (),
 }
 
-export type InternalZone = Zone & {
+export type InternalZone = Zone & Destroyable & {
 	attach: (self: Zone, observer: any) -> Zone,
 	detach: (self: Zone, observer: any) -> Zone,
 
@@ -163,8 +163,6 @@ export type InternalZone = Zone & {
 	metadata: any?,
 	autoSync: boolean,
 	syncConnections: { RBXScriptConnection }?,
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
 }
 
 export type Zones = {
@@ -185,7 +183,7 @@ export type Zones = {
 	destroy: (self: Zones) -> (),
 }
 
-export type InternalZones = Zones & {
+export type InternalZones = Zones & Destroyable & {
 	attach: (self: Zones, observer: any) -> Zones,
 	detach: (self: Zones, observer: any) -> Zones,
 	_attachObserver: (self: Zones, observer: any) -> Zones,
@@ -195,8 +193,6 @@ export type InternalZones = Zones & {
 	metadata: any?,
 	zones: { [any]: boolean },
 	observers: { [any]: boolean },
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
 	add: (self: InternalZones, zone: Zone) -> (),
@@ -305,10 +301,8 @@ export type ObserverClass = {
 	) -> Observer<T>,
 }
 
-export type InternalObserver<T = any> = Observer<T> & {
+export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	id: number,
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
 }
 
 export type QuickZone = {

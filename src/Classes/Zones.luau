@@ -77,11 +77,9 @@ function Zones._detachObserver(self: Types.InternalZones, observer: any): Types.
 	end
 	self.observers[observer] = nil
 
-	local cleanup = self.onDestroyObserverCleanups[observer]
-	if cleanup then
-		cleanup()
-		self.onDestroyObserverCleanups[observer] = nil
-	end
+	-- Set with the observer, so it is there
+	self.onDestroyObserverCleanups[observer]()
+	self.onDestroyObserverCleanups[observer] = nil
 
 	for zone, _ in self.zones do
 		observer:detach(zone)
@@ -307,9 +305,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Zones.onDestroy(self: Types.InternalZones, callback: () -> ()): () -> ()
-	return Destroyed.connect(self, callback)
-end
+Zones.onDestroy = Destroyed.connect
 
 --[=[ 
 	Cleans up the zones, removes them from the LBVH tree, and detaches all observers.
@@ -386,11 +382,9 @@ function Zones.remove(self: Types.InternalZones, zone: Types.Zone)
 	end
 	self.zones[zone] = nil
 
-	local cleanup = self.onDestroyZoneCleanups[zone]
-	if cleanup then
-		cleanup()
-		self.onDestroyZoneCleanups[zone] = nil
-	end
+	-- Set with the zone, so it is there
+	self.onDestroyZoneCleanups[zone]()
+	self.onDestroyZoneCleanups[zone] = nil
 
 	for observer, _ in self.observers do
 		observer:detach(zone)
