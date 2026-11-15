@@ -11,14 +11,12 @@ local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local Types = require(script.Parent.Parent.Types)
+local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
 
 local entityData = Entities.entityData
-local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
-local groupToObservers = Links.groupToObservers
-local observerExitedCallbacks = Callbacks.observerExitedCallbacks
-local observerSafety = Registry.observerSafety
-local observerTransitionedCallbacks = Callbacks.observerTransitionedCallbacks
+local groups = Registry.groups
+local observers = Registry.observers
 local slotObservers = Links.slotObservers
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotIds = ZoneShapes.zoneSlotIds
@@ -26,14 +24,12 @@ local staleSlots = ZoneShapes.staleSlots
 
 local Memberships = {}
 
-Memberships.observerTrackingEntities = {} :: { [number]: { [Types.Entity]: number } }
 -- Entities observers have in each zone
 Memberships.zoneOccupants = {} :: { [number]: number }
 -- Zones on their way out, which entities can't move into: one being destroyed, and the rest of a Zones destroyed
 -- with it, so an entity in several leaves once rather than moving through each
 Memberships.zonesBeingDestroyed = {} :: { [number]: true }
 
-local observerTrackingEntities = Memberships.observerTrackingEntities
 local zoneOccupants = Memberships.zoneOccupants
 local zonesBeingDestroyed = Memberships.zonesBeingDestroyed
 
@@ -52,23 +48,21 @@ local function removeOccupant(zoneId: number)
 	end
 end
 
--- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing's
--- entityToObservers holds its answers per entity
+-- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing keeps its
+-- answers in each entity's observers
 function Memberships.bringsIn(groupId: number, entity: Types.Entity, observerId: number): boolean
-	local groups = entityToGroups[entity]
-	local observers = groupToObservers[groupId]
-	return groups ~= nil and groups[groupId] == true and observers ~= nil and observers[observerId] == true
+	return Entities.isIn(entity, groupId) and Links.subscribes(observerId, groupId)
 end
 
 function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boolean
-	local groups = entityToGroups[entity]
-	if not groups then
+	local data = entityData[entity]
+	if not data then
 		return false
 	end
 
-	for groupId in groups do
-		local observers = groupToObservers[groupId]
-		if observers and observers[observerId] then
+	for groupId in data.groups do
+		local group = groups[groupId]
+		if group and group.subscribers[observerId] then
 			return true
 		end
 	end
@@ -79,14 +73,14 @@ end
 function Memberships.move(observerId: number, entity: Types.Entity, data: Types.EntityData, zoneId: number)
 	local memberships = data.activeObserverMemberships
 	local oldZoneId = memberships[observerId]
-	local tracked = observerTrackingEntities[observerId]
+	local observer = observers[observerId]
 	-- Destroyed observers track nothing
-	if oldZoneId == zoneId or not tracked then
+	if oldZoneId == zoneId or not observer then
 		return
 	end
 
 	memberships[observerId] = zoneId
-	tracked[entity] = zoneId
+	observer.tracked[entity] = zoneId
 	if oldZoneId then
 		removeOccupant(oldZoneId)
 	end
@@ -100,14 +94,14 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	end
 
 	data.activeObserverMemberships[observerId] = nil
-	local tracked = observerTrackingEntities[observerId]
-	if tracked then
-		tracked[entity] = nil
-	end
 	removeOccupant(zoneId)
 
-	local reference = entityToReference[entity] or entity
-	fire(observerExitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observerSafety[observerId])
+	local observer = observers[observerId]
+	if observer then
+		observer.tracked[entity] = nil
+		local reference = entityToReference[entity] or entity
+		fire(observer.exitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observer.safety)
+	end
 end
 
 local function canMoveInto(slot: number, observerId: number): boolean
@@ -140,15 +134,12 @@ local function otherZoneOf(observerId: number, data: Types.EntityData): number?
 end
 
 -- Entities another of the observer's zones holds move there, rather than exiting and entering next tick
-local function leaveDestroyedZone(observerId: number, zoneId: number)
-	local tracked = observerTrackingEntities[observerId]
-	if not tracked then
-		return
-	end
+local function leaveDestroyedZone(observer: Types.InternalObserver, zoneId: number)
+	local observerId = observer.id
 
 	-- Collected first, as a callback may update and add entities to the map
 	local leaving = {}
-	for entity, trackedZoneId in tracked do
+	for entity, trackedZoneId in observer.tracked do
 		if trackedZoneId == zoneId then
 			table.insert(leaving, entity)
 		end
@@ -164,12 +155,12 @@ local function leaveDestroyedZone(observerId: number, zoneId: number)
 			Memberships.move(observerId, entity, data, otherId)
 			local reference = entityToReference[entity] or entity
 			fire(
-				observerTransitionedCallbacks,
+				observer.transitionedCallbacks,
 				observerId,
 				reference,
 				zoneIdToZoneObj[otherId],
 				entity,
-				observerSafety[observerId],
+				observer.safety,
 				otherId
 			)
 		else
@@ -178,19 +169,10 @@ local function leaveDestroyedZone(observerId: number, zoneId: number)
 	end
 end
 
-function Memberships.exitObserver(observerId: number)
-	local tracked = observerTrackingEntities[observerId]
-	if not tracked then
-		return
-	end
-
-	-- Collected first, as callbacks may change the map
-	local leaving = {}
-	for entity in tracked do
-		table.insert(leaving, entity)
-	end
-
-	for _, entity in leaving do
+function Memberships.exitObserver(observer: Types.InternalObserver)
+	local observerId = observer.id
+	-- A snapshot, as callbacks may change the map
+	for entity in Snapshot.keys(observer.tracked) do
 		local data = entityData[entity]
 		if data then
 			Memberships.exit(observerId, entity, data)
@@ -204,13 +186,9 @@ function Memberships.leaveZone(zoneId: number)
 		return
 	end
 
-	-- Collected first, as callbacks may create or destroy observers
-	local observerIds = {}
-	for observerId in observerTrackingEntities do
-		table.insert(observerIds, observerId)
-	end
-	for _, observerId in observerIds do
-		leaveDestroyedZone(observerId, zoneId)
+	-- A snapshot, as callbacks may create or destroy observers
+	for _, observer in Snapshot.keys(observers) do
+		leaveDestroyedZone(observer :: Types.InternalObserver, zoneId)
 		if not zoneOccupants[zoneId] then
 			break
 		end
@@ -236,14 +214,6 @@ function Memberships.exitUnsubscribed(entity: Types.Entity, data: Types.EntityDa
 			end
 		end
 	end
-end
-
-function Memberships.addObserver(observerId: number)
-	observerTrackingEntities[observerId] = {}
-end
-
-function Memberships.dropObserver(observerId: number)
-	observerTrackingEntities[observerId] = nil
 end
 
 function Memberships.setZoneDestroying(zoneId: number, destroying: boolean)

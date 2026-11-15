@@ -27,7 +27,6 @@ local entityOf = References.entityOf
 local slotObservers = Links.slotObservers
 local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local groups = Registry.groups
-local entityToGroups = Entities.entityToGroups
 local entityToReference = References.entityToReference
 
 local shapeCFrames = ZoneShapes.shapeCFrames
@@ -202,12 +201,10 @@ function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 		end
 		return self
 	end
-	if isPlayer(reference) then
-		return self
+	-- Players are only ever linked to their part, by PlayerTracker
+	if not isPlayer(reference) then
+		References.link(entity, reference)
 	end
-
-	References.link(entity, reference)
-
 	return self
 end
 
@@ -263,7 +260,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 
 	entity = entityOf(entity)
 
-	local groupIds = entityToGroups[entity]
+	local groupIds = Entities.groupsOf(entity)
 	if not groupIds then
 		return self
 	end
@@ -329,25 +326,18 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 		end
 
 		if not visual then
-			local adornment: any
-			if shape == 'Ball' then
-				adornment = Instance.new('SphereHandleAdornment')
-			elseif shape == 'Cylinder' then
-				adornment = Instance.new('CylinderHandleAdornment')
-			else
-				adornment = Instance.new('BoxHandleAdornment')
-			end
+			local className = if shape == 'Ball'
+				then 'SphereHandleAdornment'
+				elseif shape == 'Cylinder' then 'CylinderHandleAdornment'
+				else 'BoxHandleAdornment'
+			local adornment: any = Instance.new(className :: any)
 			adornment.Name = 'Zone_' .. zone:getId()
 			adornment.Adornee = workspace.Terrain
 			adornment.Transparency = Config.Debug.transparency
 			adornment.AlwaysOnTop = true
 			adornment.ZIndex = 1
 			adornment.Parent = debugFolder
-			visual = {
-				adornment = adornment,
-				shape = shape,
-				zone = zone,
-			}
+			visual = { adornment = adornment, shape = shape, zone = zone }
 			debugVisuals[slot] = visual
 		end
 		return visual
@@ -355,11 +345,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 
 	local loopEvent: RBXScriptSignal<number> = RunService:IsClient() and RunService.PreRender or RunService.Heartbeat
 
+	-- Disconnected before the folder goes, so the folder is there
 	debugConnection = loopEvent:Connect(function()
-		if not debugFolder then
-			return
-		end
-
 		for slot, cframe in shapeCFrames do
 			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
@@ -367,9 +354,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 			local halfSize = shapeExtents[slot]
 			local size = halfSize * 2
 
-			local observers = slotObservers[slot]
 			-- Links drops a slot's list once it empties
-			local isActive = observers ~= nil
+			local isActive = slotObservers[slot] ~= nil
 			local color
 			if dynamicSlots[slot] then
 				color = isActive and Config.Debug.dynamicActive or Config.Debug.dynamicInactive

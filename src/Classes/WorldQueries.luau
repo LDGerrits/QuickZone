@@ -22,9 +22,8 @@ local containsPoint = ZoneShapes.containsPoint
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local entityData = Entities.entityData
-local observerIdToObserverObj = Registry.observerIdToObserverObj
+local observers = Registry.observers
 local groups = Registry.groups
-local entityToGroups = Entities.entityToGroups
 local referenceToEntity = References.referenceToEntity
 
 local queryHits = {} :: { number }
@@ -69,11 +68,7 @@ end
 	@return { Observer }
 ]=]
 function WorldQueries:getObservers(): { Types.Observer<any> }
-	local result = {}
-	for _, observer in observerIdToObserverObj do
-		table.insert(result, observer)
-	end
-	return (result :: any) :: { Types.Observer<any> }
+	return Snapshot.collect(self:iterObservers())
 end
 
 --[=[ 
@@ -85,11 +80,7 @@ end
 	@return { Group }
 ]=]
 function WorldQueries:getGroups(): { Types.Group }
-	local result = {}
-	for _, group in groups do
-		table.insert(result, group)
-	end
-	return result
+	return Snapshot.collect(self:iterGroups())
 end
 
 --[=[ 
@@ -101,11 +92,7 @@ end
 	@return { Zone }
 ]=]
 function WorldQueries:getZones(): { Types.Zone }
-	local result = {}
-	for _, zone in zoneIdToZoneObj do
-		table.insert(result, zone)
-	end
-	return result
+	return Snapshot.collect(self:iterZones())
 end
 
 --[=[ 
@@ -199,7 +186,7 @@ end
 ]=]
 function WorldQueries:getGroupsOfEntity(entity: any): { Types.Group }
 	entity = entityOf(entity)
-	local groupIds = entityToGroups[entity]
+	local groupIds = Entities.groupsOf(entity)
 	if not groupIds then
 		-- A player without a character is still in the groups it was added to
 		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
@@ -283,7 +270,7 @@ end
 	@return () -> Observer?
 ]=]
 function WorldQueries:iterObservers(): () -> Types.Observer<any>?
-	local nextObserver = Snapshot.keys(observerIdToObserverObj)
+	local nextObserver = Snapshot.keys(observers)
 	return function(): Types.Observer<any>?
 		local _, observer = nextObserver()
 		return observer
@@ -303,7 +290,7 @@ end
 function WorldQueries:iterGroupsOfEntity(entity: any): () -> Types.Group?
 	entity = entityOf(entity)
 
-	local groupIds = entityToGroups[entity]
+	local groupIds = Entities.groupsOf(entity)
 	if not groupIds then
 		local list = if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
 		local i = 0

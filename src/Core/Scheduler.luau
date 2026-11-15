@@ -33,16 +33,10 @@ local slotObservers = Links.slotObservers
 local slotSoleObserver = Links.slotSoleObserver
 local autoSyncZones = Registry.autoSyncZones
 
-local observerPriorityMap = Registry.observerPriorityMap
-local observerTrackingEntities = Memberships.observerTrackingEntities
-local observerEnteredCallbacks = Callbacks.observerEnteredCallbacks
-local observerTransitionedCallbacks = Callbacks.observerTransitionedCallbacks
-local observerEnabled = Registry.observerEnabled
-local observerSafety = Registry.observerSafety
+local observers = Registry.observers
 
 local entityToReference = References.entityToReference
 local entityData = Entities.entityData
-local entityToObservers = Routing.entityToObservers
 local dirtyProfiles = Routing.dirtyProfiles
 
 local staticTree = ZoneShapes.staticTree
@@ -56,7 +50,7 @@ local ctx_highestWin: number
 local ctx_candidatePriority = table.create(16) :: { [number]: number }
 local ctx_candidateIndex = table.create(16) :: { [number]: number }
 local ctx_candidateList = table.create(16) :: { [number]: number }
-local ctx_linkedObservers: { [number]: boolean }
+local ctx_linkedObservers: { [number]: true }
 local ctx_currentMemberships: { [number]: number }
 local ctx_checkingRate: number? = nil
 local ctx_checkingIndex = 0
@@ -83,12 +77,17 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 local Scheduler = {}
 
 local function processObserverHit(observerId: number, zoneId: number)
-	if not ctx_linkedObservers[observerId] or observerEnabled[observerId] == false then
+	if not ctx_linkedObservers[observerId] then
+		return
+	end
+	-- Zones list only live observers
+	local observer = observers[observerId]
+	if not observer or not observer.enabled then
 		return
 	end
 
 	if ctx_candidatePriority[observerId] == nil then
-		local priority = observerPriorityMap[observerId] or 0
+		local priority = observer.priority
 		ctx_cCount += 1
 		ctx_candidateList[ctx_cCount] = observerId
 		ctx_candidateIndex[observerId] = zoneId
@@ -104,13 +103,13 @@ local function processObserverHit(observerId: number, zoneId: number)
 end
 
 local function processZoneHit(slot: number)
-	local observers = slotObservers[slot]
-	if not observers then
+	local attached = slotObservers[slot]
+	if not attached then
 		return
 	end
 
 	local zoneId = zoneSlotIds[slot]
-	for _, observerId in observers do
+	for _, observerId in attached do
 		processObserverHit(observerId, zoneId)
 	end
 end
@@ -275,7 +274,7 @@ local function runTick(dt: number)
 				data.logicVersion = logicVersion
 				data.staticVersion = staticVersion
 
-				ctx_linkedObservers = entityToObservers[entity]
+				ctx_linkedObservers = data.linkedObservers :: { [number]: true }
 				ctx_currentMemberships = data.activeObserverMemberships
 
 				ctx_cCount = 0
@@ -309,7 +308,9 @@ local function runTick(dt: number)
 					ctx_candidateIndex[observerId] = nil
 					ctx_candidateList[i] = nil
 
-					if not observerTrackingEntities[observerId] then
+					-- An earlier callback may have destroyed the observer
+					local observer = observers[observerId]
+					if not observer then
 						continue
 					end
 
@@ -324,14 +325,14 @@ local function runTick(dt: number)
 
 					-- An earlier callback may have removed the entity or destroyed the zone
 					local zone = zoneIdToZoneObj[zoneIdx]
-					if entityData[entity] ~= data or not zone then
+					if data.dropped or not zone then
 						continue
 					end
 
 					-- Or changed the observer, so recheck next tick. A clean profile means it is still subscribed
 					local attached = slotObservers[zone.slot]
 					if
-						observerEnabled[observerId] == false
+						not observer.enabled
 						or not attached
 						or not table.find(attached, observerId)
 						or (dirtyProfiles[entity] and not isSubscribed(entity, observerId))
@@ -344,12 +345,12 @@ local function runTick(dt: number)
 
 					local reference = entityToReference[entity] or entity
 					fireCallback(
-						if currentZoneId then observerTransitionedCallbacks else observerEnteredCallbacks,
+						if currentZoneId then observer.transitionedCallbacks else observer.enteredCallbacks,
 						observerId,
 						reference,
 						zone,
 						entity,
-						observerSafety[observerId],
+						observer.safety,
 						zoneIdx
 					)
 				end
@@ -436,15 +437,11 @@ function Scheduler.update(dt: number?)
 end
 
 function Scheduler.setEnabled(enabled: boolean)
-	if enabled then
-		if not autoUpdateConnection then
-			autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
-		end
-	else
-		if autoUpdateConnection then
-			autoUpdateConnection:Disconnect()
-			autoUpdateConnection = nil
-		end
+	if enabled and not autoUpdateConnection then
+		autoUpdateConnection = RunService.PostSimulation:Connect(Scheduler.update)
+	elseif not enabled and autoUpdateConnection then
+		autoUpdateConnection:Disconnect()
+		autoUpdateConnection = nil
 	end
 end
 

@@ -8,6 +8,7 @@ local TestFolder = ServerScriptService.Test
 local TiniestFolder = TestFolder.Tiniest
 
 local Util = require(TestFolder.Util)
+local Invariants = require(TestFolder.Invariants)
 local setOf = Util.setOf
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
@@ -1552,8 +1553,7 @@ local function checkConsistency(world: World)
 		end
 	end
 
-	-- Memberships, the observers' tracked maps and the zones' occupant counts
-	local occupants = {}
+	-- Entity data exactly while in a group, which the internal tables must agree on
 	for _, entity in world.entities do
 		local data = Entities.entityData[entity]
 		if (data ~= nil) ~= tracked(world, entity) then
@@ -1563,41 +1563,10 @@ local function checkConsistency(world: World)
 			)
 			return
 		end
-		if not data then
-			continue
-		end
-		for observerId, zoneId in data.activeObserverMemberships do
-			local trackedMap = Memberships.observerTrackingEntities[observerId]
-			if not trackedMap or trackedMap[entity] ~= zoneId then
-				fail(
-					world,
-					`{describeEntity(world, entity)} is in zone {zoneId} for observer id {observerId}, its tracked map disagrees`
-				)
-				return
-			end
-			if not Registry.zoneIdToZoneObj[zoneId] then
-				fail(world, `{describeEntity(world, entity)} is in destroyed zone {zoneId}`)
-				return
-			end
-			occupants[zoneId] = (occupants[zoneId] or 0) + 1
-		end
 	end
-	for _, model in liveObservers(world) do
-		local observerId = model.observer:getId()
-		for entity, zoneId in Memberships.observerTrackingEntities[observerId] or {} do
-			local data = Entities.entityData[entity]
-			if not data or data.activeObserverMemberships[observerId] ~= zoneId then
-				fail(world, `observer {model.index} tracks an entity in zone {zoneId} that has no such membership`)
-				return
-			end
-		end
-	end
-	for _, zone in world.zones do
-		local id = zone:getId()
-		if Memberships.zoneOccupants[id] ~= occupants[id] then
-			fail(world, `{describeZone(zone)} counts {Memberships.zoneOccupants[id]} occupants, has {occupants[id]}`)
-			return
-		end
+	local problems = Invariants.check()
+	if problems then
+		fail(world, `internal state is inconsistent: {problems}`)
 	end
 end
 

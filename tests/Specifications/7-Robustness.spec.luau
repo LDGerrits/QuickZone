@@ -14,7 +14,6 @@ local Util = require(TestFolder.Util)
 local withCleanup = Util.withCleanup
 
 local QuickZone = require(ReplicatedStorage.QuickZone)
-local Callbacks = require(ReplicatedStorage.QuickZone.Core.Callbacks)
 local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
 local Memberships = require(ReplicatedStorage.QuickZone.Core.Memberships)
 local Registry = require(ReplicatedStorage.QuickZone.Core.Registry)
@@ -240,7 +239,7 @@ return function(Tiniest: Tiniest)
 
 				Expect(fired).is(COUNT)
 				-- Let go of once the event ended
-				Expect(#Callbacks.observerEnteredCallbacks[observer:getId()]).is(0)
+				Expect(#(observer :: any).enteredCallbacks).is(0)
 				-- Copying the list for each disconnect took 150 ms
 				Expect(if elapsed < 0.05 then 'fast' else string.format('%.0f ms', elapsed * 1000)).is('fast')
 			end)
@@ -515,7 +514,7 @@ return function(Tiniest: Tiniest)
 				Expect(refused).is(4)
 				Expect(Registry.zoneIdToZoneObj[zoneId]).is(nil)
 				Expect(Registry.groups[groupId]).is(nil)
-				Expect(Registry.observerIdToObserverObj[observerId]).is(nil)
+				Expect(Registry.observers[observerId]).is(nil)
 			end)
 		end)
 

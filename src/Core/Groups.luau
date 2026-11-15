@@ -1,15 +1,15 @@
 --!strict
 
--- Group operations by id, taking members as users give them. Classes change membership only through here and
--- read it from Entities
+-- Group operations by id, taking members as users give them, and groups coming and going. Classes change
+-- membership only through here
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
 local GroupPresence = require(script.Parent.GroupPresence)
-local Links = require(script.Parent.Links)
 local Members = require(script.Parent.Members)
 local PlayerTracker = require(script.Parent.PlayerTracker)
 local References = require(script.Parent.References)
+local Registry = require(script.Parent.Registry)
 
 local isPlayer = References.isPlayer
 
@@ -25,13 +25,6 @@ local function removeMember(groupId: number, entity: Types.Entity)
 	end
 	-- No-op if an exit callback destroyed the group
 	Members.remove(groupId, entity)
-end
-
--- After the Group class registers it
-function Groups.create(groupId: number, autoClean: boolean)
-	Links.addGroup(groupId)
-	Entities.addGroup(groupId)
-	Members.addGroup(groupId, autoClean)
 end
 
 function Groups.add(groupId: number, reference: any)
@@ -77,7 +70,8 @@ Groups.setAutoClean = Members.setAutoClean
 function Groups.clear(groupId: number)
 	-- Held once and walked backwards: exit callbacks may remove later members, or destroy the group and empty the
 	-- list
-	local members = Entities.groupEntities[groupId]
+	local group = Registry.groups[groupId]
+	local members = group and group.members
 	if members then
 		for idx = #members, 1, -1 do
 			local entity = members[idx]
@@ -96,14 +90,20 @@ function Groups.contains(groupId: number, reference: any): boolean
 		or (isPlayer(reference) and PlayerTracker.isSubscribed(reference, groupId))
 end
 
--- After its onDestroy callbacks. The Group class forgets the object
-function Groups.destroy(groupId: number)
+-- Built by the class with its state
+function Groups.create(group: Types.InternalGroup)
+	Registry.groups[group.id] = group
+end
+
+-- After its onDestroy callbacks
+function Groups.destroy(group: Types.InternalGroup)
+	local groupId = group.id
 	Groups.clear(groupId)
 	GroupPresence.groupDestroyed(groupId)
 
-	Links.dropGroup(groupId)
-	Entities.dropGroup(groupId)
-	Members.dropGroup(groupId)
+	Entities.dropGroup(group)
+	Members.dropGroup(group)
+	Registry.groups[groupId] = nil
 end
 
 return Groups

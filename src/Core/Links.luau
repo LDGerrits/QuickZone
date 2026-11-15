@@ -1,50 +1,39 @@
 --!strict
 
--- Owns observer links to groups and zones. Only this module writes them
+-- Owns observer links to groups and zones. Only this module writes them, and the groups' subscribers
+
+local Registry = require(script.Parent.Registry)
+
+local groups = Registry.groups
 
 local Links = {}
 
-Links.groupToObservers = {} :: { [number]: { [number]: boolean } }
 Links.slotObservers = {} :: { [number]: { number } }
 Links.slotSoleObserver = {} :: { [number]: number }
 
-local groupToObservers = Links.groupToObservers
 local slotObservers = Links.slotObservers
 local slotSoleObserver = Links.slotSoleObserver
 
-function Links.addGroup(groupId: number)
-	groupToObservers[groupId] = {}
-end
-
-function Links.dropGroup(groupId: number)
-	groupToObservers[groupId] = nil
-end
-
-function Links.groupIdsOf(observerId: number): { number }
-	local list = {}
-	for groupId, observers in groupToObservers do
-		if observers[observerId] then
-			table.insert(list, groupId)
-		end
-	end
-	return list
+function Links.subscribes(observerId: number, groupId: number): boolean
+	local group = groups[groupId]
+	return group ~= nil and group.subscribers[observerId] == true
 end
 
 function Links.unsubscribeAll(observerId: number)
-	for _, observers in groupToObservers do
-		observers[observerId] = nil
+	for _, group in groups do
+		group.subscribers[observerId] = nil
 	end
 end
 
--- Only live groups are subscribed, so the set exists
+-- Only live groups are subscribed
 function Links.subscribe(observerId: number, groupId: number)
-	groupToObservers[groupId][observerId] = true
+	groups[groupId].subscribers[observerId] = true
 end
 
 function Links.unsubscribe(observerId: number, groupId: number)
-	local observers = groupToObservers[groupId]
-	if observers then
-		observers[observerId] = nil
+	local group = groups[groupId]
+	if group then
+		group.subscribers[observerId] = nil
 	end
 end
 

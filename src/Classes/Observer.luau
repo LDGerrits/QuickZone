@@ -20,9 +20,6 @@ local Zones = require(script.Parent.Zones)
 
 local checkZone = Checks.checkZone
 
-local hasAttachedMap = {} :: { [number]: boolean }
-local hasSubscribedMap = {} :: { [number]: boolean }
-
 -- A NaN setting would quietly break every later tick
 local function checkPriority(p: any): number
 	if type(p) ~= 'number' or p ~= p then
@@ -124,38 +121,35 @@ function Observer.new<T>(config: {
 	local self: Types.InternalObserver<T> = setmetatable({
 		id = id,
 		phase = 'alive',
-	}, Observer) :: any
-
-	Registry.observerIdToObserverObj[id] = self
-	Wiring.addObserver(id, {
 		priority = priority,
 		updateRate = updateRate,
-		precision = precision,
+		precisionSq = precision ^ 2,
 		enabled = if config and config.enabled ~= nil then not not config.enabled else true,
 		safety = if config and config.safety ~= nil then not not config.safety else Config.Observer.safety,
-	})
+		staticZoneCount = 0,
+		dynamicZoneCount = 0,
+		tracked = {},
+		enteredCallbacks = {},
+		exitedCallbacks = {},
+		transitionedCallbacks = {},
+		hasAttached = false,
+		hasSubscribed = false,
+	}, Observer) :: any
 
-	hasAttachedMap[id] = false
-	hasSubscribedMap[id] = false
+	Wiring.addObserver(self)
 
-	if config and config.zones then
-		for _, zone in config.zones do
-			self:attach(zone)
-		end
+	local zones = config and config.zones
+	local groups = config and config.groups
+	for _, zone in (zones or {}) :: { any } do
+		self:attach(zone)
 	end
-
-	if config and config.groups then
-		for _, group in config.groups do
-			self:subscribe(group)
-		end
+	for _, group in (groups or {}) :: { any } do
+		self:subscribe(group)
 	end
-
-	local explicitlyPassedZones = config and config.zones ~= nil
-	local explicitlyPassedGroups = config and config.groups ~= nil
 
 	-- Deferred, so a later :attach or :subscribe silences the warning
-	local missingZones = not explicitlyPassedZones
-	local missingGroups = not explicitlyPassedGroups
+	local missingZones = zones == nil
+	local missingGroups = groups == nil
 
 	if missingZones or missingGroups then
 		local creationTrace = debug.traceback('', 2)
@@ -165,10 +159,10 @@ function Observer.new<T>(config: {
 				return
 			end
 
-			if missingZones and not hasAttachedMap[id] then
+			if missingZones and not self.hasAttached then
 				Log.warn('Observer %d has no attached zones. It will not detect spatial queries.', creationTrace, id)
 			end
-			if missingGroups and not hasSubscribedMap[id] then
+			if missingGroups and not self.hasSubscribed then
 				Log.warn('Observer %d has no subscribed groups. It will not track any entities.', creationTrace, id)
 			end
 		end)
@@ -197,7 +191,7 @@ function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalG
 	if Destroyed.isDestroyed(self) then
 		return self
 	end
-	hasSubscribedMap[self.id] = true
+	self.hasSubscribed = true
 
 	Wiring.subscribe(self.id, group.id)
 	return self
@@ -246,7 +240,7 @@ function Observer.attach(self: Types.InternalObserver, zone: any)
 	if Destroyed.isDestroyed(self) then
 		return self
 	end
-	hasAttachedMap[self.id] = true
+	self.hasAttached = true
 
 	if getmetatable(zone) == Zones then
 		zone:_attachObserver(self)
@@ -366,7 +360,7 @@ end
 	@return boolean
 ]=]
 function Observer.isEnabled(self: Types.InternalObserver): boolean
-	return Registry.observerEnabled[self.id] ~= false
+	return self.enabled
 end
 
 --[=[ 
@@ -377,7 +371,7 @@ end
 	@return boolean
 ]=]
 function Observer.isSafe(self: Types.InternalObserver): boolean
-	return Registry.observerSafety[self.id]
+	return self.safety
 end
 
 --[=[ 
@@ -399,7 +393,7 @@ end
 	@return number
 ]=]
 function Observer.getPriority(self: Types.InternalObserver): number
-	return Registry.observerPriorityMap[self.id]
+	return self.priority
 end
 
 --[=[ 
@@ -410,7 +404,7 @@ end
 	@return number
 ]=]
 function Observer.getUpdateRate(self: Types.InternalObserver): number
-	return Registry.observerUpdateRate[self.id]
+	return self.updateRate
 end
 
 --[=[ 
@@ -421,7 +415,7 @@ end
 	@return number
 ]=]
 function Observer.getPrecision(self: Types.InternalObserver): number
-	return math.sqrt(Registry.observerPrecisionSq[self.id])
+	return math.sqrt(self.precisionSq)
 end
 
 --[=[ 
@@ -439,9 +433,7 @@ end
 	@param callback () -> ()
 	@return () -> () -- Disconnect function
 ]=]
-function Observer.onDestroy(self: Types.InternalObserver, callback: () -> ()): () -> ()
-	return Destroyed.connect(self, callback)
-end
+Observer.onDestroy = Destroyed.connect
 
 --[=[ 
 	Cleans up the observer, disables tracking, and unsubscribes it from all groups and zones.
@@ -459,13 +451,7 @@ function Observer.destroy(self: Types.InternalObserver): ()
 
 	Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
-	local id = self.id
-	Wiring.removeObserver(id)
-	Registry.observerIdToObserverObj[id] = nil
-
-	hasAttachedMap[id] = nil
-	hasSubscribedMap[id] = nil
-
+	Wiring.removeObserver(self)
 	Destroyed.finish(self)
 end
 

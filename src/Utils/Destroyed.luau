@@ -6,7 +6,7 @@
 local Log = require(script.Parent.Log)
 local Types = require(script.Parent.Parent.Types)
 
-type Destroyable = { phase: Types.Phase, onDestroyCallbacks: { () -> () }? }
+type Destroyable = Types.Destroyable
 
 local Destroyed = {}
 

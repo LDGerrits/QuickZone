@@ -37,6 +37,8 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 -- See Utils/Destroyed
 export type Phase = 'alive' | 'destroying' | 'dead'
 
+export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
+
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
 -- Flat LBVH, see Utils/LinearBVH for the node layout
@@ -77,9 +79,12 @@ export type ZoneChanges = {
 export type EntityData = {
 	-- Memberships
 	activeObserverMemberships: { [number]: number },
-	-- Entities
+	-- Entities. Dropped once it left its last group, after which its table is never reused
 	strategy: number,
-	-- Routing
+	groups: { [number]: true },
+	dropped: boolean,
+	-- Routing. The observers its groups bring it into, nil while none does
+	linkedObservers: { [number]: true }?,
 	precisionSq: number,
 	updateRate: number,
 	bucketIndex: number,
@@ -109,10 +114,21 @@ export type Group<T = any> = {
 	destroy: (self: Group<T>) -> (),
 }
 
-export type InternalGroup<T = any> = Group<T> & {
+-- Its state is kept on the object, registered in Registry.groups while alive. The class sets first values, then
+-- the writers are:
+--   subscribers                             Links
+--   members, memberIndices                  Entities
+--   autoClean, removalWatches               Members
+export type InternalGroup<T = any> = Group<T> & Destroyable & {
 	id: number,
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
+	-- Observers subscribed to it
+	subscribers: { [number]: true },
+	-- Swap-removed, each at its index in memberIndices. Emptied in place on destroy, so a loop holding it ends
+	members: { Entity },
+	memberIndices: { [Entity]: number },
+	autoClean: boolean,
+	-- Instance members watched for removal while autoClean is on
+	removalWatches: { [Instance]: RBXScriptConnection },
 }
 
 export type GroupClass = {
@@ -151,7 +167,7 @@ export type Zone = {
 	destroy: (self: Zone) -> (),
 }
 
-export type InternalZone = Zone & {
+export type InternalZone = Zone & Destroyable & {
 	attach: (self: Zone, observer: any) -> Zone,
 	detach: (self: Zone, observer: any) -> Zone,
 
@@ -163,8 +179,6 @@ export type InternalZone = Zone & {
 	metadata: any?,
 	autoSync: boolean,
 	syncConnections: { RBXScriptConnection }?,
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
 }
 
 export type Zones = {
@@ -185,7 +199,7 @@ export type Zones = {
 	destroy: (self: Zones) -> (),
 }
 
-export type InternalZones = Zones & {
+export type InternalZones = Zones & Destroyable & {
 	attach: (self: Zones, observer: any) -> Zones,
 	detach: (self: Zones, observer: any) -> Zones,
 	_attachObserver: (self: Zones, observer: any) -> Zones,
@@ -195,8 +209,6 @@ export type InternalZones = Zones & {
 	metadata: any?,
 	zones: { [any]: boolean },
 	observers: { [any]: boolean },
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
 	add: (self: InternalZones, zone: Zone) -> (),
@@ -305,11 +317,39 @@ export type ObserverClass = {
 	) -> Observer<T>,
 }
 
-export type InternalObserver<T = any> = Observer<T> & {
+-- Its state is kept on the object, registered in Registry.observers while alive. The class sets first values, then
+-- the writers are:
+--   priority, updateRate, precisionSq,
+--   enabled, safety, the callback lists     Wiring
+--   staticZoneCount, dynamicZoneCount       Routing
+--   tracked                                 Memberships
+--   the callback lists' entries             Callbacks
+--   trackers                                GroupPresence
+--   hasAttached, hasSubscribed              Observer
+export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	id: number,
-	onDestroyCallbacks: { () -> () }?,
-	phase: Phase,
+	priority: number,
+	updateRate: number,
+	precisionSq: number,
+	enabled: boolean,
+	safety: boolean,
+	-- Attached zones per tree, which decide the trees its entities query
+	staticZoneCount: number,
+	dynamicZoneCount: number,
+	-- The zone id each entity inside is in
+	tracked: { [Entity]: number },
+	enteredCallbacks: { ObserverCallback },
+	exitedCallbacks: { ObserverCallback },
+	transitionedCallbacks: { ObserverCallback },
+	-- Replaced rather than changed, so a list being run never shifts. Only set while it has trackers
+	trackers: { Tracker }?,
+	-- Whether attach or subscribe was ever called, for the warning about a missing one
+	hasAttached: boolean,
+	hasSubscribed: boolean,
 }
+
+export type ObserverCallback = (any, Zone, Entity) -> ()
+export type Tracker = (entity: Entity?, destroyedGroupId: number?) -> ()
 
 export type QuickZone = {
 	Zone: ZoneClass,

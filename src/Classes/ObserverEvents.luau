@@ -18,7 +18,8 @@ local checkCallback = Log.checkCallback
 
 -- Also true after destroy, so a late cleanup still runs in its own thread
 local function isSafe(observerId: number): boolean
-	return Registry.observerSafety[observerId] ~= false
+	local observer = Registry.observers[observerId]
+	return observer == nil or observer.safety
 end
 
 local function forPlayers(callback: (Player, Types.Zone, Types.Entity) -> any): (any, Types.Zone, Types.Entity) -> any
@@ -58,7 +59,7 @@ local function groupEvent(
 		Callbacks.call(callback, isSafe(observerId), group, zone, entity)
 	end
 	local function ignore() end
-	return GroupPresence.track(observerId, if onArrive then fire else ignore, if onArrive then ignore else fire)
+	return GroupPresence.track(self, if onArrive then fire else ignore, if onArrive then ignore else fire)
 end
 
 local ObserverEvents = {}
@@ -161,7 +162,7 @@ end
 ]=]
 function ObserverEvents.onEnter(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(Callbacks.observerEnteredCallbacks, self.id, callback)
+	return Callbacks.connect(self.enteredCallbacks, callback)
 end
 
 --[=[ 
@@ -175,7 +176,7 @@ end
 ]=]
 function ObserverEvents.onExit(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(Callbacks.observerExitedCallbacks, self.id, callback)
+	return Callbacks.connect(self.exitedCallbacks, callback)
 end
 
 --[=[
@@ -350,7 +351,7 @@ function ObserverEvents.observeGroup(
 	local generations = {} :: { [number]: number }
 	local disconnected = false
 
-	local disconnectTracker = GroupPresence.track(observerId, function(groupId, group, zone, entity)
+	local disconnectTracker = GroupPresence.track(self, function(groupId, group, zone, entity)
 		local generation = (generations[groupId] or 0) + 1
 		generations[groupId] = generation
 		Callbacks.call(function()
@@ -436,7 +437,7 @@ function ObserverEvents.onTransition(
 	callback: (any, Types.Zone, Types.Entity) -> ()
 ): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(Callbacks.observerTransitionedCallbacks, self.id, callback)
+	return Callbacks.connect(self.transitionedCallbacks, callback)
 end
 
 --[=[ 

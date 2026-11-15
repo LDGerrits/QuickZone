@@ -3,10 +3,7 @@
 local Log = {}
 
 local function formatLog(messageTemplate: string, trace: string?, ...: any): string
-	local messageText = string.format(messageTemplate, ...)
-
-	messageText = `[QuickZone] {messageText}`
-
+	local messageText = `[QuickZone] {string.format(messageTemplate, ...)}`
 	local finalTrace = trace or debug.traceback('', 3)
 
 	if finalTrace ~= '' then
@@ -25,8 +22,7 @@ function Log.fatal(message: string, trace: string?, ...: any)
 end
 
 function Log.nonFatal(message: string, trace: string?, ...: any)
-	local formattedString = formatLog(message, trace, ...)
-	task.spawn(error :: any, formattedString, 0)
+	task.spawn(error :: any, formatLog(message, trace, ...), 0)
 end
 
 -- Fails where the callback is given rather than later when it runs

@@ -10,22 +10,15 @@ local CORNER_WEDGE_SHAPE_VALUE = Enum.PartType.CornerWedge.Value
 local MESH_SHAPE_VALUE = -1 -- Meshes have no Enum.PartType equivalent
 local MESH_TOLERANCE_SQ = 1e-2 * 1e-2 -- 0.01 studs to account for float error up to 50k studs
 
-local MORTON_SHIFT16_MASK = 0xFF0000FF
-local MORTON_SHIFT8_MASK = 0xF00F00F
-local MORTON_SHIFT4_MASK = 0x30C30C3
-local MORTON_SHIFT2_MASK = 0x9249249
+-- Spreads 10 bits two apart for Morton codes: shift and mask
+local MORTON_STEPS = { { 16, 0xFF0000FF }, { 8, 0xF00F00F }, { 4, 0x30C30C3 }, { 2, 0x9249249 } }
 
 local expandLUT = table.create(1024) :: { number }
 for i = 0, 1023 do
 	local value = i
-	value = bit32.bor(bit32.lshift(value, 16), value)
-	value = bit32.band(value, MORTON_SHIFT16_MASK)
-	value = bit32.bor(bit32.lshift(value, 8), value)
-	value = bit32.band(value, MORTON_SHIFT8_MASK)
-	value = bit32.bor(bit32.lshift(value, 4), value)
-	value = bit32.band(value, MORTON_SHIFT4_MASK)
-	value = bit32.bor(bit32.lshift(value, 2), value)
-	value = bit32.band(value, MORTON_SHIFT2_MASK)
+	for _, step in MORTON_STEPS do
+		value = bit32.band(bit32.bor(bit32.lshift(value, step[1]), value), step[2])
+	end
 	expandLUT[i + 1] = value
 end
 
@@ -41,10 +34,6 @@ Geometry.CYLINDER_SHAPE_VALUE = CYLINDER_SHAPE_VALUE
 Geometry.WEDGE_SHAPE_VALUE = WEDGE_SHAPE_VALUE
 Geometry.CORNER_WEDGE_SHAPE_VALUE = CORNER_WEDGE_SHAPE_VALUE
 Geometry.MESH_SHAPE_VALUE = MESH_SHAPE_VALUE
-
-function Geometry.unionBounds(minA: Vector3, maxA: Vector3, minB: Vector3, maxB: Vector3): (Vector3, Vector3)
-	return vector.min(minA, minB), vector.max(maxA, maxB)
-end
 
 -- 0 along an axis the half size is perpendicular to, where inf * 0 would be NaN
 local function reach(direction: number, half: number): number

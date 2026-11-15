@@ -1,7 +1,7 @@
 --!strict
 
 -- An entity joining or leaving a group, with its follow-on steps in required order, and autoClean removal
--- watches. Only this module writes its tables
+-- watches. Only this module writes the groups' autoClean and removalWatches
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
@@ -13,26 +13,23 @@ local Routing = require(script.Parent.Routing)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Log = require(script.Parent.Parent.Utils.Log)
 
+local groups = Registry.groups
+
 local Members = {}
-
-Members.autoCleanGroups = {} :: { [number]: true }
-Members.removalWatches = {} :: { [number]: { [Instance]: RBXScriptConnection } }
-
-local autoCleanGroups = Members.autoCleanGroups
-local removalWatches = Members.removalWatches
 
 -- True from the start of destroy, so nothing new joins mid-teardown
 function Members.isGroupDestroyed(groupId: number): boolean
-	local group = Registry.groups[groupId]
+	local group = groups[groupId]
 	return group == nil or Destroyed.isDestroyed(group)
 end
 
 local isDestroyed = Members.isGroupDestroyed
 
-local function watchRemoval(groupId: number, entity: Types.Entity)
-	local groupWatches = removalWatches[groupId]
-	if typeof(entity) == 'Instance' and not groupWatches[entity] then
-		groupWatches[entity] = entity.AncestryChanged:Connect(function(_, parent)
+local function watchRemoval(group: Types.InternalGroup, entity: Types.Entity)
+	local watches = group.removalWatches
+	if typeof(entity) == 'Instance' and not watches[entity] then
+		local groupId = group.id
+		watches[entity] = entity.AncestryChanged:Connect(function(_, parent)
 			if not parent then
 				Members.remove(groupId, entity)
 			end
@@ -40,40 +37,27 @@ local function watchRemoval(groupId: number, entity: Types.Entity)
 	end
 end
 
-function Members.addGroup(groupId: number, autoClean: boolean)
-	if autoClean then
-		autoCleanGroups[groupId] = true
+local function unwatchAll(group: Types.InternalGroup)
+	for _, conn in group.removalWatches do
+		conn:Disconnect()
 	end
-	removalWatches[groupId] = {}
+	table.clear(group.removalWatches)
 end
 
-function Members.dropGroup(groupId: number)
-	local groupWatches = removalWatches[groupId]
-	if groupWatches then
-		for _, conn in groupWatches do
-			conn:Disconnect()
-		end
-	end
-	autoCleanGroups[groupId] = nil
-	removalWatches[groupId] = nil
-end
+Members.dropGroup = unwatchAll
 
 function Members.setAutoClean(groupId: number, enabled: boolean)
-	if (autoCleanGroups[groupId] == true) == enabled then
+	local group = groups[groupId]
+	if group.autoClean == enabled then
 		return
 	end
-	local groupWatches = removalWatches[groupId]
+	group.autoClean = enabled
 	if enabled then
-		autoCleanGroups[groupId] = true
-		for _, entity in Entities.groupEntities[groupId] do
-			watchRemoval(groupId, entity)
+		for _, entity in group.members do
+			watchRemoval(group, entity)
 		end
 	else
-		autoCleanGroups[groupId] = nil
-		for entity, conn in groupWatches do
-			conn:Disconnect()
-			groupWatches[entity] = nil
-		end
+		unwatchAll(group)
 	end
 end
 
@@ -93,8 +77,9 @@ function Members.add(groupId: number, entity: Types.Entity)
 
 	Routing.recheck(entity)
 
-	if autoCleanGroups[groupId] then
-		watchRemoval(groupId, entity)
+	local group = groups[groupId]
+	if group.autoClean then
+		watchRemoval(group, entity)
 	end
 
 	-- Observers it is already in may now count this group
@@ -107,15 +92,16 @@ function Members.remove(groupId: number, entity: Types.Entity)
 		return
 	end
 
-	local groupWatches = removalWatches[groupId]
-	local watch = groupWatches and groupWatches[entity :: any]
+	local group = groups[groupId]
+	local watches = group and group.removalWatches
+	local watch = watches and watches[entity :: any]
 	if watch then
 		watch:Disconnect()
-		groupWatches[entity :: any] = nil
+		watches[entity :: any] = nil
 	end
 
+	local data = Entities.entityData[entity] :: Types.EntityData
 	Entities.leave(entity, groupId)
-	local data = Entities.entityData[entity]
 
 	Routing.recheck(entity)
 
@@ -124,9 +110,9 @@ function Members.remove(groupId: number, entity: Types.Entity)
 	GroupPresence.groupsChanged(entity)
 
 	-- Routing first: it reads the data of the entity swapped into its bucket slot, possibly this one
-	if Entities.isGroupless(entity, data) then
-		Routing.forget(entity, data :: Types.EntityData)
-		Entities.drop(entity)
+	if Entities.isGroupless(data) then
+		Routing.forget(entity, data)
+		Entities.drop(entity, data)
 		References.forget(entity)
 	end
 end

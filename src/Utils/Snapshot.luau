@@ -39,4 +39,13 @@ function Snapshot.keys<K, V>(t: { [K]: V }): () -> (K?, V?)
 	end
 end
 
+-- What an iterator yields, as a list: the get methods are their iter methods run to the end
+function Snapshot.collect<T>(iterate: () -> T?): { T }
+	local list = {}
+	for value in iterate do
+		table.insert(list, value)
+	end
+	return list
+end
+
 return Snapshot

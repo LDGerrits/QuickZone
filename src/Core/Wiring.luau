@@ -1,10 +1,10 @@
 --!strict
 
--- Zones coming and going, observer zone attachments, group subscriptions and settings, with their follow-on steps in
--- required order. The only writer of the zone maps and observer settings in Registry
+-- Zones and observers coming and going, observer zone attachments, group subscriptions and settings, with their
+-- follow-on steps in required order. The only writer of the zone and observer maps in Registry, and of observer
+-- settings
 
 local Types = require(script.Parent.Parent.Types)
-local Callbacks = require(script.Parent.Callbacks)
 local Entities = require(script.Parent.Entities)
 local GroupPresence = require(script.Parent.GroupPresence)
 local Links = require(script.Parent.Links)
@@ -14,19 +14,13 @@ local Routing = require(script.Parent.Routing)
 local ZoneShapes = require(script.Parent.ZoneShapes)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 
-export type ObserverSettings = {
-	priority: number,
-	updateRate: number,
-	precision: number,
-	enabled: boolean,
-	safety: boolean,
-}
+local observers = Registry.observers
 
 local Wiring = {}
 
 local function disconnectFromGroup(observerId: number, groupId: number)
 	-- Cloned: exit callbacks may remove members, swapping later ones into visited slots
-	for _, entity in table.clone(Entities.groupEntities[groupId] :: { Types.Entity }) do
+	for _, entity in table.clone(Registry.groups[groupId].members) do
 		local data = Entities.entityData[entity]
 		if not data then
 			continue
@@ -35,7 +29,8 @@ local function disconnectFromGroup(observerId: number, groupId: number)
 		Routing.recheck(entity)
 
 		-- Disabled observers let go of every entity
-		if Registry.observerEnabled[observerId] and Memberships.isSubscribed(entity, observerId) then
+		local observer = observers[observerId]
+		if observer and observer.enabled and Memberships.isSubscribed(entity, observerId) then
 			continue
 		end
 
@@ -97,12 +92,9 @@ function Wiring.removeZone(zone: Types.InternalZone)
 	local slot = zone.slot
 
 	Memberships.setZoneDestroying(id, true)
-	local attached = Links.detachAll(slot)
-	if attached then
-		local isDynamic = ZoneShapes.isDynamic(slot)
-		for _, observerId in attached do
-			Routing.changeZoneCount(observerId, isDynamic, -1)
-		end
+	local isDynamic = ZoneShapes.isDynamic(slot)
+	for _, observerId in (Links.detachAll(slot) or {}) :: { number } do
+		Routing.changeZoneCount(observerId, isDynamic, -1)
 	end
 	Memberships.leaveZone(id)
 
@@ -130,7 +122,7 @@ end
 function Wiring.subscribe(observerId: number, groupId: number)
 	Links.subscribe(observerId, groupId)
 
-	for _, entity in Entities.groupEntities[groupId] do
+	for _, entity in Registry.groups[groupId].members do
 		Routing.recheck(entity)
 	end
 
@@ -145,23 +137,17 @@ function Wiring.unsubscribe(observerId: number, groupId: number)
 	GroupPresence.subscriptionChanged(observerId, groupId)
 end
 
--- Settings must already be validated
-function Wiring.addObserver(observerId: number, settings: ObserverSettings)
-	Registry.observerPriorityMap[observerId] = settings.priority
-	Registry.observerUpdateRate[observerId] = settings.updateRate
-	Registry.observerPrecisionSq[observerId] = settings.precision ^ 2
-	Registry.observerEnabled[observerId] = settings.enabled
-	Registry.observerSafety[observerId] = settings.safety
-	Callbacks.addObserver(observerId)
-	Memberships.addObserver(observerId)
-	Routing.addObserver(observerId)
+-- Built by the class with its state, settings already validated
+function Wiring.addObserver(observer: Types.InternalObserver)
+	observers[observer.id] = observer
 end
 
 -- After its onDestroy callbacks
-function Wiring.removeObserver(observerId: number)
+function Wiring.removeObserver(observer: Types.InternalObserver)
+	local observerId = observer.id
 	-- Exits every entity: destroyed from an exit callback, that loop may not have reached them all
 	Wiring.setEnabled(observerId, false)
-	Memberships.exitObserver(observerId)
+	Memberships.exitObserver(observer)
 
 	-- Unlinked entities must be rerouted, also when the observer was already disabled
 	Routing.rerouteObserver(observerId)
@@ -173,29 +159,27 @@ function Wiring.removeObserver(observerId: number)
 		end
 	end
 
-	Registry.observerPriorityMap[observerId] = nil
-	Registry.observerEnabled[observerId] = nil
-	Registry.observerSafety[observerId] = nil
-	Registry.observerUpdateRate[observerId] = nil
-	Registry.observerPrecisionSq[observerId] = nil
-	Callbacks.dropObserver(observerId)
-	GroupPresence.dropObserver(observerId)
-	Memberships.dropObserver(observerId)
-	Routing.dropObserver(observerId)
+	observers[observerId] = nil
+	-- Let go of what callbacks hold, as before. A fire still running keeps its own list
+	observer.enteredCallbacks = {}
+	observer.exitedCallbacks = {}
+	observer.transitionedCallbacks = {}
+	observer.trackers = nil
 end
 
 function Wiring.setEnabled(observerId: number, enabled: boolean)
-	if (Registry.observerEnabled[observerId] ~= false) == enabled then
+	local observer = observers[observerId]
+	if observer.enabled == enabled then
 		return
 	end
 
-	Registry.observerEnabled[observerId] = enabled
+	observer.enabled = enabled
 	Routing.recheckAll()
 
 	if not enabled then
 		-- Cloned, as exit callbacks may subscribe groups; checked live, as they may unsubscribe too
-		for groupId, observers in table.clone(Links.groupToObservers) do
-			if observers[observerId] and Registry.groups[groupId] then
+		for groupId in table.clone(Registry.groups) do
+			if Links.subscribes(observerId, groupId) then
 				disconnectFromGroup(observerId, groupId)
 			end
 		end
@@ -205,22 +189,22 @@ function Wiring.setEnabled(observerId: number, enabled: boolean)
 end
 
 function Wiring.setPriority(observerId: number, priority: number)
-	Registry.observerPriorityMap[observerId] = priority
+	observers[observerId].priority = priority
 	Routing.recheckAll()
 end
 
 function Wiring.setUpdateRate(observerId: number, hz: number)
-	Registry.observerUpdateRate[observerId] = hz
+	observers[observerId].updateRate = hz
 	Routing.rerouteObserver(observerId)
 end
 
 function Wiring.setPrecision(observerId: number, precision: number)
-	Registry.observerPrecisionSq[observerId] = precision ^ 2
+	observers[observerId].precisionSq = precision ^ 2
 	Routing.rerouteObserver(observerId)
 end
 
 function Wiring.setSafety(observerId: number, safety: boolean)
-	Registry.observerSafety[observerId] = safety
+	observers[observerId].safety = safety
 end
 
 return Wiring

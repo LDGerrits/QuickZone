@@ -9,15 +9,17 @@ cd "$(dirname "$0")/.."
 forbidden=(
 	'Routing\.[A-Za-z]+\('
 	'Members\.[A-Za-z]+\('
-	'Links\.(attach|detach|detachAll|subscribe|unsubscribe|unsubscribeAll|addGroup|dropGroup)\('
-	'Entities\.(join|leave|drop|addGroup|dropGroup)\('
-	'Memberships\.(move|exit|exitObserver|exitUnsubscribed|leaveZone|setZoneDestroying|addObserver|dropObserver)\('
-	'GroupPresence\.(groupsChanged|subscriptionChanged|groupDestroyed|dropObserver)\('
-	'Callbacks\.(addObserver|dropObserver)\('
+	'Links\.(attach|detach|detachAll|subscribe|unsubscribe|unsubscribeAll)\('
+	'Entities\.(join|leave|drop|dropGroup)\('
+	'Memberships\.(move|exit|exitObserver|exitUnsubscribed|leaveZone|setZoneDestroying)\('
+	'GroupPresence\.(groupsChanged|subscriptionChanged|groupDestroyed)\('
 	'ZoneShapes\.(setDynamic|allocateSlot|add|remove)\('
 	'PlayerTracker\.(subscribe|unsubscribe|dropGroup)\('
 	'References\.(link|forget|release)\('
-	'Registry\.observer(PriorityMap|Enabled|Safety|UpdateRate|PrecisionSq)\[[^]]*\] =([^=]|$)'
+	'Registry\.observers\[[^]]*\] =([^=]|$)'
+	'\.(priority|updateRate|precisionSq|enabled|safety|staticZoneCount|dynamicZoneCount|tracked|trackers) =([^=]|$)'
+	'\.(subscribers|members|memberIndices|autoClean|removalWatches|groups|linkedObservers|dropped) =([^=]|$)'
+	'Registry\.groups\[[^]]*\] =([^=]|$)'
 	'Registry\.zone(IdToZoneObj|SlotToZoneObj)\[[^]]*\] =([^=]|$)'
 )
 pattern=$(IFS='|'; echo "${forbidden[*]}")
@@ -43,8 +45,8 @@ check "Classes must leave these operations to Core/Groups, Core/Wiring and Core/
 	"$pattern" src/Classes/*.luau
 
 # Whether a group brings an entity into an observer is Memberships.bringsIn; Routing caches its answers
-check "Ask Memberships.bringsIn or isSubscribed instead of reading groupToObservers per group" \
-	'groupToObservers\[' -r src --include='*.luau' \
+check "Ask Memberships.bringsIn, isSubscribed or Links.subscribes instead of reading a group's subscribers" \
+	'subscribers\[' -r src --include='*.luau' \
 	--exclude=Links.luau --exclude=Memberships.luau --exclude=Routing.luau
 
 check "Zones are added and removed through Wiring" \

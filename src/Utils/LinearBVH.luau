@@ -8,7 +8,6 @@ local Types = require(script.Parent.Parent.Types)
 local HUGE_VECTOR = vector.one * math.huge
 local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
-local unionBounds = Geometry.unionBounds
 local getMortonScale = Geometry.getMortonScale
 local positionToMortonCode = Geometry.positionToMortonCode
 
@@ -222,7 +221,7 @@ local function buildFlatTree(beginIndex: number, endIndex: number, offset: numbe
 		local rightOffset, lMin, lMax = buildFlatTree(beginIndex, mid - 1, offset + NODE_SIZE)
 		local nextOffset, rMin, rMax = buildFlatTree(mid, endIndex, rightOffset)
 
-		local min, max = unionBounds(lMin, lMax, rMin, rMax)
+		local min, max = vector.min(lMin, rMin), vector.max(lMax, rMax)
 		writeNode(buildBuffer, offset, min, max, nextOffset, 0)
 
 		local extent = max - min
