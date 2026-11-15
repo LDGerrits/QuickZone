@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails when a class does a multi-step Core operation itself. Operations that take several steps in a set order
-# belong to Core/Groups and Core/Wiring, so a class that looks right on its own can't skip a step. Classes may still
-# read Core tables and make single-owner calls (Callbacks.connect, ZoneShapes.setCFrame, ...)
+# belong to Core/Groups, Core/Wiring and Core/GroupPresence, so a class that looks right on its own can't skip a step.
+# Classes may still read Core tables and make single-owner calls (Callbacks.connect, ZoneShapes.setCFrame, ...)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -11,22 +11,43 @@ forbidden=(
 	'Members\.[A-Za-z]+\('
 	'Links\.(attach|detach|detachAll|subscribe|unsubscribe|unsubscribeAll|addGroup|dropGroup)\('
 	'Entities\.(join|leave|drop|addGroup|dropGroup)\('
-	'Memberships\.(move|exit|exitObserver|exitUnsubscribed|leaveZone|groupsChanged|groupDestroyed|addObserver|dropObserver)\('
+	'Memberships\.(move|exit|exitObserver|exitUnsubscribed|leaveZone|setZoneDestroying|addObserver|dropObserver)\('
+	'GroupPresence\.(groupsChanged|subscriptionChanged|groupDestroyed|dropObserver)\('
 	'Callbacks\.(addObserver|dropObserver)\('
-	'ZoneShapes\.setDynamic\('
+	'ZoneShapes\.(setDynamic|allocateSlot|add|remove)\('
 	'PlayerTracker\.(subscribe|unsubscribe|dropGroup)\('
 	'References\.(link|forget|release)\('
-	'Registry\.observer(PriorityMap|Enabled|Safety|UpdateRate|PrecisionSq)\[[^]]*\] ='
+	'Registry\.observer(PriorityMap|Enabled|Safety|UpdateRate|PrecisionSq)\[[^]]*\] =([^=]|$)'
+	'Registry\.zone(IdToZoneObj|SlotToZoneObj)\[[^]]*\] =([^=]|$)'
 )
 pattern=$(IFS='|'; echo "${forbidden[*]}")
 
+failed=0
+
 # grep exits 1 when nothing matches, and 2 on an error, which must fail the check too
-status=0
-grep -nE "$pattern" src/Classes/*.luau || status=$?
-if [ "$status" -eq 0 ]; then
-	echo "Classes must leave these operations to Core/Groups and Core/Wiring" >&2
-	exit 1
-elif [ "$status" -ne 1 ]; then
-	echo "check-structure: grep failed" >&2
-	exit "$status"
-fi
+check() {
+	local message=$1
+	shift
+	local status=0
+	grep -nE "$@" || status=$?
+	if [ "$status" -eq 0 ]; then
+		echo "$message" >&2
+		failed=1
+	elif [ "$status" -ne 1 ]; then
+		echo "check-structure: grep failed" >&2
+		exit "$status"
+	fi
+}
+
+check "Classes must leave these operations to Core/Groups, Core/Wiring and Core/GroupPresence" \
+	"$pattern" src/Classes/*.luau
+
+# Whether a group brings an entity into an observer is Memberships.bringsIn; Routing caches its answers
+check "Ask Memberships.bringsIn or isSubscribed instead of reading groupToObservers per group" \
+	'groupToObservers\[' -r src --include='*.luau' \
+	--exclude=Links.luau --exclude=Memberships.luau --exclude=Routing.luau
+
+check "Zones are added and removed through Wiring" \
+	'ZoneShapes\.(allocateSlot|add|remove)\(' -r src --include='*.luau' --exclude=Wiring.luau --exclude=ZoneShapes.luau
+
+exit "$failed"

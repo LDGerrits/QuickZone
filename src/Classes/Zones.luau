@@ -8,7 +8,7 @@
 	attached and detached accordingly.
 ]=]
 
-local Memberships = require(script.Parent.Parent.Core.Memberships)
+local Wiring = require(script.Parent.Parent.Core.Wiring)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
@@ -335,28 +335,23 @@ function Zones.destroy(self: Types.InternalZones)
 		return
 	end
 
-	-- Its zones go together, so an entity in several of them leaves once rather than moving through each
 	local zoneIds = {}
 	for zone in self.zones do
-		local id = zone:getId()
-		table.insert(zoneIds, id)
-		Memberships.setZoneDestroying(id, true)
+		table.insert(zoneIds, zone:getId())
 	end
 
-	Destroyed.fireCallbacks(self.onDestroyCallbacks)
+	Wiring.destroyZones(zoneIds, function()
+		Destroyed.fireCallbacks(self.onDestroyCallbacks)
 
-	for _, cleanup in self.onDestroyObserverCleanups do
-		cleanup()
-	end
+		for _, cleanup in self.onDestroyObserverCleanups do
+			cleanup()
+		end
 
-	for zone, cleanup in self.onDestroyZoneCleanups do
-		cleanup()
-		zone:destroy()
-	end
-	-- By id, to cover zones a callback took out first. Ids are never reused
-	for _, id in zoneIds do
-		Memberships.setZoneDestroying(id, false)
-	end
+		for zone, cleanup in self.onDestroyZoneCleanups do
+			cleanup()
+			zone:destroy()
+		end
+	end)
 
 	table.clear(self.zones)
 	table.clear(self.observers)

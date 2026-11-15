@@ -1,16 +1,18 @@
 --!strict
 
--- Observer zone attachments, group subscriptions and settings, with their follow-on steps in required order. The
--- only writer of observer settings in Registry
+-- Zones coming and going, observer zone attachments, group subscriptions and settings, with their follow-on steps in
+-- required order. The only writer of the zone maps and observer settings in Registry
 
 local Types = require(script.Parent.Parent.Types)
 local Callbacks = require(script.Parent.Callbacks)
 local Entities = require(script.Parent.Entities)
+local GroupPresence = require(script.Parent.GroupPresence)
 local Links = require(script.Parent.Links)
 local Memberships = require(script.Parent.Memberships)
 local Registry = require(script.Parent.Registry)
 local Routing = require(script.Parent.Routing)
 local ZoneShapes = require(script.Parent.ZoneShapes)
+local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 
 export type ObserverSettings = {
 	priority: number,
@@ -21,15 +23,6 @@ export type ObserverSettings = {
 }
 
 local Wiring = {}
-
-local function notifyGroupTrackers(observerId: number, groupId: number)
-	if Callbacks.observerGroupTrackers[observerId] then
-		-- Cloned: tracker callbacks may change the group
-		for _, entity in table.clone(Entities.groupEntities[groupId] :: { Types.Entity }) do
-			Memberships.groupsChanged(entity, observerId)
-		end
-	end
-end
 
 local function disconnectFromGroup(observerId: number, groupId: number)
 	-- Cloned: exit callbacks may remove members, swapping later ones into visited slots
@@ -82,9 +75,28 @@ function Wiring.setZoneDynamic(slot: number, isDynamic: boolean): boolean
 	return true
 end
 
--- Observers go before any callback, so an update can't move entities back in; entities leave while the zone
--- object is still alive
-function Wiring.unwireZone(slot: number, zoneId: number)
+-- After the class built the zone object, which gets its slot here
+function Wiring.addZone(
+	zone: Types.InternalZone,
+	isDynamic: boolean,
+	cframe: CFrame,
+	halfSize: Vector3,
+	shapeType: number,
+	part: BasePart?
+)
+	local slot = ZoneShapes.allocateSlot(zone.id)
+	zone.slot = slot
+	ZoneShapes.add(slot, isDynamic, cframe, halfSize, shapeType, part)
+	Registry.zoneIdToZoneObj[zone.id] = zone
+	Registry.zoneSlotToZoneObj[slot] = zone
+end
+
+-- Between the class's Destroyed.begin and finish. Observers go before any callback, so an update can't move entities
+-- back in; entities leave while the zone object is still alive, and the slot is freed after every callback
+function Wiring.removeZone(zone: Types.InternalZone)
+	local id = zone.id
+	local slot = zone.slot
+
 	local attached = Links.detachAll(slot)
 	if attached then
 		local isDynamic = ZoneShapes.isDynamic(slot)
@@ -92,8 +104,25 @@ function Wiring.unwireZone(slot: number, zoneId: number)
 			Routing.changeZoneCount(observerId, isDynamic, -1)
 		end
 	end
+	Memberships.leaveZone(id)
 
-	Memberships.leaveZone(zoneId)
+	Destroyed.fireCallbacks(zone.onDestroyCallbacks)
+
+	Registry.zoneIdToZoneObj[id] = nil
+	Registry.zoneSlotToZoneObj[slot] = nil
+	ZoneShapes.remove(slot)
+end
+
+-- A Zones destroys its zones together, so an entity in several leaves once rather than moving through each
+function Wiring.destroyZones(zoneIds: { number }, destroy: () -> ())
+	for _, id in zoneIds do
+		Memberships.setZoneDestroying(id, true)
+	end
+	destroy()
+	-- By id, to cover zones a callback took out first. Ids are never reused
+	for _, id in zoneIds do
+		Memberships.setZoneDestroying(id, false)
+	end
 end
 
 function Wiring.subscribe(observerId: number, groupId: number)
@@ -104,14 +133,14 @@ function Wiring.subscribe(observerId: number, groupId: number)
 	end
 
 	-- Members already inside through other groups bring this one in
-	notifyGroupTrackers(observerId, groupId)
+	GroupPresence.subscriptionChanged(observerId, groupId)
 end
 
 function Wiring.unsubscribe(observerId: number, groupId: number)
 	Links.unsubscribe(observerId, groupId)
 	disconnectFromGroup(observerId, groupId)
 	-- Members that stay inside through other groups no longer bring this one in
-	notifyGroupTrackers(observerId, groupId)
+	GroupPresence.subscriptionChanged(observerId, groupId)
 end
 
 -- Settings must already be validated
@@ -148,6 +177,7 @@ function Wiring.removeObserver(observerId: number)
 	Registry.observerUpdateRate[observerId] = nil
 	Registry.observerPrecisionSq[observerId] = nil
 	Callbacks.dropObserver(observerId)
+	GroupPresence.dropObserver(observerId)
 	Memberships.dropObserver(observerId)
 	Routing.dropObserver(observerId)
 end

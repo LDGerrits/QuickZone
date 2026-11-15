@@ -1307,6 +1307,38 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('A group callback that removes the entity again hides the group from later group callbacks.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-28000, 0, -27885)
+				local entity = { Position = position }
+				local zone = track(Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 }))
+				local group = track(Group.new({ autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				local events = {}
+				local function log(name: string): () -> ()
+					return function()
+						table.insert(events, name)
+					end
+				end
+				observer:onExit(log('exit'))
+				observer:onGroupEnter(function(entered)
+					table.insert(events, 'first enter')
+					entered:remove(entity)
+				end)
+				observer:onGroupExit(log('first exit'))
+				observer:onGroupEnter(log('second enter'))
+				observer:onGroupExit(log('second exit'))
+				observer:observeGroup(function()
+					table.insert(events, 'observe')
+					return log('observe cleanup')
+				end)
+				group:add(entity)
+				QuickZone:update(1)
+
+				Expect(table.concat(events, ', ')).is('first enter, exit')
+			end)
+		end)
+
 		Test('Groups already inside arrive when the callback is connected.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-28000, 0, -27900)

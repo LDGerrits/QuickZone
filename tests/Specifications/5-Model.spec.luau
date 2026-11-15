@@ -14,6 +14,7 @@ local QuickZone = require(ReplicatedStorage.QuickZone)
 local Destroyed = require(ReplicatedStorage.QuickZone.Utils.Destroyed)
 local Callbacks = require(ReplicatedStorage.QuickZone.Core.Callbacks)
 local Entities = require(ReplicatedStorage.QuickZone.Core.Entities)
+local GroupPresence = require(ReplicatedStorage.QuickZone.Core.GroupPresence)
 local Links = require(ReplicatedStorage.QuickZone.Core.Links)
 local Members = require(ReplicatedStorage.QuickZone.Core.Members)
 local Memberships = require(ReplicatedStorage.QuickZone.Core.Memberships)
@@ -1827,6 +1828,7 @@ local function snapshotState(): { [string]: { [any]: true } }
 	local modules = {
 		Callbacks = Callbacks,
 		Entities = Entities,
+		GroupPresence = GroupPresence,
 		Links = Links,
 		Members = Members,
 		Memberships = Memberships,

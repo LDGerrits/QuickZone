@@ -5,6 +5,7 @@
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
+local GroupPresence = require(script.Parent.GroupPresence)
 local Memberships = require(script.Parent.Memberships)
 local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
@@ -97,7 +98,7 @@ function Members.add(groupId: number, entity: Types.Entity)
 	end
 
 	-- Observers it is already in may now count this group
-	Memberships.groupsChanged(entity)
+	GroupPresence.groupsChanged(entity)
 end
 
 -- Takes the entity as given. Exit callbacks run mid-way, so dropping is decided after them
@@ -120,7 +121,7 @@ function Members.remove(groupId: number, entity: Types.Entity)
 
 	Memberships.exitUnsubscribed(entity, data)
 	-- Observers it stays in through other groups may no longer count this group
-	Memberships.groupsChanged(entity)
+	GroupPresence.groupsChanged(entity)
 
 	-- Routing first: it reads the data of the entity swapped into its bucket slot, possibly this one
 	if Entities.isGroupless(entity, data) then

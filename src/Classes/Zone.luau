@@ -197,22 +197,17 @@ local function newZoneInternal(
 	local id = Registry.nextZoneId
 	Registry.nextZoneId += 1
 
-	local slot = ZoneShapes.allocateSlot(id)
-
 	local resolvedType, part = resolveShape(id, shapeType, asQueryablePart(reference))
-	ZoneShapes.add(slot, isDynamic, cframe, size * 0.5, resolvedType, part)
 
 	local self: Types.InternalZone = setmetatable({
 		id = id,
 		phase = 'alive',
-		slot = slot,
 		requestedShapeType = shapeType,
 		reference = reference,
 		metadata = metadata,
 		autoSync = false,
 	}, Zone) :: any
-	Registry.zoneIdToZoneObj[id] = self
-	Registry.zoneSlotToZoneObj[slot] = self
+	Wiring.addZone(self, isDynamic, cframe, size * 0.5, resolvedType, part)
 
 	if autoSync then
 		self:setAutoSync(true)
@@ -676,16 +671,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	clearAutoSync(self)
 	self.autoSync = false
 
-	local id = self.id
-	local slot = self.slot
-
-	Wiring.unwireZone(slot, id)
-
-	Destroyed.fireCallbacks(self.onDestroyCallbacks)
-
-	Registry.zoneIdToZoneObj[id] = nil
-	Registry.zoneSlotToZoneObj[slot] = nil
-	ZoneShapes.remove(slot)
+	Wiring.removeZone(self)
 
 	Destroyed.finish(self)
 end
