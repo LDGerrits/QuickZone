@@ -18,7 +18,7 @@ forbidden=(
 	'References\.(link|forget|release)\('
 	'Registry\.observers\[[^]]*\] =([^=]|$)'
 	'\.(priority|updateRate|precisionSq|enabled|safety|staticZoneCount|dynamicZoneCount|tracked|trackers) =([^=]|$)'
-	'\.(subscribers|members|memberIndices|autoClean|removalWatches|groups|observers|dropped) =([^=]|$)'
+	'\.(subscribers|members|memberIndices|autoClean|removalWatches|groups|linkedObservers|dropped) =([^=]|$)'
 	'Registry\.groups\[[^]]*\] =([^=]|$)'
 	'Registry\.zone(IdToZoneObj|SlotToZoneObj)\[[^]]*\] =([^=]|$)'
 )

@@ -19,7 +19,7 @@ local checkCallback = Log.checkCallback
 -- Also true after destroy, so a late cleanup still runs in its own thread
 local function isSafe(observerId: number): boolean
 	local observer = Registry.observers[observerId]
-	return observer == nil or observer.safety ~= false
+	return observer == nil or observer.safety
 end
 
 local function forPlayers(callback: (Player, Types.Zone, Types.Entity) -> any): (any, Types.Zone, Types.Entity) -> any
@@ -162,7 +162,7 @@ end
 ]=]
 function ObserverEvents.onEnter(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(self.entered, callback)
+	return Callbacks.connect(self.enteredCallbacks, callback)
 end
 
 --[=[ 
@@ -176,7 +176,7 @@ end
 ]=]
 function ObserverEvents.onExit(self: Types.InternalObserver, callback: (any, Types.Zone, Types.Entity) -> ()): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(self.exited, callback)
+	return Callbacks.connect(self.exitedCallbacks, callback)
 end
 
 --[=[
@@ -437,7 +437,7 @@ function ObserverEvents.onTransition(
 	callback: (any, Types.Zone, Types.Entity) -> ()
 ): () -> ()
 	checkCallback(callback)
-	return Callbacks.connect(self.transitioned, callback)
+	return Callbacks.connect(self.transitionedCallbacks, callback)
 end
 
 --[=[ 

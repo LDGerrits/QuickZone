@@ -51,9 +51,7 @@ end
 -- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing keeps its
 -- answers in each entity's observers
 function Memberships.bringsIn(groupId: number, entity: Types.Entity, observerId: number): boolean
-	local data = entityData[entity]
-	local group = groups[groupId]
-	return data ~= nil and data.groups[groupId] == true and group ~= nil and group.subscribers[observerId] == true
+	return Entities.isIn(entity, groupId) and Links.subscribes(observerId, groupId)
 end
 
 function Memberships.isSubscribed(entity: Types.Entity, observerId: number): boolean
@@ -102,7 +100,7 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	if observer then
 		observer.tracked[entity] = nil
 		local reference = entityToReference[entity] or entity
-		fire(observer.exited, observerId, reference, zoneIdToZoneObj[zoneId], entity, observer.safety)
+		fire(observer.exitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observer.safety)
 	end
 end
 
@@ -157,7 +155,7 @@ local function leaveDestroyedZone(observer: Types.InternalObserver, zoneId: numb
 			Memberships.move(observerId, entity, data, otherId)
 			local reference = entityToReference[entity] or entity
 			fire(
-				observer.transitioned,
+				observer.transitionedCallbacks,
 				observerId,
 				reference,
 				zoneIdToZoneObj[otherId],

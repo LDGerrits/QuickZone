@@ -60,7 +60,7 @@ function Routing.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 end
 
 local function processProfileChange(entity: Types.Entity, data: Types.EntityData)
-	local linkedObservers = data.observers
+	local linkedObservers = data.linkedObservers
 	if linkedObservers then
 		table.clear(linkedObservers)
 	else
@@ -116,16 +116,16 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 	-- Rate 0 means no observer watches the entity
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
-		data.observers = linkedObservers
+		data.linkedObservers = linkedObservers
 	else
-		data.observers = nil
+		data.linkedObservers = nil
 	end
 end
 
 local function processTopologyChange(data: Types.EntityData)
 	local needsStatic = false
 	local needsDynamic = false
-	local linkedObservers = data.observers
+	local linkedObservers = data.linkedObservers
 
 	if linkedObservers then
 		for observerId, _ in linkedObservers do
@@ -193,7 +193,7 @@ end
 
 function Routing.forget(entity: Types.Entity, data: Types.EntityData)
 	Routing.leaveBucket(entity, data)
-	data.observers = nil
+	data.linkedObservers = nil
 	dirtyProfiles[entity] = nil
 	dirtyTopology[entity] = nil
 end

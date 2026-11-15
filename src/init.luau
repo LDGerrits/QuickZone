@@ -27,7 +27,6 @@ local entityOf = References.entityOf
 local slotObservers = Links.slotObservers
 local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local groups = Registry.groups
-local entityData = Entities.entityData
 local entityToReference = References.entityToReference
 
 local shapeCFrames = ZoneShapes.shapeCFrames
@@ -261,8 +260,7 @@ function QuickZone:removeEntity(entity: any): QuickZone
 
 	entity = entityOf(entity)
 
-	local data = entityData[entity]
-	local groupIds = data and data.groups
+	local groupIds = Entities.groupsOf(entity)
 	if not groupIds then
 		return self
 	end

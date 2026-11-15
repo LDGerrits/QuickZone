@@ -274,7 +274,7 @@ local function runTick(dt: number)
 				data.logicVersion = logicVersion
 				data.staticVersion = staticVersion
 
-				ctx_linkedObservers = data.observers :: { [number]: true }
+				ctx_linkedObservers = data.linkedObservers :: { [number]: true }
 				ctx_currentMemberships = data.activeObserverMemberships
 
 				ctx_cCount = 0
@@ -345,7 +345,7 @@ local function runTick(dt: number)
 
 					local reference = entityToReference[entity] or entity
 					fireCallback(
-						if currentZoneId then observer.transitioned else observer.entered,
+						if currentZoneId then observer.transitionedCallbacks else observer.enteredCallbacks,
 						observerId,
 						reference,
 						zone,

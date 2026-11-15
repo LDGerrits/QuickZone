@@ -160,6 +160,11 @@ function Wiring.removeObserver(observer: Types.InternalObserver)
 	end
 
 	observers[observerId] = nil
+	-- Let go of what callbacks hold, as before. A fire still running keeps its own list
+	observer.enteredCallbacks = {}
+	observer.exitedCallbacks = {}
+	observer.transitionedCallbacks = {}
+	observer.trackers = nil
 end
 
 function Wiring.setEnabled(observerId: number, enabled: boolean)

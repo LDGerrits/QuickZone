@@ -62,6 +62,11 @@ function Entities.dropGroup(group: Types.InternalGroup)
 	table.clear(group.memberIndices)
 end
 
+function Entities.groupsOf(entity: Types.Entity): { [number]: true }?
+	local data = entityData[entity]
+	return data and data.groups
+end
+
 function Entities.isIn(entity: Types.Entity, groupId: number): boolean
 	local data = entityData[entity]
 	return data ~= nil and data.groups[groupId] == true

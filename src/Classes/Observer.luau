@@ -129,9 +129,9 @@ function Observer.new<T>(config: {
 		staticZoneCount = 0,
 		dynamicZoneCount = 0,
 		tracked = {},
-		entered = {},
-		exited = {},
-		transitioned = {},
+		enteredCallbacks = {},
+		exitedCallbacks = {},
+		transitionedCallbacks = {},
 		hasAttached = false,
 		hasSubscribed = false,
 	}, Observer) :: any

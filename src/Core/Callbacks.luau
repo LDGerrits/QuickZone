@@ -1,6 +1,7 @@
 --!strict
 
--- Observer enter, exit and transition callbacks and group trackers. Only this module writes the observers' lists
+-- Observer enter, exit and transition callbacks, group trackers' among them. Only this module writes the entries of
+-- the observers' callback lists
 
 local Entities = require(script.Parent.Entities)
 local Registry = require(script.Parent.Registry)
@@ -78,7 +79,7 @@ function Callbacks.fire(
 			if now ~= zoneId then
 				-- Unless its zone was destroyed and it moved to another: later callbacks get that entry
 				local observer = observers[observerId]
-				if now == nil or not observer or callbacks ~= observer.entered then
+				if now == nil or not observer or callbacks ~= observer.enteredCallbacks then
 					break
 				end
 				zoneId = now

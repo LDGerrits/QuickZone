@@ -239,7 +239,7 @@ return function(Tiniest: Tiniest)
 
 				Expect(fired).is(COUNT)
 				-- Let go of once the event ended
-				Expect(#(observer :: any).entered).is(0)
+				Expect(#(observer :: any).enteredCallbacks).is(0)
 				-- Copying the list for each disconnect took 150 ms
 				Expect(if elapsed < 0.05 then 'fast' else string.format('%.0f ms', elapsed * 1000)).is('fast')
 			end)

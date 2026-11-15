@@ -170,9 +170,9 @@ function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPrese
 		end
 	end
 	-- Entries in the observer's own lists, so each tracker decides at its place among the user's callbacks
-	local disconnectEnter = Callbacks.connect(observer.entered, onEvent)
-	local disconnectTransition = Callbacks.connect(observer.transitioned, onEvent)
-	local disconnectExit = Callbacks.connect(observer.exited, onEvent)
+	local disconnectEnter = Callbacks.connect(observer.enteredCallbacks, onEvent)
+	local disconnectTransition = Callbacks.connect(observer.transitionedCallbacks, onEvent)
+	local disconnectExit = Callbacks.connect(observer.exitedCallbacks, onEvent)
 
 	-- Runs while the group still exists, and may count entities whose exit hasn't reached this tracker yet
 	local function dropGroup(groupId: number)

@@ -58,7 +58,7 @@ function Invariants.check(): string?
 		if observer.trackers and #observer.trackers == 0 then
 			problem(`observer {observerId} has an empty trackers list`)
 		end
-		for _, list in { observer.entered, observer.exited, observer.transitioned } do
+		for _, list in { observer.enteredCallbacks, observer.exitedCallbacks, observer.transitionedCallbacks } do
 			if table.find(list :: { any }, false) then
 				problem(`observer {observerId} has a blanked callback outside of firing`)
 			end
@@ -210,7 +210,7 @@ function Invariants.check(): string?
 				minPrecisionSq = math.min(minPrecisionSq, observer.precisionSq)
 			end
 		end
-		local routed = data.observers
+		local routed = data.linkedObservers
 		if if maxRate > 0 then not (routed and sameKeys(routed, expected)) else routed ~= nil then
 			problem(`{entity} is routed to the wrong observers`)
 		end

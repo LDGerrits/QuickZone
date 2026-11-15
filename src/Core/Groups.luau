@@ -1,7 +1,7 @@
 --!strict
 
--- Group operations by id, taking members as users give them. Classes change membership only through here and
--- read it from Entities
+-- Group operations by id, taking members as users give them, and groups coming and going. Classes change
+-- membership only through here
 
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)

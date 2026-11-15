@@ -84,7 +84,7 @@ export type EntityData = {
 	groups: { [number]: true },
 	dropped: boolean,
 	-- Routing. The observers its groups bring it into, nil while none does
-	observers: { [number]: true }?,
+	linkedObservers: { [number]: true }?,
 	precisionSq: number,
 	updateRate: number,
 	bucketIndex: number,
@@ -114,7 +114,8 @@ export type Group<T = any> = {
 	destroy: (self: Group<T>) -> (),
 }
 
--- Its state is kept on the object, registered in Registry.groups while alive. Writers:
+-- Its state is kept on the object, registered in Registry.groups while alive. The class sets first values, then
+-- the writers are:
 --   subscribers                             Links
 --   members, memberIndices                  Entities
 --   autoClean, removalWatches               Members
@@ -316,11 +317,13 @@ export type ObserverClass = {
 	) -> Observer<T>,
 }
 
--- Its state is kept on the object, registered in Registry.observers while alive. Writers:
---   settings                                Wiring
+-- Its state is kept on the object, registered in Registry.observers while alive. The class sets first values, then
+-- the writers are:
+--   priority, updateRate, precisionSq,
+--   enabled, safety, the callback lists     Wiring
 --   staticZoneCount, dynamicZoneCount       Routing
 --   tracked                                 Memberships
---   entered, exited, transitioned           Callbacks
+--   the callback lists' entries             Callbacks
 --   trackers                                GroupPresence
 --   hasAttached, hasSubscribed              Observer
 export type InternalObserver<T = any> = Observer<T> & Destroyable & {
@@ -335,9 +338,9 @@ export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	dynamicZoneCount: number,
 	-- The zone id each entity inside is in
 	tracked: { [Entity]: number },
-	entered: { ObserverCallback },
-	exited: { ObserverCallback },
-	transitioned: { ObserverCallback },
+	enteredCallbacks: { ObserverCallback },
+	exitedCallbacks: { ObserverCallback },
+	transitionedCallbacks: { ObserverCallback },
 	-- Replaced rather than changed, so a list being run never shifts. Only set while it has trackers
 	trackers: { Tracker }?,
 	-- Whether attach or subscribe was ever called, for the warning about a missing one
@@ -345,7 +348,6 @@ export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	hasSubscribed: boolean,
 }
 
--- Blanked to false in its list while firing when disconnected
 export type ObserverCallback = (any, Zone, Entity) -> ()
 export type Tracker = (entity: Entity?, destroyedGroupId: number?) -> ()
 
