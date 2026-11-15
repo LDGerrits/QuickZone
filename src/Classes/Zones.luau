@@ -12,20 +12,20 @@ local Wiring = require(script.Parent.Parent.Core.Wiring)
 local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Snapshot = require(script.Parent.Parent.Utils.Snapshot)
+local SyncMode = require(script.Parent.Parent.Utils.SyncMode)
 
 local Zones = {}
 Zones.__index = Zones
 
 function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: any? }?): Types.Zones
-	local isDynamic = if config and config.isDynamic ~= nil then config.isDynamic else false
-	local metadata = if config then config.metadata else nil
-	local autoSync = if config and config.autoSync ~= nil then config.autoSync else false
+	local isDynamic = if config then not not config.isDynamic else false
+	local autoSync = if config then not not config.autoSync else false
 
 	local self: Types.InternalZones = setmetatable({
 		phase = 'alive',
-		dynamic = not not (isDynamic or autoSync),
-		metadata = metadata,
-		autoSync = not not autoSync,
+		-- The mode it gives zones added to it
+		syncMode = SyncMode.of(isDynamic, autoSync),
+		metadata = if config then config.metadata else nil,
 		zones = {} :: { [Types.Zone]: boolean },
 		observers = {} :: { [Types.Observer<any>]: boolean },
 		onDestroyObserverCleanups = {} :: { [Types.Observer<any>]: () -> () },
@@ -129,7 +129,7 @@ end
 	@return boolean
 ]=]
 function Zones.isDynamic(self: Types.InternalZones): boolean
-	return self.dynamic
+	return self.syncMode ~= 'static'
 end
 
 --[=[ 
@@ -162,10 +162,7 @@ end
 function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
 	-- Applied even when unchanged, as single zones may have been changed directly
 	autoSync = not not autoSync
-	self.autoSync = autoSync
-	if autoSync then
-		self.dynamic = true
-	end
+	self.syncMode = SyncMode.withAutoSync(self.syncMode, autoSync)
 
 	for zone, _ in self.zones do
 		zone:setAutoSync(autoSync)
@@ -190,10 +187,7 @@ end
 function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
 	-- Applied even when unchanged, as single zones may have been changed directly
 	isDynamic = not not isDynamic
-	self.dynamic = isDynamic
-	if not isDynamic then
-		self.autoSync = false
-	end
+	self.syncMode = SyncMode.withDynamic(self.syncMode, isDynamic)
 
 	for zone, _ in self.zones do
 		zone:setDynamic(isDynamic)
@@ -371,8 +365,8 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 		zone:setMetadata(self.metadata)
 	end
 
-	zone:setDynamic(self.dynamic)
-	zone:setAutoSync(self.autoSync)
+	zone:setDynamic(self.syncMode ~= 'static')
+	zone:setAutoSync(self.syncMode == 'synced')
 
 	self.zones[zone] = true
 

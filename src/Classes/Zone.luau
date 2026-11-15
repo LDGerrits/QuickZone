@@ -25,6 +25,7 @@ local Types = require(script.Parent.Parent.Types)
 local Destroyed = require(script.Parent.Parent.Utils.Destroyed)
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local Log = require(script.Parent.Parent.Utils.Log)
+local SyncMode = require(script.Parent.Parent.Utils.SyncMode)
 local ZoneContainers = require(script.Parent.ZoneContainers)
 
 local shapeCFrames = ZoneShapes.shapeCFrames
@@ -156,6 +157,29 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 	zone:sync()
 end
 
+-- Whether a zone syncs is not stored apart: it does while autoSync is on and its reference can be followed
+local function followReference(zone: Types.InternalZone)
+	clearAutoSync(zone)
+	if zone.autoSync and zone.reference then
+		setupAutoSync(zone, zone.reference)
+	end
+end
+
+local function syncModeOf(zone: Types.InternalZone): Types.SyncMode
+	return SyncMode.of(ZoneShapes.isDynamic(zone.slot), zone.autoSync)
+end
+
+-- Every change of mode goes through here, so the tree and the sync agree with it
+local function setSyncMode(zone: Types.InternalZone, mode: Types.SyncMode)
+	local autoSync = mode == 'synced'
+	local syncChanged = zone.autoSync ~= autoSync
+	zone.autoSync = autoSync
+	Wiring.setZoneDynamic(zone.slot, mode ~= 'static')
+	if syncChanged then
+		followReference(zone)
+	end
+end
+
 -- Checked before writing, as a stored bad value breaks every later write
 local function checkCFrame(cframe: any)
 	if typeof(cframe) ~= 'CFrame' then
@@ -210,7 +234,7 @@ local function newZoneInternal(
 	Wiring.addZone(self, isDynamic, cframe, size * 0.5, resolvedType, part)
 
 	if autoSync then
-		self:setAutoSync(true)
+		setSyncMode(self, 'synced')
 	end
 
 	return self
@@ -334,24 +358,7 @@ end
 	@return Zone
 ]=]
 function Zone.setAutoSync(self: Types.InternalZone, autoSync: boolean): Types.Zone
-	autoSync = not not autoSync
-	if self.autoSync == autoSync then
-		return self
-	end
-
-	self.autoSync = autoSync
-	if autoSync then
-		if not ZoneShapes.isDynamic(self.slot) then
-			self:setDynamic(true)
-		end
-
-		if self.reference then
-			setupAutoSync(self, self.reference)
-		end
-	else
-		clearAutoSync(self)
-	end
-
+	setSyncMode(self, SyncMode.withAutoSync(syncModeOf(self), autoSync))
 	return self
 end
 
@@ -374,12 +381,7 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 		applyShape(self, MESH_SHAPE_VALUE)
 	end
 
-	if self.autoSync then
-		clearAutoSync(self)
-		if reference then
-			setupAutoSync(self, reference)
-		end
-	end
+	followReference(self)
 
 	return self
 end
@@ -432,16 +434,7 @@ end
 	@return Zone
 ]=]
 function Zone.setDynamic(self: Types.InternalZone, isDynamic: boolean): Types.Zone
-	-- A boolean, as observer zone counts assume the zone really changes tree
-	isDynamic = not not isDynamic
-	if not Wiring.setZoneDynamic(self.slot, isDynamic) then
-		return self
-	end
-
-	if not isDynamic and self.autoSync then
-		self:setAutoSync(false)
-	end
-
+	setSyncMode(self, SyncMode.withDynamic(syncModeOf(self), isDynamic))
 	return self
 end
 
@@ -668,8 +661,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 		return
 	end
 
-	clearAutoSync(self)
-	self.autoSync = false
+	self:setAutoSync(false)
 
 	Wiring.removeZone(self)
 

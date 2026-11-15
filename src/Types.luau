@@ -37,6 +37,8 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 -- See Utils/Destroyed
 export type Phase = 'alive' | 'destroying' | 'dead'
 
+export type SyncMode = 'static' | 'dynamic' | 'synced'
+
 -- Flat LBVH, see Utils/LinearBVH for the node layout
 export type Tree = {
 	buffer: buffer,
@@ -189,8 +191,7 @@ export type InternalZones = Zones & {
 	_attachObserver: (self: Zones, observer: any) -> Zones,
 	_detachObserver: (self: Zones, observer: any) -> Zones,
 
-	autoSync: boolean,
-	dynamic: boolean,
+	syncMode: SyncMode,
 	metadata: any?,
 	zones: { [any]: boolean },
 	observers: { [any]: boolean },
