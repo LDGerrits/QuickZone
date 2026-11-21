@@ -4,10 +4,9 @@ local CollectionService = game:GetService('CollectionService')
 
 local TagWatcher = {}
 
--- onChange also fires on ancestry changes. onRemoved fires for every instance losing the tag, accepted or not
 function TagWatcher.watch(
 	tag: string,
-	onChange: (instance: Instance) -> (),
+	onAddedOrMoved: (instance: Instance) -> (),
 	onRemoved: (instance: Instance) -> (),
 	accept: ((instance: Instance) -> boolean)?
 ): () -> ()
@@ -18,9 +17,9 @@ function TagWatcher.watch(
 			return
 		end
 		watching[instance] = instance.AncestryChanged:Connect(function()
-			onChange(instance)
+			onAddedOrMoved(instance)
 		end)
-		onChange(instance)
+		onAddedOrMoved(instance)
 	end
 
 	local function stopWatching(instance: Instance)

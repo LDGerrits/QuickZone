@@ -16,7 +16,6 @@ local IS_CLIENT = RunService:IsClient()
 
 local checkCallback = Log.checkCallback
 
--- Also true after destroy, so a late cleanup still runs in its own thread
 local function isSafe(observerId: number): boolean
 	local observer = Registry.observers[observerId]
 	return observer == nil or observer.safety
@@ -347,7 +346,6 @@ function ObserverEvents.observeGroup(
 	checkCallback(callback)
 	local observerId = self.id
 	local cleanups = {} :: { [number]: () -> () }
-	-- Bumped on arrive and leave, so a cleanup returned after its group left still runs
 	local generations = {} :: { [number]: number }
 	local disconnected = false
 

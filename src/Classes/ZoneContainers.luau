@@ -11,7 +11,6 @@ local ZoneContainers = {}
 
 type ZoneClass = { fromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone }
 
--- Zone gives itself, as it requires this module
 local Zone: ZoneClass
 
 function ZoneContainers.setZone(zone: ZoneClass)
@@ -131,7 +130,6 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
 	local partDestroyingConnections = {} :: { [BasePart]: RBXScriptConnection }
 	local instanceToZone = {} :: { [BasePart]: Types.Zone }
-	-- A set rather than a count, as a tagged instance reports itself again each time it moves
 	local partClaims = {} :: { [BasePart]: { [Instance]: true } }
 
 	local function dropPart(part: BasePart)
@@ -168,7 +166,6 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	local function claimPart(part: BasePart, claimer: Instance)
 		local claims = partClaims[part]
 		if claims then
-			-- A user-destroyed zone returns on a new claim, not on a claimer reporting itself again
 			if not claims[claimer] then
 				claims[claimer] = true
 				if Destroyed.isDestroyed(instanceToZone[part]) then

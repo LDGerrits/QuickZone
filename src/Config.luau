@@ -2,7 +2,6 @@
 
 local Config = {}
 
--- How an entity's position is read
 Config.Strategy = {
 	POS = 1,
 	PRIM = 2,
@@ -17,24 +16,18 @@ Config.Group = {
 }
 
 Config.Scheduler = {
-	-- When false, call QuickZone:update yourself
 	enabled = true,
 
-	-- Seconds, while the public API takes ms
-	frameBudget = 1 / 1000,
+	frameBudgetSeconds = 1 / 1000,
 
-	-- Hz
 	autoSyncRate = 30,
 }
 
 Config.Observer = {
-	-- Hz
 	updateRate = 30,
 
-	-- Studs moved before an entity is queried again
 	precision = 0.1,
 
-	-- Callbacks run via task.spawn
 	safety = true,
 }
 

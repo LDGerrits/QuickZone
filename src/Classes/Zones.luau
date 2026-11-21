@@ -23,7 +23,6 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 
 	local self: Types.InternalZones = setmetatable({
 		phase = 'alive',
-		-- The mode it gives zones added to it
 		syncMode = SyncMode.of(isDynamic, autoSync),
 		metadata = if config then config.metadata else nil,
 		zones = {} :: { [Types.Zone]: boolean },
@@ -35,7 +34,6 @@ function Zones.new(config: { isDynamic: boolean?, autoSync: boolean?, metadata: 
 	return self
 end
 
--- Kept for scripts that attach from the zones. Observer:attach is the way to do it
 function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	if not Destroyed.isDead(observer) then
 		observer:attach(self)
@@ -43,7 +41,6 @@ function Zones.attach(self: Types.InternalZones, observer: any): Types.Zones
 	return self
 end
 
--- Kept for scripts that detach from the zones. Observer:detach is the way to do it
 function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 	if not Destroyed.isDead(observer) then
 		observer:detach(self)
@@ -51,9 +48,7 @@ function Zones.detach(self: Types.InternalZones, observer: any): Types.Zones
 	return self
 end
 
--- private, for Observer:attach
 function Zones._attachObserver(self: Types.InternalZones, observer: any): Types.Zones
-	-- Its destroy has already let go of its observers
 	if Destroyed.isDestroyed(self) or self.observers[observer] then
 		return self
 	end
@@ -70,14 +65,12 @@ function Zones._attachObserver(self: Types.InternalZones, observer: any): Types.
 	return self
 end
 
--- private, for Observer:detach
 function Zones._detachObserver(self: Types.InternalZones, observer: any): Types.Zones
 	if not self.observers[observer] then
 		return self
 	end
 	self.observers[observer] = nil
 
-	-- Set with the observer, so it is there
 	self.onDestroyObserverCleanups[observer]()
 	self.onDestroyObserverCleanups[observer] = nil
 
@@ -158,7 +151,6 @@ end
 	@return Zones
 ]=]
 function Zones.setAutoSync(self: Types.InternalZones, autoSync: boolean): Types.Zones
-	-- Applied even when unchanged, as single zones may have been changed directly
 	autoSync = not not autoSync
 	self.syncMode = SyncMode.withAutoSync(self.syncMode, autoSync)
 
@@ -183,7 +175,6 @@ end
 	@return Zones
 ]=]
 function Zones.setDynamic(self: Types.InternalZones, isDynamic: boolean): Types.Zones
-	-- Applied even when unchanged, as single zones may have been changed directly
 	isDynamic = not not isDynamic
 	self.syncMode = SyncMode.withDynamic(self.syncMode, isDynamic)
 
@@ -320,7 +311,6 @@ Zones.onDestroy = Destroyed.connect
 	@within Zones
 ]=]
 function Zones.destroy(self: Types.InternalZones)
-	-- A callback below may destroy the zones again
 	if not Destroyed.begin(self) then
 		return
 	end
@@ -351,7 +341,6 @@ function Zones.destroy(self: Types.InternalZones)
 	Destroyed.finish(self)
 end
 
--- private. No destroy check: its constructors stop before its zones are destroyed
 function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	if self.zones[zone] then
 		return
@@ -375,14 +364,12 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	end
 end
 
--- private
 function Zones.remove(self: Types.InternalZones, zone: Types.Zone)
 	if not self.zones[zone] then
 		return
 	end
 	self.zones[zone] = nil
 
-	-- Set with the zone, so it is there
 	self.onDestroyZoneCleanups[zone]()
 	self.onDestroyZoneCleanups[zone] = nil
 

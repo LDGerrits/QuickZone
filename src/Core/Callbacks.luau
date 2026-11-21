@@ -1,13 +1,9 @@
 --!strict
 
--- Observer enter, exit and transition callbacks, group trackers' among them. Only this module writes the entries of
--- the observers' callback lists
-
 local Entities = require(script.Parent.Entities)
 local Registry = require(script.Parent.Registry)
 local Types = require(script.Parent.Parent.Types)
 
--- Entries are blanked to false while firing when disconnected
 type CallbackList = { any }
 
 local entityData = Entities.entityData
@@ -16,7 +12,6 @@ local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 
 local Callbacks = {}
 
--- While firing, a disconnect blanks its entry so no list shifts under a loop; the last fire compacts
 local firing = 0
 local blanked = {} :: { [CallbackList]: true }
 
@@ -53,7 +48,6 @@ function Callbacks.connect(list: CallbackList, callback: Types.ObserverCallback)
 	end
 end
 
--- One of the observer's lists. zoneId is the entity's new zone, nil for exits
 function Callbacks.fire(
 	callbacks: CallbackList,
 	observerId: number,
@@ -65,7 +59,6 @@ function Callbacks.fire(
 )
 	firing += 1
 
-	-- Callbacks connected during the event wait for the next one
 	for i = 1, #callbacks do
 		local callback = callbacks[i]
 		if not callback then
@@ -73,11 +66,9 @@ function Callbacks.fire(
 		end
 
 		if i > 1 then
-			-- Stop once a callback moved the entity, or later ones would see an entry after its own exit
 			local data = entityData[entity]
 			local now = if data then data.activeObserverMemberships[observerId] else nil
 			if now ~= zoneId then
-				-- Unless its zone was destroyed and it moved to another: later callbacks get that entry
 				local observer = observers[observerId]
 				if now == nil or not observer or callbacks ~= observer.enteredCallbacks then
 					break
@@ -87,7 +78,6 @@ function Callbacks.fire(
 			end
 		end
 
-		-- Callbacks.call, inlined as events are many
 		if safety then
 			task.spawn(callback, reference, zone, entity)
 		else
@@ -107,7 +97,6 @@ function Callbacks.fire(
 	end
 end
 
--- Unsafe callbacks report errors instead of throwing, so they can't interrupt the state change that ran them
 function Callbacks.call<A...>(callback: (A...) -> ...any, safety: boolean, ...: A...)
 	if safety then
 		task.spawn(callback, ...)

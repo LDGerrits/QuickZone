@@ -1,7 +1,5 @@
 --!strict
 
--- Owns observer links to groups and zones. Only this module writes them, and the groups' subscribers
-
 local Registry = require(script.Parent.Registry)
 
 local groups = Registry.groups
@@ -25,7 +23,6 @@ function Links.unsubscribeAll(observerId: number)
 	end
 end
 
--- Only live groups are subscribed
 function Links.subscribe(observerId: number, groupId: number)
 	groups[groupId].subscribers[observerId] = true
 end

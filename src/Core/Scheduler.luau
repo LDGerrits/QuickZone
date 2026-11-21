@@ -55,7 +55,7 @@ local ctx_currentMemberships: { [number]: number }
 local ctx_checkingRate: number? = nil
 local ctx_checkingIndex = 0
 
-local frameBudget = Config.Scheduler.frameBudget
+local frameBudgetSeconds = Config.Scheduler.frameBudgetSeconds
 local autoSyncRate = Config.Scheduler.autoSyncRate
 local autoSyncTimer = 0
 local autoUpdateConnection: RBXScriptConnection?
@@ -66,6 +66,8 @@ local nextBucketIndex = 1
 local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
 local NOWHERE = Vector3.new(0 / 0, 0 / 0, 0 / 0)
+
+local UNCHECKED_VERSION = Entities.UNCHECKED_VERSION
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -80,7 +82,6 @@ local function processObserverHit(observerId: number, zoneId: number)
 	if not ctx_linkedObservers[observerId] then
 		return
 	end
-	-- Zones list only live observers
 	local observer = observers[observerId]
 	if not observer or not observer.enabled then
 		return
@@ -97,7 +98,6 @@ local function processObserverHit(observerId: number, zoneId: number)
 			ctx_highestWin = priority
 		end
 	elseif ctx_currentMemberships[observerId] == zoneId then
-		-- An observer's zones share its priority, so only the current zone takes over
 		ctx_candidateIndex[observerId] = zoneId
 	end
 end
@@ -166,7 +166,6 @@ local function runTick(dt: number)
 		end
 	end
 
-	-- No early return on budget, or entities would never be checked while zones keep moving
 	ZoneShapes.rebuildTrees()
 
 	local numBuckets = #bucketList
@@ -228,7 +227,6 @@ local function runTick(dt: number)
 			elseif strategy == STRAT_PIVOT then
 				position = (entity :: any):GetPivot().Position
 			end
-			-- A table entity without a position is nowhere, rather than an error that stops the tick
 			if not position then
 				position = NOWHERE
 			end
@@ -262,9 +260,8 @@ local function runTick(dt: number)
 				end
 			end
 
-			-- Groups changed by a callback this tick apply next tick; checked now, a lost observer could still win
 			if shouldCheck and dirtyProfiles[entity] then
-				data.logicVersion = -1
+				data.logicVersion = UNCHECKED_VERSION
 				shouldCheck = false
 			end
 
@@ -308,7 +305,6 @@ local function runTick(dt: number)
 					ctx_candidateIndex[observerId] = nil
 					ctx_candidateList[i] = nil
 
-					-- An earlier callback may have destroyed the observer
 					local observer = observers[observerId]
 					if not observer then
 						continue
@@ -323,13 +319,11 @@ local function runTick(dt: number)
 						continue
 					end
 
-					-- An earlier callback may have removed the entity or destroyed the zone
 					local zone = zoneIdToZoneObj[zoneIdx]
 					if data.dropped or not zone then
 						continue
 					end
 
-					-- Or changed the observer, so recheck next tick. A clean profile means it is still subscribed
 					local attached = slotObservers[zone.slot]
 					if
 						not observer.enabled
@@ -337,7 +331,7 @@ local function runTick(dt: number)
 						or not table.find(attached, observerId)
 						or (dirtyProfiles[entity] and not isSubscribed(entity, observerId))
 					then
-						data.logicVersion = -1
+						data.logicVersion = UNCHECKED_VERSION
 						continue
 					end
 
@@ -355,13 +349,11 @@ local function runTick(dt: number)
 					)
 				end
 
-				-- A callback changed its groups, so recheck next tick even when standing still
 				if dirtyProfiles[entity] then
-					data.logicVersion = -1
+					data.logicVersion = UNCHECKED_VERSION
 				end
 			end
 
-			-- Callbacks may have removed entities, swapping another into this index
 			if list[idx] == entity then
 				idx += 1
 			end
@@ -377,7 +369,7 @@ local function runTick(dt: number)
 			budgetCheckCountdown -= 1
 			if budgetCheckCountdown == 0 then
 				budgetCheckCountdown = BUDGET_CHECK
-				if (os.clock() - start) > frameBudget then
+				if (os.clock() - start) > frameBudgetSeconds then
 					break
 				end
 			end
@@ -386,13 +378,12 @@ local function runTick(dt: number)
 		bucketLastProcessedIndex[rate] = idx
 		ctx_checkingRate = nil
 
-		if (os.clock() - start) > frameBudget then
+		if (os.clock() - start) > frameBudgetSeconds then
 			break
 		end
 	end
 end
 
--- Leftover candidates would freeze their observers, and every tick would stop at the same entity
 local function recoverFromError()
 	ctx_cCount = 0
 	table.clear(ctx_candidateList)
@@ -405,8 +396,6 @@ local function recoverFromError()
 	end
 end
 
--- Set while a tick runs, so an update from a callback is skipped instead of clobbering it.
--- Suspended means an unsafe callback yielded
 local tickThread: thread? = nil
 local warnedYield = false
 
@@ -423,7 +412,6 @@ function Scheduler.update(dt: number?)
 		return
 	end
 
-	-- A missing, NaN or negative time step would stop auto-syncing for good
 	local step = if type(dt) == 'number' and dt >= 0 then dt else 0
 
 	tickThread = coroutine.running()
@@ -465,7 +453,7 @@ end
 
 function Scheduler.setFrameBudget(n: number)
 	Scheduler.checkFrameBudget(n)
-	frameBudget = n
+	frameBudgetSeconds = n
 end
 
 Scheduler.setEnabled(Config.Scheduler.enabled)

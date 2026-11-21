@@ -10,7 +10,6 @@ local CORNER_WEDGE_SHAPE_VALUE = Enum.PartType.CornerWedge.Value
 local MESH_SHAPE_VALUE = -1 -- Meshes have no Enum.PartType equivalent
 local MESH_TOLERANCE_SQ = 1e-2 * 1e-2 -- 0.01 studs to account for float error up to 50k studs
 
--- Spreads 10 bits two apart for Morton codes: shift and mask
 local MORTON_STEPS = { { 16, 0xFF0000FF }, { 8, 0xF00F00F }, { 4, 0x30C30C3 }, { 2, 0x9249249 } }
 
 local expandLUT = table.create(1024) :: { number }
@@ -82,7 +81,6 @@ function Geometry.positionToMortonCode(
 	return bit32.bor(expandBits(x), bit32.lshift(expandBits(y), 1), bit32.lshift(expandBits(z), 2))
 end
 
--- PointToObjectSpace without the engine call
 local function toObjectSpace(point: Vector3, position: Vector3, right: Vector3, up: Vector3, back: Vector3): Vector3
 	local offset = point - position
 	return Vector3.new(vector.dot(offset, right), vector.dot(offset, up), vector.dot(offset, back))
@@ -135,11 +133,9 @@ function Geometry.isPointInShape(
 		if not part then
 			return false
 		end
-		-- Mapped onto the part, so a zone moved or resized off its part still agrees with the trees
 		local scale = part.ExtentsSize / (halfSize * 2)
 		local partCFrame = part.CFrame
 		local query = partCFrame:PointToWorldSpace(toObjectSpace(point, position, right, up, back) * scale)
-		-- Measured at the zone's size, so the tolerance doesn't grow with it
 		local offset = partCFrame:VectorToObjectSpace(part:GetClosestPointOnSurface(query) - query) / scale
 		return vector.dot(offset, offset) <= MESH_TOLERANCE_SQ
 	end

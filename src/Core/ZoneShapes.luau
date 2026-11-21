@@ -2,8 +2,6 @@
 --!optimize 2
 --!strict
 
--- Owns zone slots, geometry, trees and their change logs. Writes go through here to keep them in step
-
 local Geometry = require(script.Parent.Parent.Utils.Geometry)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local ZoneChanges = require(script.Parent.ZoneChanges)
@@ -12,7 +10,6 @@ local Types = require(script.Parent.Parent.Types)
 local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
 local BALL_SHAPE_VALUE = Geometry.BALL_SHAPE_VALUE
 local CYLINDER_SHAPE_VALUE = Geometry.CYLINDER_SHAPE_VALUE
--- Bounds that contain nothing and widen nothing they are merged into
 local EMPTY_MIN = Vector3.one * math.huge
 local EMPTY_MAX = -EMPTY_MIN
 
@@ -22,7 +19,6 @@ local isPointInShape = Geometry.isPointInShape
 
 local ZoneShapes = {}
 
--- Keyed by reused slots rather than ids, so the tables stay arrays
 ZoneShapes.zoneSlotCount = 0
 ZoneShapes.freeZoneSlots = {} :: { number }
 ZoneShapes.zoneSlotIds = {} :: { [number]: number }
@@ -30,10 +26,8 @@ ZoneShapes.staticSlots = {} :: { [number]: true }
 ZoneShapes.dynamicSlots = {} :: { [number]: true }
 ZoneShapes.shapeCFrames = {} :: { [number]: CFrame }
 ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
--- Half size the shape fills: a Ball its smallest side, a Cylinder its smallest cross-section
-ZoneShapes.shapeExtents = {} :: { [number]: Vector3 }
+ZoneShapes.shapeFilledHalfSizes = {} :: { [number]: Vector3 }
 ZoneShapes.shapeTypes = {} :: { [number]: number }
--- The part a Mesh zone queries
 ZoneShapes.shapeParts = {} :: { [number]: BasePart? }
 ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
@@ -42,9 +36,7 @@ ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
 ZoneShapes.shapeAxisAligned = {} :: { [number]: boolean }
--- Zones whose leaf is exactly their shape
 ZoneShapes.treeExact = {} :: { [number]: boolean }
--- Changed since their tree was built, so the trees may miss them
 ZoneShapes.staleSlots = {} :: { [number]: true }
 ZoneShapes.staticChanges = ZoneChanges.new()
 ZoneShapes.dynamicChanges = ZoneChanges.new()
@@ -55,7 +47,7 @@ ZoneShapes.dynamicVersion = 0
 
 local shapeCFrames = ZoneShapes.shapeCFrames
 local shapeHalfSizes = ZoneShapes.shapeHalfSizes
-local shapeExtents = ZoneShapes.shapeExtents
+local shapeFilledHalfSizes = ZoneShapes.shapeFilledHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
 local shapeParts = ZoneShapes.shapeParts
 local shapePositions = ZoneShapes.shapePositions
@@ -87,7 +79,6 @@ local function treeOf(isDynamic: boolean): Types.Tree
 	return if isDynamic then dynamicTree else staticTree
 end
 
--- Rebuilt rather than refit
 local function markMembersChanged(isDynamic: boolean)
 	local tree = treeOf(isDynamic)
 	tree.pending = true
@@ -122,7 +113,6 @@ local function deriveWorldShape(slot: number)
 		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
 	end
 
-	-- Skipped when the log is full, as zones moving every frame soon fill it
 	local changes = changesOf(isDynamic)
 	if not changes.all then
 		local oldMin = shapeBoundsMin[slot]
@@ -132,14 +122,13 @@ local function deriveWorldShape(slot: number)
 		ZoneChanges.add(changes, boundsMin, boundsMax)
 	end
 
-	shapeExtents[slot] = halfSize
+	shapeFilledHalfSizes[slot] = halfSize
 	shapePositions[slot] = position
 	shapeRights[slot] = right
 	shapeUps[slot] = up
 	shapeBacks[slot] = back
 	shapeBoundsMin[slot] = boundsMin
 	shapeBoundsMax[slot] = boundsMax
-	-- Unrotated blocks are exactly their bounds
 	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE and isAxis(right) and isAxis(up) and isAxis(back)
 
 	treeExact[slot] = nil
@@ -217,7 +206,6 @@ function ZoneShapes.isDynamic(slot: number): boolean
 	return dynamicSlots[slot] == true
 end
 
--- Logged in both trees, as entities only query the trees their observers have zones in
 function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	if (dynamicSlots[slot] == true) == isDynamic then
 		return
@@ -241,7 +229,6 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	end
 end
 
--- For changes that don't alter the shape, like attaching
 function ZoneShapes.touch(slot: number)
 	local min = shapeBoundsMin[slot]
 	if min then
@@ -259,7 +246,7 @@ function ZoneShapes.remove(slot: number)
 
 	shapeCFrames[slot] = nil
 	shapeHalfSizes[slot] = nil
-	shapeExtents[slot] = nil
+	shapeFilledHalfSizes[slot] = nil
 	shapeTypes[slot] = nil
 	shapeParts[slot] = nil
 	shapePositions[slot] = nil
@@ -272,12 +259,10 @@ function ZoneShapes.remove(slot: number)
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
 
-	-- Reusable at once, as a stale tree leaf checks the new zone's shape
 	ZoneShapes.zoneSlotIds[slot] = nil
 	table.insert(ZoneShapes.freeZoneSlots, slot)
 end
 
--- Only stale leaves can have changed, as every write marks its slot
 local function markBuilt(slots: { [number]: any })
 	for slot in staleSlots do
 		if slots[slot] then
@@ -299,7 +284,7 @@ function ZoneShapes.containsPoint(slot: number, point: Vector3): boolean
 		shapeRights[slot],
 		shapeUps[slot],
 		shapeBacks[slot],
-		shapeExtents[slot],
+		shapeFilledHalfSizes[slot],
 		shapeType,
 		shapeParts[slot]
 	)
@@ -309,15 +294,13 @@ function ZoneShapes.leafContainsPoint(slot: number, point: Vector3): boolean
 	return treeExact[slot] == true or ZoneShapes.containsPoint(slot, point)
 end
 
--- Hits are leaf boxes; check each with leafContainsPoint before the trees change
 function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 	local hitCount = queryPoint(dynamicTree, point, hits, 0)
 	return queryPoint(staticTree, point, hits, hitCount)
 end
 
--- Rebuild when members changed or the refit gives up on a degraded tree
 local function updateTree(tree: Types.Tree, members: { [number]: any })
-	if tree.membersChanged or not LinearBVH.refit(tree, shapeBoundsMin, shapeBoundsMax) then
+	if tree.membersChanged or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
 		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
 		tree.membersChanged = false
 	end

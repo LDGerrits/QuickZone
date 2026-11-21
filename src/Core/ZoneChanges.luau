@@ -2,15 +2,12 @@
 --!optimize 2
 --!strict
 
--- Where a tree's zones changed per version, so entities standing still only re-query near a change
-
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Types = require(script.Parent.Parent.Types)
 
 local anyLeafContains = LinearBVH.anyLeafContains
 
 local HISTORY = 16
--- More boxes than this, or than the tree has zones, counts as everything changed
 local MIN_BOXES = 64
 local MAX_BOXES = 2048
 
@@ -36,7 +33,6 @@ function ZoneChanges.new(): Types.ZoneChanges
 	}
 end
 
--- Empty boxes (min above max) are skipped
 function ZoneChanges.add(log: Types.ZoneChanges, min: Vector3, max: Vector3)
 	if log.all or min.X > max.X then
 		return
@@ -78,7 +74,6 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 		boxCenters[i] = (boxesMin[i] + boxesMax[i]) * 0.5
 	end
 
-	-- Box indices are the leaf ids; empty when everything changed, freeing the old leaves
 	LinearBVH.build(slot.tree, boxesMin, boxesMin, boxesMax, boxCenters)
 
 	table.clear(boxesMin)
@@ -92,7 +87,6 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 	return true
 end
 
--- Whether a change after fromVersion up to toVersion touched a or b
 function ZoneChanges.touches(
 	log: Types.ZoneChanges,
 	fromVersion: number,

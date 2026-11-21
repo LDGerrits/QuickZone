@@ -1,9 +1,11 @@
 --!strict
---v1.6.0 • LDGerrits
+-- QuickZone v1.6.0
+-- https://github.com/LDGerrits/QuickZone
+-- MIT License, Copyright (c) 2026 Loek Gerrits
 --[=[
 	@class QuickZone
-
-	A high-performance, physics-free spatial query library for Roblox. Maintain 60 FPS with 1M+ zones.
+	A high-performance, physics-free spatial query library for Roblox.
+	Maintain 60 FPS with 1M+ zones.
 ]=]
 
 local RunService = game:GetService('RunService')
@@ -30,7 +32,7 @@ local groups = Registry.groups
 local entityToReference = References.entityToReference
 
 local shapeCFrames = ZoneShapes.shapeCFrames
-local shapeExtents = ZoneShapes.shapeExtents
+local shapeFilledHalfSizes = ZoneShapes.shapeFilledHalfSizes
 local dynamicSlots = ZoneShapes.dynamicSlots
 
 local debugConnection: RBXScriptConnection?
@@ -78,7 +80,6 @@ function QuickZone:configure(config: { enabled: boolean?, autoSyncRate: number?,
 	if type(config) ~= 'table' then
 		Log.fatal('configure expects a config table, got %s.', nil, typeof(config))
 	end
-	-- Validate all first, so a bad value applies nothing
 	if config.autoSyncRate ~= nil then
 		Scheduler.checkAutoSyncRate(config.autoSyncRate)
 	end
@@ -194,14 +195,12 @@ end
 function QuickZone:setReference(entity: Entity, reference: any?): QuickZone
 	local oldReference = entityToReference[entity]
 
-	-- PlayerTracker owns player links and resets them on respawn
 	if isPlayer(oldReference) then
 		if reference ~= oldReference then
 			Log.warn("Cannot change the reference of a player's HumanoidRootPart. Ignoring request.", nil)
 		end
 		return self
 	end
-	-- Players are only ever linked to their part, by PlayerTracker
 	if not isPlayer(reference) then
 		References.link(entity, reference)
 	end
@@ -247,10 +246,8 @@ end
 	@return QuickZone
 ]=]
 function QuickZone:removeEntity(entity: any): QuickZone
-	-- Groups already asked, so a managed group warns once
 	local asked = {} :: { [any]: true }
 
-	-- Also when the player has no character
 	if isPlayer(entity) then
 		for _, group in PlayerTracker.groupsOf(entity) do
 			asked[group] = true
@@ -270,7 +267,6 @@ function QuickZone:removeEntity(entity: any): QuickZone
 		table.insert(idsToRemove, groupId)
 	end
 
-	-- A character part is removed as its player; others as themselves, since entities may share a reference
 	local reference = entityToReference[entity]
 	local target = if isPlayer(reference) then reference else entity
 	for _, groupId in idsToRemove do
@@ -313,7 +309,6 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	newDebugFolder.Parent = workspace
 	debugFolder = newDebugFolder
 
-	-- Keyed by slot, which a new zone may take over
 	local function getOrCreateVisual(slot: number): DebugVisual
 		local zone = zoneSlotToZoneObj[slot]
 		local shape: Types.ShapeType = zone:getShape()
@@ -344,16 +339,13 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 
 	local loopEvent: RBXScriptSignal<number> = RunService:IsClient() and RunService.PreRender or RunService.Heartbeat
 
-	-- Disconnected before the folder goes, so the folder is there
 	debugConnection = loopEvent:Connect(function()
 		for slot, cframe in shapeCFrames do
 			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
-			-- Drawn at the size the shape detects
-			local halfSize = shapeExtents[slot]
+			local halfSize = shapeFilledHalfSizes[slot]
 			local size = halfSize * 2
 
-			-- Links drops a slot's list once it empties
 			local isActive = slotObservers[slot] ~= nil
 			local color
 			if dynamicSlots[slot] then

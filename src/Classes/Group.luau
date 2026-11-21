@@ -376,7 +376,6 @@ Group.onDestroy = Destroyed.connect
 	@within Group
 ]=]
 function Group.destroy(self: Types.InternalGroup): ()
-	-- A callback below may destroy the group again
 	if not Destroyed.begin(self) then
 		return
 	end
@@ -388,7 +387,6 @@ function Group.destroy(self: Types.InternalGroup): ()
 	Destroyed.finish(self)
 end
 
--- Player and tag groups own their members, so the methods that change them only warn
 ManagedGroup = setmetatable({}, { __index = Group }) :: any
 ManagedGroup.__index = ManagedGroup
 

@@ -1,8 +1,5 @@
 --!strict
 
--- Follows grouped players through their characters: the current HumanoidRootPart is the member, the player its
--- reference
-
 local Players = game:GetService('Players')
 
 local Types = require(script.Parent.Parent.Types)
@@ -10,9 +7,6 @@ local Members = require(script.Parent.Members)
 local References = require(script.Parent.References)
 local Registry = require(script.Parent.Registry)
 
--- A player in a group. Its states: no character, a character without a HumanoidRootPart, or a part linked (hrp set,
--- and the player its reference). Kept after leaving its last group until its next character, as that may happen in a
--- callback mid-handling
 type Tracked = {
 	groupIds: { [number]: true },
 	character: Model?,
@@ -29,7 +23,6 @@ local PlayerTracker = {}
 local stopTracking: (player: Player) -> ()
 
 local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracked
-	-- stop is set once the connections it ends exist
 	local state: Tracked = { groupIds = groupIds, stop = nil :: any }
 	tracked[player] = state
 
@@ -49,16 +42,13 @@ local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracke
 
 		local hrp = state.hrp
 		if hrp then
-			-- Before exits, so a callback re-adding the player doesn't add this part
 			state.hrp = nil
 			References.release(player, hrp)
 
-			-- Cloned: exit callbacks may add the player to groups. A group they destroy has no members left
 			for groupId in table.clone(state.groupIds) do
 				Members.remove(groupId, hrp)
 			end
 
-			-- Unless a callback gave the part to the player again
 			if state.hrp ~= hrp then
 				References.link(hrp, nil)
 			end
@@ -66,7 +56,6 @@ local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracke
 	end
 
 	local function clearCharacter()
-		-- Before its part leaves, so an exit callback putting the character back can't link the part again
 		state.character = nil
 		if charConn then
 			charConn:Disconnect()
@@ -103,9 +92,7 @@ local function trackPlayer(player: Player, groupIds: { [number]: true }): Tracke
 				end
 			end)
 
-			-- Cloned: enter callbacks may add the player to groups, which adds the part itself
 			for groupId in table.clone(state.groupIds) do
-				-- Members.add skips a group a callback destroyed
 				if state.hrp ~= hrp then
 					break
 				end
@@ -194,13 +181,11 @@ function PlayerTracker.isSubscribed(player: Player, groupId: number): boolean
 	return state ~= nil and state.groupIds[groupId] ~= nil
 end
 
--- Also while it has no character
 function PlayerTracker.groupsOf(player: Player): { Types.InternalGroup }
 	local list = {}
 	local state = tracked[player]
 	if state then
 		for groupId in state.groupIds do
-			-- Never nil: a destroyed group drops its players first
 			table.insert(list, Registry.groups[groupId])
 		end
 	end
@@ -216,7 +201,6 @@ end
 function stopTracking(player: Player)
 	local state = tracked[player]
 	if state then
-		-- Before letting go of its groups, so its part leaves them
 		state.stop()
 		tracked[player] = nil
 	end

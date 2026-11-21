@@ -20,7 +20,6 @@ local slotObservers = Links.slotObservers
 
 local queryHits = {} :: { number }
 
--- Safe while entities enter and leave, also when the loop yields across ticks
 local function iterTracked(
 	observer: Types.InternalObserver,
 	zoneIds: { [number]: true }?,
@@ -47,7 +46,6 @@ local function iterTracked(
 	end
 end
 
--- A zone being destroyed keeps its ids until it is dead
 local function zoneIdsOf(zone: any): { [number]: true }
 	local ids = {}
 	if Destroyed.isDead(zone) then
@@ -119,7 +117,6 @@ end
 function ObserverQueries.getPlayersInside(self: Types.InternalObserver): { Player }
 	local results = {}
 	for entity in self.tracked do
-		-- Only the current HumanoidRootPart maps to its player, so none comes twice
 		local ref = References.entityToReference[entity]
 		if isPlayer(ref) then
 			table.insert(results, ref)

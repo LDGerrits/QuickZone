@@ -159,7 +159,7 @@ function WorldQueries:getZonesOfEntity(entity: any): { Types.Zone }
 	end
 
 	local results: { Types.Zone } = {}
-	local seenZones = {} -- Several observers may track the entity in the same zone
+	local seenZones = {}
 
 	for _, zoneId in data.activeObserverMemberships do
 		if seenZones[zoneId] then
@@ -188,7 +188,6 @@ function WorldQueries:getGroupsOfEntity(entity: any): { Types.Group }
 	entity = entityOf(entity)
 	local groupIds = Entities.groupsOf(entity)
 	if not groupIds then
-		-- A player without a character is still in the groups it was added to
 		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) :: { Types.Group } else {}
 	end
 

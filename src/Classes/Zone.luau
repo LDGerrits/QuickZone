@@ -98,7 +98,6 @@ local function resolveShape(zoneId: number, shapeType: number, part: BasePart?):
 	return shapeType, part
 end
 
--- Kept, so a Mesh zone that fell back to Block is Mesh again once it has a part
 local function applyShape(zone: Types.InternalZone, shapeType: number)
 	zone.requestedShapeType = shapeType
 	ZoneShapes.setShape(zone.slot, resolveShape(zone.id, shapeType, asQueryablePart(zone.reference)))
@@ -115,12 +114,10 @@ local function clearAutoSync(zone: Types.InternalZone)
 end
 
 local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Attachment | Bone)
-	-- A callback during destroy must not start syncing the zone again
 	if Destroyed.isDestroyed(zone) then
 		return
 	end
 
-	-- Every tick reads its CFrame, so anything else would error each tick
 	if typeof(reference) ~= 'Instance' or not (reference:IsA('BasePart') or reference:IsA('Attachment')) then
 		Log.warn(
 			'Cannot autoSync Zone %d to %s. Use a BasePart, Attachment or Bone.',
@@ -157,7 +154,6 @@ local function setupAutoSync(zone: Types.InternalZone, reference: BasePart | Att
 	zone:sync()
 end
 
--- Whether a zone syncs is not stored apart: it does while autoSync is on and its reference can be followed
 local function followReference(zone: Types.InternalZone)
 	clearAutoSync(zone)
 	if zone.autoSync and zone.reference then
@@ -169,7 +165,6 @@ local function syncModeOf(zone: Types.InternalZone): Types.SyncMode
 	return SyncMode.of(ZoneShapes.isDynamic(zone.slot), zone.autoSync)
 end
 
--- Every change of mode goes through here, so the tree and the sync agree with it
 local function setSyncMode(zone: Types.InternalZone, mode: Types.SyncMode)
 	local autoSync = mode == 'synced'
 	local syncChanged = zone.autoSync ~= autoSync
@@ -180,7 +175,6 @@ local function setSyncMode(zone: Types.InternalZone, mode: Types.SyncMode)
 	end
 end
 
--- Checked before writing, as a stored bad value breaks every later write
 local function checkType(field: string, expected: string, value: any)
 	if typeof(value) ~= expected then
 		Log.fatal('Zone %s must be a %s, got %s.', nil, field, expected, typeof(value))
@@ -207,7 +201,6 @@ local function newZoneInternal(
 	metadata: any?,
 	autoSync: boolean
 ): Types.Zone
-	-- Checked before registering, so a bad config leaves no broken slot in the tree
 	checkType('cframe', 'CFrame', cframe)
 	checkType('size', 'Vector3', size)
 	checkReference(reference)
@@ -324,7 +317,6 @@ function Zone.fromPart(part: BasePart, config: PartsConfig?): Types.Zone
 	return newZoneInternal(part.CFrame, part.ExtentsSize, shapeId, part, isDynamic, metadata, autoSync)
 end
 
--- Kept for scripts that attach from the zone. Observer:attach is the way to do it
 function Zone.attach(self: Types.InternalZone, observer: any): Types.Zone
 	if not Destroyed.isDead(observer) then
 		observer:attach(self)
@@ -332,7 +324,6 @@ function Zone.attach(self: Types.InternalZone, observer: any): Types.Zone
 	return self
 end
 
--- Kept for scripts that detach from the zone. Observer:detach is the way to do it
 function Zone.detach(self: Types.InternalZone, observer: any): Types.Zone
 	if not Destroyed.isDead(observer) then
 		observer:detach(self)
@@ -371,7 +362,6 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 	self.reference = reference
 
 	if self.requestedShapeType == MESH_SHAPE_VALUE then
-		-- Mesh zones query the part directly, so the new reference has to take over
 		applyShape(self, MESH_SHAPE_VALUE)
 	end
 
@@ -646,7 +636,6 @@ Zone.onDestroy = Destroyed.connect
 	@within Zone
 ]=]
 function Zone.destroy(self: Types.InternalZone): ()
-	-- A callback below may destroy the zone again, which would release its slot twice
 	if not Destroyed.begin(self) then
 		return
 	end
