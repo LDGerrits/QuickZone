@@ -17,13 +17,14 @@ function Snapshot.keys<K, V>(t: { [K]: V }): () -> (K?, V?)
 
 	local i = 0
 	return function(): (K?, V?)
-		while list do
+		local current = list
+		while current do
 			i += 1
-			local key = list[i]
+			local key = current[i]
 			if key == nil then
-				table.clear(list)
+				table.clear(current)
 				if #spareLists < MAX_SPARE_LISTS then
-					table.insert(spareLists, list)
+					table.insert(spareLists, current)
 				end
 				-- The list is back in the pool; a call after the end must not read it
 				list = nil

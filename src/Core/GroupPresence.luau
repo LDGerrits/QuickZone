@@ -49,8 +49,11 @@ local function trackersOf(observerId: number): { Tracker }?
 end
 
 local function runTrackers(observerId: number, entity: Types.Entity?, destroyedGroupId: number?)
-	for _, track in trackersOf(observerId) or {} do
-		track(entity, destroyedGroupId)
+	local trackers = trackersOf(observerId)
+	if trackers then
+		for _, track in trackers do
+			track(entity, destroyedGroupId)
+		end
 	end
 end
 
@@ -114,52 +117,58 @@ function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPrese
 				end
 			end
 		end
-		for groupId in if data then data.groups else {} do
-			if not (have and have[groupId]) and counts(entity, groupId) then
-				arriving = arriving or {}
-				table.insert(arriving :: { number }, groupId)
-			end
-		end
-
-		for _, groupId in leaving or {} do
-			-- A callback may have disconnected, or settled it already
-			local now = counted[entity]
-			if disconnected or not (now and now[groupId]) or counts(entity, groupId) then
-				continue
-			end
-			now[groupId] = nil
-			if next(now) == nil then
-				counted[entity] = nil
-				lastZones[entity] = nil
-			end
-			local members = present[groupId]
-			members[entity] = nil
-			if next(members) == nil then
-				present[groupId] = nil
-				local group = groups[groupId]
-				if group then
-					onLeave(groupId, group, current :: Types.Zone, entity)
+		if data then
+			for groupId in data.groups do
+				if not (have and have[groupId]) and counts(entity, groupId) then
+					arriving = arriving or {}
+					table.insert(arriving :: { number }, groupId)
 				end
 			end
 		end
 
-		for _, groupId in arriving or {} do
-			local now = counted[entity]
-			if disconnected or (now and now[groupId]) or not counts(entity, groupId) then
-				continue
+		if leaving then
+			for _, groupId in leaving do
+				-- A callback may have disconnected, or settled it already
+				local now = counted[entity]
+				if disconnected or not (now and now[groupId]) or counts(entity, groupId) then
+					continue
+				end
+				now[groupId] = nil
+				if next(now) == nil then
+					counted[entity] = nil
+					lastZones[entity] = nil
+				end
+				local members = present[groupId]
+				members[entity] = nil
+				if next(members) == nil then
+					present[groupId] = nil
+					local group = groups[groupId]
+					if group then
+						onLeave(groupId, group, current :: Types.Zone, entity)
+					end
+				end
 			end
-			if not now then
-				now = {}
-				counted[entity] = now
-				lastZones[entity] = current :: Types.Zone
-			end
-			(now :: { [number]: true })[groupId] = true
-			local members = present[groupId]
-			if members then
-				members[entity] = true
-			else
-				present[groupId] = { [entity] = true }
-				onArrive(groupId, groups[groupId], current :: Types.Zone, entity)
+		end
+
+		if arriving then
+			for _, groupId in arriving do
+				local now = counted[entity]
+				if disconnected or (now and now[groupId]) or not counts(entity, groupId) then
+					continue
+				end
+				if not now then
+					now = {}
+					counted[entity] = now
+					lastZones[entity] = current :: Types.Zone
+				end
+				(now :: { [number]: true })[groupId] = true
+				local members = present[groupId]
+				if members then
+					members[entity] = true
+				else
+					present[groupId] = { [entity] = true }
+					onArrive(groupId, groups[groupId], current :: Types.Zone, entity)
+				end
 			end
 		end
 	end
@@ -181,7 +190,7 @@ function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPrese
 			return
 		end
 		present[groupId] = nil
-		local last, zone
+		local last: Types.Entity?, zone: Types.Zone?
 		for entity in members do
 			last = entity
 			zone = lastZones[entity]
@@ -196,7 +205,7 @@ function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPrese
 		end
 		local group = groups[groupId]
 		if group then
-			onLeave(groupId, group, zone, last)
+			onLeave(groupId, group, zone :: Types.Zone, last :: Types.Entity)
 		end
 	end
 
@@ -206,7 +215,7 @@ function GroupPresence.track(observer: Types.InternalObserver, onArrive: OnPrese
 		elseif destroyedGroupId then
 			dropGroup(destroyedGroupId)
 		else
-			reconcile(entity, nil)
+			reconcile(entity :: Types.Entity, nil)
 		end
 	end
 	addTracker(observer, track)

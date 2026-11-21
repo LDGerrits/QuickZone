@@ -18,15 +18,16 @@ export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge' 
 	.CFrame CFrame?
 	.Transform: CFrame?
 	.GetPivot ((any) -> CFrame)?
-	A custom table that mimics the spatial properties of a Roblox Instance.
+	A custom table that mimics the spatial properties of a Roblox Instance. It needs at least one of these fields.
 ]=]
-export type EntityTable = {
-	Position: Vector3?,
-	WorldPosition: Vector3?,
-	CFrame: CFrame?,
-	Transform: CFrame?,
-	GetPivot: ((self: any) -> CFrame)?,
-}
+-- One shape per field: the new type solver rejects a table such as { Position = position } against a table type whose
+-- fields are all optional
+export type EntityTable =
+	{ Position: Vector3 }
+	| { WorldPosition: Vector3 }
+	| { CFrame: CFrame }
+	| { Transform: CFrame }
+	| { GetPivot: (self: any) -> CFrame }
 
 --[=[
 	@type Entity Player | BasePart | Model | Camera | Attachment | Bone | EntityTable
@@ -132,10 +133,10 @@ export type InternalGroup<T = any> = Group<T> & Destroyable & {
 }
 
 export type GroupClass = {
-	new: <T>(config: {
-		entities: { T }?,
+	new: (config: {
+		entities: { any }?,
 		autoClean: boolean?,
-	}?) -> Group<T>,
+	}?) -> Group<any>,
 	fromTag: (tag: string) -> Group<Entity>,
 	players: () -> Group<Player>,
 	localPlayer: () -> Group<Player>,
@@ -207,7 +208,7 @@ export type InternalZones = Zones & Destroyable & {
 
 	syncMode: SyncMode,
 	metadata: any?,
-	zones: { [any]: boolean },
+	zones: { [Zone]: boolean },
 	observers: { [any]: boolean },
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
@@ -304,9 +305,9 @@ export type Observer<T = any> = {
 }
 
 export type ObserverClass = {
-	new: <T>(
+	new: (
 		config: {
-			groups: { Group<T> }?,
+			groups: { Group<any> }?,
 			zones: { Zone | Zones }?,
 			priority: number?,
 			updateRate: number?,
@@ -314,7 +315,7 @@ export type ObserverClass = {
 			enabled: boolean?,
 			safety: boolean?,
 		}?
-	) -> Observer<T>,
+	) -> Observer<any>,
 }
 
 -- Its state is kept on the object, registered in Registry.observers while alive. The class sets first values, then

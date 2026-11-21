@@ -55,10 +55,10 @@ local function groupEvent(
 ): () -> ()
 	checkCallback(callback)
 	local observerId = self.id
-	local function fire(_, group, zone, entity)
+	local fire: GroupPresence.OnPresence = function(_, group, zone, entity)
 		Callbacks.call(callback, isSafe(observerId), group, zone, entity)
 	end
-	local function ignore() end
+	local ignore: GroupPresence.OnPresence = function() end
 	return GroupPresence.track(self, if onArrive then fire else ignore, if onArrive then ignore else fire)
 end
 

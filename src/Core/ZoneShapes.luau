@@ -34,7 +34,7 @@ ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
 ZoneShapes.shapeExtents = {} :: { [number]: Vector3 }
 ZoneShapes.shapeTypes = {} :: { [number]: number }
 -- The part a Mesh zone queries
-ZoneShapes.shapeParts = {} :: { [number]: BasePart }
+ZoneShapes.shapeParts = {} :: { [number]: BasePart? }
 ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
 ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
@@ -149,9 +149,8 @@ local function deriveWorldShape(slot: number)
 end
 
 function ZoneShapes.allocateSlot(zoneId: number): number
-	local slot = table.remove(ZoneShapes.freeZoneSlots)
-	if not slot then
-		slot = ZoneShapes.zoneSlotCount + 1
+	local slot = table.remove(ZoneShapes.freeZoneSlots) or ZoneShapes.zoneSlotCount + 1
+	if slot > ZoneShapes.zoneSlotCount then
 		ZoneShapes.zoneSlotCount = slot
 	end
 	ZoneShapes.zoneSlotIds[slot] = zoneId

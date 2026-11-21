@@ -43,13 +43,13 @@ local ManagedGroup: any
 
 	@tag Constructor
 	@tag Chainable
-	@param config { entities: { T }?, autoClean: boolean? }?
+	@param config { entities: { Entity }?, autoClean: boolean? }?
 	@return Group
 ]=]
-function Group.new<T>(config: {
-	entities: { T }?,
+function Group.new(config: {
+	entities: { any }?,
 	autoClean: boolean?,
-}?): Types.Group<T>
+}?): Types.Group<any>
 	local id = Registry.nextGroupId
 	Registry.nextGroupId += 1
 
@@ -58,7 +58,7 @@ function Group.new<T>(config: {
 		autoClean = config.autoClean
 	end
 
-	local self: Types.InternalGroup<T> = setmetatable({
+	local self: Types.InternalGroup = setmetatable({
 		id = id,
 		phase = 'alive',
 		subscribers = {},
@@ -89,7 +89,7 @@ end
 	@return Group
 ]=]
 function Group.fromTag(tag: string): Types.Group<Types.Entity>
-	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Types.Entity>
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Types.Entity>
 	setmetatable(group :: any, ManagedGroup)
 
 	local id = group.id
@@ -123,7 +123,7 @@ end
 	@return Group
 ]=]
 function Group.players(): Types.Group<Player>
-	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Player>
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
 	setmetatable(group :: any, ManagedGroup)
 
 	local conn = Players.PlayerAdded:Connect(function(player)
@@ -161,7 +161,7 @@ function Group.localPlayer(): Types.Group<Player>
 		Log.fatal('Group.localPlayer() can only be called on the Client.', nil)
 	end
 
-	local group = Group.new({ autoClean = false, entities = nil }) :: Types.InternalGroup<Player>
+	local group = Group.new({ autoClean = false }) :: Types.InternalGroup<Player>
 	setmetatable(group :: any, ManagedGroup)
 
 	Groups.add(group.id, Players.LocalPlayer)

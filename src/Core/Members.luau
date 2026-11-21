@@ -31,7 +31,7 @@ local function watchRemoval(group: Types.InternalGroup, entity: Types.Entity)
 		local groupId = group.id
 		watches[entity] = entity.AncestryChanged:Connect(function(_, parent)
 			if not parent then
-				Members.remove(groupId, entity)
+				Members.remove(groupId, entity :: any)
 			end
 		end)
 	end

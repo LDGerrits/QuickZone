@@ -45,7 +45,11 @@ function Links.attach(slot: number, observerId: number): boolean
 		return false
 	end
 	table.insert(attached, observerId)
-	slotSoleObserver[slot] = if #attached == 1 then attached[1] else nil
+	if #attached == 1 then
+		slotSoleObserver[slot] = attached[1]
+	else
+		slotSoleObserver[slot] = nil
+	end
 	return true
 end
 
@@ -62,7 +66,11 @@ function Links.detach(slot: number, observerId: number): boolean
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
-		slotSoleObserver[slot] = if #attached == 1 then attached[1] else nil
+		if #attached == 1 then
+			slotSoleObserver[slot] = attached[1]
+		else
+			slotSoleObserver[slot] = nil
+		end
 	end
 
 	if #attached == 0 then

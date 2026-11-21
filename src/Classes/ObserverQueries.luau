@@ -28,11 +28,13 @@ local function iterTracked(
 ): () -> (any?, Types.Zone?)
 	local nextEntity = Snapshot.keys(observer.tracked)
 	return function()
+		-- A local, as the new type solver forgets an upvalue's refinement inside a loop
+		local inZones = zoneIds
 		while true do
 			local entity, zoneId = nextEntity()
 			if entity == nil then
 				return nil, nil
-			elseif zoneIds and not zoneIds[zoneId :: number] then
+			elseif inZones and not inZones[zoneId :: number] then
 				continue
 			end
 

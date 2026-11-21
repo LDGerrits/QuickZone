@@ -44,7 +44,11 @@ end
 local function removeOccupant(zoneId: number)
 	local count = zoneOccupants[zoneId]
 	if count then
-		zoneOccupants[zoneId] = if count > 1 then count - 1 else nil
+		if count > 1 then
+			zoneOccupants[zoneId] = count - 1
+		else
+			zoneOccupants[zoneId] = nil
+		end
 	end
 end
 

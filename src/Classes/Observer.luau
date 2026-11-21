@@ -95,8 +95,8 @@ Observer.__index = Observer
 	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
 ]=]
-function Observer.new<T>(config: {
-	groups: { Types.Group<T> }?,
+function Observer.new(config: {
+	groups: { Types.Group<any> }?,
 	zones: { Types.Zone | Types.Zones }?,
 	priority: number?,
 	updateRate: number?,
@@ -107,18 +107,20 @@ function Observer.new<T>(config: {
 	local priority = checkPriority(config and config.priority or 0)
 	local updateRate = checkUpdateRate(config and config.updateRate or Config.Observer.updateRate)
 	local precision = checkPrecision(config and config.precision or Config.Observer.precision)
+	local zones = config and config.zones
+	local groups = config and config.groups
 	-- Checked before registering, so a bad entry leaves no half-made observer
-	for _, zone in config and config.zones or {} do
+	for _, zone in (zones or {}) :: { any } do
 		checkZone(zone)
 	end
-	for _, group in config and config.groups or {} do
+	for _, group in (groups or {}) :: { any } do
 		checkGroup(group)
 	end
 
 	local id = Registry.nextObserverId
 	Registry.nextObserverId += 1
 
-	local self: Types.InternalObserver<T> = setmetatable({
+	local self: Types.InternalObserver = setmetatable({
 		id = id,
 		phase = 'alive',
 		priority = priority,
@@ -138,8 +140,6 @@ function Observer.new<T>(config: {
 
 	Wiring.addObserver(self)
 
-	local zones = config and config.zones
-	local groups = config and config.groups
 	for _, zone in (zones or {}) :: { any } do
 		self:attach(zone)
 	end
@@ -455,10 +455,10 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	Destroyed.finish(self)
 end
 
-for name, method in ObserverEvents do
+for name, method in ObserverEvents :: any do
 	(Observer :: any)[name] = method
 end
-for name, method in ObserverQueries do
+for name, method in ObserverQueries :: any do
 	(Observer :: any)[name] = method
 end
 

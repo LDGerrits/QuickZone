@@ -17,7 +17,7 @@ local entityToReference = References.entityToReference
 local referenceToEntity = References.referenceToEntity
 
 function References.isPlayer(x: any): boolean
-	return typeof(x) == 'Instance' and x:IsA('Player')
+	return typeof(x) == 'Instance' and (x :: Instance):IsA('Player')
 end
 
 -- An entity wins over the reference map, as it can also be another's reference (a model of its hitbox part)

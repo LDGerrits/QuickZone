@@ -39,7 +39,7 @@ local debugFolder: Folder?
 type DebugVisual = {
 	adornment: any,
 	shape: Types.ShapeType,
-	zone: Types.Zone,
+	zone: Types.InternalZone,
 }
 
 local debugVisuals = {} :: { [number]: DebugVisual }
@@ -315,32 +315,31 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 
 	-- Keyed by slot, which a new zone may take over
 	local function getOrCreateVisual(slot: number): DebugVisual
-		local visual = debugVisuals[slot]
 		local zone = zoneSlotToZoneObj[slot]
-		local shape = zone:getShape()
+		local shape: Types.ShapeType = zone:getShape()
 
-		if visual and (visual.shape ~= shape or visual.zone ~= zone) then
+		local visual = debugVisuals[slot]
+		if visual then
+			if visual.shape == shape and visual.zone == zone then
+				return visual
+			end
 			visual.adornment:Destroy()
-			debugVisuals[slot] = nil
-			visual = nil
 		end
 
-		if not visual then
-			local className = if shape == 'Ball'
-				then 'SphereHandleAdornment'
-				elseif shape == 'Cylinder' then 'CylinderHandleAdornment'
-				else 'BoxHandleAdornment'
-			local adornment: any = Instance.new(className :: any)
-			adornment.Name = 'Zone_' .. zone:getId()
-			adornment.Adornee = workspace.Terrain
-			adornment.Transparency = Config.Debug.transparency
-			adornment.AlwaysOnTop = true
-			adornment.ZIndex = 1
-			adornment.Parent = debugFolder
-			visual = { adornment = adornment, shape = shape, zone = zone }
-			debugVisuals[slot] = visual
-		end
-		return visual
+		local className = if shape == 'Ball'
+			then 'SphereHandleAdornment'
+			elseif shape == 'Cylinder' then 'CylinderHandleAdornment'
+			else 'BoxHandleAdornment'
+		local adornment: any = Instance.new(className :: any)
+		adornment.Name = 'Zone_' .. zone:getId()
+		adornment.Adornee = workspace.Terrain
+		adornment.Transparency = Config.Debug.transparency
+		adornment.AlwaysOnTop = true
+		adornment.ZIndex = 1
+		adornment.Parent = debugFolder
+		local newVisual: DebugVisual = { adornment = adornment, shape = shape, zone = zone }
+		debugVisuals[slot] = newVisual
+		return newVisual
 	end
 
 	local loopEvent: RBXScriptSignal<number> = RunService:IsClient() and RunService.PreRender or RunService.Heartbeat
@@ -388,8 +387,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	return self
 end
 
-for name, method in WorldQueries do
+for name, method in WorldQueries :: any do
 	(QuickZone :: any)[name] = method
 end
 
-return QuickZone
+return QuickZone :: Types.QuickZone

@@ -325,7 +325,7 @@ function Zones.destroy(self: Types.InternalZones)
 		return
 	end
 
-	local zoneIds = {}
+	local zoneIds: { number } = {}
 	for zone in self.zones do
 		table.insert(zoneIds, zone:getId())
 	end

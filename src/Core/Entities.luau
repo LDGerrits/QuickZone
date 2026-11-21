@@ -27,14 +27,15 @@ local groups = Registry.groups
 
 local function strategyOf(entity: any): number?
 	if typeof(entity) == 'Instance' then
-		if entity:IsA('BasePart') then
+		local instance: Instance = entity
+		if instance:IsA('BasePart') then
 			return STRAT_POS
-		elseif entity:IsA('Attachment') or entity:IsA('Bone') then
+		elseif instance:IsA('Attachment') or instance:IsA('Bone') then
 			return STRAT_WORLD
-		elseif entity:IsA('Camera') then
+		elseif instance:IsA('Camera') then
 			return STRAT_CFRAME
-		elseif entity:IsA('Model') then
-			return entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
+		elseif instance:IsA('Model') then
+			return instance.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
 		end
 	elseif typeof(entity) == 'table' then
 		if entity.Position then
@@ -90,11 +91,11 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			return false
 		end
 
-		data = {
+		local newData: Types.EntityData = {
 			strategy = strat,
 			groups = {},
 			dropped = false,
-			observers = nil,
+			linkedObservers = nil,
 			lastPosition = Vector3.zero,
 			activeObserverMemberships = {},
 			precisionSq = DEFAULT_PRECISION_SQ,
@@ -106,7 +107,8 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			needsStatic = false,
 			needsDynamic = false,
 		}
-		entityData[entity] = data
+		entityData[entity] = newData
+		data = newData
 	end
 	local memberOf = (data :: Types.EntityData).groups
 	memberOf[groupId] = true

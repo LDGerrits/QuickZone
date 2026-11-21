@@ -92,7 +92,7 @@ local function prepareScratch(tree: Types.Tree, count: number)
 	sortedCodes, sortedIds = codesA, idsA
 
 	if #memberIds > count then
-		memberIds = table.move(memberIds, 1, count, 1, table.create(count))
+		memberIds = table.move(memberIds, 1, count, 1, table.create(count) :: { number })
 	end
 end
 
