@@ -185,6 +185,8 @@ export type InternalZones = Zones & Destroyable & {
 	observers: { [any]: boolean },
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
+	_addZone: (self: InternalZones, zone: Zone) -> (),
+	_removeZone: (self: InternalZones, zone: Zone) -> (),
 	add: (self: InternalZones, zone: Zone) -> (),
 	remove: (self: InternalZones, zone: Zone) -> (),
 }

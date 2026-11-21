@@ -341,7 +341,7 @@ function Zones.destroy(self: Types.InternalZones)
 	Destroyed.finish(self)
 end
 
-function Zones.add(self: Types.InternalZones, zone: Types.Zone)
+function Zones._addZone(self: Types.InternalZones, zone: Types.Zone)
 	if self.zones[zone] then
 		return
 	end
@@ -356,7 +356,7 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	self.zones[zone] = true
 
 	self.onDestroyZoneCleanups[zone] = zone:onDestroy(function()
-		self:remove(zone)
+		self:_removeZone(zone)
 	end)
 
 	for observer, _ in self.observers do
@@ -364,7 +364,7 @@ function Zones.add(self: Types.InternalZones, zone: Types.Zone)
 	end
 end
 
-function Zones.remove(self: Types.InternalZones, zone: Types.Zone)
+function Zones._removeZone(self: Types.InternalZones, zone: Types.Zone)
 	if not self.zones[zone] then
 		return
 	end
@@ -377,5 +377,8 @@ function Zones.remove(self: Types.InternalZones, zone: Types.Zone)
 		observer:detach(zone)
 	end
 end
+
+Zones.add = Zones._addZone
+Zones.remove = Zones._removeZone
 
 return Zones

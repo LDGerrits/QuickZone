@@ -9,12 +9,12 @@ type PartsConfig = Types.PartsConfig
 
 local ZoneContainers = {}
 
-type ZoneClass = { fromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone }
+type FromPart = (part: BasePart, config: PartsConfig?) -> Types.Zone
 
-local Zone: ZoneClass
+local fromPart: FromPart
 
-function ZoneContainers.setZone(zone: ZoneClass)
-	Zone = zone
+function ZoneContainers.useFromPart(zoneFromPart: FromPart)
+	fromPart = zoneFromPart
 end
 
 local function fromContainer(
@@ -28,9 +28,9 @@ local function fromContainer(
 
 	local function onAdded(instance: Instance)
 		if instance:IsA('BasePart') and not instanceToZone[instance] then
-			local zone = Zone.fromPart(instance, { isDynamic = zones:isDynamic() })
+			local zone = fromPart(instance, { isDynamic = zones:isDynamic() })
 			instanceToZone[instance] = zone
-			zones:add(zone)
+			zones:_addZone(zone)
 		end
 	end
 
@@ -73,7 +73,7 @@ function ZoneContainers.fromParts(parts: { BasePart }, config: PartsConfig?): Ty
 	local zones = Zones.new(config) :: Types.InternalZones
 	for _, part in parts do
 		if typeof(part) == 'Instance' and part:IsA('BasePart') then
-			zones:add(Zone.fromPart(part, { isDynamic = zones:isDynamic() }))
+			zones:_addZone(fromPart(part, { isDynamic = zones:isDynamic() }))
 		end
 	end
 	return zones
@@ -158,9 +158,9 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	end
 
 	local function addZone(part: BasePart)
-		local newZone = Zone.fromPart(part, { isDynamic = zones:isDynamic() })
+		local newZone = fromPart(part, { isDynamic = zones:isDynamic() })
 		instanceToZone[part] = newZone
-		zones:add(newZone)
+		zones:_addZone(newZone)
 	end
 
 	local function claimPart(part: BasePart, claimer: Instance)

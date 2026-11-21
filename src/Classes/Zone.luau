@@ -647,7 +647,7 @@ function Zone.destroy(self: Types.InternalZone): ()
 	Destroyed.finish(self)
 end
 
-ZoneContainers.setZone(Zone)
+ZoneContainers.useFromPart(Zone.fromPart)
 Zone.fromParts = ZoneContainers.fromParts
 Zone.fromChildren = ZoneContainers.fromChildren
 Zone.fromDescendants = ZoneContainers.fromDescendants

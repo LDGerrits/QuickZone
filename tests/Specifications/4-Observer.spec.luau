@@ -3135,4 +3135,61 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 		end)
 	end)
+
+	Describe('Undocumented methods scripts rely on', function()
+		Test('Zone:attach and Zone:detach work as Observer:attach and Observer:detach.', function()
+			local position = Vector3.new(-51000, 0, 51000)
+			local entity = { Position = position }
+			local group = Group.new({ entities = { entity }, autoClean = false })
+			local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = {}, groups = { group }, safety = false })
+
+			Expect((zone :: any):attach(observer)).is(zone)
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+			Expect((zone :: any):detach(observer)).is(zone)
+			QuickZone:update(1)
+			Expect(observer:getZoneOfEntity(entity)).is(nil)
+
+			observer:destroy()
+			group:destroy()
+			zone:destroy()
+		end)
+
+		Test(
+			'Zones:attach, Zones:detach, Zones:add and Zones:remove keep the container and its observers in step.',
+			function()
+				local position = Vector3.new(-51000, 0, 52000)
+				local entity = { Position = position }
+				local group = Group.new({ entities = { entity }, autoClean = false })
+				local zones = Zone.fromParts({}, { metadata = 'container' })
+				local untyped: any = zones
+				local zone = Zone.new({ cframe = CFrame.new(position), size = Vector3.one * 10 })
+				local observer = Observer.new({ zones = {}, groups = { group }, safety = false })
+
+				Expect(untyped:attach(observer)).is(zones)
+				untyped:add(zone)
+				Expect(zones:contains(zone)).is_true()
+				Expect(zone:getMetadata()).is('container')
+				QuickZone:update(1)
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
+
+				untyped:remove(zone)
+				Expect(zones:contains(zone)).never_is_true()
+				QuickZone:update(1)
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+
+				untyped:add(zone)
+				Expect(untyped:detach(observer)).is(zones)
+				QuickZone:update(1)
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+
+				observer:destroy()
+				group:destroy()
+				zones:destroy()
+				Expect(Destroyed.isDestroyed(zone)).is_true()
+			end
+		)
+	end)
 end
