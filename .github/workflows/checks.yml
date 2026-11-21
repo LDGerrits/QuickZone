@@ -1,0 +1,32 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'v*'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rokit
+        uses: CompeyDev/setup-rokit@v0.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rokit Tools
+        run: rokit install --no-trust-check
+
+      - name: Lint
+        run: selene src
+
+      - name: Formatting
+        run: stylua --check src tests
+
+      - name: Structure
+        run: ./scripts/check-structure.sh
