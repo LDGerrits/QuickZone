@@ -1,7 +1,5 @@
 --!strict
 
--- Owns observer links to groups and zones. Only this module writes them, and the groups' subscribers
-
 local Registry = require(script.Parent.Registry)
 
 local groups = Registry.groups
@@ -25,7 +23,6 @@ function Links.unsubscribeAll(observerId: number)
 	end
 end
 
--- Only live groups are subscribed
 function Links.subscribe(observerId: number, groupId: number)
 	groups[groupId].subscribers[observerId] = true
 end
@@ -45,7 +42,11 @@ function Links.attach(slot: number, observerId: number): boolean
 		return false
 	end
 	table.insert(attached, observerId)
-	slotSoleObserver[slot] = if #attached == 1 then attached[1] else nil
+	if #attached == 1 then
+		slotSoleObserver[slot] = attached[1]
+	else
+		slotSoleObserver[slot] = nil
+	end
 	return true
 end
 
@@ -62,7 +63,11 @@ function Links.detach(slot: number, observerId: number): boolean
 			attached[idx] = attached[lastIdx]
 		end
 		attached[lastIdx] = nil
-		slotSoleObserver[slot] = if #attached == 1 then attached[1] else nil
+		if #attached == 1 then
+			slotSoleObserver[slot] = attached[1]
+		else
+			slotSoleObserver[slot] = nil
+		end
 	end
 
 	if #attached == 0 then

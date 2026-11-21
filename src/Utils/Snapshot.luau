@@ -3,7 +3,6 @@
 -- Survives the table changing mid-loop, where next() errors once a removed key is rehashed away. Removed keys
 -- are skipped, added keys are not visited
 
--- Pooled so repeated loops don't allocate
 local spareLists = {} :: { { any } }
 local MAX_SPARE_LISTS = 4
 
@@ -17,15 +16,15 @@ function Snapshot.keys<K, V>(t: { [K]: V }): () -> (K?, V?)
 
 	local i = 0
 	return function(): (K?, V?)
-		while list do
+		local current = list
+		while current do
 			i += 1
-			local key = list[i]
+			local key = current[i]
 			if key == nil then
-				table.clear(list)
+				table.clear(current)
 				if #spareLists < MAX_SPARE_LISTS then
-					table.insert(spareLists, list)
+					table.insert(spareLists, current)
 				end
-				-- The list is back in the pool; a call after the end must not read it
 				list = nil
 				break
 			end
@@ -39,7 +38,6 @@ function Snapshot.keys<K, V>(t: { [K]: V }): () -> (K?, V?)
 	end
 end
 
--- What an iterator yields, as a list: the get methods are their iter methods run to the end
 function Snapshot.collect<T>(iterate: () -> T?): { T }
 	local list = {}
 	for value in iterate do

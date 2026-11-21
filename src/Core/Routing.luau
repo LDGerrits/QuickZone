@@ -2,9 +2,6 @@
 --!optimize 2
 --!strict
 
--- Which observers watch each entity, at what rate, precision and trees, and the scheduler's buckets.
--- Others mark entities, only this module writes the routing
-
 local Types = require(script.Parent.Parent.Types)
 local Entities = require(script.Parent.Entities)
 local Registry = require(script.Parent.Registry)
@@ -14,9 +11,10 @@ local observers = Registry.observers
 local entityData = Entities.entityData
 local groups = Registry.groups
 
+local UNCHECKED_VERSION = -1
+
 local Routing = {}
 
--- Raised to recheck every entity next tick
 Routing.logicVersion = 0
 Routing.dirtyProfiles = {} :: { [Types.Entity]: boolean }
 Routing.dirtyTopology = {} :: { [Types.Entity]: boolean }
@@ -28,25 +26,22 @@ local dirtyTopology = Routing.dirtyTopology
 local bucketList = Routing.bucketList
 local buckets = Routing.buckets
 
--- Works out rate, precision and trees again at the next tick
 function Routing.reroute(entity: Types.Entity)
 	dirtyProfiles[entity] = true
 	dirtyTopology[entity] = true
 end
 
--- Also checked next tick when standing still, as another observer may take it over
 function Routing.recheck(entity: Types.Entity)
 	Routing.reroute(entity)
 	local data = entityData[entity]
 	if data then
-		data.logicVersion = -1
+		data.logicVersion = UNCHECKED_VERSION
 	end
 end
 
 function Routing.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 	local bucket = buckets[data.updateRate]
 	local idx = data.bucketIndex
-	-- Already out: the slot is empty or holds the entity swapped into it
 	if not bucket or bucket[idx] ~= entity then
 		return
 	end
@@ -113,7 +108,6 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 		data.updateRate = maxRate
 	end
 
-	-- Rate 0 means no observer watches the entity
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
 		data.linkedObservers = linkedObservers
@@ -129,7 +123,6 @@ local function processTopologyChange(data: Types.EntityData)
 
 	if linkedObservers then
 		for observerId, _ in linkedObservers do
-			-- Settled profiles only route to live observers, but a stale route must not error the tick
 			local observer = observers[observerId]
 			if not observer then
 				continue
@@ -150,7 +143,6 @@ local function processTopologyChange(data: Types.EntityData)
 	data.needsDynamic = needsDynamic
 end
 
--- Every member of a group the observer subscribes to
 local function markMembersOf(observerId: number, alsoProfiles: boolean)
 	for _, group in groups do
 		if group.subscribers[observerId] then
@@ -182,7 +174,6 @@ function Routing.changeZoneCount(observerId: number, isDynamic: boolean, delta: 
 		observer.staticZoneCount = newCount
 	end
 
-	-- Delta is always 1 or -1, so only crossing zero changes which trees entities need
 	if current == 0 or newCount == 0 then
 		if newCount == 0 then
 			Routing.recheckAll()
@@ -207,7 +198,6 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 		end
 	end
 
-	-- After profiles, as topology reads the observers they route to
 	for entity, _ in dirtyTopology do
 		dirtyTopology[entity] = nil
 		local data = entityData[entity]
@@ -216,7 +206,6 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 		end
 	end
 
-	-- Only here, as callbacks can't shrink the list while a tick walks it
 	for i = #bucketList, 1, -1 do
 		local rate = bucketList[i]
 		if #buckets[rate] == 0 then

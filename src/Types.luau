@@ -34,65 +34,48 @@ export type EntityTable = {
 ]=]
 export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | EntityTable
 
--- See Utils/Destroyed
 export type Phase = 'alive' | 'destroying' | 'dead'
 
 export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
 
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
--- Flat LBVH, see Utils/LinearBVH for the node layout
 export type Tree = {
 	buffer: buffer,
 	count: number,
-	-- Summed branch area when built
 	cost: number,
-	-- Updates until refitting is tried again
 	refitSkips: number,
-	-- Its zones changed since it was last built or refit
 	pending: boolean,
-	-- Zones were added or removed, so refit can't be used
 	membersChanged: boolean,
 }
 
--- See Core/ZoneChanges
 export type ChangeSlot = {
 	version: number,
-	-- Everything changed
 	all: boolean,
-	-- One leaf per box
 	tree: Tree,
 }
 
 export type ZoneChanges = {
-	-- Boxes since the last commit
 	boxesMin: { Vector3 },
 	boxesMax: { Vector3 },
 	boxCount: number,
 	all: boolean,
 	boxLimit: number,
-	-- One slot per tree version
 	history: { ChangeSlot },
 }
 
--- Fields by writer
 export type EntityData = {
-	-- Memberships
 	activeObserverMemberships: { [number]: number },
-	-- Entities. Dropped once it left its last group, after which its table is never reused
 	strategy: number,
 	groups: { [number]: true },
 	dropped: boolean,
-	-- Routing. The observers its groups bring it into, nil while none does
 	linkedObservers: { [number]: true }?,
 	precisionSq: number,
 	updateRate: number,
 	bucketIndex: number,
 	needsStatic: boolean,
 	needsDynamic: boolean,
-	-- Scheduler, and Routing.recheck. -1 forces a check next tick
 	logicVersion: number,
-	-- Scheduler
 	lastPosition: Vector3,
 	staticVersion: number,
 	dynamicVersion: number,
@@ -114,28 +97,20 @@ export type Group<T = any> = {
 	destroy: (self: Group<T>) -> (),
 }
 
--- Its state is kept on the object, registered in Registry.groups while alive. The class sets first values, then
--- the writers are:
---   subscribers                             Links
---   members, memberIndices                  Entities
---   autoClean, removalWatches               Members
 export type InternalGroup<T = any> = Group<T> & Destroyable & {
 	id: number,
-	-- Observers subscribed to it
 	subscribers: { [number]: true },
-	-- Swap-removed, each at its index in memberIndices. Emptied in place on destroy, so a loop holding it ends
 	members: { Entity },
 	memberIndices: { [Entity]: number },
 	autoClean: boolean,
-	-- Instance members watched for removal while autoClean is on
 	removalWatches: { [Instance]: RBXScriptConnection },
 }
 
 export type GroupClass = {
-	new: <T>(config: {
-		entities: { T }?,
+	new: (config: {
+		entities: { any }?,
 		autoClean: boolean?,
-	}?) -> Group<T>,
+	}?) -> Group<any>,
 	fromTag: (tag: string) -> Group<Entity>,
 	players: () -> Group<Player>,
 	localPlayer: () -> Group<Player>,
@@ -173,7 +148,6 @@ export type InternalZone = Zone & Destroyable & {
 
 	id: number,
 	slot: number,
-	-- The shape asked for. Mesh without a part is Block in the tree until it gets one
 	requestedShapeType: number,
 	reference: (Attachment | BasePart | Bone)?,
 	metadata: any?,
@@ -207,10 +181,12 @@ export type InternalZones = Zones & Destroyable & {
 
 	syncMode: SyncMode,
 	metadata: any?,
-	zones: { [any]: boolean },
+	zones: { [Zone]: boolean },
 	observers: { [any]: boolean },
 	onDestroyObserverCleanups: { [any]: () -> () },
 	onDestroyZoneCleanups: { [any]: () -> () },
+	_addZone: (self: InternalZones, zone: Zone) -> (),
+	_removeZone: (self: InternalZones, zone: Zone) -> (),
 	add: (self: InternalZones, zone: Zone) -> (),
 	remove: (self: InternalZones, zone: Zone) -> (),
 }
@@ -304,9 +280,9 @@ export type Observer<T = any> = {
 }
 
 export type ObserverClass = {
-	new: <T>(
+	new: (
 		config: {
-			groups: { Group<T> }?,
+			groups: { Group<any> }?,
 			zones: { Zone | Zones }?,
 			priority: number?,
 			updateRate: number?,
@@ -314,18 +290,9 @@ export type ObserverClass = {
 			enabled: boolean?,
 			safety: boolean?,
 		}?
-	) -> Observer<T>,
+	) -> Observer<any>,
 }
 
--- Its state is kept on the object, registered in Registry.observers while alive. The class sets first values, then
--- the writers are:
---   priority, updateRate, precisionSq,
---   enabled, safety, the callback lists     Wiring
---   staticZoneCount, dynamicZoneCount       Routing
---   tracked                                 Memberships
---   the callback lists' entries             Callbacks
---   trackers                                GroupPresence
---   hasAttached, hasSubscribed              Observer
 export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	id: number,
 	priority: number,
@@ -333,17 +300,13 @@ export type InternalObserver<T = any> = Observer<T> & Destroyable & {
 	precisionSq: number,
 	enabled: boolean,
 	safety: boolean,
-	-- Attached zones per tree, which decide the trees its entities query
 	staticZoneCount: number,
 	dynamicZoneCount: number,
-	-- The zone id each entity inside is in
 	tracked: { [Entity]: number },
 	enteredCallbacks: { ObserverCallback },
 	exitedCallbacks: { ObserverCallback },
 	transitionedCallbacks: { ObserverCallback },
-	-- Replaced rather than changed, so a list being run never shifts. Only set while it has trackers
 	trackers: { Tracker }?,
-	-- Whether attach or subscribe was ever called, for the warning about a missing one
 	hasAttached: boolean,
 	hasSubscribed: boolean,
 }

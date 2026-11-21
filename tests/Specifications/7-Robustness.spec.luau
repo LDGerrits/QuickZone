@@ -1599,9 +1599,52 @@ return function(Tiniest: Tiniest)
 				end)
 			end
 		)
+
+		Test("A zone's onDestroy callbacks run once its entities have exited.", function()
+			withCleanup(function(track)
+				local position = Vector3.new(-48700, 0, 41000)
+				local entity = { Position = position }
+				local zone = track(Zone.new(cube(position)))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				local order = {}
+				observer:onExit(function()
+					table.insert(order, 'exit')
+				end)
+				zone:onDestroy(function()
+					table.insert(order, `destroy {observer:getZoneOfEntity(entity)}`)
+				end)
+				zone:destroy()
+
+				Expect(table.concat(order, ', ')).is('exit, destroy nil')
+			end)
+		end)
 	end)
 
 	Describe('Objects being destroyed take on nothing new', function()
+		Test('A zone takes in no entity from an update its own onDestroy callback runs.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-48800, 0, 41000)
+				local entity = { Position = position }
+				local zone = track(Zone.new(cube(position)))
+				local group = track(Group.new({ autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				QuickZone:update(1)
+				local entered = 0
+				observer:onEnter(function()
+					entered += 1
+				end)
+				group:add(entity)
+				zone:onDestroy(function()
+					QuickZone:update(1)
+				end)
+				zone:destroy()
+
+				Expect(entered).is(0)
+			end)
+		end)
+
 		Test('A Zones that an exit callback attaches to during its destroy keeps no hook on the observer.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-48200, 0, 41000)

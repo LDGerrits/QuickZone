@@ -2,8 +2,6 @@
 --!optimize 2
 --!strict
 
--- The zone each observer has an entity in. Writes go through here to keep tracking and occupants in step
-
 local Callbacks = require(script.Parent.Callbacks)
 local Entities = require(script.Parent.Entities)
 local Links = require(script.Parent.Links)
@@ -24,10 +22,7 @@ local staleSlots = ZoneShapes.staleSlots
 
 local Memberships = {}
 
--- Entities observers have in each zone
 Memberships.zoneOccupants = {} :: { [number]: number }
--- Zones on their way out, which entities can't move into: one being destroyed, and the rest of a Zones destroyed
--- with it, so an entity in several leaves once rather than moving through each
 Memberships.zonesBeingDestroyed = {} :: { [number]: true }
 
 local zoneOccupants = Memberships.zoneOccupants
@@ -44,12 +39,14 @@ end
 local function removeOccupant(zoneId: number)
 	local count = zoneOccupants[zoneId]
 	if count then
-		zoneOccupants[zoneId] = if count > 1 then count - 1 else nil
+		if count > 1 then
+			zoneOccupants[zoneId] = count - 1
+		else
+			zoneOccupants[zoneId] = nil
+		end
 	end
 end
 
--- Whether group G brings entity E into observer O. isSubscribed asks it of any of E's groups, and Routing keeps its
--- answers in each entity's observers
 function Memberships.bringsIn(groupId: number, entity: Types.Entity, observerId: number): boolean
 	return Entities.isIn(entity, groupId) and Links.subscribes(observerId, groupId)
 end
@@ -74,7 +71,6 @@ function Memberships.move(observerId: number, entity: Types.Entity, data: Types.
 	local memberships = data.activeObserverMemberships
 	local oldZoneId = memberships[observerId]
 	local observer = observers[observerId]
-	-- Destroyed observers track nothing
 	if oldZoneId == zoneId or not observer then
 		return
 	end
@@ -113,7 +109,6 @@ local function canMoveInto(slot: number, observerId: number): boolean
 		and table.find(attached, observerId) ~= nil
 end
 
--- Uses the position the entity was last checked at
 local function otherZoneOf(observerId: number, data: Types.EntityData): number?
 	local position = data.lastPosition
 	local hitCount = ZoneShapes.leavesAtPoint(position, leafHits)
@@ -124,7 +119,6 @@ local function otherZoneOf(observerId: number, data: Types.EntityData): number?
 		end
 	end
 
-	-- The trees miss zones made or moved since they were built
 	for slot in staleSlots do
 		if canMoveInto(slot, observerId) and ZoneShapes.containsPoint(slot, position) then
 			return zoneSlotIds[slot]
@@ -133,11 +127,9 @@ local function otherZoneOf(observerId: number, data: Types.EntityData): number?
 	return nil
 end
 
--- Entities another of the observer's zones holds move there, rather than exiting and entering next tick
 local function leaveDestroyedZone(observer: Types.InternalObserver, zoneId: number)
 	local observerId = observer.id
 
-	-- Collected first, as a callback may update and add entities to the map
 	local leaving = {}
 	for entity, trackedZoneId in observer.tracked do
 		if trackedZoneId == zoneId then
@@ -171,7 +163,6 @@ end
 
 function Memberships.exitObserver(observer: Types.InternalObserver)
 	local observerId = observer.id
-	-- A snapshot, as callbacks may change the map
 	for entity in Snapshot.keys(observer.tracked) do
 		local data = entityData[entity]
 		if data then
@@ -180,13 +171,11 @@ function Memberships.exitObserver(observer: Types.InternalObserver)
 	end
 end
 
--- Goes through every observer, as ones detached since the last tick may still hold entities
 function Memberships.leaveZone(zoneId: number)
 	if not zoneOccupants[zoneId] then
 		return
 	end
 
-	-- A snapshot, as callbacks may create or destroy observers
 	for _, observer in Snapshot.keys(observers) do
 		leaveDestroyedZone(observer :: Types.InternalObserver, zoneId)
 		if not zoneOccupants[zoneId] then
@@ -198,7 +187,6 @@ function Memberships.leaveZone(zoneId: number)
 end
 
 function Memberships.exitUnsubscribed(entity: Types.Entity, data: Types.EntityData)
-	-- Collected first, as a callback may update and add memberships
 	local leaving: { number }? = nil
 	for observerId in data.activeObserverMemberships do
 		if not Memberships.isSubscribed(entity, observerId) then

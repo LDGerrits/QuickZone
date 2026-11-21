@@ -1,8 +1,5 @@
 --!strict
 
--- alive -> destroying (callbacks run, queries still find it, it takes on nothing new) -> dead (queries skip it,
--- destroy does nothing, other methods error)
-
 local Log = require(script.Parent.Log)
 local Types = require(script.Parent.Parent.Types)
 
@@ -43,7 +40,6 @@ local function deadMetatableOf(class: any): any
 	return dead
 end
 
--- Destroy stays callable on dead objects, as a late cleanup may call it
 function Destroyed.finish(object: Destroyable)
 	object.phase = 'dead'
 	local metatable = getmetatable(object :: any)
@@ -74,7 +70,6 @@ function Destroyed.connect(object: Destroyable, callback: () -> ()): () -> ()
 	end
 end
 
--- Cloned as callbacks may disconnect each other; disconnected ones are skipped
 function Destroyed.fireCallbacks(callbacks: { () -> () }?)
 	if not callbacks then
 		return

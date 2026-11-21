@@ -9,13 +9,12 @@ type PartsConfig = Types.PartsConfig
 
 local ZoneContainers = {}
 
-type ZoneClass = { fromPart: (part: BasePart, config: PartsConfig?) -> Types.Zone }
+type FromPart = (part: BasePart, config: PartsConfig?) -> Types.Zone
 
--- Zone gives itself, as it requires this module
-local Zone: ZoneClass
+local fromPart: FromPart
 
-function ZoneContainers.setZone(zone: ZoneClass)
-	Zone = zone
+function ZoneContainers.useFromPart(zoneFromPart: FromPart)
+	fromPart = zoneFromPart
 end
 
 local function fromContainer(
@@ -29,9 +28,9 @@ local function fromContainer(
 
 	local function onAdded(instance: Instance)
 		if instance:IsA('BasePart') and not instanceToZone[instance] then
-			local zone = Zone.fromPart(instance, { isDynamic = zones:isDynamic() })
+			local zone = fromPart(instance, { isDynamic = zones:isDynamic() })
 			instanceToZone[instance] = zone
-			zones:add(zone)
+			zones:_addZone(zone)
 		end
 	end
 
@@ -74,7 +73,7 @@ function ZoneContainers.fromParts(parts: { BasePart }, config: PartsConfig?): Ty
 	local zones = Zones.new(config) :: Types.InternalZones
 	for _, part in parts do
 		if typeof(part) == 'Instance' and part:IsA('BasePart') then
-			zones:add(Zone.fromPart(part, { isDynamic = zones:isDynamic() }))
+			zones:_addZone(fromPart(part, { isDynamic = zones:isDynamic() }))
 		end
 	end
 	return zones
@@ -131,7 +130,6 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	local containerConnections = {} :: { [Instance]: { RBXScriptConnection } }
 	local partDestroyingConnections = {} :: { [BasePart]: RBXScriptConnection }
 	local instanceToZone = {} :: { [BasePart]: Types.Zone }
-	-- A set rather than a count, as a tagged instance reports itself again each time it moves
 	local partClaims = {} :: { [BasePart]: { [Instance]: true } }
 
 	local function dropPart(part: BasePart)
@@ -160,15 +158,14 @@ function ZoneContainers.fromTag(tag: string, config: PartsConfig?): Types.Zones
 	end
 
 	local function addZone(part: BasePart)
-		local newZone = Zone.fromPart(part, { isDynamic = zones:isDynamic() })
+		local newZone = fromPart(part, { isDynamic = zones:isDynamic() })
 		instanceToZone[part] = newZone
-		zones:add(newZone)
+		zones:_addZone(newZone)
 	end
 
 	local function claimPart(part: BasePart, claimer: Instance)
 		local claims = partClaims[part]
 		if claims then
-			-- A user-destroyed zone returns on a new claim, not on a claimer reporting itself again
 			if not claims[claimer] then
 				claims[claimer] = true
 				if Destroyed.isDestroyed(instanceToZone[part]) then

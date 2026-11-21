@@ -20,7 +20,6 @@ local Zones = require(script.Parent.Zones)
 
 local checkZone = Checks.checkZone
 
--- A NaN setting would quietly break every later tick
 local function checkPriority(p: any): number
 	if type(p) ~= 'number' or p ~= p then
 		Log.fatal('priority must be a number, got %s.', nil, tostring(p))
@@ -43,7 +42,6 @@ local function checkPrecision(n: any): number
 end
 
 local function checkGroup(group: any)
-	-- A destroyed group is unregistered and gets its own error below
 	local isGroup = type(group) == 'table'
 		and type(group.id) == 'number'
 		and (Registry.groups[group.id] == group or Destroyed.isDestroyed(group))
@@ -95,8 +93,8 @@ Observer.__index = Observer
 	@param config { groups: { Types.Group }?, zones: { Types.Zone | Types.Zones }?, priority: number?, updateRate: number?, precision: number?, enabled: boolean?, safety: boolean? }?
 	@return Observer
 ]=]
-function Observer.new<T>(config: {
-	groups: { Types.Group<T> }?,
+function Observer.new(config: {
+	groups: { Types.Group<any> }?,
 	zones: { Types.Zone | Types.Zones }?,
 	priority: number?,
 	updateRate: number?,
@@ -107,18 +105,19 @@ function Observer.new<T>(config: {
 	local priority = checkPriority(config and config.priority or 0)
 	local updateRate = checkUpdateRate(config and config.updateRate or Config.Observer.updateRate)
 	local precision = checkPrecision(config and config.precision or Config.Observer.precision)
-	-- Checked before registering, so a bad entry leaves no half-made observer
-	for _, zone in config and config.zones or {} do
+	local zones = config and config.zones
+	local groups = config and config.groups
+	for _, zone in (zones or {}) :: { any } do
 		checkZone(zone)
 	end
-	for _, group in config and config.groups or {} do
+	for _, group in (groups or {}) :: { any } do
 		checkGroup(group)
 	end
 
 	local id = Registry.nextObserverId
 	Registry.nextObserverId += 1
 
-	local self: Types.InternalObserver<T> = setmetatable({
+	local self: Types.InternalObserver = setmetatable({
 		id = id,
 		phase = 'alive',
 		priority = priority,
@@ -138,8 +137,6 @@ function Observer.new<T>(config: {
 
 	Wiring.addObserver(self)
 
-	local zones = config and config.zones
-	local groups = config and config.groups
 	for _, zone in (zones or {}) :: { any } do
 		self:attach(zone)
 	end
@@ -147,7 +144,6 @@ function Observer.new<T>(config: {
 		self:subscribe(group)
 	end
 
-	-- Deferred, so a later :attach or :subscribe silences the warning
 	local missingZones = zones == nil
 	local missingGroups = groups == nil
 
@@ -187,7 +183,6 @@ end
 ]=]
 function Observer.subscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
 	checkGroup(group)
-	-- Called from a callback during its destroy
 	if Destroyed.isDestroyed(self) then
 		return self
 	end
@@ -207,7 +202,6 @@ end
 	@return Observer
 ]=]
 function Observer.unsubscribe(self: Types.InternalObserver, group: Types.InternalGroup): Types.Observer
-	-- Destroying a group already unsubscribed it
 	if Destroyed.isDestroyed(group) then
 		return self
 	end
@@ -236,7 +230,6 @@ end
 ]=]
 function Observer.attach(self: Types.InternalObserver, zone: any)
 	checkZone(zone)
-	-- Called from a callback during its destroy
 	if Destroyed.isDestroyed(self) then
 		return self
 	end
@@ -261,7 +254,6 @@ end
 	@return Observer
 ]=]
 function Observer.detach(self: Types.InternalObserver, zone: any)
-	-- Destroying a zone already detached it
 	if Destroyed.isDestroyed(zone) then
 		return self
 	end
@@ -444,7 +436,6 @@ Observer.onDestroy = Destroyed.connect
 	@within Observer
 ]=]
 function Observer.destroy(self: Types.InternalObserver): ()
-	-- A callback below may destroy the observer again
 	if not Destroyed.begin(self) then
 		return
 	end
@@ -455,10 +446,10 @@ function Observer.destroy(self: Types.InternalObserver): ()
 	Destroyed.finish(self)
 end
 
-for name, method in ObserverEvents do
+for name, method in ObserverEvents :: any do
 	(Observer :: any)[name] = method
 end
-for name, method in ObserverQueries do
+for name, method in ObserverQueries :: any do
 	(Observer :: any)[name] = method
 end
 

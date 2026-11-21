@@ -68,7 +68,7 @@ end
 	@return { Observer }
 ]=]
 function WorldQueries:getObservers(): { Types.Observer<any> }
-	return Snapshot.collect(self:iterObservers())
+	return Snapshot.collect(WorldQueries.iterObservers(self))
 end
 
 --[=[ 
@@ -80,7 +80,7 @@ end
 	@return { Group }
 ]=]
 function WorldQueries:getGroups(): { Types.Group }
-	return Snapshot.collect(self:iterGroups())
+	return Snapshot.collect(WorldQueries.iterGroups(self))
 end
 
 --[=[ 
@@ -92,7 +92,7 @@ end
 	@return { Zone }
 ]=]
 function WorldQueries:getZones(): { Types.Zone }
-	return Snapshot.collect(self:iterZones())
+	return Snapshot.collect(WorldQueries.iterZones(self))
 end
 
 --[=[ 
@@ -124,7 +124,7 @@ end
 	@return { Zone }
 ]=]
 function WorldQueries:getZonesAtPoint(position: Vector3): { Zone }
-	local results = {}
+	local results: { Zone } = {}
 	local count = 0
 
 	local hitCount = leavesAtPoint(position, queryHits)
@@ -158,8 +158,8 @@ function WorldQueries:getZonesOfEntity(entity: any): { Types.Zone }
 		return {}
 	end
 
-	local results = {}
-	local seenZones = {} -- Several observers may track the entity in the same zone
+	local results: { Types.Zone } = {}
+	local seenZones = {}
 
 	for _, zoneId in data.activeObserverMemberships do
 		if seenZones[zoneId] then
@@ -188,11 +188,10 @@ function WorldQueries:getGroupsOfEntity(entity: any): { Types.Group }
 	entity = entityOf(entity)
 	local groupIds = Entities.groupsOf(entity)
 	if not groupIds then
-		-- A player without a character is still in the groups it was added to
-		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) else {}
+		return if isPlayer(entity) then PlayerTracker.groupsOf(entity) :: { Types.Group } else {}
 	end
 
-	local results = {}
+	local results: { Types.Group } = {}
 	local count = 0
 
 	for groupId in groupIds do
@@ -343,12 +342,12 @@ function WorldQueries:iterZonesOfEntity(entity: any): () -> Types.Zone?
 
 	return function(): Types.Zone?
 		while true do
-			local observerId, zoneId = nextMembership()
-			if not observerId then
+			local _, zoneId = nextMembership()
+			if not zoneId then
 				return nil
 			end
 
-			if seenZones[zoneId :: number] then
+			if seenZones[zoneId] then
 				continue
 			end
 

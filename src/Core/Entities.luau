@@ -1,8 +1,5 @@
 --!strict
 
--- Owns entity group membership and group member lists. Creates and drops each entity's data, whose fields other
--- modules write (see Types.EntityData)
-
 local Config = require(script.Parent.Parent.Config)
 local Types = require(script.Parent.Parent.Types)
 local Log = require(script.Parent.Parent.Utils.Log)
@@ -17,9 +14,10 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 
 local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
+local UNCHECKED_VERSION = -1
+
 local Entities = {}
 
--- Entities in a group. Dropped when they leave their last one
 Entities.entityData = {} :: { [Types.Entity]: Types.EntityData }
 
 local entityData = Entities.entityData
@@ -27,14 +25,15 @@ local groups = Registry.groups
 
 local function strategyOf(entity: any): number?
 	if typeof(entity) == 'Instance' then
-		if entity:IsA('BasePart') then
+		local instance: Instance = entity
+		if instance:IsA('BasePart') then
 			return STRAT_POS
-		elseif entity:IsA('Attachment') or entity:IsA('Bone') then
+		elseif instance:IsA('Attachment') or instance:IsA('Bone') then
 			return STRAT_WORLD
-		elseif entity:IsA('Camera') then
+		elseif instance:IsA('Camera') then
 			return STRAT_CFRAME
-		elseif entity:IsA('Model') then
-			return entity.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
+		elseif instance:IsA('Model') then
+			return instance.PrimaryPart and STRAT_PRIM or STRAT_PIVOT
 		end
 	elseif typeof(entity) == 'table' then
 		if entity.Position then
@@ -56,7 +55,6 @@ function Entities.canTrack(x: any): boolean
 	return strategyOf(x) ~= nil
 end
 
--- Emptied in place so a loop still holding the list ends
 function Entities.dropGroup(group: Types.InternalGroup)
 	table.clear(group.members)
 	table.clear(group.memberIndices)
@@ -72,7 +70,6 @@ function Entities.isIn(entity: Types.Entity, groupId: number): boolean
 	return data ~= nil and data.groups[groupId] == true
 end
 
--- False when already in the group or untrackable
 function Entities.join(entity: Types.Entity, groupId: number): boolean
 	if Entities.isIn(entity, groupId) then
 		return false
@@ -90,28 +87,28 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			return false
 		end
 
-		data = {
+		local newData: Types.EntityData = {
 			strategy = strat,
 			groups = {},
 			dropped = false,
-			observers = nil,
+			linkedObservers = nil,
 			lastPosition = Vector3.zero,
 			activeObserverMemberships = {},
 			precisionSq = DEFAULT_PRECISION_SQ,
 			updateRate = -1,
 			bucketIndex = 0,
-			dynamicVersion = -1,
-			staticVersion = -1,
-			logicVersion = -1,
+			dynamicVersion = UNCHECKED_VERSION,
+			staticVersion = UNCHECKED_VERSION,
+			logicVersion = UNCHECKED_VERSION,
 			needsStatic = false,
 			needsDynamic = false,
 		}
-		entityData[entity] = data
+		entityData[entity] = newData
+		data = newData
 	end
 	local memberOf = (data :: Types.EntityData).groups
 	memberOf[groupId] = true
 
-	-- Only live groups are joined
 	local group = groups[groupId]
 	local members = group.members
 	local idx = #members + 1
@@ -120,7 +117,6 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 	return true
 end
 
--- Keeps the entity's data until dropped, as exit callbacks still read it
 function Entities.leave(entity: Types.Entity, groupId: number)
 	local data = entityData[entity]
 	if data then
@@ -131,7 +127,6 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	local indices = group and group.memberIndices
 	local idx = indices and indices[entity]
 	if idx then
-		-- Also right when it is the last, as its own entries are cleared after
 		local members = (group :: Types.InternalGroup).members
 		local lastIdx = #members
 		local lastEntity = members[lastIdx]
@@ -142,12 +137,10 @@ function Entities.leave(entity: Types.Entity, groupId: number)
 	end
 end
 
--- Left its last group, and exit callbacks didn't re-add it or drop it
 function Entities.isGroupless(data: Types.EntityData): boolean
 	return not data.dropped and next(data.groups) == nil
 end
 
--- Only after Routing.forget
 function Entities.drop(entity: Types.Entity, data: Types.EntityData)
 	data.dropped = true
 	entityData[entity] = nil
