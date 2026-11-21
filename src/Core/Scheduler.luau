@@ -207,8 +207,7 @@ local function runTick(dt: number)
 
 		while processed < workQuota do
 			ctx_checkingIndex = idx
-			-- Cast below to the class its strategy reads
-			local entity: any = list[idx]
+			local entity = list[idx]
 			local data = entityData[entity] :: Types.EntityData
 
 			local position

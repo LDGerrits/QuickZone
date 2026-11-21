@@ -18,16 +18,15 @@ export type ShapeType = 'Block' | 'Ball' | 'Cylinder' | 'Wedge' | 'CornerWedge' 
 	.CFrame CFrame?
 	.Transform: CFrame?
 	.GetPivot ((any) -> CFrame)?
-	A custom table that mimics the spatial properties of a Roblox Instance. It needs at least one of these fields.
+	A custom table that mimics the spatial properties of a Roblox Instance.
 ]=]
--- One shape per field: the new type solver rejects a table such as { Position = position } against a table type whose
--- fields are all optional
-export type EntityTable =
-	{ Position: Vector3 }
-	| { WorldPosition: Vector3 }
-	| { CFrame: CFrame }
-	| { Transform: CFrame }
-	| { GetPivot: (self: any) -> CFrame }
+export type EntityTable = {
+	Position: Vector3?,
+	WorldPosition: Vector3?,
+	CFrame: CFrame?,
+	Transform: CFrame?,
+	GetPivot: ((self: any) -> CFrame)?,
+}
 
 --[=[
 	@type Entity Player | BasePart | Model | Camera | Attachment | Bone | EntityTable
