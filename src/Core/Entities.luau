@@ -14,9 +14,9 @@ local STRAT_PIVOT = Config.Strategy.PIVOT
 
 local DEFAULT_PRECISION_SQ = Config.Observer.precision ^ 2
 
-local Entities = {}
+local UNCHECKED_VERSION = -1
 
-Entities.UNCHECKED_VERSION = -1
+local Entities = {}
 
 Entities.entityData = {} :: { [Types.Entity]: Types.EntityData }
 
@@ -97,9 +97,9 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			precisionSq = DEFAULT_PRECISION_SQ,
 			updateRate = -1,
 			bucketIndex = 0,
-			dynamicVersion = Entities.UNCHECKED_VERSION,
-			staticVersion = Entities.UNCHECKED_VERSION,
-			logicVersion = Entities.UNCHECKED_VERSION,
+			dynamicVersion = UNCHECKED_VERSION,
+			staticVersion = UNCHECKED_VERSION,
+			logicVersion = UNCHECKED_VERSION,
 			needsStatic = false,
 			needsDynamic = false,
 		}

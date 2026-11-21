@@ -11,6 +11,8 @@ local observers = Registry.observers
 local entityData = Entities.entityData
 local groups = Registry.groups
 
+local UNCHECKED_VERSION = -1
+
 local Routing = {}
 
 Routing.logicVersion = 0
@@ -33,7 +35,7 @@ function Routing.recheck(entity: Types.Entity)
 	Routing.reroute(entity)
 	local data = entityData[entity]
 	if data then
-		data.logicVersion = Entities.UNCHECKED_VERSION
+		data.logicVersion = UNCHECKED_VERSION
 	end
 end
 

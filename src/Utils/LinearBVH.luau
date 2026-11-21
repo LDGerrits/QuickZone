@@ -18,6 +18,11 @@ local writeu32 = buffer.writeu32
 local extract = bit32.extract
 
 local NODE_SIZE = 32
+local MIN_Y_OFFSET = 4
+local MIN_Z_OFFSET = 8
+local MAX_X_OFFSET = 12
+local MAX_Y_OFFSET = 16
+local MAX_Z_OFFSET = 20
 local SKIP_OFFSET = 24
 local ID_OFFSET = 28
 
@@ -181,11 +186,11 @@ end
 
 local function writeNode(buf: buffer, offset: number, min: Vector3, max: Vector3, skip: number, id: number)
 	writef32(buf, offset, min.X)
-	writef32(buf, offset + 4, min.Y)
-	writef32(buf, offset + 8, min.Z)
-	writef32(buf, offset + 12, max.X)
-	writef32(buf, offset + 16, max.Y)
-	writef32(buf, offset + 20, max.Z)
+	writef32(buf, offset + MIN_Y_OFFSET, min.Y)
+	writef32(buf, offset + MIN_Z_OFFSET, min.Z)
+	writef32(buf, offset + MAX_X_OFFSET, max.X)
+	writef32(buf, offset + MAX_Y_OFFSET, max.Y)
+	writef32(buf, offset + MAX_Z_OFFSET, max.Z)
 	writeu32(buf, offset + SKIP_OFFSET, skip)
 	writeu32(buf, offset + ID_OFFSET, id)
 end
@@ -311,28 +316,28 @@ function LinearBVH.tryRefit(
 			end
 
 			writef32(buf, offset, min.X)
-			writef32(buf, offset + 4, min.Y)
-			writef32(buf, offset + 8, min.Z)
-			writef32(buf, offset + 12, max.X)
-			writef32(buf, offset + 16, max.Y)
-			writef32(buf, offset + 20, max.Z)
+			writef32(buf, offset + MIN_Y_OFFSET, min.Y)
+			writef32(buf, offset + MIN_Z_OFFSET, min.Z)
+			writef32(buf, offset + MAX_X_OFFSET, max.X)
+			writef32(buf, offset + MAX_Y_OFFSET, max.Y)
+			writef32(buf, offset + MAX_Z_OFFSET, max.Z)
 		else
 			local left = offset + NODE_SIZE
 			local right = readu32(buf, left + SKIP_OFFSET)
 
 			local minX = math.min(readf32(buf, left), readf32(buf, right))
-			local minY = math.min(readf32(buf, left + 4), readf32(buf, right + 4))
-			local minZ = math.min(readf32(buf, left + 8), readf32(buf, right + 8))
-			local maxX = math.max(readf32(buf, left + 12), readf32(buf, right + 12))
-			local maxY = math.max(readf32(buf, left + 16), readf32(buf, right + 16))
-			local maxZ = math.max(readf32(buf, left + 20), readf32(buf, right + 20))
+			local minY = math.min(readf32(buf, left + MIN_Y_OFFSET), readf32(buf, right + MIN_Y_OFFSET))
+			local minZ = math.min(readf32(buf, left + MIN_Z_OFFSET), readf32(buf, right + MIN_Z_OFFSET))
+			local maxX = math.max(readf32(buf, left + MAX_X_OFFSET), readf32(buf, right + MAX_X_OFFSET))
+			local maxY = math.max(readf32(buf, left + MAX_Y_OFFSET), readf32(buf, right + MAX_Y_OFFSET))
+			local maxZ = math.max(readf32(buf, left + MAX_Z_OFFSET), readf32(buf, right + MAX_Z_OFFSET))
 
 			writef32(buf, offset, minX)
-			writef32(buf, offset + 4, minY)
-			writef32(buf, offset + 8, minZ)
-			writef32(buf, offset + 12, maxX)
-			writef32(buf, offset + 16, maxY)
-			writef32(buf, offset + 20, maxZ)
+			writef32(buf, offset + MIN_Y_OFFSET, minY)
+			writef32(buf, offset + MIN_Z_OFFSET, minZ)
+			writef32(buf, offset + MAX_X_OFFSET, maxX)
+			writef32(buf, offset + MAX_Y_OFFSET, maxY)
+			writef32(buf, offset + MAX_Z_OFFSET, maxZ)
 
 			cost += halfArea(maxX - minX, maxY - minY, maxZ - minZ)
 		end
@@ -355,11 +360,11 @@ function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, hits: { number }
 	while offset < endOffset do
 		if
 			px >= readf32(buf, offset)
-			and px <= readf32(buf, offset + 12)
-			and py >= readf32(buf, offset + 4)
-			and py <= readf32(buf, offset + 16)
-			and pz >= readf32(buf, offset + 8)
-			and pz <= readf32(buf, offset + 20)
+			and px <= readf32(buf, offset + MAX_X_OFFSET)
+			and py >= readf32(buf, offset + MIN_Y_OFFSET)
+			and py <= readf32(buf, offset + MAX_Y_OFFSET)
+			and pz >= readf32(buf, offset + MIN_Z_OFFSET)
+			and pz <= readf32(buf, offset + MAX_Z_OFFSET)
 		then
 			local id = readu32(buf, offset + ID_OFFSET)
 			if id ~= 0 then
@@ -384,11 +389,11 @@ function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
 	while offset < endOffset do
 		if
 			px >= readf32(buf, offset)
-			and px <= readf32(buf, offset + 12)
-			and py >= readf32(buf, offset + 4)
-			and py <= readf32(buf, offset + 16)
-			and pz >= readf32(buf, offset + 8)
-			and pz <= readf32(buf, offset + 20)
+			and px <= readf32(buf, offset + MAX_X_OFFSET)
+			and py >= readf32(buf, offset + MIN_Y_OFFSET)
+			and py <= readf32(buf, offset + MAX_Y_OFFSET)
+			and pz >= readf32(buf, offset + MIN_Z_OFFSET)
+			and pz <= readf32(buf, offset + MAX_Z_OFFSET)
 		then
 			if readu32(buf, offset + ID_OFFSET) ~= 0 then
 				return true

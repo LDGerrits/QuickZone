@@ -138,10 +138,13 @@ local function deriveWorldShape(slot: number)
 end
 
 function ZoneShapes.allocateSlot(zoneId: number): number
-	local slot = table.remove(ZoneShapes.freeZoneSlots) or ZoneShapes.zoneSlotCount + 1
-	if slot > ZoneShapes.zoneSlotCount then
-		ZoneShapes.zoneSlotCount = slot
+	local freed = table.remove(ZoneShapes.freeZoneSlots)
+	if freed then
+		ZoneShapes.zoneSlotIds[freed] = zoneId
+		return freed
 	end
+	local slot = ZoneShapes.zoneSlotCount + 1
+	ZoneShapes.zoneSlotCount = slot
 	ZoneShapes.zoneSlotIds[slot] = zoneId
 	return slot
 end

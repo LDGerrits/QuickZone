@@ -67,7 +67,7 @@ local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
 local NOWHERE = Vector3.new(0 / 0, 0 / 0, 0 / 0)
 
-local UNCHECKED_VERSION = Entities.UNCHECKED_VERSION
+local UNCHECKED_VERSION = -1
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -415,8 +415,8 @@ function Scheduler.update(dt: number?)
 	local step = if type(dt) == 'number' and dt >= 0 then dt else 0
 
 	tickThread = coroutine.running()
-	-- Untyped, as xpcall's type gives the handler's result no place in its returns
-	local ok, trace = (xpcall :: any)(runTick, debug.traceback, step)
+	-- Cast, as xpcall's type gives the handler's result no place in its returns
+	local ok, trace = xpcall(runTick :: any, debug.traceback :: any, step)
 	tickThread = nil
 	warnedYield = false
 	if not ok then
