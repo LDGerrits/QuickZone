@@ -81,7 +81,6 @@ function Wiring.removeZone(zone: Types.InternalZone)
 	local id = zone.id
 	local slot = zone.slot
 
-	Memberships.setZoneDestroying(id, true)
 	local isDynamic = ZoneShapes.isDynamic(slot)
 	for _, observerId in (Links.detachAll(slot) or {}) :: { number } do
 		Routing.changeZoneCount(observerId, isDynamic, -1)
@@ -93,7 +92,6 @@ function Wiring.removeZone(zone: Types.InternalZone)
 	Registry.zoneIdToZoneObj[id] = nil
 	Registry.zoneSlotToZoneObj[slot] = nil
 	ZoneShapes.remove(slot)
-	Memberships.setZoneDestroying(id, false)
 end
 
 function Wiring.destroyZones(zoneIds: { number }, destroy: () -> ())
