@@ -1982,4 +1982,93 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 	end)
+
+	Describe('Review of 1.6.0', function()
+		Test("Updates go on after a tick's thread is killed inside an unsafe callback.", function()
+			withCleanup(function(track)
+				local position = Vector3.new(-48800, 0, 41000)
+				local first = { Position = position }
+				local second = { Position = position + AWAY }
+				local zone = track(Zone.new(cube(position)))
+				local group = track(Group.new({ entities = { first, second }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+				local stall = true
+				local disconnects = {}
+				for i = 1, 3 do
+					disconnects[i] = observer:onEnter(function()
+						if stall then
+							task.wait(0.1)
+						end
+					end)
+				end
+
+				QuickZone:setEnabled(false)
+				local ok, err = pcall(function()
+					local thread = task.spawn(QuickZone.update, QuickZone, 1)
+					task.cancel(thread)
+					stall = false
+					-- Disconnected while the dead tick still counted as firing, so only blanked until it is cleared
+					disconnects[1]()
+					second.Position = position
+					local warnings = Util.captureWarnings(function()
+						QuickZone:update(1)
+						QuickZone:update(1)
+					end)
+					disconnects[2]()
+
+					Expect(#warnings).is(0)
+					Expect(observer:getZoneOfEntity(second)).is(zone)
+					Expect(#(observer :: any).enteredCallbacks).is(1)
+				end)
+				QuickZone:setEnabled(true)
+				if not ok then
+					error(err, 0)
+				end
+			end)
+		end)
+
+		Test('An entity leaves a block with a scaled CFrame as soon as it is outside it.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-49000, 0, 41000)
+				local entity = { Position = position }
+				-- Axes four times unit length, so the size of 8 spans 2 studs
+				local scaled = CFrame.new(position.X, position.Y, position.Z, 4, 0, 0, 0, 4, 0, 0, 0, 4)
+				local zone = track(Zone.new({ cframe = scaled, size = Vector3.one * 8 }))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+
+				QuickZone:update(1)
+				-- A small step, after which a check may give the entity room to move unchecked
+				entity.Position = position + Vector3.new(0.2, 0, 0)
+				QuickZone:update(1)
+				local inside = observer:getZoneOfEntity(entity)
+				entity.Position = position + Vector3.new(1.5, 0, 0)
+				QuickZone:update(1)
+
+				Expect(inside).is(zone)
+				Expect(zone:isPointInside(entity.Position)).is(false)
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+			end)
+		end)
+
+		Test('Zones:add leaves a dynamic, auto-synced zone as it is in a static container.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-49200, 0, 41000)
+				local part = track(Util.createPart({ Position = position }))
+				local zones = track(Zone.fromParts({}))
+				local zone = track(Zone.fromPart(part, { isDynamic = true, autoSync = true }))
+				local late = track(Zone.new(cube(position)));
+				(zones :: any):add(zone)
+				zones:setDynamic(true);
+				(zones :: any):add(late)
+
+				part.Position = position + AWAY
+				QuickZone:update(1)
+
+				Expect(zone:isDynamic()).is_true()
+				Expect(zone:getPosition()).is(part.Position)
+				Expect(late:isDynamic()).is_true()
+			end)
+		end)
+	end)
 end
