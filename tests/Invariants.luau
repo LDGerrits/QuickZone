@@ -77,10 +77,10 @@ function Invariants.check(): string?
 		if zoneIds[zone.id] ~= zone then
 			problem(`slot {slot} holds zone {zone.id}, which is not registered by id`)
 		end
-		local static = ZoneShapes.staticSlots[slot] == true
-		local dynamic = ZoneShapes.dynamicSlots[slot] == true
-		if static == dynamic then
-			problem(`slot {slot} is static {static} and dynamic {dynamic}`)
+	end
+	for slot in ZoneShapes.dynamicSlots do
+		if not zoneSlots[slot] then
+			problem(`slot {slot} is dynamic but holds no zone`)
 		end
 	end
 	if count(ZoneShapes.zoneSlotIds) ~= count(zoneSlots) then

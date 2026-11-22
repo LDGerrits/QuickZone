@@ -27,22 +27,24 @@ local ZoneShapes = {}
 ZoneShapes.zoneSlotCount = 0
 ZoneShapes.freeZoneSlots = {} :: { number }
 ZoneShapes.zoneSlotIds = {} :: { [number]: number }
-ZoneShapes.staticSlots = {} :: { [number]: true }
 ZoneShapes.dynamicSlots = {} :: { [number]: true }
-ZoneShapes.shapeCFrames = {} :: { [number]: CFrame }
-ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
+-- The half size a zone tests points against: never negative, and for a ball or cylinder the one its radius fills
 ZoneShapes.shapeFilledHalfSizes = {} :: { [number]: Vector3 }
+-- The half size the zone was given, only where it differs from the filled one, as for a ball or cylinder
+ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
 ZoneShapes.shapeTypes = {} :: { [number]: number }
 ZoneShapes.shapeParts = {} :: { [number]: BasePart? }
 ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
 ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
+-- A zone's box, kept only where it isn't its position plus and minus its filled half size: when it is rotated, or its
+-- size is infinite or NaN
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
-ZoneShapes.shapeAxisAligned = {} :: { [number]: boolean }
 ZoneShapes.treeExact = {} :: { [number]: boolean }
-ZoneShapes.staleSlots = {} :: { [number]: true }
+-- Slots changed since their trees were last updated, each with whether it is axis-aligned, which treeExact takes then
+ZoneShapes.staleSlots = {} :: { [number]: boolean }
 ZoneShapes.staticChanges = ZoneChanges.new()
 ZoneShapes.dynamicChanges = ZoneChanges.new()
 ZoneShapes.staticTree = LinearBVH.new()
@@ -55,7 +57,6 @@ ZoneShapes.dynamicVersion = 0
 ZoneShapes.dynamicChurn = false
 
 local zoneSlotIds = ZoneShapes.zoneSlotIds
-local shapeCFrames = ZoneShapes.shapeCFrames
 local shapeHalfSizes = ZoneShapes.shapeHalfSizes
 local shapeFilledHalfSizes = ZoneShapes.shapeFilledHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
@@ -66,16 +67,20 @@ local shapeUps = ZoneShapes.shapeUps
 local shapeBacks = ZoneShapes.shapeBacks
 local shapeBoundsMin = ZoneShapes.shapeBoundsMin
 local shapeBoundsMax = ZoneShapes.shapeBoundsMax
-local shapeAxisAligned = ZoneShapes.shapeAxisAligned
 local treeExact = ZoneShapes.treeExact
 local staleSlots = ZoneShapes.staleSlots
-local staticSlots = ZoneShapes.staticSlots
 local dynamicSlots = ZoneShapes.dynamicSlots
 local dynamicTree = ZoneShapes.dynamicTree
 local staticTree = ZoneShapes.staticTree
 local recentTree = ZoneShapes.recentTree
 local staticChanges = ZoneShapes.staticChanges
 local dynamicChanges = ZoneShapes.dynamicChanges
+local leafBoxes: Types.LeafBoxes = {
+	min = shapeBoundsMin,
+	max = shapeBoundsMax,
+	centers = shapePositions,
+	halfSizes = shapeFilledHalfSizes,
+}
 
 -- Whether staleSlots may hold a slot. next() on a large emptied table scans every free node, so hot paths read this.
 local hasStale = false
@@ -93,6 +98,8 @@ local RECENT_FROM = 256
 -- staticTree is rebuilt once recentTree, or its own leaves that no zone owns, reach this share of it
 local REBUILD_SHARE = 8
 local MIN_REBUILD_LIMIT = 32
+-- After building a static tree this large, the space builds sort in is freed rather than kept for the next build
+local RELEASE_SCRATCH_FROM = 65536
 
 local function isAxis(direction: Vector3): boolean
 	local magnitude = vector.abs(direction)
@@ -125,7 +132,6 @@ local function addStatic(slot: number)
 	local useRecent = staticTreeCount() >= RECENT_FROM
 		and staticTree.pendingUpdate ~= 'rebuild'
 		and recentCount < rebuildLimit()
-	staticSlots[slot] = true
 	staticCount += 1
 	if useRecent then
 		recentStaticSlots[slot] = true
@@ -138,10 +144,9 @@ end
 
 -- Whether the slot's leaf stays in staticTree, so the slot has to be held until staticTree is rebuilt
 local function removeStatic(slot: number): boolean
-	if not staticSlots[slot] then
+	if shapeTypes[slot] == nil or dynamicSlots[slot] then
 		return false
 	end
-	staticSlots[slot] = nil
 	staticCount -= 1
 
 	if recentStaticSlots[slot] then
@@ -172,60 +177,116 @@ local function extentsOf(halfSize: Vector3, shapeType: number): Vector3
 	return extents
 end
 
-local function deriveWorldShape(slot: number)
+-- A CFrame as its position and the columns of its matrix, which is how a zone keeps it. Both hold float32 numbers,
+-- so cframeOf rebuilds the exact CFrame, scaled or skewed ones too.
+local function partsOf(cframe: CFrame): (Vector3, Vector3, Vector3, Vector3)
+	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe:GetComponents()
+	return Vector3.new(x, y, z), Vector3.new(r00, r10, r20), Vector3.new(r01, r11, r21), Vector3.new(r02, r12, r22)
+end
+
+function ZoneShapes.cframeOf(slot: number): CFrame
+	local p, r, u, b = shapePositions[slot], shapeRights[slot], shapeUps[slot], shapeBacks[slot]
+	return CFrame.new(p.X, p.Y, p.Z, r.X, u.X, b.X, r.Y, u.Y, b.Y, r.Z, u.Z, b.Z)
+end
+
+local function rawHalfSizeOf(slot: number): Vector3
+	return shapeHalfSizes[slot] or shapeFilledHalfSizes[slot]
+end
+ZoneShapes.rawHalfSizeOf = rawHalfSizeOf
+
+-- Most zones have no part, and writing nil to a missing key still adds one
+local function setPart(slot: number, part: BasePart?)
+	if part ~= nil or shapeParts[slot] ~= nil then
+		shapeParts[slot] = part
+	end
+end
+
+-- The zone's box. The slot must hold a zone.
+local function boundsOf(slot: number): (Vector3, Vector3)
+	local min = shapeBoundsMin[slot]
+	if min then
+		return min, shapeBoundsMax[slot]
+	end
+	local position, halfSize = shapePositions[slot], shapeFilledHalfSizes[slot]
+	return position - halfSize, position + halfSize
+end
+
+-- Whether every point inside the zone's box is inside the zone, so the tree's box test is the whole answer
+local function isAxisAligned(slot: number): boolean
+	return shapeTypes[slot] == BLOCK_SHAPE_VALUE
+		and isAxis(shapeRights[slot])
+		and isAxis(shapeUps[slot])
+		and isAxis(shapeBacks[slot])
+end
+
+local function deriveWorldShape(
+	slot: number,
+	rawHalfSize: Vector3,
+	position: Vector3,
+	right: Vector3,
+	up: Vector3,
+	back: Vector3
+)
 	local isDynamic = dynamicSlots[slot] == true
 	local shapeType = shapeTypes[slot]
-	local halfSize = extentsOf(shapeHalfSizes[slot], shapeType)
+	local halfSize = extentsOf(rawHalfSize, shapeType)
 
-	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = shapeCFrames[slot]:GetComponents()
-	local position = Vector3.new(x, y, z)
-	local right = Vector3.new(r00, r10, r20)
-	local up = Vector3.new(r01, r11, r21)
-	local back = Vector3.new(r02, r12, r22)
 	-- Unrotated is the common case, where the bounds are the half size around the position. A CFrame built from a
 	-- scaled matrix has other diagonal values and takes the general path, as before.
-	local unrotated = r01 == 0
-		and r02 == 0
-		and r10 == 0
-		and r12 == 0
-		and r20 == 0
-		and r21 == 0
-		and math.abs(r00) == 1
-		and math.abs(r11) == 1
-		and math.abs(r22) == 1
+	local unrotated = right.Y == 0
+		and right.Z == 0
+		and up.X == 0
+		and up.Z == 0
+		and back.X == 0
+		and back.Y == 0
+		and math.abs(right.X) == 1
+		and math.abs(up.Y) == 1
+		and math.abs(back.Z) == 1
 	local boundsMin, boundsMax
+	local keepBounds = true
 	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
 	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
 		boundsMin, boundsMax = position - halfSize, position + halfSize
+		keepBounds = false
 	else
 		boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
 	end
 	-- A NaN position or size would spread NaN to every tree node above the leaf, hiding other zones
 	if boundsMin ~= boundsMin or boundsMax ~= boundsMax then
 		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
+		keepBounds = true
 	end
 
 	local changes = changesOf(isDynamic)
 	if not changes.all then
-		local oldMin = shapeBoundsMin[slot]
-		if oldMin then
-			ZoneChanges.add(changes, oldMin, shapeBoundsMax[slot])
+		if shapePositions[slot] then
+			ZoneChanges.add(changes, boundsOf(slot))
 		end
 		ZoneChanges.add(changes, boundsMin, boundsMax)
 	end
 
 	shapeFilledHalfSizes[slot] = halfSize
+	-- Writing nil to a missing key still adds one, so only a slot that has a raw size gets it cleared
+	if rawHalfSize ~= halfSize then
+		shapeHalfSizes[slot] = rawHalfSize
+	elseif shapeHalfSizes[slot] then
+		shapeHalfSizes[slot] = nil
+	end
 	shapePositions[slot] = position
 	shapeRights[slot] = right
 	shapeUps[slot] = up
 	shapeBacks[slot] = back
-	shapeBoundsMin[slot] = boundsMin
-	shapeBoundsMax[slot] = boundsMax
-	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE
-		and (unrotated or (isAxis(right) and isAxis(up) and isAxis(back)))
+	-- Writing nil to a missing key still adds one, so only a slot that has bounds gets them cleared
+	if keepBounds then
+		shapeBoundsMin[slot] = boundsMin
+		shapeBoundsMax[slot] = boundsMax
+	elseif shapeBoundsMin[slot] then
+		shapeBoundsMin[slot] = nil
+		shapeBoundsMax[slot] = nil
+	end
 
 	treeExact[slot] = nil
-	staleSlots[slot] = true
+	staleSlots[slot] = shapeType == BLOCK_SHAPE_VALUE and (unrotated or (isAxis(right) and isAxis(up) and isAxis(back)))
 	hasStale = true
 
 	requestRefit(if isDynamic then dynamicTree elseif recentStaticSlots[slot] then recentTree else staticTree)
@@ -258,51 +319,71 @@ function ZoneShapes.add(
 		addStatic(slot)
 	end
 
-	shapeCFrames[slot] = cframe
-	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
-	shapeParts[slot] = part
-	deriveWorldShape(slot)
+	setPart(slot, part)
+	deriveWorldShape(slot, halfSize, partsOf(cframe))
+end
+
+-- Whether the slot already has this CFrame. Vector3 and CFrame both compare exactly, so this agrees with ==.
+local function hasCFrame(slot: number, position: Vector3, right: Vector3, up: Vector3, back: Vector3): boolean
+	return shapePositions[slot] == position
+		and shapeRights[slot] == right
+		and shapeUps[slot] == up
+		and shapeBacks[slot] == back
 end
 
 function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeType: number, part: BasePart?)
 	-- A late property signal can write to a removed zone
-	if not shapeCFrames[slot] then
+	if not shapeTypes[slot] then
 		return
 	end
 
+	local position, right, up, back = partsOf(cframe)
 	if
-		shapeCFrames[slot] == cframe
-		and shapeHalfSizes[slot] == halfSize
+		hasCFrame(slot, position, right, up, back)
+		and rawHalfSizeOf(slot) == halfSize
 		and shapeTypes[slot] == shapeType
 		and shapeParts[slot] == part
 	then
 		return
 	end
 
-	shapeCFrames[slot] = cframe
-	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
-	shapeParts[slot] = part
-	deriveWorldShape(slot)
+	setPart(slot, part)
+	deriveWorldShape(slot, halfSize, position, right, up, back)
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
 	-- Like set, which a removed zone or an unchanged CFrame leaves alone
-	local current = shapeCFrames[slot]
-	if not current or current == cframe then
+	if not shapeTypes[slot] then
 		return
 	end
-	shapeCFrames[slot] = cframe
-	deriveWorldShape(slot)
+	local position, right, up, back = partsOf(cframe)
+	if hasCFrame(slot, position, right, up, back) then
+		return
+	end
+	deriveWorldShape(slot, rawHalfSizeOf(slot), position, right, up, back)
+end
+
+-- Like set, keeping the zone's CFrame
+local function setSizeAndShape(slot: number, halfSize: Vector3, shapeType: number, part: BasePart?)
+	if not shapeTypes[slot] then
+		return
+	end
+	if rawHalfSizeOf(slot) == halfSize and shapeTypes[slot] == shapeType and shapeParts[slot] == part then
+		return
+	end
+	shapeTypes[slot] = shapeType
+	setPart(slot, part)
+	deriveWorldShape(slot, halfSize, shapePositions[slot], shapeRights[slot], shapeUps[slot], shapeBacks[slot])
 end
 
 function ZoneShapes.setHalfSize(slot: number, halfSize: Vector3)
-	ZoneShapes.set(slot, shapeCFrames[slot], halfSize, shapeTypes[slot], shapeParts[slot])
+	setSizeAndShape(slot, halfSize, shapeTypes[slot], shapeParts[slot])
 end
 
 function ZoneShapes.setShape(slot: number, shapeType: number, part: BasePart?)
-	ZoneShapes.set(slot, shapeCFrames[slot], shapeHalfSizes[slot], shapeType, part)
+	setSizeAndShape(slot, rawHalfSizeOf(slot), shapeType, part)
 end
 
 function ZoneShapes.isDynamic(slot: number): boolean
@@ -325,20 +406,19 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 		addStatic(slot)
 	end
 	requestRebuild(dynamicTree)
-	staleSlots[slot] = true
+	staleSlots[slot] = isAxisAligned(slot)
 	hasStale = true
 
-	local min = shapeBoundsMin[slot]
-	if min then
-		ZoneChanges.add(staticChanges, min, shapeBoundsMax[slot])
-		ZoneChanges.add(dynamicChanges, min, shapeBoundsMax[slot])
+	if shapePositions[slot] then
+		local min, max = boundsOf(slot)
+		ZoneChanges.add(staticChanges, min, max)
+		ZoneChanges.add(dynamicChanges, min, max)
 	end
 end
 
 function ZoneShapes.touch(slot: number)
-	local min = shapeBoundsMin[slot]
-	if min then
-		ZoneChanges.add(changesOf(dynamicSlots[slot] == true), min, shapeBoundsMax[slot])
+	if shapePositions[slot] then
+		ZoneChanges.add(changesOf(dynamicSlots[slot] == true), boundsOf(slot))
 	end
 end
 
@@ -354,18 +434,20 @@ function ZoneShapes.remove(slot: number)
 		holdSlot = removeStatic(slot)
 	end
 
-	shapeCFrames[slot] = nil
-	shapeHalfSizes[slot] = nil
+	if shapeHalfSizes[slot] then
+		shapeHalfSizes[slot] = nil
+	end
 	shapeFilledHalfSizes[slot] = nil
 	shapeTypes[slot] = nil
-	shapeParts[slot] = nil
+	setPart(slot, nil)
 	shapePositions[slot] = nil
 	shapeRights[slot] = nil
 	shapeUps[slot] = nil
 	shapeBacks[slot] = nil
-	shapeBoundsMin[slot] = nil
-	shapeBoundsMax[slot] = nil
-	shapeAxisAligned[slot] = nil
+	if shapeBoundsMin[slot] then
+		shapeBoundsMin[slot] = nil
+		shapeBoundsMax[slot] = nil
+	end
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
 
@@ -471,8 +553,8 @@ function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 end
 
 local function updateTree(tree: Types.Tree, members: { [number]: any })
-	if tree.pendingUpdate == 'rebuild' or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
-		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
+	if tree.pendingUpdate == 'rebuild' or not LinearBVH.tryRefit(tree, leafBoxes) then
+		LinearBVH.build(tree, members, leafBoxes)
 	end
 	tree.pendingUpdate = 'none'
 end
@@ -485,10 +567,7 @@ function ZoneShapes.rebuildTrees()
 	-- staticTree doesn't go through updateTree: whether it rebuilds has to be known first, because a rebuild takes
 	-- every static slot, those in recentTree too, and frees the held slots. It refits only while each leaf has a zone
 	-- in it, and a failed refit rebuilds it like any other.
-	if
-		staticTree.pendingUpdate == 'refit'
-		and (#heldSlots > 0 or not LinearBVH.tryRefit(staticTree, shapeBoundsMin, shapeBoundsMax))
-	then
+	if staticTree.pendingUpdate == 'refit' and (#heldSlots > 0 or not LinearBVH.tryRefit(staticTree, leafBoxes)) then
 		requestRebuild(staticTree)
 	end
 	if staticTree.pendingUpdate == 'rebuild' then
@@ -501,7 +580,11 @@ function ZoneShapes.rebuildTrees()
 			table.insert(freeZoneSlots, slot)
 		end
 		table.clear(heldSlots)
-		LinearBVH.build(staticTree, staticSlots, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		-- Every live slot that isn't dynamic is static
+		LinearBVH.build(staticTree, zoneSlotIds, leafBoxes, dynamicSlots)
+		if staticTree.count >= RELEASE_SCRATCH_FROM then
+			LinearBVH.releaseScratch()
+		end
 	end
 	staticTree.pendingUpdate = 'none'
 
@@ -512,8 +595,8 @@ function ZoneShapes.rebuildTrees()
 	-- A slot goes stale only with a request to update its tree, so every tree that holds one was just updated. Entries
 	-- are removed one by one, which lets the table shrink again; table.clear would keep its largest size for good.
 	if hasStale then
-		for slot in staleSlots do
-			treeExact[slot] = shapeAxisAligned[slot]
+		for slot, aligned in staleSlots do
+			treeExact[slot] = aligned
 			staleSlots[slot] = nil
 		end
 		hasStale = false

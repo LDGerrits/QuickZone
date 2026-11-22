@@ -36,13 +36,23 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 
 export type Phase = 'alive' | 'destroying' | 'dead'
 
-export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
+-- A missing phase means alive: zones leave it out until they are destroyed, which keeps their tables small
+export type Destroyable = { phase: Phase?, onDestroyCallbacks: { () -> () }? }
 
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
 -- What a tree needs before the next query: nothing, new bounds for the same leaves, or new leaves. A request only
 -- moves it forward (none -> refit -> rebuild), and updating the tree brings it back to none.
 export type TreeUpdate = 'none' | 'refit' | 'rebuild'
+
+-- Where a tree's leaves get their boxes: from min and max, or where a leaf has none there, its center plus and minus
+-- its half size
+export type LeafBoxes = {
+	min: { [number]: Vector3 },
+	max: { [number]: Vector3 },
+	centers: { [number]: Vector3 },
+	halfSizes: { [number]: Vector3 },
+}
 
 export type Tree = {
 	buffer: buffer,
@@ -154,7 +164,8 @@ export type InternalZone = Zone & Destroyable & {
 
 	id: number,
 	slot: number,
-	requestedShapeType: number,
+	-- Set only while the zone asks for shape Mesh, which follows a part reference
+	meshRequested: true?,
 	reference: (Attachment | BasePart | Bone)?,
 	metadata: any?,
 	autoSync: true?,

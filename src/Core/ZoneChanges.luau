@@ -75,7 +75,7 @@ function ZoneChanges.commit(log: Types.ZoneChanges, version: number, zoneCount: 
 		boxCenters[i] = (boxesMin[i] + boxesMax[i]) * 0.5
 	end
 
-	LinearBVH.build(slot.tree, boxesMin, boxesMin, boxesMax, boxCenters)
+	LinearBVH.build(slot.tree, boxesMin, { min = boxesMin, max = boxesMax, centers = boxCenters, halfSizes = {} })
 
 	table.clear(boxesMin)
 	table.clear(boxesMax)

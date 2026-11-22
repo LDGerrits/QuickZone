@@ -36,6 +36,8 @@ local REFIT_BACKOFF = 8
 
 local SHRINK_MIN_NODES = 64
 local SHRINK_FACTOR = 4
+-- Spare room kept when a buffer grows, as a share of what it needs: 1/8, so one more zone rarely reallocates it
+local GROWTH_SHARE = 8
 
 local LinearBVH = {}
 
@@ -45,8 +47,13 @@ end
 
 local EMPTY_BUFFER = buffer.create(0)
 local EMPTY_BOUNDS = table.freeze({}) :: { [number]: Vector3 }
+local NO_BOXES: Types.LeafBoxes = {
+	min = EMPTY_BOUNDS,
+	max = EMPTY_BOUNDS,
+	centers = EMPTY_BOUNDS,
+	halfSizes = EMPTY_BOUNDS,
+}
 
-local memberIds = {} :: { number }
 local codesA = EMPTY_BUFFER
 local idsA = EMPTY_BUFFER
 local codesB = EMPTY_BUFFER
@@ -56,8 +63,7 @@ local scratchOwner: Types.Tree? = nil
 
 local sortedCodes = codesA
 local sortedIds = idsA
-local buildBoundsMin = EMPTY_BOUNDS
-local buildBoundsMax = EMPTY_BOUNDS
+local buildBoxes = NO_BOXES
 local buildBuffer = EMPTY_BUFFER
 local buildCost = 0
 
@@ -76,20 +82,24 @@ local function prepareScratch(tree: Types.Tree, count: number)
 	end
 
 	scratchOwner = tree
-	local size = (count + count // 2) * 4
+	local size = (count + count // GROWTH_SHARE) * 4
 	codesA = buffer.create(size)
 	idsA = buffer.create(size)
 	codesB = buffer.create(size)
 	idsB = buffer.create(size)
 	sortedCodes, sortedIds = codesA, idsA
-
-	if #memberIds > count then
-		memberIds = table.move(memberIds, 1, count, 1, table.create(count) :: { number })
-	end
 end
 
 function LinearBVH.scratchSize(): number
 	return buffer.len(codesA)
+end
+
+-- Frees the space builds sort in, which the next build allocates again. Worth it after a build that is large and
+-- rare, like the static tree's.
+function LinearBVH.releaseScratch()
+	codesA, idsA, codesB, idsB = EMPTY_BUFFER, EMPTY_BUFFER, EMPTY_BUFFER, EMPTY_BUFFER
+	sortedCodes, sortedIds = codesA, idsA
+	scratchOwner = nil
 end
 
 local function insertionSort(count: number)
@@ -184,6 +194,20 @@ local function getSplitPos(beginIndex: number, endIndex: number): number
 	return left + 1
 end
 
+-- The leaf's box, or nil when the leaf has no box any more
+local function boxOf(boxes: Types.LeafBoxes, id: number): (Vector3?, Vector3?)
+	local min = boxes.min[id]
+	if min then
+		return min, boxes.max[id]
+	end
+	local center = boxes.centers[id]
+	if center then
+		local halfSize = boxes.halfSizes[id]
+		return center - halfSize, center + halfSize
+	end
+	return nil, nil
+end
+
 local function writeNode(buf: buffer, offset: number, min: Vector3, max: Vector3, skip: number, id: number)
 	writef32(buf, offset, min.X)
 	writef32(buf, offset + MIN_Y_OFFSET, min.Y)
@@ -198,7 +222,9 @@ end
 local function buildFlatTree(beginIndex: number, endIndex: number, offset: number): (number, Vector3, Vector3)
 	if beginIndex == endIndex then
 		local id = readu32(sortedIds, beginIndex * 4)
-		local min, max = buildBoundsMin[id], buildBoundsMax[id]
+		-- A build takes only slots that have a box
+		local boxMin, boxMax = boxOf(buildBoxes, id)
+		local min, max = boxMin :: Vector3, boxMax :: Vector3
 		local nextOffset = offset + NODE_SIZE
 
 		writeNode(buildBuffer, offset, min, max, nextOffset, id)
@@ -224,24 +250,28 @@ local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
 	local buf = tree.buffer
 	local capacity = buffer.len(buf) // NODE_SIZE
 	if capacity < nodeCount or (capacity > SHRINK_MIN_NODES and capacity > nodeCount * SHRINK_FACTOR) then
-		buf = buffer.create((nodeCount + nodeCount // 2) * NODE_SIZE)
+		buf = buffer.create((nodeCount + nodeCount // GROWTH_SHARE) * NODE_SIZE)
 		tree.buffer = buf
 	end
 	return buf
 end
 
+-- Builds the tree over the keys of members, leaving out those in skip
 function LinearBVH.build(
 	tree: Types.Tree,
 	members: { [number]: any },
-	boundsMin: { [number]: Vector3 },
-	boundsMax: { [number]: Vector3 },
-	positions: { [number]: Vector3 }
+	boxes: Types.LeafBoxes,
+	skip: { [number]: any }?
 ): ()
+	local positions = boxes.centers
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
 	local count = 0
 
 	for id in members do
+		if skip and skip[id] then
+			continue
+		end
 		local position = positions[id]
 		local isFinite = position - position == Vector3.zero
 		if isFinite then
@@ -250,7 +280,6 @@ function LinearBVH.build(
 		end
 
 		count += 1
-		memberIds[count] = id
 	end
 
 	prepareScratch(tree, count)
@@ -270,35 +299,33 @@ function LinearBVH.build(
 	local sceneMin, sceneMax = min - padding, max + padding
 	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
 
-	for i = 1, count do
-		local id = memberIds[i]
-		local offset = (i - 1) * 4
+	-- A second pass over members, in the same order as the first, so no list of them is kept
+	local offset = 0
+	for id in members do
+		if skip and skip[id] then
+			continue
+		end
 		writeu32(codesA, offset, positionToMortonCode(positions[id], sceneMin, scaleX, scaleY, scaleZ))
 		writeu32(idsA, offset, id)
+		offset += 4
 	end
 	radixSort(count)
 
 	local nodeCount = 2 * count - 1
 	buildBuffer = prepareBuffer(tree, nodeCount)
-	buildBoundsMin = boundsMin
-	buildBoundsMax = boundsMax
+	buildBoxes = boxes
 	buildCost = 0
 
 	buildFlatTree(0, count - 1, 0)
 
 	buildBuffer = EMPTY_BUFFER
-	buildBoundsMin = EMPTY_BOUNDS
-	buildBoundsMax = EMPTY_BOUNDS
+	buildBoxes = NO_BOXES
 
 	tree.count = nodeCount
 	tree.cost = buildCost
 end
 
-function LinearBVH.tryRefit(
-	tree: Types.Tree,
-	boundsMin: { [number]: Vector3 },
-	boundsMax: { [number]: Vector3 }
-): boolean
+function LinearBVH.tryRefit(tree: Types.Tree, boxes: Types.LeafBoxes): boolean
 	if tree.refitSkips > 0 then
 		tree.refitSkips -= 1
 		return false
@@ -306,13 +333,20 @@ function LinearBVH.tryRefit(
 
 	local buf = tree.buffer
 	local cost = 0
+	local boxesMin, boxesMax, centers, halfSizes = boxes.min, boxes.max, boxes.centers, boxes.halfSizes
 
 	for offset = (tree.count - 1) * NODE_SIZE, 0, -NODE_SIZE do
 		local id = readu32(buf, offset + ID_OFFSET)
 		if id ~= 0 then
-			local min, max = boundsMin[id], boundsMax[id]
+			-- Like boxOf, inline: a leaf whose box is gone has no zone any more, which only a rebuild drops
+			local min, max = boxesMin[id], boxesMax[id]
 			if not min then
-				return false
+				local center = centers[id]
+				if not center then
+					return false
+				end
+				local halfSize = halfSizes[id]
+				min, max = center - halfSize, center + halfSize
 			end
 
 			writef32(buf, offset, min.X)

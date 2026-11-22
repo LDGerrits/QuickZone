@@ -8,7 +8,8 @@ type Destroyable = Types.Destroyable
 local Destroyed = {}
 
 function Destroyed.begin(object: Destroyable): boolean
-	if object.phase ~= 'alive' then
+	local phase = object.phase
+	if phase ~= nil and phase ~= 'alive' then
 		return false
 	end
 	object.phase = 'destroying'

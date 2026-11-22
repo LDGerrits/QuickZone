@@ -30,6 +30,8 @@ local isSubscribed = Memberships.isSubscribed
 local treeExact = ZoneShapes.treeExact
 local shapeBoundsMin = ZoneShapes.shapeBoundsMin
 local shapeBoundsMax = ZoneShapes.shapeBoundsMax
+local shapePositions = ZoneShapes.shapePositions
+local shapeFilledHalfSizes = ZoneShapes.shapeFilledHalfSizes
 local firstLeaf = LinearBVH.firstLeaf
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotIds = ZoneShapes.zoneSlotIds
@@ -175,7 +177,12 @@ local function stillHolds(zoneId: number, observerId: number, position: Vector3)
 	if zoneSlotIds[slot] ~= zoneId or not isAttachedTo(slot, observerId) then
 		return false
 	elseif treeExact[slot] then
+		-- ZoneShapes keeps a box only where it isn't the position plus and minus the half size
 		local min, max = shapeBoundsMin[slot], shapeBoundsMax[slot]
+		if not min then
+			local center, halfSize = shapePositions[slot], shapeFilledHalfSizes[slot]
+			min, max = center - halfSize, center + halfSize
+		end
 		return vector.max(min, position) == position and vector.min(max, position) == position
 	end
 	return containsPoint(slot, position)
