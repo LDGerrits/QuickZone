@@ -126,7 +126,7 @@ end
 	@tag Chainable
 	@method update
 	@within QuickZone
-	@param dt number? -- Delta time, 0 when left out
+	@param dt number? -- Seconds since the last update. An update checks the share `updateRate * dt` of the entities, so left out (0) it checks only one per update rate
 	@return QuickZone
 ]=]
 function QuickZone:update(dt: number?): QuickZone
