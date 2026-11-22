@@ -222,7 +222,9 @@ end
 local function buildFlatTree(beginIndex: number, endIndex: number, offset: number): (number, Vector3, Vector3)
 	if beginIndex == endIndex then
 		local id = readu32(sortedIds, beginIndex * 4)
-		local min, max = boxOf(buildBoxes, id)
+		-- A build takes only slots that have a box
+		local boxMin, boxMax = boxOf(buildBoxes, id)
+		local min, max = boxMin :: Vector3, boxMax :: Vector3
 		local nextOffset = offset + NODE_SIZE
 
 		writeNode(buildBuffer, offset, min, max, nextOffset, id)

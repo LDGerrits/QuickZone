@@ -269,7 +269,7 @@ local function deriveWorldShape(
 	-- Writing nil to a missing key still adds one, so only a slot that has a raw size gets it cleared
 	if rawHalfSize ~= halfSize then
 		shapeHalfSizes[slot] = rawHalfSize
-	elseif shapeHalfSizes[slot] ~= nil then
+	elseif shapeHalfSizes[slot] then
 		shapeHalfSizes[slot] = nil
 	end
 	shapePositions[slot] = position
@@ -280,7 +280,7 @@ local function deriveWorldShape(
 	if keepBounds then
 		shapeBoundsMin[slot] = boundsMin
 		shapeBoundsMax[slot] = boundsMax
-	elseif shapeBoundsMin[slot] ~= nil then
+	elseif shapeBoundsMin[slot] then
 		shapeBoundsMin[slot] = nil
 		shapeBoundsMax[slot] = nil
 	end
@@ -434,7 +434,7 @@ function ZoneShapes.remove(slot: number)
 		holdSlot = removeStatic(slot)
 	end
 
-	if shapeHalfSizes[slot] ~= nil then
+	if shapeHalfSizes[slot] then
 		shapeHalfSizes[slot] = nil
 	end
 	shapeFilledHalfSizes[slot] = nil
@@ -444,7 +444,7 @@ function ZoneShapes.remove(slot: number)
 	shapeRights[slot] = nil
 	shapeUps[slot] = nil
 	shapeBacks[slot] = nil
-	if shapeBoundsMin[slot] ~= nil then
+	if shapeBoundsMin[slot] then
 		shapeBoundsMin[slot] = nil
 		shapeBoundsMax[slot] = nil
 	end
