@@ -436,7 +436,9 @@ end
 	@return Zone
 ]=]
 function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
-	checkType('cframe', 'CFrame', cf)
+	if typeof(cf) ~= 'CFrame' then
+		checkType('cframe', 'CFrame', cf)
+	end
 	ZoneShapes.setCFrame(self.slot, cf)
 	return self
 end

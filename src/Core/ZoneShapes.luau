@@ -115,7 +115,15 @@ local function deriveWorldShape(slot: number)
 	local right = Vector3.new(r00, r10, r20)
 	local up = Vector3.new(r01, r11, r21)
 	local back = Vector3.new(r02, r12, r22)
-	local boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
+	-- Unrotated is the common case, where the bounds are the half size around the position
+	local unrotated = r01 == 0 and r02 == 0 and r10 == 0 and r12 == 0 and r20 == 0 and r21 == 0
+	local boundsMin, boundsMax
+	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
+	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
+		boundsMin, boundsMax = position - halfSize, position + halfSize
+	else
+		boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
+	end
 	-- A NaN position or size would spread NaN to every tree node above the leaf, hiding other zones
 	if boundsMin ~= boundsMin or boundsMax ~= boundsMax then
 		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
@@ -137,7 +145,8 @@ local function deriveWorldShape(slot: number)
 	shapeBacks[slot] = back
 	shapeBoundsMin[slot] = boundsMin
 	shapeBoundsMax[slot] = boundsMax
-	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE and isAxis(right) and isAxis(up) and isAxis(back)
+	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE
+		and (unrotated or (isAxis(right) and isAxis(up) and isAxis(back)))
 
 	treeExact[slot] = nil
 	staleSlots[slot] = true
@@ -203,7 +212,13 @@ function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeTy
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
-	ZoneShapes.set(slot, cframe, shapeHalfSizes[slot], shapeTypes[slot], shapeParts[slot])
+	-- Like set, which a removed zone or an unchanged CFrame leaves alone
+	local current = shapeCFrames[slot]
+	if not current or current == cframe then
+		return
+	end
+	shapeCFrames[slot] = cframe
+	deriveWorldShape(slot)
 end
 
 function ZoneShapes.setHalfSize(slot: number, halfSize: Vector3)
