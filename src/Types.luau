@@ -157,7 +157,7 @@ export type InternalZone = Zone & Destroyable & {
 	requestedShapeType: number,
 	reference: (Attachment | BasePart | Bone)?,
 	metadata: any?,
-	autoSync: boolean,
+	autoSync: true?,
 	syncConnections: { RBXScriptConnection }?,
 }
 
