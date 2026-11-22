@@ -350,8 +350,13 @@ function Zones._addZone(self: Types.InternalZones, zone: Types.Zone)
 		zone:setMetadata(self.metadata)
 	end
 
-	zone:setDynamic(self.syncMode ~= 'static')
-	zone:setAutoSync(self.syncMode == 'synced')
+	-- Only ever towards dynamic and synced: a zone a script adds keeps the mode it was given
+	if self.syncMode ~= 'static' and not zone:isDynamic() then
+		zone:setDynamic(true)
+	end
+	if self.syncMode == 'synced' then
+		zone:setAutoSync(true)
+	end
 
 	self.zones[zone] = true
 
