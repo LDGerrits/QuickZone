@@ -47,6 +47,12 @@ end
 
 local EMPTY_BUFFER = buffer.create(0)
 local EMPTY_BOUNDS = table.freeze({}) :: { [number]: Vector3 }
+local NO_BOXES: Types.LeafBoxes = {
+	min = EMPTY_BOUNDS,
+	max = EMPTY_BOUNDS,
+	centers = EMPTY_BOUNDS,
+	halfSizes = EMPTY_BOUNDS,
+}
 
 local codesA = EMPTY_BUFFER
 local idsA = EMPTY_BUFFER
@@ -57,8 +63,7 @@ local scratchOwner: Types.Tree? = nil
 
 local sortedCodes = codesA
 local sortedIds = idsA
-local buildBoundsMin = EMPTY_BOUNDS
-local buildBoundsMax = EMPTY_BOUNDS
+local buildBoxes = NO_BOXES
 local buildBuffer = EMPTY_BUFFER
 local buildCost = 0
 
@@ -189,6 +194,20 @@ local function getSplitPos(beginIndex: number, endIndex: number): number
 	return left + 1
 end
 
+-- The leaf's box, or nil when the leaf has no box any more
+local function boxOf(boxes: Types.LeafBoxes, id: number): (Vector3?, Vector3?)
+	local min = boxes.min[id]
+	if min then
+		return min, boxes.max[id]
+	end
+	local center = boxes.centers[id]
+	if center then
+		local halfSize = boxes.halfSizes[id]
+		return center - halfSize, center + halfSize
+	end
+	return nil, nil
+end
+
 local function writeNode(buf: buffer, offset: number, min: Vector3, max: Vector3, skip: number, id: number)
 	writef32(buf, offset, min.X)
 	writef32(buf, offset + MIN_Y_OFFSET, min.Y)
@@ -203,7 +222,7 @@ end
 local function buildFlatTree(beginIndex: number, endIndex: number, offset: number): (number, Vector3, Vector3)
 	if beginIndex == endIndex then
 		local id = readu32(sortedIds, beginIndex * 4)
-		local min, max = buildBoundsMin[id], buildBoundsMax[id]
+		local min, max = boxOf(buildBoxes, id)
 		local nextOffset = offset + NODE_SIZE
 
 		writeNode(buildBuffer, offset, min, max, nextOffset, id)
@@ -235,18 +254,22 @@ local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
 	return buf
 end
 
+-- Builds the tree over the keys of members, leaving out those in skip
 function LinearBVH.build(
 	tree: Types.Tree,
 	members: { [number]: any },
-	boundsMin: { [number]: Vector3 },
-	boundsMax: { [number]: Vector3 },
-	positions: { [number]: Vector3 }
+	boxes: Types.LeafBoxes,
+	skip: { [number]: any }?
 ): ()
+	local positions = boxes.centers
 	local min = HUGE_VECTOR
 	local max = NEGATIVE_HUGE_VECTOR
 	local count = 0
 
 	for id in members do
+		if skip and skip[id] then
+			continue
+		end
 		local position = positions[id]
 		local isFinite = position - position == Vector3.zero
 		if isFinite then
@@ -277,6 +300,9 @@ function LinearBVH.build(
 	-- A second pass over members, in the same order as the first, so no list of them is kept
 	local offset = 0
 	for id in members do
+		if skip and skip[id] then
+			continue
+		end
 		writeu32(codesA, offset, positionToMortonCode(positions[id], sceneMin, scaleX, scaleY, scaleZ))
 		writeu32(idsA, offset, id)
 		offset += 4
@@ -285,25 +311,19 @@ function LinearBVH.build(
 
 	local nodeCount = 2 * count - 1
 	buildBuffer = prepareBuffer(tree, nodeCount)
-	buildBoundsMin = boundsMin
-	buildBoundsMax = boundsMax
+	buildBoxes = boxes
 	buildCost = 0
 
 	buildFlatTree(0, count - 1, 0)
 
 	buildBuffer = EMPTY_BUFFER
-	buildBoundsMin = EMPTY_BOUNDS
-	buildBoundsMax = EMPTY_BOUNDS
+	buildBoxes = NO_BOXES
 
 	tree.count = nodeCount
 	tree.cost = buildCost
 end
 
-function LinearBVH.tryRefit(
-	tree: Types.Tree,
-	boundsMin: { [number]: Vector3 },
-	boundsMax: { [number]: Vector3 }
-): boolean
+function LinearBVH.tryRefit(tree: Types.Tree, boxes: Types.LeafBoxes): boolean
 	if tree.refitSkips > 0 then
 		tree.refitSkips -= 1
 		return false
@@ -315,7 +335,8 @@ function LinearBVH.tryRefit(
 	for offset = (tree.count - 1) * NODE_SIZE, 0, -NODE_SIZE do
 		local id = readu32(buf, offset + ID_OFFSET)
 		if id ~= 0 then
-			local min, max = boundsMin[id], boundsMax[id]
+			-- A leaf whose box is gone has no zone any more, which only a rebuild drops
+			local min, max = boxOf(boxes, id)
 			if not min then
 				return false
 			end

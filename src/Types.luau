@@ -45,6 +45,15 @@ export type SyncMode = 'static' | 'dynamic' | 'synced'
 -- moves it forward (none -> refit -> rebuild), and updating the tree brings it back to none.
 export type TreeUpdate = 'none' | 'refit' | 'rebuild'
 
+-- Where a tree's leaves get their boxes: from min and max, or where a leaf has none there, its center plus and minus
+-- its half size
+export type LeafBoxes = {
+	min: { [number]: Vector3 },
+	max: { [number]: Vector3 },
+	centers: { [number]: Vector3 },
+	halfSizes: { [number]: Vector3 },
+}
+
 export type Tree = {
 	buffer: buffer,
 	count: number,

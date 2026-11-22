@@ -27,7 +27,6 @@ local ZoneShapes = {}
 ZoneShapes.zoneSlotCount = 0
 ZoneShapes.freeZoneSlots = {} :: { number }
 ZoneShapes.zoneSlotIds = {} :: { [number]: number }
-ZoneShapes.staticSlots = {} :: { [number]: true }
 ZoneShapes.dynamicSlots = {} :: { [number]: true }
 -- The half size a zone tests points against: never negative, and for a ball or cylinder the one its radius fills
 ZoneShapes.shapeFilledHalfSizes = {} :: { [number]: Vector3 }
@@ -39,6 +38,8 @@ ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
 ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
+-- A zone's box, kept only where it isn't its position plus and minus its filled half size: when it is rotated, or its
+-- size is infinite or NaN
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
 ZoneShapes.treeExact = {} :: { [number]: boolean }
@@ -67,13 +68,18 @@ local shapeBoundsMin = ZoneShapes.shapeBoundsMin
 local shapeBoundsMax = ZoneShapes.shapeBoundsMax
 local treeExact = ZoneShapes.treeExact
 local staleSlots = ZoneShapes.staleSlots
-local staticSlots = ZoneShapes.staticSlots
 local dynamicSlots = ZoneShapes.dynamicSlots
 local dynamicTree = ZoneShapes.dynamicTree
 local staticTree = ZoneShapes.staticTree
 local recentTree = ZoneShapes.recentTree
 local staticChanges = ZoneShapes.staticChanges
 local dynamicChanges = ZoneShapes.dynamicChanges
+local leafBoxes: Types.LeafBoxes = {
+	min = shapeBoundsMin,
+	max = shapeBoundsMax,
+	centers = shapePositions,
+	halfSizes = shapeFilledHalfSizes,
+}
 
 -- Whether staleSlots may hold a slot. next() on a large emptied table scans every free node, so hot paths read this.
 local hasStale = false
@@ -125,7 +131,6 @@ local function addStatic(slot: number)
 	local useRecent = staticTreeCount() >= RECENT_FROM
 		and staticTree.pendingUpdate ~= 'rebuild'
 		and recentCount < rebuildLimit()
-	staticSlots[slot] = true
 	staticCount += 1
 	if useRecent then
 		recentStaticSlots[slot] = true
@@ -138,10 +143,9 @@ end
 
 -- Whether the slot's leaf stays in staticTree, so the slot has to be held until staticTree is rebuilt
 local function removeStatic(slot: number): boolean
-	if not staticSlots[slot] then
+	if shapeTypes[slot] == nil or dynamicSlots[slot] then
 		return false
 	end
-	staticSlots[slot] = nil
 	staticCount -= 1
 
 	if recentStaticSlots[slot] then
@@ -196,6 +200,16 @@ local function setPart(slot: number, part: BasePart?)
 	end
 end
 
+-- The zone's box. The slot must hold a zone.
+local function boundsOf(slot: number): (Vector3, Vector3)
+	local min = shapeBoundsMin[slot]
+	if min then
+		return min, shapeBoundsMax[slot]
+	end
+	local position, halfSize = shapePositions[slot], shapeFilledHalfSizes[slot]
+	return position - halfSize, position + halfSize
+end
+
 -- Whether every point inside the zone's box is inside the zone, so the tree's box test is the whole answer
 local function isAxisAligned(slot: number): boolean
 	return shapeTypes[slot] == BLOCK_SHAPE_VALUE
@@ -228,22 +242,24 @@ local function deriveWorldShape(
 		and math.abs(up.Y) == 1
 		and math.abs(back.Z) == 1
 	local boundsMin, boundsMax
+	local keepBounds = true
 	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
 	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
 		boundsMin, boundsMax = position - halfSize, position + halfSize
+		keepBounds = false
 	else
 		boundsMin, boundsMax = getBounds(position, right, up, back, halfSize)
 	end
 	-- A NaN position or size would spread NaN to every tree node above the leaf, hiding other zones
 	if boundsMin ~= boundsMin or boundsMax ~= boundsMax then
 		boundsMin, boundsMax = EMPTY_MIN, EMPTY_MAX
+		keepBounds = true
 	end
 
 	local changes = changesOf(isDynamic)
 	if not changes.all then
-		local oldMin = shapeBoundsMin[slot]
-		if oldMin then
-			ZoneChanges.add(changes, oldMin, shapeBoundsMax[slot])
+		if shapePositions[slot] then
+			ZoneChanges.add(changes, boundsOf(slot))
 		end
 		ZoneChanges.add(changes, boundsMin, boundsMax)
 	end
@@ -259,8 +275,14 @@ local function deriveWorldShape(
 	shapeRights[slot] = right
 	shapeUps[slot] = up
 	shapeBacks[slot] = back
-	shapeBoundsMin[slot] = boundsMin
-	shapeBoundsMax[slot] = boundsMax
+	-- Writing nil to a missing key still adds one, so only a slot that has bounds gets them cleared
+	if keepBounds then
+		shapeBoundsMin[slot] = boundsMin
+		shapeBoundsMax[slot] = boundsMax
+	elseif shapeBoundsMin[slot] ~= nil then
+		shapeBoundsMin[slot] = nil
+		shapeBoundsMax[slot] = nil
+	end
 
 	treeExact[slot] = nil
 	staleSlots[slot] = true
@@ -386,17 +408,16 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	staleSlots[slot] = true
 	hasStale = true
 
-	local min = shapeBoundsMin[slot]
-	if min then
-		ZoneChanges.add(staticChanges, min, shapeBoundsMax[slot])
-		ZoneChanges.add(dynamicChanges, min, shapeBoundsMax[slot])
+	if shapePositions[slot] then
+		local min, max = boundsOf(slot)
+		ZoneChanges.add(staticChanges, min, max)
+		ZoneChanges.add(dynamicChanges, min, max)
 	end
 end
 
 function ZoneShapes.touch(slot: number)
-	local min = shapeBoundsMin[slot]
-	if min then
-		ZoneChanges.add(changesOf(dynamicSlots[slot] == true), min, shapeBoundsMax[slot])
+	if shapePositions[slot] then
+		ZoneChanges.add(changesOf(dynamicSlots[slot] == true), boundsOf(slot))
 	end
 end
 
@@ -422,8 +443,10 @@ function ZoneShapes.remove(slot: number)
 	shapeRights[slot] = nil
 	shapeUps[slot] = nil
 	shapeBacks[slot] = nil
-	shapeBoundsMin[slot] = nil
-	shapeBoundsMax[slot] = nil
+	if shapeBoundsMin[slot] ~= nil then
+		shapeBoundsMin[slot] = nil
+		shapeBoundsMax[slot] = nil
+	end
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
 
@@ -529,8 +552,8 @@ function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 end
 
 local function updateTree(tree: Types.Tree, members: { [number]: any })
-	if tree.pendingUpdate == 'rebuild' or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
-		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
+	if tree.pendingUpdate == 'rebuild' or not LinearBVH.tryRefit(tree, leafBoxes) then
+		LinearBVH.build(tree, members, leafBoxes)
 	end
 	tree.pendingUpdate = 'none'
 end
@@ -543,10 +566,7 @@ function ZoneShapes.rebuildTrees()
 	-- staticTree doesn't go through updateTree: whether it rebuilds has to be known first, because a rebuild takes
 	-- every static slot, those in recentTree too, and frees the held slots. It refits only while each leaf has a zone
 	-- in it, and a failed refit rebuilds it like any other.
-	if
-		staticTree.pendingUpdate == 'refit'
-		and (#heldSlots > 0 or not LinearBVH.tryRefit(staticTree, shapeBoundsMin, shapeBoundsMax))
-	then
+	if staticTree.pendingUpdate == 'refit' and (#heldSlots > 0 or not LinearBVH.tryRefit(staticTree, leafBoxes)) then
 		requestRebuild(staticTree)
 	end
 	if staticTree.pendingUpdate == 'rebuild' then
@@ -559,7 +579,8 @@ function ZoneShapes.rebuildTrees()
 			table.insert(freeZoneSlots, slot)
 		end
 		table.clear(heldSlots)
-		LinearBVH.build(staticTree, staticSlots, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		-- Every live slot that isn't dynamic is static
+		LinearBVH.build(staticTree, zoneSlotIds, leafBoxes, dynamicSlots)
 		if staticTree.count >= RELEASE_SCRATCH_FROM then
 			LinearBVH.releaseScratch()
 		end
