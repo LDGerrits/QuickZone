@@ -49,7 +49,7 @@ export type Tree = {
 	count: number,
 	cost: number,
 	refitSkips: number,
-	update: TreeUpdate,
+	pendingUpdate: TreeUpdate,
 }
 
 export type ChangeSlot = {

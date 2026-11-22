@@ -40,7 +40,7 @@ local SHRINK_FACTOR = 4
 local LinearBVH = {}
 
 function LinearBVH.new(): Types.Tree
-	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, update = 'none' }
+	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, pendingUpdate = 'none' }
 end
 
 local EMPTY_BUFFER = buffer.create(0)

@@ -104,24 +104,30 @@ local function changesOf(isDynamic: boolean): Types.ZoneChanges
 end
 
 local function requestRefit(tree: Types.Tree)
-	if tree.update == 'none' then
-		tree.update = 'refit'
+	if tree.pendingUpdate == 'none' then
+		tree.pendingUpdate = 'refit'
 	end
 end
 
 local function requestRebuild(tree: Types.Tree)
-	tree.update = 'rebuild'
+	tree.pendingUpdate = 'rebuild'
+end
+
+local function staticTreeCount(): number
+	return staticCount - recentCount
 end
 
 local function rebuildLimit(): number
-	return math.max(MIN_REBUILD_LIMIT, (staticCount - recentCount) // REBUILD_SHARE)
+	return math.max(MIN_REBUILD_LIMIT, staticTreeCount() // REBUILD_SHARE)
 end
 
 local function addStatic(slot: number)
-	local inStaticTree = staticCount - recentCount
+	local useRecent = staticTreeCount() >= RECENT_FROM
+		and staticTree.pendingUpdate ~= 'rebuild'
+		and recentCount < rebuildLimit()
 	staticSlots[slot] = true
 	staticCount += 1
-	if inStaticTree >= RECENT_FROM and staticTree.update ~= 'rebuild' and recentCount < rebuildLimit() then
+	if useRecent then
 		recentStaticSlots[slot] = true
 		recentCount += 1
 		requestRebuild(recentTree)
@@ -143,10 +149,11 @@ local function removeStatic(slot: number): boolean
 		recentCount -= 1
 		requestRebuild(recentTree)
 		return false
-	elseif staticTree.update == 'rebuild' then
+	elseif staticTree.pendingUpdate == 'rebuild' then
 		return false
 	end
 
+	-- The caller holds this slot after it returns, so it counts as one more held slot
 	if #heldSlots + 1 >= rebuildLimit() then
 		requestRebuild(staticTree)
 	end
@@ -464,25 +471,27 @@ function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 end
 
 local function updateTree(tree: Types.Tree, members: { [number]: any })
-	if tree.update == 'rebuild' or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
+	if tree.pendingUpdate == 'rebuild' or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
 		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
 	end
-	tree.update = 'none'
+	tree.pendingUpdate = 'none'
 end
 
 function ZoneShapes.rebuildTrees()
-	if dynamicTree.update ~= 'none' then
+	if dynamicTree.pendingUpdate ~= 'none' then
 		updateTree(dynamicTree, dynamicSlots)
 	end
 
-	-- staticTree refits only while each leaf has a zone in it, and a failed refit rebuilds it like any other
+	-- staticTree doesn't go through updateTree: whether it rebuilds has to be known first, because a rebuild takes
+	-- every static slot, those in recentTree too, and frees the held slots. It refits only while each leaf has a zone
+	-- in it, and a failed refit rebuilds it like any other.
 	if
-		staticTree.update == 'refit'
+		staticTree.pendingUpdate == 'refit'
 		and (#heldSlots > 0 or not LinearBVH.tryRefit(staticTree, shapeBoundsMin, shapeBoundsMax))
 	then
 		requestRebuild(staticTree)
 	end
-	if staticTree.update == 'rebuild' then
+	if staticTree.pendingUpdate == 'rebuild' then
 		-- Every static slot goes into staticTree, and the slots held for its old leaves are free again
 		table.clear(recentStaticSlots)
 		recentCount = 0
@@ -494,9 +503,9 @@ function ZoneShapes.rebuildTrees()
 		table.clear(heldSlots)
 		LinearBVH.build(staticTree, staticSlots, shapeBoundsMin, shapeBoundsMax, shapePositions)
 	end
-	staticTree.update = 'none'
+	staticTree.pendingUpdate = 'none'
 
-	if recentTree.update ~= 'none' then
+	if recentTree.pendingUpdate ~= 'none' then
 		updateTree(recentTree, recentStaticSlots)
 	end
 
