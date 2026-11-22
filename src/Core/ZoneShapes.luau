@@ -15,7 +15,12 @@ local EMPTY_MAX = -EMPTY_MIN
 
 local getBounds = Geometry.getBounds
 local queryPoint = LinearBVH.queryPoint
+local clearRadius = LinearBVH.clearRadius
 local isPointInShape = Geometry.isPointInShape
+
+local INV_SQRT3 = 1 / math.sqrt(3)
+-- Kept off every clear radius, so float rounding at a zone's face can't put a point on the wrong side
+local CLEAR_MARGIN = 1e-3
 
 local ZoneShapes = {}
 
@@ -65,6 +70,9 @@ local dynamicTree = ZoneShapes.dynamicTree
 local staticTree = ZoneShapes.staticTree
 local staticChanges = ZoneShapes.staticChanges
 local dynamicChanges = ZoneShapes.dynamicChanges
+
+-- Whether staleSlots may hold a slot. next() on a large emptied table scans every free node, so hot paths read this.
+local hasStale = false
 
 local function isAxis(direction: Vector3): boolean
 	local magnitude = vector.abs(direction)
@@ -133,6 +141,7 @@ local function deriveWorldShape(slot: number)
 
 	treeExact[slot] = nil
 	staleSlots[slot] = true
+	hasStale = true
 
 	treeOf(isDynamic).pending = true
 end
@@ -224,6 +233,7 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	markMembersChanged(true)
 	markMembersChanged(false)
 	staleSlots[slot] = true
+	hasStale = true
 
 	local min = shapeBoundsMin[slot]
 	if min then
@@ -293,6 +303,69 @@ function ZoneShapes.containsPoint(slot: number, point: Vector3): boolean
 	)
 end
 
+-- How far point can move, on every axis, before it might cross the shape in slot. Its box holds point.
+local function leafRadius(
+	slot: number,
+	point: Vector3,
+	minX: number,
+	minY: number,
+	minZ: number,
+	maxX: number,
+	maxY: number,
+	maxZ: number
+): number
+	if treeExact[slot] then
+		local px, py, pz = point.X, point.Y, point.Z
+		return math.min(px - minX, maxX - px, py - minY, maxY - py, pz - minZ, maxZ - pz)
+	end
+
+	-- A cube of half-width r reaches r * sqrt(3) from its centre, so it clears a shape r * sqrt(3) away
+	local shapeType = shapeTypes[slot]
+	if shapeType == BALL_SHAPE_VALUE then
+		local offset = point - shapePositions[slot]
+		return math.abs(shapeFilledHalfSizes[slot].X - math.sqrt(vector.dot(offset, offset))) * INV_SQRT3
+	elseif shapeType == BLOCK_SHAPE_VALUE then
+		local offset = point - shapePositions[slot]
+		local half = shapeFilledHalfSizes[slot]
+		local localPoint = vector.abs(
+			Vector3.new(
+				vector.dot(offset, shapeRights[slot]),
+				vector.dot(offset, shapeUps[slot]),
+				vector.dot(offset, shapeBacks[slot])
+			)
+		)
+		if vector.min(localPoint, half) == localPoint then
+			local inside = half - localPoint
+			return math.min(inside.X, inside.Y, inside.Z) * INV_SQRT3
+		end
+		local outside = vector.max(localPoint - half, Vector3.zero)
+		return math.sqrt(vector.dot(outside, outside)) * INV_SQRT3
+	end
+
+	return 0
+end
+
+--[=[
+	The half-width of a cube around point inside which every zone in the trees gives the same answer as at point, up to
+	maxRadius; 0 if there is none or a zone changed since the trees were built.
+]=]
+function ZoneShapes.clearRadius(point: Vector3, maxRadius: number, useStatic: boolean, useDynamic: boolean): number
+	if hasStale then
+		return 0
+	end
+
+	local radius = maxRadius
+	if useDynamic then
+		radius = clearRadius(dynamicTree, point, radius, leafRadius)
+	end
+	if useStatic and radius > 0 then
+		radius = clearRadius(staticTree, point, radius, leafRadius)
+	end
+
+	radius -= CLEAR_MARGIN
+	return if radius > 0 then radius else 0
+end
+
 function ZoneShapes.leafContainsPoint(slot: number, point: Vector3): boolean
 	return treeExact[slot] == true or ZoneShapes.containsPoint(slot, point)
 end
@@ -326,6 +399,10 @@ function ZoneShapes.rebuildTrees()
 
 	if ZoneChanges.commit(staticChanges, ZoneShapes.staticVersion + 1, (staticTree.count + 1) // 2) then
 		ZoneShapes.staticVersion += 1
+	end
+
+	if hasStale then
+		hasStale = next(staleSlots) ~= nil
 	end
 end
 

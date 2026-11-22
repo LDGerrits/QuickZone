@@ -79,6 +79,9 @@ export type EntityData = {
 	lastPosition: Vector3,
 	staticVersion: number,
 	dynamicVersion: number,
+	clearCenter: Vector3,
+	clearRadius: number,
+	soleObserver: number?,
 }
 
 export type Group<T = any> = {
