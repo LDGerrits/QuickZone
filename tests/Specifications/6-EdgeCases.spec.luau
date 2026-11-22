@@ -1735,4 +1735,224 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 	end)
+
+	Describe('Checks QuickZone skips', function()
+		-- Every entity is checked in each update(1), so three updates settle any change
+		local function settle()
+			for _ = 1, 3 do
+				QuickZone:update(1)
+			end
+		end
+
+		Test('An entity resting in a clear spot still sees zones that appear, move, grow and go around it.', function()
+			withCleanup(function(track)
+				local origin = Vector3.new(-31000, 0, -31000)
+				-- Enough static zones elsewhere that new static zones join the small tree for recent ones
+				local far = {}
+				for i = 1, 300 do
+					far[i] = track(Zone.new({
+						cframe = CFrame.new(origin + Vector3.new(600 + (i % 20) * 30, 0, (i // 20) * 30)),
+						size = Vector3.one * 10,
+					}))
+				end
+				local entity = { Position = origin }
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = far, groups = { group } }))
+				settle()
+				-- A few small steps, so QuickZone stops checking the entity while it stays put
+				for _ = 1, 5 do
+					entity.Position += Vector3.new(0.5, 0, 0)
+					settle()
+				end
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+
+				local static = track(Zone.new({ cframe = CFrame.new(entity.Position), size = Vector3.one * 4 }))
+				observer:attach(static)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(static)
+
+				static:destroy()
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+
+				local mover = track(Zone.new({
+					cframe = CFrame.new(entity.Position + Vector3.new(20, 0, 0)),
+					size = Vector3.one * 4,
+					isDynamic = true,
+				}))
+				observer:attach(mover)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+				mover:setCFrame(CFrame.new(entity.Position))
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(mover)
+				mover:setCFrame(CFrame.new(entity.Position + Vector3.new(0, 20, 0)))
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+
+				local grower = track(Zone.new({
+					cframe = CFrame.new(entity.Position + Vector3.new(6, 0, 0)),
+					size = Vector3.one * 4,
+				}))
+				observer:attach(grower)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+				grower:setSize(Vector3.one * 20)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(grower)
+
+				-- A zone that holds the entity but that the observer isn't attached to yet
+				local unattached = track(Zone.new({ cframe = CFrame.new(entity.Position), size = Vector3.one * 6 }))
+				observer:detach(grower)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+				observer:attach(unattached)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(unattached)
+
+				-- A static zone added beside the entity limits how far it can move before it is checked again
+				observer:detach(unattached)
+				local beside = track(Zone.new({
+					cframe = CFrame.new(entity.Position + Vector3.new(5, 0, 0)),
+					size = Vector3.one * 4,
+				}))
+				observer:attach(beside)
+				settle()
+				entity.Position += Vector3.new(0, 0.5, 0)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(nil)
+				entity.Position += Vector3.new(4, 0, 0)
+				settle()
+				Expect(observer:getZoneOfEntity(entity)).is(beside)
+			end)
+		end)
+
+		Test('Static zones created and destroyed among many others are found, and destroyed ones are not.', function()
+			withCleanup(function(track)
+				local rng = Random.new(5)
+				local origin = Vector3.new(-32000, 0, -32000)
+				local live = {}
+				for i = 1, 400 do
+					live[i] = track(Zone.new({
+						cframe = Util.randomCFrame(rng, origin, 150),
+						size = Vector3.one * rng:NextNumber(8, 20),
+					}))
+				end
+				local entities = {}
+				for i = 1, 60 do
+					entities[i] = { Position = origin + Util.randomOffset(rng, 150) }
+				end
+				local group = track(Group.new({ entities = entities, autoClean = false }))
+				local observer = track(Observer.new({ zones = live, groups = { group }, precision = 0 }))
+				local everCreated = setOf(live)
+
+				local function check(label: string)
+					settle()
+					local liveSet = setOf(live)
+					for _, entity in entities do
+						local point = entity.Position
+						Expect(Util.findMismatch(live, point, QuickZone:getZonesAtPoint(point))).is(nil)
+						for _, found in QuickZone:getZonesAtPoint(point) do
+							if everCreated[found] then
+								Expect(`{label}: found zone alive {liveSet[found] == true}`).is(
+									`{label}: found zone alive true`
+								)
+							end
+						end
+						local zone = observer:getZoneOfEntity(entity)
+						if zone then
+							Expect(`{label}: entity in live zone {liveSet[zone] == true}`).is(
+								`{label}: entity in live zone true`
+							)
+							Expect(zone:isPointInside(point)).is(true)
+						else
+							for _, candidate in live do
+								Expect(candidate:isPointInside(point)).is(false)
+							end
+						end
+					end
+				end
+
+				check('start')
+				for round = 1, 9 do
+					-- Entities go where destroyed zones were, so a leftover of one would be found
+					local gone = {}
+					for _ = 1, 25 do
+						local index = rng:NextInteger(1, #live)
+						table.insert(gone, live[index]:getCFrame().Position)
+						live[index]:destroy()
+						table.remove(live, index)
+					end
+					for _ = 1, 25 do
+						local zone = track(Zone.new({
+							cframe = Util.randomCFrame(rng, origin, 150),
+							size = Vector3.one * rng:NextNumber(8, 20),
+						}))
+						observer:attach(zone)
+						table.insert(live, zone)
+						everCreated[zone] = true
+					end
+					if round % 3 == 0 then
+						live[rng:NextInteger(1, #live)]:setCFrame(Util.randomCFrame(rng, origin, 150))
+					end
+					for i, entity in entities do
+						entity.Position = gone[i] or origin + Util.randomOffset(rng, 150)
+					end
+					check(`round {round}`)
+				end
+			end)
+		end)
+
+		Test('Entities that barely move keep the right zone while static zones come and go around them.', function()
+			withCleanup(function(track)
+				local rng = Random.new(9)
+				local origin = Vector3.new(-33000, 0, -33000)
+				local live = {}
+				-- Rotated blocks and balls too, whose clear distance isn't their box's
+				local function randomZone(): any
+					return Zone.new({
+						cframe = Util.randomCFrame(rng, origin, 120),
+						size = Vector3.one * rng:NextNumber(6, 16),
+						shape = if rng:NextNumber() < 0.3 then 'Ball' else 'Block',
+					})
+				end
+				for i = 1, 400 do
+					live[i] = track(randomZone())
+				end
+				local entities = {}
+				for i = 1, 60 do
+					entities[i] = { Position = origin + Util.randomOffset(rng, 120) }
+				end
+				local group = track(Group.new({ entities = entities, autoClean = false }))
+				-- Precision 0, so an entity that moves less than the default precision is still checked
+				local observer = track(Observer.new({ zones = live, groups = { group }, precision = 0 }))
+
+				for round = 1, 14 do
+					if round % 2 == 0 then
+						local index = rng:NextInteger(1, #live)
+						live[index]:destroy()
+						table.remove(live, index)
+					else
+						local zone = track(randomZone())
+						observer:attach(zone)
+						table.insert(live, zone)
+					end
+					for _, entity in entities do
+						entity.Position += Util.randomOffset(rng, 0.6)
+					end
+					settle()
+					for _, entity in entities do
+						local zone = observer:getZoneOfEntity(entity)
+						if zone then
+							Expect(zone:isPointInside(entity.Position)).is(true)
+						else
+							for _, candidate in live do
+								Expect(candidate:isPointInside(entity.Position)).is(false)
+							end
+						end
+					end
+				end
+			end)
+		end)
+	end)
 end
