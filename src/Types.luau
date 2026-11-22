@@ -36,7 +36,8 @@ export type Entity = Player | BasePart | Model | Camera | Attachment | Bone | En
 
 export type Phase = 'alive' | 'destroying' | 'dead'
 
-export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
+-- A missing phase means alive: zones leave it out until they are destroyed, which keeps their tables small
+export type Destroyable = { phase: Phase?, onDestroyCallbacks: { () -> () }? }
 
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
@@ -154,7 +155,8 @@ export type InternalZone = Zone & Destroyable & {
 
 	id: number,
 	slot: number,
-	requestedShapeType: number,
+	-- Set only while the zone asks for shape Mesh, which follows a part reference
+	meshRequested: true?,
 	reference: (Attachment | BasePart | Bone)?,
 	metadata: any?,
 	autoSync: true?,

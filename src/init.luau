@@ -31,7 +31,7 @@ local zoneSlotToZoneObj = Registry.zoneSlotToZoneObj
 local groups = Registry.groups
 local entityToReference = References.entityToReference
 
-local shapeCFrames = ZoneShapes.shapeCFrames
+local shapeTypes = ZoneShapes.shapeTypes
 local shapeFilledHalfSizes = ZoneShapes.shapeFilledHalfSizes
 local dynamicSlots = ZoneShapes.dynamicSlots
 
@@ -340,7 +340,8 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 	local loopEvent: RBXScriptSignal<number> = RunService:IsClient() and RunService.PreRender or RunService.Heartbeat
 
 	debugConnection = loopEvent:Connect(function()
-		for slot, cframe in shapeCFrames do
+		for slot in shapeTypes do
+			local cframe = ZoneShapes.cframeOf(slot)
 			local visual = getOrCreateVisual(slot)
 			local box = visual.adornment
 			local halfSize = shapeFilledHalfSizes[slot]
@@ -369,7 +370,7 @@ function QuickZone:visualize(enabled: boolean): QuickZone
 		end
 
 		for id, box in debugVisuals do
-			if not shapeCFrames[id] then
+			if not shapeTypes[id] then
 				box.adornment:Destroy()
 				debugVisuals[id] = nil
 			end

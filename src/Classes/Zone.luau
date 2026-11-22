@@ -28,7 +28,7 @@ local Log = require(script.Parent.Parent.Utils.Log)
 local SyncMode = require(script.Parent.Parent.Utils.SyncMode)
 local ZoneContainers = require(script.Parent.ZoneContainers)
 
-local shapeCFrames = ZoneShapes.shapeCFrames
+local shapePositions = ZoneShapes.shapePositions
 local shapeHalfSizes = ZoneShapes.shapeHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
 
@@ -98,8 +98,15 @@ local function resolveShape(zoneId: number, shapeType: number, part: BasePart?):
 	return shapeType, part
 end
 
+local function setMeshRequested(zone: Types.InternalZone, shapeType: number)
+	local requested = shapeType == MESH_SHAPE_VALUE
+	if requested ~= (zone.meshRequested == true) then
+		zone.meshRequested = if requested then true else nil
+	end
+end
+
 local function applyShape(zone: Types.InternalZone, shapeType: number)
-	zone.requestedShapeType = shapeType
+	setMeshRequested(zone, shapeType)
 	ZoneShapes.setShape(zone.slot, resolveShape(zone.id, shapeType, asQueryablePart(zone.reference)))
 end
 
@@ -212,14 +219,15 @@ local function newZoneInternal(
 
 	local resolvedType, part = resolveShape(id, shapeType, asQueryablePart(reference))
 
-	-- Only the fields every zone needs, so the table gets 4 slots. Writing even nil to a missing field adds a slot,
-	-- and a zone without a reference, metadata or autoSync never sets those.
+	-- Only the fields every zone needs, so the table gets 2 slots. Writing even nil to a missing field adds a slot, so
+	-- the others are set only when they hold something, and phase stays out until the zone is destroyed.
 	local self: Types.InternalZone = setmetatable({
 		id = id,
-		phase = 'alive',
-		requestedShapeType = shapeType,
 		slot = 0,
 	}, Zone) :: any
+	if shapeType == MESH_SHAPE_VALUE then
+		self.meshRequested = true
+	end
 	if reference ~= nil then
 		self.reference = reference
 	end
@@ -369,7 +377,7 @@ function Zone.setReference(self: Types.InternalZone, reference: (BasePart | Atta
 	checkReference(reference)
 	self.reference = reference
 
-	if self.requestedShapeType == MESH_SHAPE_VALUE then
+	if self.meshRequested then
 		applyShape(self, MESH_SHAPE_VALUE)
 	end
 
@@ -401,8 +409,9 @@ function Zone.sync(self: Types.InternalZone): Types.Zone
 	end
 
 	if reference:IsA('BasePart') then
-		self.requestedShapeType = getShapeEnumValue(reference)
-		local shapeType, part = resolveShape(self.id, self.requestedShapeType, reference)
+		local requested = getShapeEnumValue(reference)
+		setMeshRequested(self, requested)
+		local shapeType, part = resolveShape(self.id, requested, reference)
 		ZoneShapes.set(self.slot, reference.CFrame, reference.ExtentsSize * 0.5, shapeType, part)
 	elseif reference:IsA('Attachment') or reference:IsA('Bone') then
 		ZoneShapes.setCFrame(self.slot, reference.WorldCFrame)
@@ -466,7 +475,7 @@ end
 ]=]
 function Zone.setPosition(self: Types.InternalZone, pos: Vector3): Types.Zone
 	checkType('position', 'Vector3', pos)
-	return self:setCFrame(shapeCFrames[self.slot].Rotation + pos)
+	return self:setCFrame(ZoneShapes.cframeOf(self.slot).Rotation + pos)
 end
 
 --[=[ 
@@ -557,7 +566,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getPosition(self: Types.InternalZone): Vector3
-	return shapeCFrames[self.slot].Position
+	return shapePositions[self.slot]
 end
 
 --[=[
@@ -568,7 +577,7 @@ end
 	@return CFrame
 ]=]
 function Zone.getCFrame(self: Types.InternalZone): CFrame
-	return shapeCFrames[self.slot]
+	return ZoneShapes.cframeOf(self.slot)
 end
 
 --[=[

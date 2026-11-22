@@ -29,7 +29,6 @@ ZoneShapes.freeZoneSlots = {} :: { number }
 ZoneShapes.zoneSlotIds = {} :: { [number]: number }
 ZoneShapes.staticSlots = {} :: { [number]: true }
 ZoneShapes.dynamicSlots = {} :: { [number]: true }
-ZoneShapes.shapeCFrames = {} :: { [number]: CFrame }
 ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
 ZoneShapes.shapeFilledHalfSizes = {} :: { [number]: Vector3 }
 ZoneShapes.shapeTypes = {} :: { [number]: number }
@@ -55,7 +54,6 @@ ZoneShapes.dynamicVersion = 0
 ZoneShapes.dynamicChurn = false
 
 local zoneSlotIds = ZoneShapes.zoneSlotIds
-local shapeCFrames = ZoneShapes.shapeCFrames
 local shapeHalfSizes = ZoneShapes.shapeHalfSizes
 local shapeFilledHalfSizes = ZoneShapes.shapeFilledHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
@@ -93,6 +91,8 @@ local RECENT_FROM = 256
 -- staticTree is rebuilt once recentTree, or its own leaves that no zone owns, reach this share of it
 local REBUILD_SHARE = 8
 local MIN_REBUILD_LIMIT = 32
+-- After building a static tree this large, the space builds sort in is freed rather than kept for the next build
+local RELEASE_SCRATCH_FROM = 65536
 
 local function isAxis(direction: Vector3): boolean
 	local magnitude = vector.abs(direction)
@@ -172,27 +172,34 @@ local function extentsOf(halfSize: Vector3, shapeType: number): Vector3
 	return extents
 end
 
-local function deriveWorldShape(slot: number)
+-- A CFrame as its position and the columns of its matrix, which is how a zone keeps it. Both hold float32 numbers,
+-- so cframeOf rebuilds the exact CFrame, scaled or skewed ones too.
+local function partsOf(cframe: CFrame): (Vector3, Vector3, Vector3, Vector3)
+	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = cframe:GetComponents()
+	return Vector3.new(x, y, z), Vector3.new(r00, r10, r20), Vector3.new(r01, r11, r21), Vector3.new(r02, r12, r22)
+end
+
+function ZoneShapes.cframeOf(slot: number): CFrame
+	local p, r, u, b = shapePositions[slot], shapeRights[slot], shapeUps[slot], shapeBacks[slot]
+	return CFrame.new(p.X, p.Y, p.Z, r.X, u.X, b.X, r.Y, u.Y, b.Y, r.Z, u.Z, b.Z)
+end
+
+local function deriveWorldShape(slot: number, position: Vector3, right: Vector3, up: Vector3, back: Vector3)
 	local isDynamic = dynamicSlots[slot] == true
 	local shapeType = shapeTypes[slot]
 	local halfSize = extentsOf(shapeHalfSizes[slot], shapeType)
 
-	local x, y, z, r00, r01, r02, r10, r11, r12, r20, r21, r22 = shapeCFrames[slot]:GetComponents()
-	local position = Vector3.new(x, y, z)
-	local right = Vector3.new(r00, r10, r20)
-	local up = Vector3.new(r01, r11, r21)
-	local back = Vector3.new(r02, r12, r22)
 	-- Unrotated is the common case, where the bounds are the half size around the position. A CFrame built from a
 	-- scaled matrix has other diagonal values and takes the general path, as before.
-	local unrotated = r01 == 0
-		and r02 == 0
-		and r10 == 0
-		and r12 == 0
-		and r20 == 0
-		and r21 == 0
-		and math.abs(r00) == 1
-		and math.abs(r11) == 1
-		and math.abs(r22) == 1
+	local unrotated = right.Y == 0
+		and right.Z == 0
+		and up.X == 0
+		and up.Z == 0
+		and back.X == 0
+		and back.Y == 0
+		and math.abs(right.X) == 1
+		and math.abs(up.Y) == 1
+		and math.abs(back.Z) == 1
 	local boundsMin, boundsMax
 	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
 	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
@@ -258,21 +265,29 @@ function ZoneShapes.add(
 		addStatic(slot)
 	end
 
-	shapeCFrames[slot] = cframe
 	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
 	shapeParts[slot] = part
-	deriveWorldShape(slot)
+	deriveWorldShape(slot, partsOf(cframe))
+end
+
+-- Whether the slot already has this CFrame. Vector3 and CFrame both compare exactly, so this agrees with ==.
+local function hasCFrame(slot: number, position: Vector3, right: Vector3, up: Vector3, back: Vector3): boolean
+	return shapePositions[slot] == position
+		and shapeRights[slot] == right
+		and shapeUps[slot] == up
+		and shapeBacks[slot] == back
 end
 
 function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeType: number, part: BasePart?)
 	-- A late property signal can write to a removed zone
-	if not shapeCFrames[slot] then
+	if not shapeTypes[slot] then
 		return
 	end
 
+	local position, right, up, back = partsOf(cframe)
 	if
-		shapeCFrames[slot] == cframe
+		hasCFrame(slot, position, right, up, back)
 		and shapeHalfSizes[slot] == halfSize
 		and shapeTypes[slot] == shapeType
 		and shapeParts[slot] == part
@@ -280,29 +295,44 @@ function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeTy
 		return
 	end
 
-	shapeCFrames[slot] = cframe
 	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
 	shapeParts[slot] = part
-	deriveWorldShape(slot)
+	deriveWorldShape(slot, position, right, up, back)
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
 	-- Like set, which a removed zone or an unchanged CFrame leaves alone
-	local current = shapeCFrames[slot]
-	if not current or current == cframe then
+	if not shapeTypes[slot] then
 		return
 	end
-	shapeCFrames[slot] = cframe
-	deriveWorldShape(slot)
+	local position, right, up, back = partsOf(cframe)
+	if hasCFrame(slot, position, right, up, back) then
+		return
+	end
+	deriveWorldShape(slot, position, right, up, back)
+end
+
+-- Like set, keeping the zone's CFrame
+local function setSizeAndShape(slot: number, halfSize: Vector3, shapeType: number, part: BasePart?)
+	if not shapeTypes[slot] then
+		return
+	end
+	if shapeHalfSizes[slot] == halfSize and shapeTypes[slot] == shapeType and shapeParts[slot] == part then
+		return
+	end
+	shapeHalfSizes[slot] = halfSize
+	shapeTypes[slot] = shapeType
+	shapeParts[slot] = part
+	deriveWorldShape(slot, shapePositions[slot], shapeRights[slot], shapeUps[slot], shapeBacks[slot])
 end
 
 function ZoneShapes.setHalfSize(slot: number, halfSize: Vector3)
-	ZoneShapes.set(slot, shapeCFrames[slot], halfSize, shapeTypes[slot], shapeParts[slot])
+	setSizeAndShape(slot, halfSize, shapeTypes[slot], shapeParts[slot])
 end
 
 function ZoneShapes.setShape(slot: number, shapeType: number, part: BasePart?)
-	ZoneShapes.set(slot, shapeCFrames[slot], shapeHalfSizes[slot], shapeType, part)
+	setSizeAndShape(slot, shapeHalfSizes[slot], shapeType, part)
 end
 
 function ZoneShapes.isDynamic(slot: number): boolean
@@ -354,7 +384,6 @@ function ZoneShapes.remove(slot: number)
 		holdSlot = removeStatic(slot)
 	end
 
-	shapeCFrames[slot] = nil
 	shapeHalfSizes[slot] = nil
 	shapeFilledHalfSizes[slot] = nil
 	shapeTypes[slot] = nil
@@ -502,6 +531,9 @@ function ZoneShapes.rebuildTrees()
 		end
 		table.clear(heldSlots)
 		LinearBVH.build(staticTree, staticSlots, shapeBoundsMin, shapeBoundsMax, shapePositions)
+		if staticTree.count >= RELEASE_SCRATCH_FROM then
+			LinearBVH.releaseScratch()
+		end
 	end
 	staticTree.pendingUpdate = 'none'
 

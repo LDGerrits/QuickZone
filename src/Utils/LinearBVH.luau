@@ -36,6 +36,8 @@ local REFIT_BACKOFF = 8
 
 local SHRINK_MIN_NODES = 64
 local SHRINK_FACTOR = 4
+-- Spare room kept when a buffer grows, as a share of what it needs: 1/8, so one more zone rarely reallocates it
+local GROWTH_SHARE = 8
 
 local LinearBVH = {}
 
@@ -46,7 +48,6 @@ end
 local EMPTY_BUFFER = buffer.create(0)
 local EMPTY_BOUNDS = table.freeze({}) :: { [number]: Vector3 }
 
-local memberIds = {} :: { number }
 local codesA = EMPTY_BUFFER
 local idsA = EMPTY_BUFFER
 local codesB = EMPTY_BUFFER
@@ -76,20 +77,24 @@ local function prepareScratch(tree: Types.Tree, count: number)
 	end
 
 	scratchOwner = tree
-	local size = (count + count // 2) * 4
+	local size = (count + count // GROWTH_SHARE) * 4
 	codesA = buffer.create(size)
 	idsA = buffer.create(size)
 	codesB = buffer.create(size)
 	idsB = buffer.create(size)
 	sortedCodes, sortedIds = codesA, idsA
-
-	if #memberIds > count then
-		memberIds = table.move(memberIds, 1, count, 1, table.create(count) :: { number })
-	end
 end
 
 function LinearBVH.scratchSize(): number
 	return buffer.len(codesA)
+end
+
+-- Frees the space builds sort in, which the next build allocates again. Worth it after a build that is large and
+-- rare, like the static tree's.
+function LinearBVH.releaseScratch()
+	codesA, idsA, codesB, idsB = EMPTY_BUFFER, EMPTY_BUFFER, EMPTY_BUFFER, EMPTY_BUFFER
+	sortedCodes, sortedIds = codesA, idsA
+	scratchOwner = nil
 end
 
 local function insertionSort(count: number)
@@ -224,7 +229,7 @@ local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
 	local buf = tree.buffer
 	local capacity = buffer.len(buf) // NODE_SIZE
 	if capacity < nodeCount or (capacity > SHRINK_MIN_NODES and capacity > nodeCount * SHRINK_FACTOR) then
-		buf = buffer.create((nodeCount + nodeCount // 2) * NODE_SIZE)
+		buf = buffer.create((nodeCount + nodeCount // GROWTH_SHARE) * NODE_SIZE)
 		tree.buffer = buf
 	end
 	return buf
@@ -250,7 +255,6 @@ function LinearBVH.build(
 		end
 
 		count += 1
-		memberIds[count] = id
 	end
 
 	prepareScratch(tree, count)
@@ -270,11 +274,12 @@ function LinearBVH.build(
 	local sceneMin, sceneMax = min - padding, max + padding
 	local scaleX, scaleY, scaleZ = getMortonScale(sceneMin, sceneMax)
 
-	for i = 1, count do
-		local id = memberIds[i]
-		local offset = (i - 1) * 4
+	-- A second pass over members, in the same order as the first, so no list of them is kept
+	local offset = 0
+	for id in members do
 		writeu32(codesA, offset, positionToMortonCode(positions[id], sceneMin, scaleX, scaleY, scaleZ))
 		writeu32(idsA, offset, id)
+		offset += 4
 	end
 	radixSort(count)
 

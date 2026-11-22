@@ -960,6 +960,46 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 		end)
 
+		Test('getCFrame returns the exact CFrame given, scaled and skewed ones too.', function()
+			local rng = Random.new(11)
+			local zone = Zone.new({ cframe = CFrame.identity, size = Vector3.one * 5 })
+			local mismatches = 0
+			for i = 1, 200 do
+				local cframe = CFrame.new(
+					rng:NextNumber(-3e4, 3e4),
+					rng:NextNumber(-3e4, 3e4),
+					rng:NextNumber(-3e4, 3e4)
+				) * CFrame.fromEulerAnglesXYZ(rng:NextNumber(-7, 7), rng:NextNumber(-7, 7), rng:NextNumber(-7, 7))
+				if i % 2 == 0 then
+					cframe = CFrame.new(1, 2, 3, 2, 0.3, 0, 0.1, 1.5, 0.2, 0, 0.4, 0.7) * cframe
+				end
+				zone:setCFrame(cframe)
+				local given, kept = { cframe:GetComponents() }, { zone:getCFrame():GetComponents() }
+				for c = 1, 12 do
+					if given[c] ~= kept[c] then
+						mismatches += 1
+						break
+					end
+				end
+			end
+			zone:destroy()
+
+			Expect(mismatches).is(0)
+		end)
+
+		Test('Setting a CFrame equal to the current one records no zone change.', function()
+			local cframe = CFrame.new(9000, 0, 9700) * CFrame.Angles(0.3, 0.2, 0.1)
+			local zone = Zone.new({ cframe = cframe, size = Vector3.one * 10 })
+			QuickZone:rebuild()
+			local version = ZoneShapes.staticVersion
+
+			zone:setCFrame(CFrame.new(cframe:GetComponents()))
+			QuickZone:rebuild()
+
+			Expect(ZoneShapes.staticVersion).is(version)
+			zone:destroy()
+		end)
+
 		Test('Zone updates after setCFrame, no tick.', function()
 			local point = Vector3.zero
 			local cframe = CFrame.new(0, 0, 15)
@@ -1378,12 +1418,12 @@ return function(Tiniest: Tiniest)
 			task.wait() -- Deferred property signals
 			local resized = ZoneShapes.shapeHalfSizes[slot] ~= nil
 			local updated = pcall(QuickZone.update, QuickZone, 1)
-			local moved = ZoneShapes.shapeCFrames[slot] ~= nil
+			local moved = ZoneShapes.shapePositions[slot] ~= nil
 
 			-- Leave no broken state behind for later tests
 			Registry.autoSyncZones[slot] = nil
 			ZoneShapes.shapeHalfSizes[slot] = nil
-			ZoneShapes.shapeCFrames[slot] = nil
+			ZoneShapes.shapePositions[slot] = nil
 			part:Destroy()
 			QuickZone:rebuild()
 
