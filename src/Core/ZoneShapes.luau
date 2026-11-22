@@ -29,8 +29,10 @@ ZoneShapes.freeZoneSlots = {} :: { number }
 ZoneShapes.zoneSlotIds = {} :: { [number]: number }
 ZoneShapes.staticSlots = {} :: { [number]: true }
 ZoneShapes.dynamicSlots = {} :: { [number]: true }
-ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
+-- The half size a zone tests points against: never negative, and for a ball or cylinder the one its radius fills
 ZoneShapes.shapeFilledHalfSizes = {} :: { [number]: Vector3 }
+-- The half size the zone was given, only where it differs from the filled one, as for a ball or cylinder
+ZoneShapes.shapeHalfSizes = {} :: { [number]: Vector3 }
 ZoneShapes.shapeTypes = {} :: { [number]: number }
 ZoneShapes.shapeParts = {} :: { [number]: BasePart? }
 ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
@@ -39,7 +41,6 @@ ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
-ZoneShapes.shapeAxisAligned = {} :: { [number]: boolean }
 ZoneShapes.treeExact = {} :: { [number]: boolean }
 ZoneShapes.staleSlots = {} :: { [number]: true }
 ZoneShapes.staticChanges = ZoneChanges.new()
@@ -64,7 +65,6 @@ local shapeUps = ZoneShapes.shapeUps
 local shapeBacks = ZoneShapes.shapeBacks
 local shapeBoundsMin = ZoneShapes.shapeBoundsMin
 local shapeBoundsMax = ZoneShapes.shapeBoundsMax
-local shapeAxisAligned = ZoneShapes.shapeAxisAligned
 local treeExact = ZoneShapes.treeExact
 local staleSlots = ZoneShapes.staleSlots
 local staticSlots = ZoneShapes.staticSlots
@@ -184,10 +184,37 @@ function ZoneShapes.cframeOf(slot: number): CFrame
 	return CFrame.new(p.X, p.Y, p.Z, r.X, u.X, b.X, r.Y, u.Y, b.Y, r.Z, u.Z, b.Z)
 end
 
-local function deriveWorldShape(slot: number, position: Vector3, right: Vector3, up: Vector3, back: Vector3)
+local function rawHalfSizeOf(slot: number): Vector3
+	return shapeHalfSizes[slot] or shapeFilledHalfSizes[slot]
+end
+ZoneShapes.rawHalfSizeOf = rawHalfSizeOf
+
+-- Most zones have no part, and writing nil to a missing key still adds one
+local function setPart(slot: number, part: BasePart?)
+	if part ~= nil or shapeParts[slot] ~= nil then
+		shapeParts[slot] = part
+	end
+end
+
+-- Whether every point inside the zone's box is inside the zone, so the tree's box test is the whole answer
+local function isAxisAligned(slot: number): boolean
+	return shapeTypes[slot] == BLOCK_SHAPE_VALUE
+		and isAxis(shapeRights[slot])
+		and isAxis(shapeUps[slot])
+		and isAxis(shapeBacks[slot])
+end
+
+local function deriveWorldShape(
+	slot: number,
+	rawHalfSize: Vector3,
+	position: Vector3,
+	right: Vector3,
+	up: Vector3,
+	back: Vector3
+)
 	local isDynamic = dynamicSlots[slot] == true
 	local shapeType = shapeTypes[slot]
-	local halfSize = extentsOf(shapeHalfSizes[slot], shapeType)
+	local halfSize = extentsOf(rawHalfSize, shapeType)
 
 	-- Unrotated is the common case, where the bounds are the half size around the position. A CFrame built from a
 	-- scaled matrix has other diagonal values and takes the general path, as before.
@@ -222,14 +249,18 @@ local function deriveWorldShape(slot: number, position: Vector3, right: Vector3,
 	end
 
 	shapeFilledHalfSizes[slot] = halfSize
+	-- Writing nil to a missing key still adds one, so only a slot that has a raw size gets it cleared
+	if rawHalfSize ~= halfSize then
+		shapeHalfSizes[slot] = rawHalfSize
+	elseif shapeHalfSizes[slot] ~= nil then
+		shapeHalfSizes[slot] = nil
+	end
 	shapePositions[slot] = position
 	shapeRights[slot] = right
 	shapeUps[slot] = up
 	shapeBacks[slot] = back
 	shapeBoundsMin[slot] = boundsMin
 	shapeBoundsMax[slot] = boundsMax
-	shapeAxisAligned[slot] = shapeType == BLOCK_SHAPE_VALUE
-		and (unrotated or (isAxis(right) and isAxis(up) and isAxis(back)))
 
 	treeExact[slot] = nil
 	staleSlots[slot] = true
@@ -265,10 +296,9 @@ function ZoneShapes.add(
 		addStatic(slot)
 	end
 
-	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
-	shapeParts[slot] = part
-	deriveWorldShape(slot, partsOf(cframe))
+	setPart(slot, part)
+	deriveWorldShape(slot, halfSize, partsOf(cframe))
 end
 
 -- Whether the slot already has this CFrame. Vector3 and CFrame both compare exactly, so this agrees with ==.
@@ -288,17 +318,16 @@ function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeTy
 	local position, right, up, back = partsOf(cframe)
 	if
 		hasCFrame(slot, position, right, up, back)
-		and shapeHalfSizes[slot] == halfSize
+		and rawHalfSizeOf(slot) == halfSize
 		and shapeTypes[slot] == shapeType
 		and shapeParts[slot] == part
 	then
 		return
 	end
 
-	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
-	shapeParts[slot] = part
-	deriveWorldShape(slot, position, right, up, back)
+	setPart(slot, part)
+	deriveWorldShape(slot, halfSize, position, right, up, back)
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
@@ -310,7 +339,7 @@ function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
 	if hasCFrame(slot, position, right, up, back) then
 		return
 	end
-	deriveWorldShape(slot, position, right, up, back)
+	deriveWorldShape(slot, rawHalfSizeOf(slot), position, right, up, back)
 end
 
 -- Like set, keeping the zone's CFrame
@@ -318,13 +347,12 @@ local function setSizeAndShape(slot: number, halfSize: Vector3, shapeType: numbe
 	if not shapeTypes[slot] then
 		return
 	end
-	if shapeHalfSizes[slot] == halfSize and shapeTypes[slot] == shapeType and shapeParts[slot] == part then
+	if rawHalfSizeOf(slot) == halfSize and shapeTypes[slot] == shapeType and shapeParts[slot] == part then
 		return
 	end
-	shapeHalfSizes[slot] = halfSize
 	shapeTypes[slot] = shapeType
-	shapeParts[slot] = part
-	deriveWorldShape(slot, shapePositions[slot], shapeRights[slot], shapeUps[slot], shapeBacks[slot])
+	setPart(slot, part)
+	deriveWorldShape(slot, halfSize, shapePositions[slot], shapeRights[slot], shapeUps[slot], shapeBacks[slot])
 end
 
 function ZoneShapes.setHalfSize(slot: number, halfSize: Vector3)
@@ -332,7 +360,7 @@ function ZoneShapes.setHalfSize(slot: number, halfSize: Vector3)
 end
 
 function ZoneShapes.setShape(slot: number, shapeType: number, part: BasePart?)
-	setSizeAndShape(slot, shapeHalfSizes[slot], shapeType, part)
+	setSizeAndShape(slot, rawHalfSizeOf(slot), shapeType, part)
 end
 
 function ZoneShapes.isDynamic(slot: number): boolean
@@ -384,17 +412,18 @@ function ZoneShapes.remove(slot: number)
 		holdSlot = removeStatic(slot)
 	end
 
-	shapeHalfSizes[slot] = nil
+	if shapeHalfSizes[slot] ~= nil then
+		shapeHalfSizes[slot] = nil
+	end
 	shapeFilledHalfSizes[slot] = nil
 	shapeTypes[slot] = nil
-	shapeParts[slot] = nil
+	setPart(slot, nil)
 	shapePositions[slot] = nil
 	shapeRights[slot] = nil
 	shapeUps[slot] = nil
 	shapeBacks[slot] = nil
 	shapeBoundsMin[slot] = nil
 	shapeBoundsMax[slot] = nil
-	shapeAxisAligned[slot] = nil
 	treeExact[slot] = nil
 	staleSlots[slot] = nil
 
@@ -545,7 +574,7 @@ function ZoneShapes.rebuildTrees()
 	-- are removed one by one, which lets the table shrink again; table.clear would keep its largest size for good.
 	if hasStale then
 		for slot in staleSlots do
-			treeExact[slot] = shapeAxisAligned[slot]
+			treeExact[slot] = isAxisAligned(slot)
 			staleSlots[slot] = nil
 		end
 		hasStale = false

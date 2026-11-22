@@ -1416,13 +1416,13 @@ return function(Tiniest: Tiniest)
 			part.Size = Vector3.one * 20
 			part.CFrame = CFrame.new(0, 3100, 0)
 			task.wait() -- Deferred property signals
-			local resized = ZoneShapes.shapeHalfSizes[slot] ~= nil
+			local resized = ZoneShapes.shapeFilledHalfSizes[slot] ~= nil
 			local updated = pcall(QuickZone.update, QuickZone, 1)
 			local moved = ZoneShapes.shapePositions[slot] ~= nil
 
 			-- Leave no broken state behind for later tests
 			Registry.autoSyncZones[slot] = nil
-			ZoneShapes.shapeHalfSizes[slot] = nil
+			ZoneShapes.shapeFilledHalfSizes[slot] = nil
 			ZoneShapes.shapePositions[slot] = nil
 			part:Destroy()
 			QuickZone:rebuild()

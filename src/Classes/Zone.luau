@@ -29,7 +29,6 @@ local SyncMode = require(script.Parent.Parent.Utils.SyncMode)
 local ZoneContainers = require(script.Parent.ZoneContainers)
 
 local shapePositions = ZoneShapes.shapePositions
-local shapeHalfSizes = ZoneShapes.shapeHalfSizes
 local shapeTypes = ZoneShapes.shapeTypes
 
 local BLOCK_SHAPE_VALUE = Geometry.BLOCK_SHAPE_VALUE
@@ -588,7 +587,7 @@ end
 	@return Vector3
 ]=]
 function Zone.getSize(self: Types.InternalZone): Vector3
-	return shapeHalfSizes[self.slot] * 2
+	return ZoneShapes.rawHalfSizeOf(self.slot) * 2
 end
 
 --[=[ 
