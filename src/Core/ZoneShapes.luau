@@ -80,13 +80,12 @@ local dynamicChanges = ZoneShapes.dynamicChanges
 -- Whether staleSlots may hold a slot. next() on a large emptied table scans every free node, so hot paths read this.
 local hasStale = false
 
--- Static slots in staticTree and in recentTree. A static zone removed from staticTree stays there as a leaf that no
--- zone owns, and its slot isn't handed out again until staticTree is rebuilt, so no new zone can take that leaf.
-local mainStaticSlots = {} :: { [number]: true }
+-- A static slot lives in recentTree when it is in recentStaticSlots, else in staticTree. A static zone removed from
+-- staticTree stays there as a leaf that no zone owns, and its slot is held until staticTree is rebuilt, so no new
+-- zone can take that leaf.
+local staticCount = 0
 local recentStaticSlots = {} :: { [number]: true }
-local mainCount = 0
 local recentCount = 0
-local orphanCount = 0
 local heldSlots = {} :: { number }
 
 -- From this many zones in staticTree on, static zones are added to recentTree
@@ -104,54 +103,52 @@ local function changesOf(isDynamic: boolean): Types.ZoneChanges
 	return if isDynamic then dynamicChanges else staticChanges
 end
 
-local function treeOf(isDynamic: boolean): Types.Tree
-	return if isDynamic then dynamicTree else staticTree
+local function requestRefit(tree: Types.Tree)
+	if tree.update == 'none' then
+		tree.update = 'refit'
+	end
 end
 
-local function markMembersChanged(isDynamic: boolean)
-	local tree = treeOf(isDynamic)
-	tree.pending = true
-	tree.membersChanged = true
+local function requestRebuild(tree: Types.Tree)
+	tree.update = 'rebuild'
 end
 
 local function rebuildLimit(): number
-	return math.max(MIN_REBUILD_LIMIT, mainCount // REBUILD_SHARE)
+	return math.max(MIN_REBUILD_LIMIT, (staticCount - recentCount) // REBUILD_SHARE)
 end
 
 local function addStatic(slot: number)
-	if mainCount >= RECENT_FROM and not staticTree.membersChanged and recentCount < rebuildLimit() then
+	local inStaticTree = staticCount - recentCount
+	staticSlots[slot] = true
+	staticCount += 1
+	if inStaticTree >= RECENT_FROM and staticTree.update ~= 'rebuild' and recentCount < rebuildLimit() then
 		recentStaticSlots[slot] = true
 		recentCount += 1
-		recentTree.pending = true
-		recentTree.membersChanged = true
+		requestRebuild(recentTree)
 	else
-		mainStaticSlots[slot] = true
-		mainCount += 1
-		markMembersChanged(false)
+		requestRebuild(staticTree)
 	end
 end
 
--- Whether the slot has to be held back until staticTree is rebuilt
+-- Whether the slot's leaf stays in staticTree, so the slot has to be held until staticTree is rebuilt
 local function removeStatic(slot: number): boolean
+	if not staticSlots[slot] then
+		return false
+	end
+	staticSlots[slot] = nil
+	staticCount -= 1
+
 	if recentStaticSlots[slot] then
 		recentStaticSlots[slot] = nil
 		recentCount -= 1
-		recentTree.pending = true
-		recentTree.membersChanged = true
+		requestRebuild(recentTree)
 		return false
-	elseif not mainStaticSlots[slot] then
-		return false
-	end
-
-	mainStaticSlots[slot] = nil
-	mainCount -= 1
-	if staticTree.membersChanged then
+	elseif staticTree.update == 'rebuild' then
 		return false
 	end
 
-	orphanCount += 1
-	if orphanCount >= rebuildLimit() then
-		markMembersChanged(false)
+	if #heldSlots + 1 >= rebuildLimit() then
+		requestRebuild(staticTree)
 	end
 	return true
 end
@@ -224,13 +221,7 @@ local function deriveWorldShape(slot: number)
 	staleSlots[slot] = true
 	hasStale = true
 
-	if isDynamic then
-		dynamicTree.pending = true
-	elseif recentStaticSlots[slot] then
-		recentTree.pending = true
-	else
-		staticTree.pending = true
-	end
+	requestRefit(if isDynamic then dynamicTree elseif recentStaticSlots[slot] then recentTree else staticTree)
 end
 
 function ZoneShapes.allocateSlot(zoneId: number): number
@@ -255,9 +246,8 @@ function ZoneShapes.add(
 )
 	if isDynamic then
 		dynamicSlots[slot] = true
-		markMembersChanged(true)
+		requestRebuild(dynamicTree)
 	else
-		staticSlots[slot] = true
 		addStatic(slot)
 	end
 
@@ -318,19 +308,16 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 	end
 
 	if isDynamic then
-		staticSlots[slot] = nil
-		dynamicSlots[slot] = true
 		if removeStatic(slot) then
-			-- The slot stays in use, so its leaf in staticTree goes with a rebuild instead
-			orphanCount -= 1
-			markMembersChanged(false)
+			-- The slot stays in use, so it can't be held: its leaf in staticTree goes with a rebuild instead
+			requestRebuild(staticTree)
 		end
+		dynamicSlots[slot] = true
 	else
 		dynamicSlots[slot] = nil
-		staticSlots[slot] = true
 		addStatic(slot)
 	end
-	markMembersChanged(true)
+	requestRebuild(dynamicTree)
 	staleSlots[slot] = true
 	hasStale = true
 
@@ -352,11 +339,10 @@ function ZoneShapes.remove(slot: number)
 	local isDynamic = dynamicSlots[slot] == true
 	ZoneShapes.touch(slot)
 
-	staticSlots[slot] = nil
-	dynamicSlots[slot] = nil
 	local holdSlot = false
 	if isDynamic then
-		markMembersChanged(true)
+		dynamicSlots[slot] = nil
+		requestRebuild(dynamicTree)
 	else
 		holdSlot = removeStatic(slot)
 	end
@@ -378,15 +364,6 @@ function ZoneShapes.remove(slot: number)
 
 	ZoneShapes.zoneSlotIds[slot] = nil
 	table.insert(if holdSlot then heldSlots else ZoneShapes.freeZoneSlots, slot)
-end
-
-local function markBuilt(slots: { [number]: any })
-	for slot in staleSlots do
-		if slots[slot] then
-			treeExact[slot] = shapeAxisAligned[slot]
-			staleSlots[slot] = nil
-		end
-	end
 end
 
 function ZoneShapes.containsPoint(slot: number, point: Vector3): boolean
@@ -487,48 +464,50 @@ function ZoneShapes.leavesAtPoint(point: Vector3, hits: { number }): number
 end
 
 local function updateTree(tree: Types.Tree, members: { [number]: any })
-	if tree.membersChanged or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
+	if tree.update == 'rebuild' or not LinearBVH.tryRefit(tree, shapeBoundsMin, shapeBoundsMax) then
 		LinearBVH.build(tree, members, shapeBoundsMin, shapeBoundsMax, shapePositions)
-		tree.membersChanged = false
 	end
-	tree.pending = false
-	markBuilt(members)
+	tree.update = 'none'
 end
 
 function ZoneShapes.rebuildTrees()
-	if dynamicTree.pending then
+	if dynamicTree.update ~= 'none' then
 		updateTree(dynamicTree, dynamicSlots)
 	end
 
-	-- A refit would find the leaves no zone owns, so moving a static zone rebuilds while there are any
-	if staticTree.pending and orphanCount > 0 then
-		staticTree.membersChanged = true
+	-- staticTree refits only while each leaf has a zone in it, and a failed refit rebuilds it like any other
+	if
+		staticTree.update == 'refit'
+		and (#heldSlots > 0 or not LinearBVH.tryRefit(staticTree, shapeBoundsMin, shapeBoundsMax))
+	then
+		requestRebuild(staticTree)
 	end
-
-	if staticTree.pending and staticTree.membersChanged then
-		for slot in recentStaticSlots do
-			mainStaticSlots[slot] = true
-		end
-		mainCount += recentCount
+	if staticTree.update == 'rebuild' then
+		-- Every static slot goes into staticTree, and the slots held for its old leaves are free again
 		table.clear(recentStaticSlots)
 		recentCount = 0
-		recentTree.pending = true
-		recentTree.membersChanged = true
-
-		orphanCount = 0
+		requestRebuild(recentTree)
 		local freeZoneSlots = ZoneShapes.freeZoneSlots
 		for _, slot in heldSlots do
 			table.insert(freeZoneSlots, slot)
 		end
 		table.clear(heldSlots)
+		LinearBVH.build(staticTree, staticSlots, shapeBoundsMin, shapeBoundsMax, shapePositions)
 	end
+	staticTree.update = 'none'
 
-	if staticTree.pending then
-		updateTree(staticTree, mainStaticSlots)
-	end
-
-	if recentTree.pending then
+	if recentTree.update ~= 'none' then
 		updateTree(recentTree, recentStaticSlots)
+	end
+
+	-- A slot goes stale only with a request to update its tree, so every tree that holds one was just updated. Entries
+	-- are removed one by one, which lets the table shrink again; table.clear would keep its largest size for good.
+	if hasStale then
+		for slot in staleSlots do
+			treeExact[slot] = shapeAxisAligned[slot]
+			staleSlots[slot] = nil
+		end
+		hasStale = false
 	end
 
 	local dynamicAll = dynamicChanges.all
@@ -539,12 +518,8 @@ function ZoneShapes.rebuildTrees()
 		ZoneShapes.dynamicChurn = false
 	end
 
-	if ZoneChanges.commit(staticChanges, ZoneShapes.staticVersion + 1, mainCount + recentCount) then
+	if ZoneChanges.commit(staticChanges, ZoneShapes.staticVersion + 1, staticCount) then
 		ZoneShapes.staticVersion += 1
-	end
-
-	if hasStale then
-		hasStale = next(staleSlots) ~= nil
 	end
 end
 

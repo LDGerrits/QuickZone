@@ -40,13 +40,16 @@ export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
 
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
+-- What a tree needs before the next query: nothing, new bounds for the same leaves, or new leaves. A request only
+-- moves it forward (none -> refit -> rebuild), and updating the tree brings it back to none.
+export type TreeUpdate = 'none' | 'refit' | 'rebuild'
+
 export type Tree = {
 	buffer: buffer,
 	count: number,
 	cost: number,
 	refitSkips: number,
-	pending: boolean,
-	membersChanged: boolean,
+	update: TreeUpdate,
 }
 
 export type ChangeSlot = {
