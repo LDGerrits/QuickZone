@@ -178,8 +178,17 @@ local function deriveWorldShape(slot: number)
 	local right = Vector3.new(r00, r10, r20)
 	local up = Vector3.new(r01, r11, r21)
 	local back = Vector3.new(r02, r12, r22)
-	-- Unrotated is the common case, where the bounds are the half size around the position
-	local unrotated = r01 == 0 and r02 == 0 and r10 == 0 and r12 == 0 and r20 == 0 and r21 == 0
+	-- Unrotated is the common case, where the bounds are the half size around the position. A CFrame built from a
+	-- scaled matrix has other diagonal values and takes the general path, as before.
+	local unrotated = r01 == 0
+		and r02 == 0
+		and r10 == 0
+		and r12 == 0
+		and r20 == 0
+		and r21 == 0
+		and math.abs(r00) == 1
+		and math.abs(r11) == 1
+		and math.abs(r22) == 1
 	local boundsMin, boundsMax
 	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
 	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
