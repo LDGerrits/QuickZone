@@ -43,7 +43,8 @@ ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
 ZoneShapes.treeExact = {} :: { [number]: boolean }
-ZoneShapes.staleSlots = {} :: { [number]: true }
+-- Slots changed since their trees were last updated, each with whether it is axis-aligned, which treeExact takes then
+ZoneShapes.staleSlots = {} :: { [number]: boolean }
 ZoneShapes.staticChanges = ZoneChanges.new()
 ZoneShapes.dynamicChanges = ZoneChanges.new()
 ZoneShapes.staticTree = LinearBVH.new()
@@ -285,7 +286,7 @@ local function deriveWorldShape(
 	end
 
 	treeExact[slot] = nil
-	staleSlots[slot] = true
+	staleSlots[slot] = shapeType == BLOCK_SHAPE_VALUE and (unrotated or (isAxis(right) and isAxis(up) and isAxis(back)))
 	hasStale = true
 
 	requestRefit(if isDynamic then dynamicTree elseif recentStaticSlots[slot] then recentTree else staticTree)
@@ -405,7 +406,7 @@ function ZoneShapes.setDynamic(slot: number, isDynamic: boolean)
 		addStatic(slot)
 	end
 	requestRebuild(dynamicTree)
-	staleSlots[slot] = true
+	staleSlots[slot] = isAxisAligned(slot)
 	hasStale = true
 
 	if shapePositions[slot] then
@@ -594,8 +595,8 @@ function ZoneShapes.rebuildTrees()
 	-- A slot goes stale only with a request to update its tree, so every tree that holds one was just updated. Entries
 	-- are removed one by one, which lets the table shrink again; table.clear would keep its largest size for good.
 	if hasStale then
-		for slot in staleSlots do
-			treeExact[slot] = isAxisAligned(slot)
+		for slot, aligned in staleSlots do
+			treeExact[slot] = aligned
 			staleSlots[slot] = nil
 		end
 		hasStale = false

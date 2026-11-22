@@ -331,14 +331,20 @@ function LinearBVH.tryRefit(tree: Types.Tree, boxes: Types.LeafBoxes): boolean
 
 	local buf = tree.buffer
 	local cost = 0
+	local boxesMin, boxesMax, centers, halfSizes = boxes.min, boxes.max, boxes.centers, boxes.halfSizes
 
 	for offset = (tree.count - 1) * NODE_SIZE, 0, -NODE_SIZE do
 		local id = readu32(buf, offset + ID_OFFSET)
 		if id ~= 0 then
-			-- A leaf whose box is gone has no zone any more, which only a rebuild drops
-			local min, max = boxOf(boxes, id)
+			-- Like boxOf, inline: a leaf whose box is gone has no zone any more, which only a rebuild drops
+			local min, max = boxesMin[id], boxesMax[id]
 			if not min then
-				return false
+				local center = centers[id]
+				if not center then
+					return false
+				end
+				local halfSize = halfSizes[id]
+				min, max = center - halfSize, center + halfSize
 			end
 
 			writef32(buf, offset, min.X)
