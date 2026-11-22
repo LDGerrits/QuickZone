@@ -102,6 +102,8 @@ function Entities.join(entity: Types.Entity, groupId: number): boolean
 			logicVersion = UNCHECKED_VERSION,
 			needsStatic = false,
 			needsDynamic = false,
+			clearCenter = Vector3.zero,
+			clearRadius = 0,
 		}
 		entityData[entity] = newData
 		data = newData

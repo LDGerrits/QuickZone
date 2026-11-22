@@ -40,13 +40,16 @@ export type Destroyable = { phase: Phase, onDestroyCallbacks: { () -> () }? }
 
 export type SyncMode = 'static' | 'dynamic' | 'synced'
 
+-- What a tree needs before the next query: nothing, new bounds for the same leaves, or new leaves. A request only
+-- moves it forward (none -> refit -> rebuild), and updating the tree brings it back to none.
+export type TreeUpdate = 'none' | 'refit' | 'rebuild'
+
 export type Tree = {
 	buffer: buffer,
 	count: number,
 	cost: number,
 	refitSkips: number,
-	pending: boolean,
-	membersChanged: boolean,
+	pendingUpdate: TreeUpdate,
 }
 
 export type ChangeSlot = {
@@ -79,6 +82,9 @@ export type EntityData = {
 	lastPosition: Vector3,
 	staticVersion: number,
 	dynamicVersion: number,
+	clearCenter: Vector3,
+	clearRadius: number,
+	soleObserver: number?,
 }
 
 export type Group<T = any> = {
@@ -151,7 +157,7 @@ export type InternalZone = Zone & Destroyable & {
 	requestedShapeType: number,
 	reference: (Attachment | BasePart | Bone)?,
 	metadata: any?,
-	autoSync: boolean,
+	autoSync: true?,
 	syncConnections: { RBXScriptConnection }?,
 }
 

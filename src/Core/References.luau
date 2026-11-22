@@ -10,6 +10,9 @@ local References = {}
 References.entityToReference = (setmetatable({}, { __mode = 'k' }) :: any) :: { [Types.Entity]: any }
 References.referenceToEntity = (setmetatable({}, { __mode = 'v' }) :: any) :: { [any]: Types.Entity }
 
+-- Whether any entity ever had a reference, so hot paths can skip the lookup until one does
+References.linked = false
+
 local entityToReference = References.entityToReference
 local referenceToEntity = References.referenceToEntity
 
@@ -35,6 +38,7 @@ function References.link(entity: Types.Entity, reference: any?)
 	end
 	entityToReference[entity] = reference
 	if reference ~= nil then
+		References.linked = true
 		referenceToEntity[reference] = entity
 	end
 end

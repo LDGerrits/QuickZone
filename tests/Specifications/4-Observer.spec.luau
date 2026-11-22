@@ -2696,6 +2696,46 @@ return function(Tiniest: Tiniest)
 			zone:destroy()
 		end)
 
+		Test('Zones attached to one observer share its observer list.', function()
+			local zoneA = Zone.new({ cframe = CFrame.new(9000, 0, 9500), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(9100, 0, 9500), size = Vector3.one * 10 })
+			local observer = Observer.new({ zones = { zoneA, zoneB }, groups = {} })
+
+			local listA = Links.slotObservers[(zoneA :: any).slot]
+			local listB = Links.slotObservers[(zoneB :: any).slot]
+			Expect(listA ~= nil and rawequal(listA, listB)).is(true)
+
+			observer:destroy()
+			zoneA:destroy()
+			zoneB:destroy()
+		end)
+
+		Test("A second observer on one zone leaves the first observer's other zones alone.", function()
+			local positionA = Vector3.new(9000, 0, 9600)
+			local positionB = Vector3.new(9100, 0, 9600)
+			local zoneA = Zone.new({ cframe = CFrame.new(positionA), size = Vector3.one * 10 })
+			local zoneB = Zone.new({ cframe = CFrame.new(positionB), size = Vector3.one * 10 })
+			local first = Observer.new({ zones = { zoneA, zoneB }, groups = {} })
+			local second = Observer.new({ zones = { zoneA }, groups = {} })
+			QuickZone:rebuild()
+
+			local secondSeesB = second:isPointInside(positionB)
+			local firstSeesA = first:isPointInside(positionA)
+			second:detach(zoneA)
+			local secondSeesAAfter = second:isPointInside(positionA)
+			local firstSeesAAfter = first:isPointInside(positionA)
+
+			Expect(secondSeesB).is(false)
+			Expect(firstSeesA).is(true)
+			Expect(secondSeesAAfter).is(false)
+			Expect(firstSeesAAfter).is(true)
+
+			first:destroy()
+			second:destroy()
+			zoneA:destroy()
+			zoneB:destroy()
+		end)
+
 		Test('Attaching an attached zone or detaching an unattached one records no zone change.', function()
 			local zone = Zone.new({ cframe = CFrame.new(9000, 0, 9400), size = Vector3.one * 10 })
 			local observer = Observer.new({ zones = { zone }, groups = {} })

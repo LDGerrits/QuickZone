@@ -137,6 +137,7 @@ function Wiring.removeObserver(observer: Types.InternalObserver)
 			Wiring.detach(slot, observerId)
 		end
 	end
+	Links.dropSoleList(observerId)
 
 	observers[observerId] = nil
 	observer.enteredCallbacks = {}

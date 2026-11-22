@@ -40,7 +40,7 @@ local SHRINK_FACTOR = 4
 local LinearBVH = {}
 
 function LinearBVH.new(): Types.Tree
-	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, pending = false, membersChanged = false }
+	return { buffer = buffer.create(0), count = 0, cost = 0, refitSkips = 0, pendingUpdate = 'none' }
 end
 
 local EMPTY_BUFFER = buffer.create(0)
@@ -380,6 +380,35 @@ function LinearBVH.queryPoint(tree: Types.Tree, point: Vector3, hits: { number }
 	return hitCount
 end
 
+-- The first leaf, in tree order, whose box holds point and that accept takes; nil if none
+function LinearBVH.firstLeaf(tree: Types.Tree, point: Vector3, accept: (id: number, point: Vector3) -> boolean): number?
+	local buf = tree.buffer
+	local endOffset = tree.count * NODE_SIZE
+	local px, py, pz = point.X, point.Y, point.Z
+
+	local offset = 0
+	while offset < endOffset do
+		if
+			px >= readf32(buf, offset)
+			and px <= readf32(buf, offset + MAX_X_OFFSET)
+			and py >= readf32(buf, offset + MIN_Y_OFFSET)
+			and py <= readf32(buf, offset + MAX_Y_OFFSET)
+			and pz >= readf32(buf, offset + MIN_Z_OFFSET)
+			and pz <= readf32(buf, offset + MAX_Z_OFFSET)
+		then
+			local id = readu32(buf, offset + ID_OFFSET)
+			if id ~= 0 and accept(id, point) then
+				return id
+			end
+			offset += NODE_SIZE
+		else
+			offset = readu32(buf, offset + SKIP_OFFSET)
+		end
+	end
+
+	return nil
+end
+
 function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
 	local buf = tree.buffer
 	local endOffset = tree.count * NODE_SIZE
@@ -394,6 +423,89 @@ function LinearBVH.anyLeafContains(tree: Types.Tree, point: Vector3): boolean
 			and py <= readf32(buf, offset + MAX_Y_OFFSET)
 			and pz >= readf32(buf, offset + MIN_Z_OFFSET)
 			and pz <= readf32(buf, offset + MAX_Z_OFFSET)
+		then
+			if readu32(buf, offset + ID_OFFSET) ~= 0 then
+				return true
+			end
+			offset += NODE_SIZE
+		else
+			offset = readu32(buf, offset + SKIP_OFFSET)
+		end
+	end
+
+	return false
+end
+
+export type LeafRadius = (
+	id: number,
+	point: Vector3,
+	minX: number,
+	minY: number,
+	minZ: number,
+	maxX: number,
+	maxY: number,
+	maxZ: number
+) -> number
+
+--[=[
+	The largest r, up to maxRadius, such that no leaf can change between point and any position closer than r on every
+	axis. A leaf whose box doesn't hold the point limits r to its distance from the point. A leaf whose box holds it
+	asks leafRadius, which returns how far the point can move before it might cross that leaf's shape (0 if unknown).
+]=]
+function LinearBVH.clearRadius(tree: Types.Tree, point: Vector3, maxRadius: number, leafRadius: LeafRadius): number
+	local buf = tree.buffer
+	local endOffset = tree.count * NODE_SIZE
+	local px, py, pz = point.X, point.Y, point.Z
+	local radius = maxRadius
+
+	local offset = 0
+	while offset < endOffset do
+		local minX = readf32(buf, offset)
+		local maxX = readf32(buf, offset + MAX_X_OFFSET)
+		local minY = readf32(buf, offset + MIN_Y_OFFSET)
+		local maxY = readf32(buf, offset + MAX_Y_OFFSET)
+		local minZ = readf32(buf, offset + MIN_Z_OFFSET)
+		local maxZ = readf32(buf, offset + MAX_Z_OFFSET)
+		local gap = math.max(minX - px, px - maxX, minY - py, py - maxY, minZ - pz, pz - maxZ)
+
+		if gap >= radius then
+			offset = readu32(buf, offset + SKIP_OFFSET)
+		else
+			local id = readu32(buf, offset + ID_OFFSET)
+			if id ~= 0 then
+				if gap > 0 then
+					radius = gap
+				else
+					local limit = leafRadius(id, point, minX, minY, minZ, maxX, maxY, maxZ)
+					if not (limit > 0) then
+						return 0
+					elseif limit < radius then
+						radius = limit
+					end
+				end
+			end
+			offset += NODE_SIZE
+		end
+	end
+
+	return radius
+end
+
+function LinearBVH.anyLeafIntersects(tree: Types.Tree, min: Vector3, max: Vector3): boolean
+	local buf = tree.buffer
+	local endOffset = tree.count * NODE_SIZE
+	local minX, minY, minZ = min.X, min.Y, min.Z
+	local maxX, maxY, maxZ = max.X, max.Y, max.Z
+
+	local offset = 0
+	while offset < endOffset do
+		if
+			maxX >= readf32(buf, offset)
+			and minX <= readf32(buf, offset + MAX_X_OFFSET)
+			and maxY >= readf32(buf, offset + MIN_Y_OFFSET)
+			and minY <= readf32(buf, offset + MAX_Y_OFFSET)
+			and maxZ >= readf32(buf, offset + MIN_Z_OFFSET)
+			and minZ <= readf32(buf, offset + MAX_Z_OFFSET)
 		then
 			if readu32(buf, offset + ID_OFFSET) ~= 0 then
 				return true

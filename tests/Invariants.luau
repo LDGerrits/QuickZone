@@ -118,6 +118,19 @@ function Invariants.check(): string?
 		if Links.slotSoleObserver[slot] ~= sole then
 			problem(`slot {slot} caches sole observer {Links.slotSoleObserver[slot]}, expected {sole}`)
 		end
+		if (sole ~= nil) ~= rawequal(attached, Links.soleLists[attached[1]]) then
+			problem(
+				`slot {slot} has a list of {#attached} that is {if sole then 'not ' else ''}its observer's shared list`
+			)
+		end
+	end
+	for observerId, list in Links.soleLists do
+		if not observers[observerId] then
+			problem(`observer {observerId} has a shared list after it was destroyed`)
+		end
+		if #list ~= 1 or list[1] ~= observerId or not table.isfrozen(list) then
+			problem(`observer {observerId} has a shared list that changed`)
+		end
 	end
 	for slot in Links.slotSoleObserver do
 		if not Links.slotObservers[slot] then

@@ -34,46 +34,60 @@ function Links.unsubscribe(observerId: number, groupId: number)
 	end
 end
 
+-- Zones with one observer share that observer's frozen list, so most zones carry no list of their own. Only Links
+-- writes to the lists, and a list of one is always the shared one.
+local soleLists = {} :: { [number]: { number } }
+Links.soleLists = soleLists
+
+local function soleListOf(observerId: number): { number }
+	local list = soleLists[observerId]
+	if not list then
+		list = table.freeze({ observerId })
+		soleLists[observerId] = list
+	end
+	return list
+end
+
 function Links.attach(slot: number, observerId: number): boolean
-	local attached = slotObservers[slot] or {}
-	slotObservers[slot] = attached
+	local attached = slotObservers[slot]
+	if not attached then
+		slotObservers[slot] = soleListOf(observerId)
+		slotSoleObserver[slot] = observerId
+		return true
+	end
 
 	if table.find(attached, observerId) then
 		return false
 	end
-	table.insert(attached, observerId)
 	if #attached == 1 then
-		slotSoleObserver[slot] = attached[1]
-	else
+		slotObservers[slot] = { attached[1], observerId }
 		slotSoleObserver[slot] = nil
+	else
+		table.insert(attached, observerId)
 	end
 	return true
 end
 
 function Links.detach(slot: number, observerId: number): boolean
 	local attached = slotObservers[slot]
-	if not attached then
+	local idx = attached and table.find(attached, observerId)
+	if not attached or not idx then
 		return false
 	end
 
-	local idx = table.find(attached, observerId)
-	if idx then
-		local lastIdx = #attached
-		if idx ~= lastIdx then
-			attached[idx] = attached[lastIdx]
-		end
-		attached[lastIdx] = nil
-		if #attached == 1 then
-			slotSoleObserver[slot] = attached[1]
-		else
-			slotSoleObserver[slot] = nil
-		end
-	end
-
-	if #attached == 0 then
+	local count = #attached
+	if count == 1 then
 		slotObservers[slot] = nil
+		slotSoleObserver[slot] = nil
+	elseif count == 2 then
+		local remaining = if idx == 1 then attached[2] else attached[1]
+		slotObservers[slot] = soleListOf(remaining)
+		slotSoleObserver[slot] = remaining
+	else
+		attached[idx] = attached[count]
+		attached[count] = nil
 	end
-	return idx ~= nil
+	return true
 end
 
 function Links.detachAll(slot: number): { number }?
@@ -81,6 +95,11 @@ function Links.detachAll(slot: number): { number }?
 	slotObservers[slot] = nil
 	slotSoleObserver[slot] = nil
 	return attached
+end
+
+-- Drops the shared list of an observer that no zone lists any more
+function Links.dropSoleList(observerId: number)
+	soleLists[observerId] = nil
 end
 
 return Links

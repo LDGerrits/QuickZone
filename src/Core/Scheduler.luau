@@ -9,7 +9,6 @@ local Types = require(script.Parent.Parent.Types)
 local Callbacks = require(script.Parent.Callbacks)
 local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Log = require(script.Parent.Parent.Utils.Log)
-local Entities = require(script.Parent.Entities)
 local Links = require(script.Parent.Links)
 local Memberships = require(script.Parent.Memberships)
 local References = require(script.Parent.References)
@@ -20,6 +19,8 @@ local ZoneShapes = require(script.Parent.ZoneShapes)
 
 local queryPoint = LinearBVH.queryPoint
 local touches = ZoneChanges.touches
+local touchesBox = ZoneChanges.touchesBox
+local clearRadiusAt = ZoneShapes.clearRadius
 local containsPoint = ZoneShapes.containsPoint
 local fireCallback = Callbacks.fire
 local moveMembership = Memberships.move
@@ -27,6 +28,9 @@ local exitMembership = Memberships.exit
 local isSubscribed = Memberships.isSubscribed
 
 local treeExact = ZoneShapes.treeExact
+local shapeBoundsMin = ZoneShapes.shapeBoundsMin
+local shapeBoundsMax = ZoneShapes.shapeBoundsMax
+local firstLeaf = LinearBVH.firstLeaf
 local zoneIdToZoneObj = Registry.zoneIdToZoneObj
 local zoneSlotIds = ZoneShapes.zoneSlotIds
 local slotObservers = Links.slotObservers
@@ -36,10 +40,10 @@ local autoSyncZones = Registry.autoSyncZones
 local observers = Registry.observers
 
 local entityToReference = References.entityToReference
-local entityData = Entities.entityData
 local dirtyProfiles = Routing.dirtyProfiles
 
 local staticTree = ZoneShapes.staticTree
+local recentTree = ZoneShapes.recentTree
 local dynamicTree = ZoneShapes.dynamicTree
 local staticChanges = ZoneShapes.staticChanges
 local dynamicChanges = ZoneShapes.dynamicChanges
@@ -62,12 +66,19 @@ local autoUpdateConnection: RBXScriptConnection?
 
 local bucketList = Routing.bucketList
 local buckets = Routing.buckets
+local bucketData = Routing.bucketData
 local nextBucketIndex = 1
 local bucketLastProcessedIndex = {} :: { [number]: number }
 local BUDGET_CHECK = 32
 local NOWHERE = Vector3.new(0 / 0, 0 / 0, 0 / 0)
 
 local UNCHECKED_VERSION = -1
+
+-- After a check, an entity that moved less than CLEAR_AFTER_MOVE on every axis since its previous check gets a cube
+-- of up to MAX_CLEAR_RADIUS studs around it in which no zone can change its answer. Its checks are skipped while it
+-- stays inside, until a zone change reaches the cube.
+local MAX_CLEAR_RADIUS = 32
+local CLEAR_AFTER_MOVE = 8
 
 local STRAT_POS = Config.Strategy.POS
 local STRAT_PRIM = Config.Strategy.PRIM
@@ -138,6 +149,38 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	end
 end
 
+-- The observer that acceptsSoleHit checks slots against
+local ctx_soleObserverId = 0
+
+local function isAttachedTo(slot: number, observerId: number): boolean
+	local sole = slotSoleObserver[slot]
+	if sole then
+		return sole == observerId
+	end
+	local attached = slotObservers[slot]
+	return attached ~= nil and table.find(attached, observerId) ~= nil
+end
+
+local function acceptsSoleHit(slot: number, position: Vector3): boolean
+	return isAttachedTo(slot, ctx_soleObserverId) and (treeExact[slot] or containsPoint(slot, position))
+end
+
+-- Whether the zone still holds the position, as a tree query would find it
+local function stillHolds(zoneId: number, observerId: number, position: Vector3): boolean
+	local zone = zoneIdToZoneObj[zoneId]
+	if not zone then
+		return false
+	end
+	local slot = zone.slot
+	if zoneSlotIds[slot] ~= zoneId or not isAttachedTo(slot, observerId) then
+		return false
+	elseif treeExact[slot] then
+		local min, max = shapeBoundsMin[slot], shapeBoundsMax[slot]
+		return vector.max(min, position) == position and vector.min(max, position) == position
+	end
+	return containsPoint(slot, position)
+end
+
 local function dropBucketProgress(rate: number)
 	bucketLastProcessedIndex[rate] = nil
 end
@@ -186,6 +229,7 @@ local function runTick(dt: number)
 		nextBucketIndex = (nextBucketIndex % numBuckets) + 1
 
 		local list = buckets[rate]
+		local dataList = bucketData[rate]
 		local totalEntities = #list
 		if totalEntities == 0 then
 			continue
@@ -207,7 +251,7 @@ local function runTick(dt: number)
 		while processed < workQuota do
 			ctx_checkingIndex = idx
 			local entity = list[idx]
-			local data = entityData[entity] :: Types.EntityData
+			local data = dataList[idx]
 
 			local position
 			local strategy = data.strategy
@@ -236,121 +280,225 @@ local function runTick(dt: number)
 
 			local lastPosition = data.lastPosition
 			local shouldCheck = data.logicVersion ~= logicVersion
+			local inClear = false
 
 			if not shouldCheck then
-				local dx = position.X - lastPosition.X
-				local dy = position.Y - lastPosition.Y
-				local dz = position.Z - lastPosition.Z
+				local clearRadius = data.clearRadius
+				if clearRadius > 0 then
+					-- False for a NaN position, which then counts as moved below
+					local offset = vector.abs(position - data.clearCenter)
+					if offset.X < clearRadius and offset.Y < clearRadius and offset.Z < clearRadius then
+						inClear = true
+					else
+						data.clearRadius = 0
+					end
+				end
 
-				-- A NaN position counts as moved, so the entity leaves its zone instead of keeping it forever
-				shouldCheck = not ((dx * dx + dy * dy + dz * dz) < data.precisionSq)
+				if not inClear then
+					local dx = position.X - lastPosition.X
+					local dy = position.Y - lastPosition.Y
+					local dz = position.Z - lastPosition.Z
+
+					-- A NaN position counts as moved, so the entity leaves its zone instead of keeping it forever
+					shouldCheck = not ((dx * dx + dy * dy + dz * dz) < data.precisionSq)
+				end
 			end
 
 			if not shouldCheck and needsDynamic and data.dynamicVersion ~= dynamicVersion then
-				shouldCheck = touches(dynamicChanges, data.dynamicVersion, dynamicVersion, position, lastPosition)
+				if inClear then
+					local center, extent = data.clearCenter, vector.one * data.clearRadius
+					shouldCheck = touchesBox(
+						dynamicChanges,
+						data.dynamicVersion,
+						dynamicVersion,
+						center - extent,
+						center + extent
+					)
+				else
+					shouldCheck = touches(dynamicChanges, data.dynamicVersion, dynamicVersion, position, lastPosition)
+				end
 				if not shouldCheck then
 					data.dynamicVersion = dynamicVersion
 				end
 			end
 
 			if not shouldCheck and needsStatic and data.staticVersion ~= staticVersion then
-				shouldCheck = touches(staticChanges, data.staticVersion, staticVersion, position, lastPosition)
+				if inClear then
+					local center, extent = data.clearCenter, vector.one * data.clearRadius
+					shouldCheck =
+						touchesBox(staticChanges, data.staticVersion, staticVersion, center - extent, center + extent)
+				else
+					shouldCheck = touches(staticChanges, data.staticVersion, staticVersion, position, lastPosition)
+				end
 				if not shouldCheck then
 					data.staticVersion = staticVersion
 				end
 			end
 
-			if shouldCheck and dirtyProfiles[entity] then
+			if shouldCheck and Routing.profilesDirty and dirtyProfiles[entity] then
 				data.logicVersion = UNCHECKED_VERSION
+				data.clearRadius = 0
 				shouldCheck = false
+			elseif inClear and not shouldCheck then
+				data.lastPosition = position
 			end
 
 			if shouldCheck then
+				local moved = vector.abs(position - lastPosition)
 				data.lastPosition = position
 				data.dynamicVersion = dynamicVersion
 				data.logicVersion = logicVersion
 				data.staticVersion = staticVersion
 
-				ctx_linkedObservers = data.linkedObservers :: { [number]: true }
-				ctx_currentMemberships = data.activeObserverMemberships
-
-				ctx_cCount = 0
-				ctx_highestWin = -math.huge
-
-				if needsDynamic then
-					queryTree(dynamicTree, position)
-				end
-
-				if needsStatic then
-					queryTree(staticTree, position)
-				end
-
 				local current = data.activeObserverMemberships
+				local soleObserverId = data.soleObserver
 
-				for observerId in current do
-					local newPri = ctx_candidatePriority[observerId]
-					if newPri and newPri >= ctx_highestWin then
-						continue
+				if soleObserverId then
+					local observer = observers[soleObserverId]
+					local currentZoneId = current[soleObserverId]
+					local zoneIdx = nil
+					if observer and observer.enabled then
+						-- The entity keeps its zone while that zone holds it, else takes the first one that does,
+						-- dynamic zones first
+						if currentZoneId and stillHolds(currentZoneId, soleObserverId, position) then
+							zoneIdx = currentZoneId
+						else
+							ctx_soleObserverId = soleObserverId
+							local slot = if needsDynamic then firstLeaf(dynamicTree, position, acceptsSoleHit) else nil
+							if not slot and needsStatic then
+								slot = firstLeaf(staticTree, position, acceptsSoleHit)
+								if not slot and recentTree.count > 0 then
+									slot = firstLeaf(recentTree, position, acceptsSoleHit)
+								end
+							end
+							if slot then
+								zoneIdx = zoneSlotIds[slot]
+							end
+						end
 					end
 
-					exitMembership(observerId, entity, data)
+					if zoneIdx == nil then
+						if currentZoneId then
+							exitMembership(soleObserverId, entity, data)
+						end
+					elseif zoneIdx ~= currentZoneId then
+						-- No callback ran since this entity's check began, so the observer is still enabled and
+						-- attached to the zone (both checked above), and the entity's links are unchanged
+						local zone = zoneIdToZoneObj[zoneIdx]
+						if zone then
+							local soleObserver = observer :: Types.InternalObserver
+							moveMembership(soleObserverId, entity, data, zoneIdx)
+							fireCallback(
+								if currentZoneId
+									then soleObserver.transitionedCallbacks
+									else soleObserver.enteredCallbacks,
+								soleObserverId,
+								References.linked and entityToReference[entity] or entity,
+								zone,
+								entity,
+								soleObserver.safety,
+								zoneIdx
+							)
+						end
+					end
+				else
+					ctx_linkedObservers = data.linkedObservers :: { [number]: true }
+					ctx_currentMemberships = current
+
+					ctx_cCount = 0
+					ctx_highestWin = -math.huge
+
+					if needsDynamic then
+						queryTree(dynamicTree, position)
+					end
+
+					if needsStatic then
+						queryTree(staticTree, position)
+						if recentTree.count > 0 then
+							queryTree(recentTree, position)
+						end
+					end
+
+					for observerId in current do
+						local newPri = ctx_candidatePriority[observerId]
+						if newPri and newPri >= ctx_highestWin then
+							continue
+						end
+
+						exitMembership(observerId, entity, data)
+					end
+
+					for i = 1, ctx_cCount do
+						local observerId = ctx_candidateList[i]
+						local priority = ctx_candidatePriority[observerId]
+						local zoneIdx = ctx_candidateIndex[observerId]
+
+						ctx_candidatePriority[observerId] = nil
+						ctx_candidateIndex[observerId] = nil
+						ctx_candidateList[i] = nil
+
+						local observer = observers[observerId]
+						if not observer then
+							continue
+						end
+
+						if priority < ctx_highestWin then
+							continue
+						end
+
+						local currentZoneId = current[observerId]
+						if currentZoneId == zoneIdx then
+							continue
+						end
+
+						local zone = zoneIdToZoneObj[zoneIdx]
+						if data.dropped or not zone then
+							continue
+						end
+
+						local attached = slotObservers[zone.slot]
+						if
+							not observer.enabled
+							or not attached
+							or not table.find(attached, observerId)
+							or (
+								Routing.profilesDirty
+								and dirtyProfiles[entity]
+								and not isSubscribed(entity, observerId)
+							)
+						then
+							data.logicVersion = UNCHECKED_VERSION
+							continue
+						end
+
+						moveMembership(observerId, entity, data, zoneIdx)
+
+						local reference = entityToReference[entity] or entity
+						fireCallback(
+							if currentZoneId then observer.transitionedCallbacks else observer.enteredCallbacks,
+							observerId,
+							reference,
+							zone,
+							entity,
+							observer.safety,
+							zoneIdx
+						)
+					end
 				end
-
-				for i = 1, ctx_cCount do
-					local observerId = ctx_candidateList[i]
-					local priority = ctx_candidatePriority[observerId]
-					local zoneIdx = ctx_candidateIndex[observerId]
-
-					ctx_candidatePriority[observerId] = nil
-					ctx_candidateIndex[observerId] = nil
-					ctx_candidateList[i] = nil
-
-					local observer = observers[observerId]
-					if not observer then
-						continue
-					end
-
-					if priority < ctx_highestWin then
-						continue
-					end
-
-					local currentZoneId = current[observerId]
-					if currentZoneId == zoneIdx then
-						continue
-					end
-
-					local zone = zoneIdToZoneObj[zoneIdx]
-					if data.dropped or not zone then
-						continue
-					end
-
-					local attached = slotObservers[zone.slot]
-					if
-						not observer.enabled
-						or not attached
-						or not table.find(attached, observerId)
-						or (dirtyProfiles[entity] and not isSubscribed(entity, observerId))
-					then
-						data.logicVersion = UNCHECKED_VERSION
-						continue
-					end
-
-					moveMembership(observerId, entity, data, zoneIdx)
-
-					local reference = entityToReference[entity] or entity
-					fireCallback(
-						if currentZoneId then observer.transitionedCallbacks else observer.enteredCallbacks,
-						observerId,
-						reference,
-						zone,
-						entity,
-						observer.safety,
-						zoneIdx
-					)
-				end
-
-				if dirtyProfiles[entity] then
+				if Routing.profilesDirty and dirtyProfiles[entity] then
 					data.logicVersion = UNCHECKED_VERSION
+					data.clearRadius = 0
+				elseif
+					moved.X < CLEAR_AFTER_MOVE
+					and moved.Y < CLEAR_AFTER_MOVE
+					and moved.Z < CLEAR_AFTER_MOVE
+					-- When every dynamic zone moves, the next tick undoes any clear cube near one
+					and not (needsDynamic and ZoneShapes.dynamicChurn)
+				then
+					data.clearRadius = clearRadiusAt(position, MAX_CLEAR_RADIUS, needsStatic, needsDynamic)
+					data.clearCenter = position
+				else
+					data.clearRadius = 0
 				end
 			end
 

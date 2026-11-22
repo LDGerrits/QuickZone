@@ -17,17 +17,23 @@ local Routing = {}
 
 Routing.logicVersion = 0
 Routing.dirtyProfiles = {} :: { [Types.Entity]: boolean }
+-- Whether dirtyProfiles may hold an entity, so the scheduler can skip looking each entity up
+Routing.profilesDirty = false
 Routing.dirtyTopology = {} :: { [Types.Entity]: boolean }
 Routing.bucketList = {} :: { number }
 Routing.buckets = {} :: { [number]: { Types.Entity } }
+-- Each bucket's entity data, at the same index as the entity, so the scheduler reads it without a hash lookup
+Routing.bucketData = {} :: { [number]: { Types.EntityData } }
 
 local dirtyProfiles = Routing.dirtyProfiles
 local dirtyTopology = Routing.dirtyTopology
 local bucketList = Routing.bucketList
 local buckets = Routing.buckets
+local bucketData = Routing.bucketData
 
 function Routing.reroute(entity: Types.Entity)
 	dirtyProfiles[entity] = true
+	Routing.profilesDirty = true
 	dirtyTopology[entity] = true
 end
 
@@ -46,11 +52,15 @@ function Routing.leaveBucket(entity: Types.Entity, data: Types.EntityData)
 		return
 	end
 
+	local dataList = bucketData[data.updateRate]
 	local last = #bucket
 	local lastEntity = bucket[last]
+	local lastData = dataList[last]
 	bucket[idx] = lastEntity
-	entityData[lastEntity].bucketIndex = idx
+	dataList[idx] = lastData
+	lastData.bucketIndex = idx
 	bucket[last] = nil
+	dataList[last] = nil
 	data.bucketIndex = 0
 end
 
@@ -64,6 +74,8 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 
 	local minPrecSq = math.huge
 	local maxRate = 0
+	local linkCount = 0
+	local soleObserver = nil
 
 	for groupId, _ in data.groups do
 		local group = groups[groupId]
@@ -72,6 +84,10 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 		end
 
 		for observerId, _ in group.subscribers do
+			if not (linkedObservers :: { [number]: true })[observerId] then
+				linkCount += 1
+				soleObserver = observerId
+			end
 			(linkedObservers :: { [number]: true })[observerId] = true
 
 			local observer = observers[observerId]
@@ -93,6 +109,7 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 		if maxRate > 0 then
 			if not buckets[maxRate] then
 				buckets[maxRate] = {}
+				bucketData[maxRate] = {}
 				table.insert(bucketList, maxRate)
 				table.sort(bucketList, function(a: number, b: number)
 					return a > b
@@ -102,6 +119,7 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 			local newBucket = buckets[maxRate]
 			local newIdx = #newBucket + 1
 			newBucket[newIdx] = entity
+			bucketData[maxRate][newIdx] = data
 			data.bucketIndex = newIdx
 		end
 
@@ -111,8 +129,10 @@ local function processProfileChange(entity: Types.Entity, data: Types.EntityData
 	if maxRate > 0 then
 		data.precisionSq = minPrecSq
 		data.linkedObservers = linkedObservers
+		data.soleObserver = if linkCount == 1 then soleObserver else nil
 	else
 		data.linkedObservers = nil
+		data.soleObserver = nil
 	end
 end
 
@@ -150,6 +170,7 @@ local function markMembersOf(observerId: number, alsoProfiles: boolean)
 				dirtyTopology[entity] = true
 				if alsoProfiles then
 					dirtyProfiles[entity] = true
+					Routing.profilesDirty = true
 				end
 			end
 		end
@@ -185,6 +206,7 @@ end
 function Routing.forget(entity: Types.Entity, data: Types.EntityData)
 	Routing.leaveBucket(entity, data)
 	data.linkedObservers = nil
+	data.soleObserver = nil
 	dirtyProfiles[entity] = nil
 	dirtyTopology[entity] = nil
 end
@@ -197,6 +219,7 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 			processProfileChange(entity, data)
 		end
 	end
+	Routing.profilesDirty = false
 
 	for entity, _ in dirtyTopology do
 		dirtyTopology[entity] = nil
@@ -210,6 +233,7 @@ function Routing.settle(onBucketDropped: (rate: number) -> ())
 		local rate = bucketList[i]
 		if #buckets[rate] == 0 then
 			buckets[rate] = nil
+			bucketData[rate] = nil
 			onBucketDropped(rate)
 			table.remove(bucketList, i)
 		end

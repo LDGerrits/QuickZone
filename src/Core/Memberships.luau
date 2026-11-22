@@ -95,7 +95,7 @@ function Memberships.exit(observerId: number, entity: Types.Entity, data: Types.
 	local observer = observers[observerId]
 	if observer then
 		observer.tracked[entity] = nil
-		local reference = entityToReference[entity] or entity
+		local reference = References.linked and entityToReference[entity] or entity
 		fire(observer.exitedCallbacks, observerId, reference, zoneIdToZoneObj[zoneId], entity, observer.safety)
 	end
 end

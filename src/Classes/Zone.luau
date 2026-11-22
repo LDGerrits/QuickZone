@@ -162,13 +162,15 @@ local function followReference(zone: Types.InternalZone)
 end
 
 local function syncModeOf(zone: Types.InternalZone): Types.SyncMode
-	return SyncMode.of(ZoneShapes.isDynamic(zone.slot), zone.autoSync)
+	return SyncMode.of(ZoneShapes.isDynamic(zone.slot), zone.autoSync == true)
 end
 
 local function setSyncMode(zone: Types.InternalZone, mode: Types.SyncMode)
 	local autoSync = mode == 'synced'
-	local syncChanged = zone.autoSync ~= autoSync
-	zone.autoSync = autoSync
+	local syncChanged = (zone.autoSync == true) ~= autoSync
+	if syncChanged then
+		zone.autoSync = if autoSync then true else nil
+	end
 	Wiring.setZoneDynamic(zone.slot, mode ~= 'static')
 	if syncChanged then
 		followReference(zone)
@@ -210,14 +212,20 @@ local function newZoneInternal(
 
 	local resolvedType, part = resolveShape(id, shapeType, asQueryablePart(reference))
 
+	-- Only the fields every zone needs, so the table gets 4 slots. Writing even nil to a missing field adds a slot,
+	-- and a zone without a reference, metadata or autoSync never sets those.
 	local self: Types.InternalZone = setmetatable({
 		id = id,
 		phase = 'alive',
 		requestedShapeType = shapeType,
-		reference = reference,
-		metadata = metadata,
-		autoSync = false,
+		slot = 0,
 	}, Zone) :: any
+	if reference ~= nil then
+		self.reference = reference
+	end
+	if metadata ~= nil then
+		self.metadata = metadata
+	end
 	Wiring.addZone(self, isDynamic, cframe, size * 0.5, resolvedType, part)
 
 	if autoSync then
@@ -436,7 +444,9 @@ end
 	@return Zone
 ]=]
 function Zone.setCFrame(self: Types.InternalZone, cf: CFrame): Types.Zone
-	checkType('cframe', 'CFrame', cf)
+	if typeof(cf) ~= 'CFrame' then
+		checkType('cframe', 'CFrame', cf)
+	end
 	ZoneShapes.setCFrame(self.slot, cf)
 	return self
 end

@@ -6,6 +6,7 @@ local LinearBVH = require(script.Parent.Parent.Utils.LinearBVH)
 local Types = require(script.Parent.Parent.Types)
 
 local anyLeafContains = LinearBVH.anyLeafContains
+local anyLeafIntersects = LinearBVH.anyLeafIntersects
 
 local HISTORY = 16
 local MIN_BOXES = 64
@@ -107,6 +108,33 @@ function ZoneChanges.touches(
 
 		local tree = slot.tree
 		if anyLeafContains(tree, a) or (b ~= a and anyLeafContains(tree, b)) then
+			return true
+		end
+	end
+
+	return false
+end
+
+-- Like touches, for every point of a box
+function ZoneChanges.touchesBox(
+	log: Types.ZoneChanges,
+	fromVersion: number,
+	toVersion: number,
+	min: Vector3,
+	max: Vector3
+): boolean
+	if fromVersion < 0 or toVersion - fromVersion > HISTORY then
+		return true
+	end
+
+	local history = log.history
+	for version = fromVersion + 1, toVersion do
+		local slot = history[version % HISTORY + 1]
+		if not slot or slot.version ~= version or slot.all then
+			return true
+		end
+
+		if anyLeafIntersects(slot.tree, min, max) then
 			return true
 		end
 	end
