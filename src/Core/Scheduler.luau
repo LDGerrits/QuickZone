@@ -552,9 +552,18 @@ local function recoverFromError()
 end
 
 local tickThread: thread? = nil
+local tickCallbackDepth = 0
 local warnedYield = false
 
 function Scheduler.update(dt: number?)
+	-- A tick whose thread was killed, by a script timeout or task.cancel, never comes back to clear tickThread
+	if tickThread and coroutine.status(tickThread) == 'dead' then
+		tickThread = nil
+		warnedYield = false
+		recoverFromError()
+		Callbacks.restoreDepth(tickCallbackDepth)
+	end
+
 	if tickThread then
 		if not warnedYield and coroutine.status(tickThread) == 'suspended' then
 			warnedYield = true
@@ -570,6 +579,7 @@ function Scheduler.update(dt: number?)
 	local step = if type(dt) == 'number' and dt >= 0 then dt else 0
 
 	tickThread = coroutine.running()
+	tickCallbackDepth = Callbacks.depth()
 	-- Cast, as xpcall's type gives the handler's result no place in its returns
 	local ok, trace = xpcall(runTick :: any, debug.traceback :: any, step)
 	tickThread = nil

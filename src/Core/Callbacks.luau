@@ -97,6 +97,21 @@ function Callbacks.fire(
 	end
 end
 
+-- How many fire calls are running, for the scheduler to put back when a tick's thread dies inside one
+function Callbacks.depth(): number
+	return firing
+end
+
+function Callbacks.restoreDepth(depth: number)
+	firing = depth
+	if firing == 0 and next(blanked) then
+		for list in blanked do
+			compact(list)
+		end
+		table.clear(blanked)
+	end
+end
+
 function Callbacks.call<A...>(callback: (A...) -> ...any, safety: boolean, ...: A...)
 	if safety then
 		task.spawn(callback, ...)
