@@ -43,6 +43,7 @@ local entityToReference = References.entityToReference
 local dirtyProfiles = Routing.dirtyProfiles
 
 local staticTree = ZoneShapes.staticTree
+local recentTree = ZoneShapes.recentTree
 local dynamicTree = ZoneShapes.dynamicTree
 local staticChanges = ZoneShapes.staticChanges
 local dynamicChanges = ZoneShapes.dynamicChanges
@@ -366,6 +367,9 @@ local function runTick(dt: number)
 							local slot = if needsDynamic then firstLeaf(dynamicTree, position, acceptsSoleHit) else nil
 							if not slot and needsStatic then
 								slot = firstLeaf(staticTree, position, acceptsSoleHit)
+								if not slot and recentTree.count > 0 then
+									slot = firstLeaf(recentTree, position, acceptsSoleHit)
+								end
 							end
 							if slot then
 								zoneIdx = zoneSlotIds[slot]
@@ -410,6 +414,9 @@ local function runTick(dt: number)
 
 					if needsStatic then
 						queryTree(staticTree, position)
+						if recentTree.count > 0 then
+							queryTree(recentTree, position)
+						end
 					end
 
 					for observerId in current do
@@ -481,7 +488,13 @@ local function runTick(dt: number)
 				if Routing.profilesDirty and dirtyProfiles[entity] then
 					data.logicVersion = UNCHECKED_VERSION
 					data.clearRadius = 0
-				elseif moved.X < CLEAR_AFTER_MOVE and moved.Y < CLEAR_AFTER_MOVE and moved.Z < CLEAR_AFTER_MOVE then
+				elseif
+					moved.X < CLEAR_AFTER_MOVE
+					and moved.Y < CLEAR_AFTER_MOVE
+					and moved.Z < CLEAR_AFTER_MOVE
+					-- When every dynamic zone moves, the next tick undoes any clear cube near one
+					and not (needsDynamic and ZoneShapes.dynamicChurn)
+				then
 					data.clearRadius = clearRadiusAt(position, MAX_CLEAR_RADIUS, needsStatic, needsDynamic)
 					data.clearCenter = position
 				else
