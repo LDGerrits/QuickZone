@@ -21,6 +21,8 @@ local isPointInShape = Geometry.isPointInShape
 local INV_SQRT3 = 1 / math.sqrt(3)
 -- Kept off every clear radius, so float rounding at a zone's face can't put a point on the wrong side
 local CLEAR_MARGIN = 1e-3
+-- The squared length up to which an axis of a rotated CFrame counts as unit length, above float rounding
+local MAX_UNIT_LENGTH_SQ = 1 + 1e-4
 
 local ZoneShapes = {}
 
@@ -498,15 +500,15 @@ local function leafRadius(
 		local offset = point - shapePositions[slot]
 		return math.abs(shapeFilledHalfSizes[slot].X - math.sqrt(vector.dot(offset, offset))) * INV_SQRT3
 	elseif shapeType == BLOCK_SHAPE_VALUE then
+		local right, up, back = shapeRights[slot], shapeUps[slot], shapeBacks[slot]
+		-- The distances below are in the block's own space, which is world space only while its axes are unit length
+		if math.max(vector.dot(right, right), vector.dot(up, up), vector.dot(back, back)) > MAX_UNIT_LENGTH_SQ then
+			return 0
+		end
 		local offset = point - shapePositions[slot]
 		local half = shapeFilledHalfSizes[slot]
-		local localPoint = vector.abs(
-			Vector3.new(
-				vector.dot(offset, shapeRights[slot]),
-				vector.dot(offset, shapeUps[slot]),
-				vector.dot(offset, shapeBacks[slot])
-			)
-		)
+		local localPoint =
+			vector.abs(Vector3.new(vector.dot(offset, right), vector.dot(offset, up), vector.dot(offset, back)))
 		if vector.min(localPoint, half) == localPoint then
 			local inside = half - localPoint
 			return math.min(inside.X, inside.Y, inside.Z) * INV_SQRT3
