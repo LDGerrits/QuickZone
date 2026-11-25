@@ -23,6 +23,8 @@ local INV_SQRT3 = 1 / math.sqrt(3)
 local CLEAR_MARGIN = 1e-3
 -- The squared length up to which an axis of a rotated CFrame counts as unit length, above float rounding
 local MAX_UNIT_LENGTH_SQ = 1 + 1e-4
+-- The dot of two axes of a rotated CFrame up to which they count as square to each other, above float rounding
+local MAX_SKEW = 1e-4
 
 local ZoneShapes = {}
 
@@ -508,7 +510,16 @@ local function leafRadius(
 	elseif shapeType == BLOCK_SHAPE_VALUE then
 		local right, up, back = shapeRights[slot], shapeUps[slot], shapeBacks[slot]
 		-- The distances below are in the block's own space, which is world space only while its axes are unit length
-		if math.max(vector.dot(right, right), vector.dot(up, up), vector.dot(back, back)) > MAX_UNIT_LENGTH_SQ then
+		-- and square to each other
+		if
+			math.max(vector.dot(right, right), vector.dot(up, up), vector.dot(back, back)) > MAX_UNIT_LENGTH_SQ
+			or math.max(
+					math.abs(vector.dot(right, up)),
+					math.abs(vector.dot(up, back)),
+					math.abs(vector.dot(back, right))
+				)
+				> MAX_SKEW
+		then
 			return 0
 		end
 		local offset = point - shapePositions[slot]
