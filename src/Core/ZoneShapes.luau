@@ -40,8 +40,8 @@ ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
 ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
--- A zone's box, kept only where it isn't its position plus and minus its filled half size: when it is rotated, or its
--- size is infinite or NaN
+-- A zone's box, kept only where it isn't its position plus and minus its filled half size: when it is rotated and not a
+-- ball, or its size is infinite or NaN
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
 ZoneShapes.treeExact = {} :: { [number]: boolean }
@@ -246,8 +246,14 @@ local function deriveWorldShape(
 		and math.abs(back.Z) == 1
 	local boundsMin, boundsMax
 	local keepBounds = true
-	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
-	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
+	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN. A ball is a
+	-- sphere around its position whatever its CFrame, so it takes these bounds too.
+	if
+		(unrotated or shapeType == BALL_SHAPE_VALUE)
+		and halfSize.X < math.huge
+		and halfSize.Y < math.huge
+		and halfSize.Z < math.huge
+	then
 		boundsMin, boundsMax = position - halfSize, position + halfSize
 		keepBounds = false
 	else
