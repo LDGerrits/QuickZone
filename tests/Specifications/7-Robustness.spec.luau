@@ -2145,6 +2145,58 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test(
+			'An entity near a block whose axes are nearly square to each other is checked before it can reach it.',
+			function()
+				withCleanup(function(track)
+					-- Near the origin, where floats resolve the 2e-3 studs this turns on
+					local position = Vector3.new(-1500, 500, -1500)
+					-- Unit axes whose dots are all 9.9e-5, half turned about (1, 1, 1)
+					local skew = 9.9e-5
+					local alpha = math.sqrt(1 - skew)
+					local common = 2 * alpha / 3 + (math.sqrt(alpha * alpha + 3 * skew) - alpha) / 3
+					local right = Vector3.new(common - alpha, common, common)
+					local up = Vector3.new(common, common - alpha, common)
+					local back = Vector3.new(common, common, common - alpha)
+					local cframe = CFrame.new(
+						position.X,
+						position.Y,
+						position.Z,
+						right.X,
+						up.X,
+						back.X,
+						right.Y,
+						up.Y,
+						back.Y,
+						right.Z,
+						up.Z,
+						back.Z
+					)
+					-- The direction of the block's corner: its points in the block's own space are this times a number
+					local corner = (up:Cross(back) + back:Cross(right) + right:Cross(up)) / right:Dot(up:Cross(back))
+					-- 32 studs outside every face, as far as a clear cube reaches, and a hair inside the nearest corner
+					local start = position + corner * 132
+					local goal = position + corner * (100 - 1e-4)
+					local entity = { Position = start + Vector3.new(0.2, 0, 0) }
+					local zone = track(Zone.new({ cframe = cframe, size = Vector3.one * 200 }))
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+
+					QuickZone:update(1)
+					-- A small step, after which a check may give the entity room to move unchecked
+					entity.Position = start
+					QuickZone:update(1)
+					local outside = observer:getZoneOfEntity(entity)
+					entity.Position = goal
+					QuickZone:update(1)
+
+					Expect(outside).is(nil)
+					Expect(zone:isPointInside(goal)).is(true)
+					Expect(observer:getZoneOfEntity(entity)).is(zone)
+				end)
+			end
+		)
+
 		Test('Zones:add leaves a dynamic, auto-synced zone as it is in a static container.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-49200, 0, 41000)
