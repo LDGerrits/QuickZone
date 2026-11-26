@@ -97,7 +97,6 @@ function Links.detachAll(slot: number): { number }?
 	return attached
 end
 
--- Drops the shared list of an observer that no zone lists any more
 function Links.dropSoleList(observerId: number)
 	soleLists[observerId] = nil
 end

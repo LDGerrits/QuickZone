@@ -21,8 +21,6 @@ local isPointInShape = Geometry.isPointInShape
 local INV_SQRT3 = 1 / math.sqrt(3)
 -- Kept off every clear radius, so float rounding at a zone's face can't put a point on the wrong side
 local CLEAR_MARGIN = 1e-3
--- The squared length up to which an axis of a rotated CFrame counts as unit length, above float rounding
-local MAX_UNIT_LENGTH_SQ = 1 + 1e-4
 
 local ZoneShapes = {}
 
@@ -40,8 +38,8 @@ ZoneShapes.shapePositions = {} :: { [number]: Vector3 }
 ZoneShapes.shapeRights = {} :: { [number]: Vector3 }
 ZoneShapes.shapeUps = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBacks = {} :: { [number]: Vector3 }
--- A zone's box, kept only where it isn't its position plus and minus its filled half size: when it is rotated, or its
--- size is infinite or NaN
+-- A zone's box, kept only where it isn't its position plus and minus its filled half size: when it is rotated and not a
+-- ball, or its size is infinite or NaN
 ZoneShapes.shapeBoundsMin = {} :: { [number]: Vector3 }
 ZoneShapes.shapeBoundsMax = {} :: { [number]: Vector3 }
 ZoneShapes.treeExact = {} :: { [number]: boolean }
@@ -95,12 +93,10 @@ local recentStaticSlots = {} :: { [number]: true }
 local recentCount = 0
 local heldSlots = {} :: { number }
 
--- From this many zones in staticTree on, static zones are added to recentTree
 local RECENT_FROM = 256
 -- staticTree is rebuilt once recentTree, or its own leaves that no zone owns, reach this share of it
 local REBUILD_SHARE = 8
 local MIN_REBUILD_LIMIT = 32
--- After building a static tree this large, the space builds sort in is freed rather than kept for the next build
 local RELEASE_SCRATCH_FROM = 65536
 
 local function isAxis(direction: Vector3): boolean
@@ -203,7 +199,6 @@ local function setPart(slot: number, part: BasePart?)
 	end
 end
 
--- The zone's box. The slot must hold a zone.
 local function boundsOf(slot: number): (Vector3, Vector3)
 	local min = shapeBoundsMin[slot]
 	if min then
@@ -233,8 +228,6 @@ local function deriveWorldShape(
 	local shapeType = shapeTypes[slot]
 	local halfSize = extentsOf(rawHalfSize, shapeType)
 
-	-- Unrotated is the common case, where the bounds are the half size around the position. A CFrame built from a
-	-- scaled matrix has other diagonal values and takes the general path, as before.
 	local unrotated = right.Y == 0
 		and right.Z == 0
 		and up.X == 0
@@ -246,8 +239,14 @@ local function deriveWorldShape(
 		and math.abs(back.Z) == 1
 	local boundsMin, boundsMax
 	local keepBounds = true
-	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN
-	if unrotated and halfSize.X < math.huge and halfSize.Y < math.huge and halfSize.Z < math.huge then
+	-- An infinite size, as for a kill plane, goes through getBounds, which keeps it from turning into NaN. A ball is a
+	-- sphere around its position whatever its CFrame, so it takes these bounds too.
+	if
+		(unrotated or shapeType == BALL_SHAPE_VALUE)
+		and halfSize.X < math.huge
+		and halfSize.Y < math.huge
+		and halfSize.Z < math.huge
+	then
 		boundsMin, boundsMax = position - halfSize, position + halfSize
 		keepBounds = false
 	else
@@ -278,7 +277,6 @@ local function deriveWorldShape(
 	shapeRights[slot] = right
 	shapeUps[slot] = up
 	shapeBacks[slot] = back
-	-- Writing nil to a missing key still adds one, so only a slot that has bounds gets them cleared
 	if keepBounds then
 		shapeBoundsMin[slot] = boundsMin
 		shapeBoundsMax[slot] = boundsMax
@@ -356,7 +354,6 @@ function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeTy
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
-	-- Like set, which a removed zone or an unchanged CFrame leaves alone
 	if not shapeTypes[slot] then
 		return
 	end
@@ -367,7 +364,6 @@ function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
 	deriveWorldShape(slot, rawHalfSizeOf(slot), position, right, up, back)
 end
 
--- Like set, keeping the zone's CFrame
 local function setSizeAndShape(slot: number, halfSize: Vector3, shapeType: number, part: BasePart?)
 	if not shapeTypes[slot] then
 		return
@@ -501,20 +497,27 @@ local function leafRadius(
 		return math.abs(shapeFilledHalfSizes[slot].X - math.sqrt(vector.dot(offset, offset))) * INV_SQRT3
 	elseif shapeType == BLOCK_SHAPE_VALUE then
 		local right, up, back = shapeRights[slot], shapeUps[slot], shapeBacks[slot]
-		-- The distances below are in the block's own space, which is world space only while its axes are unit length
-		if math.max(vector.dot(right, right), vector.dot(up, up), vector.dot(back, back)) > MAX_UNIT_LENGTH_SQ then
-			return 0
-		end
+		-- The distances below are in the block's own space, which its axes stretch by at most the square root of the
+		-- largest row sum of their absolute dots, 1 when they are orthonormal; dividing by it keeps them world distances
+		local rightUp, upBack, backRight =
+			math.abs(vector.dot(right, up)), math.abs(vector.dot(up, back)), math.abs(vector.dot(back, right))
+		local stretch = math.sqrt(
+			math.max(
+				vector.dot(right, right) + rightUp + backRight,
+				vector.dot(up, up) + rightUp + upBack,
+				vector.dot(back, back) + upBack + backRight
+			)
+		)
 		local offset = point - shapePositions[slot]
 		local half = shapeFilledHalfSizes[slot]
 		local localPoint =
 			vector.abs(Vector3.new(vector.dot(offset, right), vector.dot(offset, up), vector.dot(offset, back)))
 		if vector.min(localPoint, half) == localPoint then
 			local inside = half - localPoint
-			return math.min(inside.X, inside.Y, inside.Z) * INV_SQRT3
+			return math.min(inside.X, inside.Y, inside.Z) * INV_SQRT3 / stretch
 		end
 		local outside = vector.max(localPoint - half, Vector3.zero)
-		return math.sqrt(vector.dot(outside, outside)) * INV_SQRT3
+		return math.sqrt(vector.dot(outside, outside)) * INV_SQRT3 / stretch
 	end
 
 	return 0
@@ -573,7 +576,6 @@ function ZoneShapes.rebuildTrees()
 		requestRebuild(staticTree)
 	end
 	if staticTree.pendingUpdate == 'rebuild' then
-		-- Every static slot goes into staticTree, and the slots held for its old leaves are free again
 		table.clear(recentStaticSlots)
 		recentCount = 0
 		requestRebuild(recentTree)
@@ -582,7 +584,6 @@ function ZoneShapes.rebuildTrees()
 			table.insert(freeZoneSlots, slot)
 		end
 		table.clear(heldSlots)
-		-- Every live slot that isn't dynamic is static
 		LinearBVH.build(staticTree, zoneSlotIds, leafBoxes, dynamicSlots)
 		if staticTree.count >= RELEASE_SCRATCH_FROM then
 			LinearBVH.releaseScratch()

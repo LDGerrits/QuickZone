@@ -2051,6 +2051,152 @@ return function(Tiniest: Tiniest)
 			end)
 		end)
 
+		Test('Observers and point queries find every point of a zone with short or skewed axes.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-49400, 0, 41000)
+				local rotation = CFrame.Angles(0.3, 0.5, 0.7)
+				-- Points inside each zone, by the same dot products Zone:isPointInside takes, that its axes don't reach
+				local cases = {
+					{
+						cframe = CFrame.new(position.X, position.Y, position.Z, 0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5),
+						shape = 'Block',
+						offset = Vector3.new(1.8, 0, 0),
+					},
+					{
+						cframe = CFrame.fromMatrix(position, Vector3.xAxis, Vector3.new(0.6, 0.8, 0), Vector3.zAxis),
+						shape = 'Block',
+						offset = Vector3.new(0, 1.2, 0),
+					},
+					{
+						cframe = CFrame.new(position.X, position.Y, position.Z, 0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5)
+							* rotation,
+						shape = 'Ball',
+						offset = Vector3.new(0.9, 0, 0),
+					},
+					-- A ball is a sphere around its position, so long axes don't shrink it either
+					{
+						cframe = CFrame.new(position.X, position.Y, position.Z, 2, 0, 0, 0, 2, 0, 0, 0, 2) * rotation,
+						shape = 'Ball',
+						offset = Vector3.new(0.9, 0, 0),
+					},
+				}
+				for i, case in cases do
+					local entity = { Position = case.cframe.Position + case.offset + Vector3.new(0, 0, i * 50) }
+					local zone = track(Zone.new({
+						cframe = case.cframe + Vector3.new(0, 0, i * 50),
+						size = Vector3.one * 2,
+						shape = case.shape :: any,
+					}))
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+
+					QuickZone:update(1)
+
+					Expect(zone:isPointInside(entity.Position)).is(true)
+					Expect(observer:getZoneOfEntity(entity)).is(zone)
+					Expect(table.find(QuickZone:getZonesAtPoint(entity.Position), zone)).never_is(nil)
+				end
+			end)
+		end)
+
+		Test('An entity near a block with skewed axes is checked before it can reach the block.', function()
+			withCleanup(function(track)
+				local position = Vector3.new(-49600, 0, 41000)
+				-- Axes no longer than unit length that aren't square to each other, and a start outside the block but
+				-- inside its box, from which a step within the room a check would give it reaches the block
+				local right = Vector3.new(0.64, -0.6, 0.48)
+				local up = Vector3.new(-0.07, -0.45, -0.89)
+				local back = Vector3.new(-0.45, 0.77, -0.45)
+				local cframe = CFrame.new(
+					position.X,
+					position.Y,
+					position.Z,
+					right.X,
+					up.X,
+					back.X,
+					right.Y,
+					up.Y,
+					back.Y,
+					right.Z,
+					up.Z,
+					back.Z
+				)
+				local start = position + Vector3.new(13.65, -7.03, 1.73)
+				local goal = position + Vector3.new(6.5, 1.07, -3.66)
+				local entity = { Position = start }
+				local zone = track(Zone.new({
+					cframe = cframe,
+					size = Vector3.new(4.28, 5.92, 3.54),
+				}))
+				local group = track(Group.new({ entities = { entity }, autoClean = false }))
+				local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+
+				QuickZone:update(1)
+				-- A small step, after which a check may give the entity room to move unchecked
+				entity.Position = start + Vector3.new(0.2, 0, 0)
+				QuickZone:update(1)
+				local outside = observer:getZoneOfEntity(entity)
+				entity.Position = goal
+				QuickZone:update(1)
+
+				Expect(outside).is(nil)
+				Expect(zone:isPointInside(goal)).is(true)
+				Expect(observer:getZoneOfEntity(entity)).is(zone)
+			end)
+		end)
+
+		Test(
+			'An entity near a block whose axes are nearly square to each other is checked before it can reach it.',
+			function()
+				withCleanup(function(track)
+					-- Near the origin, where floats resolve the 2e-3 studs this turns on
+					local position = Vector3.new(-1500, 500, -1500)
+					-- Unit axes whose dots are all 9.9e-5, half turned about (1, 1, 1)
+					local skew = 9.9e-5
+					local alpha = math.sqrt(1 - skew)
+					local common = 2 * alpha / 3 + (math.sqrt(alpha * alpha + 3 * skew) - alpha) / 3
+					local right = Vector3.new(common - alpha, common, common)
+					local up = Vector3.new(common, common - alpha, common)
+					local back = Vector3.new(common, common, common - alpha)
+					local cframe = CFrame.new(
+						position.X,
+						position.Y,
+						position.Z,
+						right.X,
+						up.X,
+						back.X,
+						right.Y,
+						up.Y,
+						back.Y,
+						right.Z,
+						up.Z,
+						back.Z
+					)
+					-- The direction of the block's corner: its points in the block's own space are this times a number
+					local corner = (up:Cross(back) + back:Cross(right) + right:Cross(up)) / right:Dot(up:Cross(back))
+					-- 32 studs outside every face, as far as a clear cube reaches, and a hair inside the nearest corner
+					local start = position + corner * 132
+					local goal = position + corner * (100 - 1e-4)
+					local entity = { Position = start + Vector3.new(0.2, 0, 0) }
+					local zone = track(Zone.new({ cframe = cframe, size = Vector3.one * 200 }))
+					local group = track(Group.new({ entities = { entity }, autoClean = false }))
+					local observer = track(Observer.new({ zones = { zone }, groups = { group }, safety = false }))
+
+					QuickZone:update(1)
+					-- A small step, after which a check may give the entity room to move unchecked
+					entity.Position = start
+					QuickZone:update(1)
+					local outside = observer:getZoneOfEntity(entity)
+					entity.Position = goal
+					QuickZone:update(1)
+
+					Expect(outside).is(nil)
+					Expect(zone:isPointInside(goal)).is(true)
+					Expect(observer:getZoneOfEntity(entity)).is(zone)
+				end)
+			end
+		)
+
 		Test('Zones:add leaves a dynamic, auto-synced zone as it is in a static container.', function()
 			withCleanup(function(track)
 				local position = Vector3.new(-49200, 0, 41000)

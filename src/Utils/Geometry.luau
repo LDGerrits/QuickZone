@@ -9,6 +9,8 @@ local WEDGE_SHAPE_VALUE = Enum.PartType.Wedge.Value
 local CORNER_WEDGE_SHAPE_VALUE = Enum.PartType.CornerWedge.Value
 local MESH_SHAPE_VALUE = -1 -- Meshes have no Enum.PartType equivalent
 local MESH_TOLERANCE_SQ = 1e-2 * 1e-2 -- 0.01 studs to account for float error up to 50k studs
+local HUGE_VECTOR = vector.one * math.huge
+local NEGATIVE_HUGE_VECTOR = -HUGE_VECTOR
 
 local MORTON_STEPS = { { 16, 0xFF0000FF }, { 8, 0xF00F00F }, { 4, 0x30C30C3 }, { 2, 0x9249249 } }
 
@@ -41,24 +43,32 @@ end
 
 function Geometry.getBounds(
 	position: Vector3,
-	right: Vector3,
-	up: Vector3,
-	back: Vector3,
+	rightAxis: Vector3,
+	upAxis: Vector3,
+	backAxis: Vector3,
 	halfSize: Vector3
 ): (Vector3, Vector3)
-	local x = math.abs(right.X) * halfSize.X + math.abs(up.X) * halfSize.Y + math.abs(back.X) * halfSize.Z
-	local y = math.abs(right.Y) * halfSize.X + math.abs(up.Y) * halfSize.Y + math.abs(back.Y) * halfSize.Z
-	local z = math.abs(right.Z) * halfSize.X + math.abs(up.Z) * halfSize.Y + math.abs(back.Z) * halfSize.Z
-
-	-- An infinite size, as for a kill plane, multiplies a zero component into NaN
-	local hasNaN = x ~= x or y ~= y or z ~= z
-	if hasNaN then
-		x = reach(right.X, halfSize.X) + reach(up.X, halfSize.Y) + reach(back.X, halfSize.Z)
-		y = reach(right.Y, halfSize.X) + reach(up.Y, halfSize.Y) + reach(back.Y, halfSize.Z)
-		z = reach(right.Z, halfSize.X) + reach(up.Z, halfSize.Y) + reach(back.Z, halfSize.Z)
+	-- A shape holds the points whose dot with each axis is within its half size: a box spanned by the columns of the
+	-- inverse transpose, the cross products below over the determinant. Those are the axes themselves only while they
+	-- are orthonormal, unlike a scaled or skewed CFrame.
+	local right = vector.cross(upAxis, backAxis)
+	local up = vector.cross(backAxis, rightAxis)
+	local back = vector.cross(rightAxis, upAxis)
+	local det = math.abs(vector.dot(rightAxis, right))
+	if det == 0 then
+		return NEGATIVE_HUGE_VECTOR, HUGE_VECTOR
 	end
 
-	local extent = Vector3.new(x, y, z)
+	local extent = (vector.abs(right) * halfSize.X + vector.abs(up) * halfSize.Y + vector.abs(back) * halfSize.Z) / det
+	-- An infinite size, as for a kill plane, multiplies a zero component into NaN
+	if extent ~= extent then
+		extent = Vector3.new(
+			reach(right.X, halfSize.X) + reach(up.X, halfSize.Y) + reach(back.X, halfSize.Z),
+			reach(right.Y, halfSize.X) + reach(up.Y, halfSize.Y) + reach(back.Y, halfSize.Z),
+			reach(right.Z, halfSize.X) + reach(up.Z, halfSize.Y) + reach(back.Z, halfSize.Z)
+		) / det
+	end
+
 	return position - extent, position + extent
 end
 

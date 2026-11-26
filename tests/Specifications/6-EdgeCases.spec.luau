@@ -58,6 +58,10 @@ return function(Tiniest: Tiniest)
 					{ cframe = CFrame.new(origin), size = Vector3.new(-5, -5, -5) },
 					{ cframe = CFrame.new(1e9, 1e9, 1e9), size = Vector3.one },
 					{ cframe = CFrame.new(origin), size = Vector3.one * 1e7 },
+					{
+						cframe = CFrame.new(origin.X, origin.Y, origin.Z, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+						size = Vector3.one * 10,
+					},
 				}
 				-- Each one static and dynamic. Creating may refuse them, but must not break anything
 				local degenerate = {}
