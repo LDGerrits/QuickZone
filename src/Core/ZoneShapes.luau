@@ -21,10 +21,6 @@ local isPointInShape = Geometry.isPointInShape
 local INV_SQRT3 = 1 / math.sqrt(3)
 -- Kept off every clear radius, so float rounding at a zone's face can't put a point on the wrong side
 local CLEAR_MARGIN = 1e-3
--- The squared length up to which an axis of a rotated CFrame counts as unit length, above float rounding
-local MAX_UNIT_LENGTH_SQ = 1 + 1e-4
--- The dot of two axes of a rotated CFrame up to which they count as square to each other, above float rounding
-local MAX_SKEW = 1e-4
 
 local ZoneShapes = {}
 
@@ -509,29 +505,27 @@ local function leafRadius(
 		return math.abs(shapeFilledHalfSizes[slot].X - math.sqrt(vector.dot(offset, offset))) * INV_SQRT3
 	elseif shapeType == BLOCK_SHAPE_VALUE then
 		local right, up, back = shapeRights[slot], shapeUps[slot], shapeBacks[slot]
-		-- The distances below are in the block's own space, which is world space only while its axes are unit length
-		-- and square to each other
-		if
-			math.max(vector.dot(right, right), vector.dot(up, up), vector.dot(back, back)) > MAX_UNIT_LENGTH_SQ
-			or math.max(
-					math.abs(vector.dot(right, up)),
-					math.abs(vector.dot(up, back)),
-					math.abs(vector.dot(back, right))
-				)
-				> MAX_SKEW
-		then
-			return 0
-		end
+		-- The distances below are in the block's own space, which its axes stretch by at most the square root of the
+		-- largest row sum of their absolute dots, 1 when they are orthonormal; dividing by it keeps them world distances
+		local rightUp, upBack, backRight =
+			math.abs(vector.dot(right, up)), math.abs(vector.dot(up, back)), math.abs(vector.dot(back, right))
+		local stretch = math.sqrt(
+			math.max(
+				vector.dot(right, right) + rightUp + backRight,
+				vector.dot(up, up) + rightUp + upBack,
+				vector.dot(back, back) + upBack + backRight
+			)
+		)
 		local offset = point - shapePositions[slot]
 		local half = shapeFilledHalfSizes[slot]
 		local localPoint =
 			vector.abs(Vector3.new(vector.dot(offset, right), vector.dot(offset, up), vector.dot(offset, back)))
 		if vector.min(localPoint, half) == localPoint then
 			local inside = half - localPoint
-			return math.min(inside.X, inside.Y, inside.Z) * INV_SQRT3
+			return math.min(inside.X, inside.Y, inside.Z) * INV_SQRT3 / stretch
 		end
 		local outside = vector.max(localPoint - half, Vector3.zero)
-		return math.sqrt(vector.dot(outside, outside)) * INV_SQRT3
+		return math.sqrt(vector.dot(outside, outside)) * INV_SQRT3 / stretch
 	end
 
 	return 0
