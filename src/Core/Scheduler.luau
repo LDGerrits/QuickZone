@@ -151,7 +151,6 @@ local function queryTree(tree: Types.Tree, position: Vector3)
 	end
 end
 
--- The observer that acceptsSoleHit checks slots against
 local ctx_soleObserverId = 0
 
 local function isAttachedTo(slot: number, observerId: number): boolean
@@ -509,6 +508,7 @@ local function runTick(dt: number)
 				end
 			end
 
+			-- A callback that removed the entity swapped the bucket's last entity into idx
 			if list[idx] == entity then
 				idx += 1
 			end

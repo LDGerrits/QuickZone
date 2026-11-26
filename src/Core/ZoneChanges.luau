@@ -115,7 +115,6 @@ function ZoneChanges.touches(
 	return false
 end
 
--- Like touches, for every point of a box
 function ZoneChanges.touchesBox(
 	log: Types.ZoneChanges,
 	fromVersion: number,

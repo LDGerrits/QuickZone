@@ -93,12 +93,10 @@ local recentStaticSlots = {} :: { [number]: true }
 local recentCount = 0
 local heldSlots = {} :: { number }
 
--- From this many zones in staticTree on, static zones are added to recentTree
 local RECENT_FROM = 256
 -- staticTree is rebuilt once recentTree, or its own leaves that no zone owns, reach this share of it
 local REBUILD_SHARE = 8
 local MIN_REBUILD_LIMIT = 32
--- After building a static tree this large, the space builds sort in is freed rather than kept for the next build
 local RELEASE_SCRATCH_FROM = 65536
 
 local function isAxis(direction: Vector3): boolean
@@ -201,7 +199,6 @@ local function setPart(slot: number, part: BasePart?)
 	end
 end
 
--- The zone's box. The slot must hold a zone.
 local function boundsOf(slot: number): (Vector3, Vector3)
 	local min = shapeBoundsMin[slot]
 	if min then
@@ -231,8 +228,6 @@ local function deriveWorldShape(
 	local shapeType = shapeTypes[slot]
 	local halfSize = extentsOf(rawHalfSize, shapeType)
 
-	-- Unrotated is the common case, where the bounds are the half size around the position. A CFrame built from a
-	-- scaled matrix has other diagonal values and takes the general path, as before.
 	local unrotated = right.Y == 0
 		and right.Z == 0
 		and up.X == 0
@@ -282,7 +277,6 @@ local function deriveWorldShape(
 	shapeRights[slot] = right
 	shapeUps[slot] = up
 	shapeBacks[slot] = back
-	-- Writing nil to a missing key still adds one, so only a slot that has bounds gets them cleared
 	if keepBounds then
 		shapeBoundsMin[slot] = boundsMin
 		shapeBoundsMax[slot] = boundsMax
@@ -360,7 +354,6 @@ function ZoneShapes.set(slot: number, cframe: CFrame, halfSize: Vector3, shapeTy
 end
 
 function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
-	-- Like set, which a removed zone or an unchanged CFrame leaves alone
 	if not shapeTypes[slot] then
 		return
 	end
@@ -371,7 +364,6 @@ function ZoneShapes.setCFrame(slot: number, cframe: CFrame)
 	deriveWorldShape(slot, rawHalfSizeOf(slot), position, right, up, back)
 end
 
--- Like set, keeping the zone's CFrame
 local function setSizeAndShape(slot: number, halfSize: Vector3, shapeType: number, part: BasePart?)
 	if not shapeTypes[slot] then
 		return
@@ -584,7 +576,6 @@ function ZoneShapes.rebuildTrees()
 		requestRebuild(staticTree)
 	end
 	if staticTree.pendingUpdate == 'rebuild' then
-		-- Every static slot goes into staticTree, and the slots held for its old leaves are free again
 		table.clear(recentStaticSlots)
 		recentCount = 0
 		requestRebuild(recentTree)
@@ -593,7 +584,6 @@ function ZoneShapes.rebuildTrees()
 			table.insert(freeZoneSlots, slot)
 		end
 		table.clear(heldSlots)
-		-- Every live slot that isn't dynamic is static
 		LinearBVH.build(staticTree, zoneSlotIds, leafBoxes, dynamicSlots)
 		if staticTree.count >= RELEASE_SCRATCH_FROM then
 			LinearBVH.releaseScratch()

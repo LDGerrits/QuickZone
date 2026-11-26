@@ -36,7 +36,6 @@ local REFIT_BACKOFF = 8
 
 local SHRINK_MIN_NODES = 64
 local SHRINK_FACTOR = 4
--- Spare room kept when a buffer grows, as a share of what it needs: 1/8, so one more zone rarely reallocates it
 local GROWTH_SHARE = 8
 
 local LinearBVH = {}
@@ -194,7 +193,6 @@ local function getSplitPos(beginIndex: number, endIndex: number): number
 	return left + 1
 end
 
--- The leaf's box, or nil when the leaf has no box any more
 local function boxOf(boxes: Types.LeafBoxes, id: number): (Vector3?, Vector3?)
 	local min = boxes.min[id]
 	if min then
@@ -256,7 +254,6 @@ local function prepareBuffer(tree: Types.Tree, nodeCount: number): buffer
 	return buf
 end
 
--- Builds the tree over the keys of members, leaving out those in skip
 function LinearBVH.build(
 	tree: Types.Tree,
 	members: { [number]: any },
